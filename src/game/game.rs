@@ -115,7 +115,6 @@ impl Game {
             match self.run_menu(
                 "TMaze",
                 &["New Game", "Settings", "Controls", "About", "Quit"],
-                None,
                 0,
                 true,
             ) {
@@ -146,7 +145,6 @@ impl Game {
         let mut msize: (usize, usize) = match self.run_menu(
             "Maze size",
             &["10x5", "30x10", "60x30", "100x30", "debug"],
-            None,
             0,
             false,
         )? {
@@ -510,9 +508,8 @@ impl Game {
 
     fn run_menu(
         &mut self,
-        mut title: &str,
+        title: &str,
         options: &[&str],
-        mut pos_: Option<(u16, u16)>,
         default: usize,
         counted: bool,
     ) -> Result<u16, Error> {
@@ -523,79 +520,13 @@ impl Game {
             return Err(Error::EmptyMenu);
         }
 
-        let menu_size = helpers::menu_size(&title, options, counted);
-        let mut pos = pos_.unwrap_or(self.box_center(menu_size)?);
-
-        let max_count = opt_count.to_string().len();
-
-        let default_style = self.style;
-
-        let mut render = |this: &mut Self, pos: Dims, selected: usize| -> Result<(), Error> {
-            this.renderer.begin()?;
-
-            // this.clear_box(pos, menu_size, default_style);
-            this.draw_box(pos, menu_size, default_style);
-
-            this.renderer.draw_str(
-                pos.0 + 2 + 1,
-                pos.1 + 1,
-                &format!("{}", &title),
-                default_style,
-            );
-            this.renderer.draw_str(
-                pos.0 + 1,
-                pos.1 + 1 + 1,
-                &"─".repeat(menu_size.0 as usize - 2),
-                default_style,
-            );
-
-            for (i, option) in options.iter().enumerate() {
-                let style = if i == selected {
-                    ContentStyle::default()
-                        .background(Color::White)
-                        .foreground(Color::Black)
-                } else {
-                    ContentStyle::default()
-                };
-
-                let off_x = if counted {
-                    i.to_string().len() as u16 + 2
-                } else {
-                    0
-                };
-
-                this.renderer.draw_str(
-                    pos.0 + 1,
-                    i as u16 + pos.1 + 2 + 1,
-                    &format!(
-                        "{} {}{}",
-                        if i == selected { ">" } else { " " },
-                        if counted {
-                            format!(
-                                "{}. {}",
-                                i + 1,
-                                " ".repeat(max_count - (i + 1).to_string().len())
-                            )
-                        } else {
-                            String::from("")
-                        },
-                        option
-                    ),
-                    style,
-                );
-            }
-            this.renderer.end(&mut this.stdout)?;
-
-            Ok(())
-        };
-
-        render(self, pos, selected)?;
+        self.render_menu(title, options, selected, counted)?;
 
         loop {
-            let event = read();
+            let event = read()?;
 
             match event {
-                Ok(Event::Key(KeyEvent { code, modifiers })) => match code {
+                Event::Key(KeyEvent { code, modifiers }) => match code {
                     KeyCode::Up => {
                         selected = if selected == 0 {
                             opt_count - 1
@@ -621,22 +552,83 @@ impl Game {
                     KeyCode::Esc => return Err(Error::Quit),
                     _ => {}
                 },
-                // Ok(Event::Mouse(event)) => match event {
-                //     MouseEvent {kind, column, row, modifiers} => title = format!("{:?}", (column, row))
-                // },
-                Ok(Event::Mouse(_)) => {}
-                Ok(Event::Resize(x, y)) => {
-                    pos = pos_.unwrap_or(self.box_center(menu_size)?);
-                }
-                Err(err) => {
-                    break Err(Error::CrossTermError(err));
-                }
+                Event::Mouse(_) => {}
+                _ => {}
             }
 
-            self.renderer.event(&event.unwrap());
+            self.renderer.event(&event);
 
-            render(self, pos, selected)?;
+            self.render_menu(title, options, selected, counted)?;
         }
+    }
+
+    fn render_menu(&mut self,
+                   title: &str,
+                   options: &[&str],
+                   selected: usize,
+                   counted: bool, ) -> Result<(), Error> {
+        let menu_size = helpers::menu_size(title, options, counted);
+        let pos = self.box_center(menu_size)?;
+        let opt_count = options.len();
+
+        let max_count = opt_count.to_string().len();
+
+
+        self.renderer.begin()?;
+
+        self.draw_box(pos, menu_size, self.style);
+
+        self.renderer.draw_str(
+            pos.0 + 2 + 1,
+            pos.1 + 1,
+            &format!("{}", &title),
+            self.style,
+        );
+        self.renderer.draw_str(
+            pos.0 + 1,
+            pos.1 + 1 + 1,
+            &"─".repeat(menu_size.0 as usize - 2),
+            self.style,
+        );
+
+        for (i, option) in options.iter().enumerate() {
+            let style = if i == selected {
+                ContentStyle::default()
+                    .background(Color::White)
+                    .foreground(Color::Black)
+            } else {
+                ContentStyle::default()
+            };
+
+            let off_x = if counted {
+                i.to_string().len() as u16 + 2
+            } else {
+                0
+            };
+
+            self.renderer.draw_str(
+                pos.0 + 1,
+                i as u16 + pos.1 + 2 + 1,
+                &format!(
+                    "{} {}{}",
+                    if i == selected { ">" } else { " " },
+                    if counted {
+                        format!(
+                            "{}. {}",
+                            i + 1,
+                            " ".repeat(max_count - (i + 1).to_string().len())
+                        )
+                    } else {
+                        String::from("")
+                    },
+                    option
+                ),
+                style,
+            );
+        }
+        self.renderer.end(&mut self.stdout)?;
+
+        Ok(())
     }
 
     // Helpers
