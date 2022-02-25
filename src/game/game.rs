@@ -3,11 +3,12 @@ use std::io::{stdout, Stdout};
 use crate::maze::{CellWall, Maze};
 
 use crossterm::{
-    event::{read, Event, KeyCode, KeyEvent},
+    event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
 use helpers::Dims;
 use masof::{Color, ContentStyle, Renderer};
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -38,7 +39,7 @@ mod helpers {
                     0
                 } + l
                     - 2)
-                    .max(title.len() + 2)
+                .max(title.len() + 2)
                     + 2) as u16
                     + 2,
                 options.len() as u16 + 2 + 2,
@@ -127,8 +128,12 @@ impl Game {
                     1 => {
                         self.run_popup("Not implemented yet")?;
                     }
-                    2 => { self.run_popup("Not implemented yet")?; }
-                    3 => { self.run_popup("Not implemented yet")?; }
+                    2 => {
+                        self.run_popup("Not implemented yet")?;
+                    }
+                    3 => {
+                        self.run_popup("Not implemented yet")?;
+                    }
                     4 => break,
                     _ => break,
                 },
@@ -144,7 +149,7 @@ impl Game {
     fn run_game(&mut self) -> Result<(), Error> {
         let mut msize: (usize, usize) = match self.run_menu(
             "Maze size",
-            &["10x5", "30x10", "60x30", "100x30", "debug"],
+            &["10x5", "30x10", "60x30", "100x30", "debug", "xtreme"],
             0,
             false,
         )? {
@@ -152,18 +157,51 @@ impl Game {
             1 => (30, 10),
             2 => (60, 30),
             3 => (100, 30),
-            4 => (2, 2),
+            4 => (100, 100),
+            5 => (500, 500),
             _ => (0, 0),
         };
 
         let mut player_pos: Dims = (0, 0);
         let goal_pos: Dims = (msize.0 as u16 - 1, msize.1 as u16 - 1);
 
-        let mut maze = Maze::new_dfs(
-            msize.0,
-            msize.1,
-            Some((player_pos.0 as usize, player_pos.1 as usize)),
-        );
+        let mut maze = {
+            let mut last_progress = f64::MIN;
+
+            Maze::new_dfs(
+                msize.0,
+                msize.1,
+                Some((player_pos.0 as usize, player_pos.1 as usize)),
+                Some(|visited| {
+                    let current_progess = visited as f64 / (msize.0 * msize.1) as f64;
+                    if current_progess - last_progress > 0.05 {
+                        let res = self.render_progress(
+                            &format!("Generating maze ({}x{})", msize.0, msize.1),
+                            current_progess,
+                        );
+                        last_progress = current_progess;
+
+                        // check for quit keys from user
+                        if let Ok(true) = poll(Duration::from_nanos(1)) {
+                            if let Ok(Event::Key(KeyEvent { code, modifiers })) = read() {
+                                match code {
+                                    KeyCode::Esc => {
+                                        return Err(Error::Quit);
+                                    }
+                                    KeyCode::Char('q' | 'Q') => {
+                                        return Err(Error::FullQuit);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        res
+                    } else {
+                        Ok(())
+                    }
+                }),
+            )?
+        };
 
         self.render_game(
             &maze,
@@ -255,6 +293,27 @@ impl Game {
         }
     }
 
+    fn render_progress(&mut self, title: &str, progress: f64) -> Result<(), Error> {
+        let progress_size = (title.len() as u16 + 2, 4);
+        let pos = self.box_center(progress_size)?;
+
+        self.renderer.begin()?;
+
+        self.draw_box(pos, progress_size, self.style);
+        self.renderer
+            .draw_str(pos.0 + 1, pos.1 + 1, title, self.style);
+        self.renderer.draw_str(
+            pos.0 + 1,
+            pos.1 + 2,
+            &"#".repeat((title.len() as f64 * progress) as usize),
+            self.style,
+        );
+
+        self.renderer.end(&mut self.stdout)?;
+
+        Ok(())
+    }
+
     fn render_game(
         &mut self,
         maze: &Maze,
@@ -293,19 +352,19 @@ impl Game {
         self.renderer.draw_str(
             pos.0,
             pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
+            &format!("{}", helpers::double_line_corner(false, true, false, true),),
             self.style,
         );
         self.renderer.draw_str(
             pos.0,
             pos.1 + real_size.1 - 1,
-            &format!("{}", helpers::double_line_corner(false, true, true, false), ),
+            &format!("{}", helpers::double_line_corner(false, true, true, false),),
             self.style,
         );
         self.renderer.draw_str(
             pos.0 + real_size.0 - 1,
             pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
+            &format!("{}", helpers::double_line_corner(false, true, false, true),),
             self.style,
         );
         self.renderer.draw_str(
@@ -562,28 +621,25 @@ impl Game {
         }
     }
 
-    fn render_menu(&mut self,
-                   title: &str,
-                   options: &[&str],
-                   selected: usize,
-                   counted: bool, ) -> Result<(), Error> {
+    fn render_menu(
+        &mut self,
+        title: &str,
+        options: &[&str],
+        selected: usize,
+        counted: bool,
+    ) -> Result<(), Error> {
         let menu_size = helpers::menu_size(title, options, counted);
         let pos = self.box_center(menu_size)?;
         let opt_count = options.len();
 
         let max_count = opt_count.to_string().len();
 
-
         self.renderer.begin()?;
 
         self.draw_box(pos, menu_size, self.style);
 
-        self.renderer.draw_str(
-            pos.0 + 2 + 1,
-            pos.1 + 1,
-            &format!("{}", &title),
-            self.style,
-        );
+        self.renderer
+            .draw_str(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title), self.style);
         self.renderer.draw_str(
             pos.0 + 1,
             pos.1 + 1 + 1,

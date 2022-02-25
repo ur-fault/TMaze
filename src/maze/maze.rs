@@ -1,3 +1,4 @@
+use crate::game::game::Error;
 use crate::maze::cell::{Cell, CellWall};
 use rand::seq::SliceRandom;
 
@@ -8,7 +9,12 @@ pub struct Maze {
 }
 
 impl Maze {
-    pub fn new_dfs(w: usize, h: usize, start_: Option<(usize, usize)>) -> Maze {
+    pub fn new_dfs<T: FnMut(usize) -> Result<(), Error>>(
+        w: usize,
+        h: usize,
+        start_: Option<(usize, usize)>,
+        mut report_progress: Option<T>,
+    ) -> Result<Maze, Error> {
         let mut visited: Vec<(usize, usize)> = Vec::with_capacity(w * h);
         let mut stack: Vec<(usize, usize)> = Vec::with_capacity(w * h);
 
@@ -47,9 +53,13 @@ impl Maze {
                 visited.push(chosen);
                 stack.push(chosen);
             }
+
+            if let Some(_) = report_progress {
+                report_progress.as_mut().unwrap()(visited.len())?;
+            }
         }
 
-        maze
+        Ok(maze)
     }
 
     pub fn size(&self) -> (usize, usize) {
