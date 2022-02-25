@@ -60,7 +60,7 @@ mod helpers {
 
     pub fn maze_render_size(maze: &Maze) -> Dims {
         let msize = maze.size();
-        ((msize.0 * 2 + 1) as u16, (msize.1 * 2 + 2) as u16)
+        ((msize.0 * 2 + 1) as u16, (msize.1 * 2 + 1) as u16)
     }
 
     pub fn double_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &'static str {
@@ -120,15 +120,16 @@ impl Game {
                 true,
             ) {
                 Ok(res) => match res {
-                    0 =>
-                        match self.run_game() {
-                            Ok(_) | Err(Error::Quit) => {}
-                            Err(_) => break,
-                        }
+                    0 => match self.run_game() {
+                        Ok(_) | Err(Error::Quit) => {}
+                        Err(_) => break,
+                    },
 
-                    1 => {}
-                    2 => {}
-                    3 => {}
+                    1 => {
+                        self.run_popup("Not implemented yet")?;
+                    }
+                    2 => { self.run_popup("Not implemented yet")?; }
+                    3 => { self.run_popup("Not implemented yet")?; }
                     4 => break,
                     _ => break,
                 },
@@ -144,7 +145,7 @@ impl Game {
     fn run_game(&mut self) -> Result<(), Error> {
         let mut msize: (usize, usize) = match self.run_menu(
             "Maze size",
-            &["10x5", "30x10", ("60x30"),"debug"],
+            &["10x5", "30x10", "60x30", "100x30", "debug"],
             None,
             0,
             false,
@@ -152,7 +153,8 @@ impl Game {
             0 => (10, 5),
             1 => (30, 10),
             2 => (60, 30),
-            3 => (2, 2),
+            3 => (100, 30),
+            4 => (2, 2),
             _ => (0, 0),
         };
 
@@ -165,7 +167,17 @@ impl Game {
             Some((player_pos.0 as usize, player_pos.1 as usize)),
         );
 
-        self.render_game(&maze, player_pos, goal_pos, (&format!("Dims: {}w{}h", maze.size().0, maze.size().1), "", "", "By Morsee"))?;
+        self.render_game(
+            &maze,
+            player_pos,
+            goal_pos,
+            (
+                &format!("Dims: {}w{}h", maze.size().0, maze.size().1),
+                "",
+                "",
+                "",
+            ),
+        )?;
         // self.render_game(&maze, player_pos, goal_pos)?;
 
         loop {
@@ -203,14 +215,19 @@ impl Game {
 
             match event {
                 Ok(Event::Key(KeyEvent { code, modifiers })) => match code {
-                    KeyCode::Up | KeyCode::Char('w') => player_pos = move_player(&maze, player_pos, CellWall::Top, false),
-                    KeyCode::Down | KeyCode::Char('s') => player_pos = move_player(&maze, player_pos, CellWall::Bottom, false),
-                    KeyCode::Left | KeyCode::Char('a') => player_pos = move_player(&maze, player_pos, CellWall::Left, false),
-                    KeyCode::Right | KeyCode::Char('d') => player_pos = move_player(&maze, player_pos, CellWall::Right, false),
-                    KeyCode::Char(ch) => match ch {
-                        'q' => return Err(Error::FullQuit),
-                        _ => {}
-                    },
+                    KeyCode::Up | KeyCode::Char('w' | 'W') => {
+                        player_pos = move_player(&maze, player_pos, CellWall::Top, false)
+                    }
+                    KeyCode::Down | KeyCode::Char('s' | 'S') => {
+                        player_pos = move_player(&maze, player_pos, CellWall::Bottom, false)
+                    }
+                    KeyCode::Left | KeyCode::Char('a' | 'A') => {
+                        player_pos = move_player(&maze, player_pos, CellWall::Left, false)
+                    }
+                    KeyCode::Right | KeyCode::Char('d' | 'D') => {
+                        player_pos = move_player(&maze, player_pos, CellWall::Right, false)
+                    }
+                    KeyCode::Char('q' | 'Q') => break Err(Error::FullQuit),
                     KeyCode::Enter => {}
                     KeyCode::Esc => break Err(Error::Quit),
                     _ => {}
@@ -223,22 +240,36 @@ impl Game {
 
             self.renderer.event(&event.unwrap());
 
-            self.render_game(&maze, player_pos, goal_pos, (&format!("Dims: {}w{}h", maze.size().0, maze.size().1), "", "", ""))?;
+            self.render_game(
+                &maze,
+                player_pos,
+                goal_pos,
+                (
+                    &format!("Dims: {}w{}h", maze.size().0, maze.size().1),
+                    "",
+                    "",
+                    "",
+                ),
+            )?;
 
             // check if player won
-            if player_pos == goal_pos {
-
-            }
+            if player_pos == goal_pos {}
         }
     }
 
-    fn render_game(&mut self, maze: &Maze, player_pos: Dims, goal_pos: Dims, texts: (&str, &str, &str, &str)) -> Result<(), Error> {
+    fn render_game(
+        &mut self,
+        maze: &Maze,
+        player_pos: Dims,
+        goal_pos: Dims,
+        texts: (&str, &str, &str, &str),
+    ) -> Result<(), Error> {
         let real_size = helpers::maze_render_size(maze);
         let pos = self.box_center(real_size)?;
 
         self.renderer.begin()?;
 
-        self.clear_screen(self.style)?;
+        // self.clear_screen(self.style)?;
 
         // corners
         self.renderer.draw_str(
@@ -263,25 +294,25 @@ impl Game {
         );
         self.renderer.draw_str(
             pos.0,
-            pos.1 + real_size.1 - 3,
+            pos.1 + real_size.1 - 2,
             &format!("{}", helpers::double_line_corner(false, true, false, true), ),
             self.style,
         );
         self.renderer.draw_str(
             pos.0,
-            pos.1 + real_size.1 - 2,
+            pos.1 + real_size.1 - 1,
             &format!("{}", helpers::double_line_corner(false, true, true, false), ),
             self.style,
         );
         self.renderer.draw_str(
             pos.0 + real_size.0 - 1,
-            pos.1 + real_size.1 - 3,
+            pos.1 + real_size.1 - 2,
             &format!("{}", helpers::double_line_corner(false, true, false, true), ),
             self.style,
         );
         self.renderer.draw_str(
             pos.0 + real_size.0 - 2,
-            pos.1 + real_size.1 - 2,
+            pos.1 + real_size.1 - 1,
             &format!(
                 "{}{}",
                 helpers::double_line_corner(true, false, true, false),
@@ -310,7 +341,7 @@ impl Game {
 
             self.renderer.draw_str(
                 x as u16 * 2 + pos.0 + 1,
-                pos.1 + real_size.1 - 2,
+                pos.1 + real_size.1 - 1,
                 &format!(
                     "{}{}",
                     helpers::double_line_corner(true, false, true, false),
@@ -362,8 +393,7 @@ impl Game {
                 &format!(
                     "{}",
                     helpers::double_line_corner(
-                        maze.get_cells()[y][maze.size().0 as usize - 1]
-                            .get_wall(CellWall::Bottom),
+                        maze.get_cells()[y][maze.size().0 as usize - 1].get_wall(CellWall::Bottom),
                         true,
                         false,
                         true,
@@ -428,22 +458,55 @@ impl Game {
 
         let str_pos_tl = (pos.0, pos.1 - 1);
         let str_pos_tr = (pos.0 + real_size.0 - texts.1.len() as u16, pos.1 - 1);
-        let str_pos_bl = (pos.0, pos.1 + real_size.1 - 1);
-        let str_pos_br = (pos.0 + real_size.0 - texts.3.len() as u16, pos.1 + real_size.1 - 1);
+        let str_pos_bl = (pos.0, pos.1 + real_size.1);
+        let str_pos_br = (
+            pos.0 + real_size.0 - texts.3.len() as u16,
+            pos.1 + real_size.1,
+        );
 
-        self.renderer.draw_str(str_pos_tl.0, str_pos_tl.1, texts.0, self.style);
-        self.renderer.draw_str(str_pos_tr.0, str_pos_tr.1, texts.1, self.style);
-        self.renderer.draw_str(str_pos_bl.0, str_pos_bl.1, texts.2, self.style);
-        self.renderer.draw_str(str_pos_br.0, str_pos_br.1, texts.3, self.style);
+        self.renderer
+            .draw_str(str_pos_tl.0, str_pos_tl.1, texts.0, self.style);
+        self.renderer
+            .draw_str(str_pos_tr.0, str_pos_tr.1, texts.1, self.style);
+        self.renderer
+            .draw_str(str_pos_bl.0, str_pos_bl.1, texts.2, self.style);
+        self.renderer
+            .draw_str(str_pos_br.0, str_pos_br.1, texts.3, self.style);
 
         self.renderer.end(&mut self.stdout)?;
 
         Ok(())
     }
 
-    // fn run_popup(&mut self, text: &str) -> Result<(), Error> {
-    //
-    // }
+    fn run_popup(&mut self, text: &str) -> Result<(), Error> {
+        self.render_popup(text)?;
+
+        loop {
+            let event = read()?;
+            if let Event::Key(KeyEvent { code, modifiers }) = event {
+                break Ok(());
+            }
+
+            self.renderer.event(&event);
+
+            self.render_popup(text)?;
+        }
+    }
+
+    fn render_popup(&mut self, text: &str) -> Result<(), Error> {
+        self.renderer.begin()?;
+
+        let box_size = (text.len() as u16 + 4, 3);
+        let pos = self.box_center(box_size)?;
+
+        self.draw_box(pos, box_size, self.style);
+        self.renderer
+            .draw_str(pos.0 + 1, pos.1 + 1, &format!(" {} ", text), self.style);
+
+        self.renderer.end(&mut self.stdout)?;
+
+        Ok(())
+    }
 
     fn run_menu(
         &mut self,
@@ -470,7 +533,7 @@ impl Game {
         let mut render = |this: &mut Self, pos: Dims, selected: usize| -> Result<(), Error> {
             this.renderer.begin()?;
 
-            this.clear_box(pos, menu_size, default_style);
+            // this.clear_box(pos, menu_size, default_style);
             this.draw_box(pos, menu_size, default_style);
 
             this.renderer.draw_str(
@@ -542,7 +605,7 @@ impl Game {
                     }
                     KeyCode::Down => selected = (selected + 1) % opt_count,
                     KeyCode::Char(ch) => match ch {
-                        'q' => return Err(Error::Quit),
+                        'q' | 'Q' => return Err(Error::Quit),
                         '1' if counted && 1 <= opt_count => selected = 1 - 1,
                         '2' if counted && 2 <= opt_count => selected = 2 - 1,
                         '3' if counted && 3 <= opt_count => selected = 3 - 1,
@@ -572,16 +635,11 @@ impl Game {
 
             self.renderer.event(&event.unwrap());
 
-
             render(self, pos, selected)?;
         }
     }
 
     // Helpers
-
-    fn clear_screen(&mut self, style: ContentStyle) -> Result<(), Error> {
-        Ok(self.clear_box((0, 0), size()?, style))
-    }
 
     fn box_center(&self, box_dims: Dims) -> Result<Dims, Error> {
         Ok(helpers::box_center((0, 0), size()?, box_dims))
@@ -606,12 +664,5 @@ impl Game {
             &format!("╰{}╯", "─".repeat(size.0 as usize - 2)),
             style,
         );
-    }
-
-    fn clear_box(&mut self, pos: Dims, size: Dims, style: ContentStyle) {
-        for y in pos.1..pos.1 + size.1 {
-            self.renderer
-                .draw_str(pos.0, y, &" ".repeat(size.0 as usize), style);
-        }
     }
 }
