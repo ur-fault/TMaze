@@ -7,10 +7,11 @@ use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use helpers::Dims;
+pub use helpers::{Dims, MasofDims};
 use masof::{Color, ContentStyle, Renderer};
 use std::time::{Duration, Instant};
 use thiserror::Error;
+use substring::Substring;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -29,9 +30,10 @@ pub enum Error {
 mod helpers {
     use crate::maze::Maze;
 
-    pub type Dims = (u16, u16);
+    pub type Dims = (i32, i32);
+    pub type MasofDims = (u16, u16);
 
-    pub fn menu_size(title: &str, options: &[&str], counted: bool) -> (u16, u16) {
+    pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
         match options.iter().map(|opt| opt.len()).max() {
             Some(l) => (
                 ((2 + if counted {
@@ -40,16 +42,16 @@ mod helpers {
                     0
                 } + l
                     - 2)
-                .max(title.len() + 2)
-                    + 2) as u16
+                    .max(title.len() + 2)
+                    + 2) as i32
                     + 2,
-                options.len() as u16 + 2 + 2,
+                options.len() as i32 + 2 + 2,
             ),
             None => (0, 0),
         }
     }
 
-    pub fn line_center(container_start: u16, container_end: u16, item_width: u16) -> u16 {
+    pub fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
         (container_end - container_start - item_width) / 2 + container_start
     }
 
@@ -62,7 +64,7 @@ mod helpers {
 
     pub fn maze_render_size(maze: &Maze) -> Dims {
         let msize = maze.size();
-        ((msize.0 * 2 + 1) as u16, (msize.1 * 2 + 1) as u16)
+        ((msize.0 * 2 + 1) as i32, (msize.1 * 2 + 1) as i32)
     }
 
     pub fn double_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &'static str {
@@ -84,6 +86,10 @@ mod helpers {
             (true, true, true, false) => "╩",
             (true, true, true, true) => "╬",
         }
+    }
+
+    pub fn from_maze_to_real(maze_pos: Dims) -> Dims {
+        (maze_pos.0 * 2 + 1, maze_pos.1 * 2 + 1)
     }
 }
 
@@ -164,7 +170,7 @@ impl Game {
         };
 
         let mut player_pos: Dims = (0, 0);
-        let goal_pos: Dims = (msize.0 as u16 - 1, msize.1 as u16 - 1);
+        let goal_pos: Dims = (msize.0 as i32 - 1, msize.1 as i32 - 1);
 
         let mut maze = {
             let mut last_progress = f64::MIN;
@@ -239,8 +245,8 @@ impl Game {
                             pos
                         } else {
                             (
-                                (pos.0 as i16 + wall.to_coord().0 as i16) as u16,
-                                (pos.1 as i16 + wall.to_coord().1 as i16) as u16,
+                                (pos.0 + wall.to_coord().0 as i32),
+                                (pos.1 + wall.to_coord().1 as i32),
                             )
                         }
                     } else {
@@ -250,8 +256,8 @@ impl Game {
                                 break pos;
                             }
                             pos = (
-                                (pos.0 as i16 + wall.to_coord().0 as i16) as u16,
-                                (pos.1 as i16 + wall.to_coord().1 as i16) as u16,
+                                (pos.0 + wall.to_coord().0 as i32),
+                                (pos.1 + wall.to_coord().1 as i32),
                             );
                             cell = &maze.get_cells()[pos.1 as usize][pos.0 as usize];
 
@@ -322,20 +328,24 @@ impl Game {
     }
 
     fn render_progress(&mut self, title: &str, progress: f64) -> Result<(), Error> {
-        let progress_size = (title.len() as u16 + 2, 4);
+        let progress_size = (title.len() as i32 + 2, 4);
         let pos = self.box_center(progress_size)?;
 
         self.renderer.begin()?;
 
         self.draw_box(pos, progress_size, self.style);
-        self.renderer
-            .draw_str(pos.0 + 1, pos.1 + 1, title, self.style);
-        self.renderer.draw_str(
-            pos.0 + 1,
-            pos.1 + 2,
-            &"#".repeat((title.len() as f64 * progress) as usize),
-            self.style,
-        );
+        if pos.1 + 1 >= 0 {
+            self.renderer
+                .draw_str(pos.0 as u16 + 1, pos.1 as u16 + 1, title, self.style);
+        }
+        if pos.1 + 2 >= 0 {
+            self.draw_str(
+                pos.0 + 1,
+                pos.1 + 2,
+                &"#".repeat((title.len() as f64 * progress) as usize),
+                self.style,
+            );
+        }
 
         self.renderer.end(&mut self.stdout)?;
 
@@ -350,14 +360,20 @@ impl Game {
         texts: (&str, &str, &str, &str),
     ) -> Result<(), Error> {
         let real_size = helpers::maze_render_size(maze);
-        let pos = self.box_center(real_size)?;
+        let pos = if real_size.0 > size()?.0 as i32 || real_size.1 + 2 > size()?.1 as i32 {
+            let player_real_pos = (size()?.0 as i32 / 2, size()?.1 as i32 / 2);
+            let player_real_maze_pos = helpers::from_maze_to_real(player_pos);
+            (player_real_pos.0 - player_real_maze_pos.0, player_real_pos.1 - player_real_maze_pos.1)
+        } else {
+            self.box_center((real_size.0 as i32, real_size.1 as i32))?
+        };
 
         self.renderer.begin()?;
 
         // self.clear_screen(self.style)?;
 
         // corners
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0,
             pos.1,
             &format!(
@@ -367,7 +383,7 @@ impl Game {
             ),
             self.style,
         );
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0 + real_size.0 - 2,
             pos.1,
             &format!(
@@ -377,25 +393,25 @@ impl Game {
             ),
             self.style,
         );
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0,
             pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true),),
+            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
             self.style,
         );
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0,
             pos.1 + real_size.1 - 1,
-            &format!("{}", helpers::double_line_corner(false, true, true, false),),
+            &format!("{}", helpers::double_line_corner(false, true, true, false), ),
             self.style,
         );
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0 + real_size.0 - 1,
             pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true),),
+            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
             self.style,
         );
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0 + real_size.0 - 2,
             pos.1 + real_size.1 - 1,
             &format!(
@@ -408,8 +424,8 @@ impl Game {
 
         // horizontal edge lines
         for x in 0..maze.size().0 - 1 {
-            self.renderer.draw_str(
-                x as u16 * 2 + pos.0 + 1,
+            self.draw_str(
+                x as i32 * 2 + pos.0 + 1,
                 pos.1,
                 &format!(
                     "{}{}",
@@ -424,8 +440,8 @@ impl Game {
                 self.style,
             );
 
-            self.renderer.draw_str(
-                x as u16 * 2 + pos.0 + 1,
+            self.draw_str(
+                x as i32 * 2 + pos.0 + 1,
                 pos.1 + real_size.1 - 1,
                 &format!(
                     "{}{}",
@@ -443,16 +459,16 @@ impl Game {
 
         // vertical edge lines
         for y in 0..maze.size().1 - 1 {
-            self.renderer.draw_str(
+            self.draw_str(
                 pos.0,
-                y as u16 * 2 + pos.1 + 1,
+                y as i32 * 2 + pos.1 + 1,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
                 self.style,
             );
 
-            self.renderer.draw_str(
+            self.draw_str(
                 pos.0,
-                y as u16 * 2 + pos.1 + 2,
+                y as i32 * 2 + pos.1 + 2,
                 &format!(
                     "{}",
                     helpers::double_line_corner(
@@ -465,16 +481,16 @@ impl Game {
                 self.style,
             );
 
-            self.renderer.draw_str(
+            self.draw_str(
                 pos.0 + real_size.0 - 1,
-                y as u16 * 2 + pos.1 + 1,
+                y as i32 * 2 + pos.1 + 1,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
                 self.style,
             );
 
-            self.renderer.draw_str(
+            self.draw_str(
                 pos.0 + real_size.0 - 1,
-                y as u16 * 2 + pos.1 + 2,
+                y as i32 * 2 + pos.1 + 2,
                 &format!(
                     "{}",
                     helpers::double_line_corner(
@@ -491,17 +507,17 @@ impl Game {
         for (iy, row) in maze.get_cells().iter().enumerate() {
             for (ix, cell) in row.iter().enumerate() {
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 - 1 {
-                    self.renderer.draw_str(
-                        ix as u16 * 2 + 2 + pos.0,
-                        iy as u16 * 2 + 1 + pos.1,
+                    self.draw_str(
+                        ix as i32 * 2 + 2 + pos.0,
+                        iy as i32 * 2 + 1 + pos.1,
                         helpers::double_line_corner(false, true, false, true),
                         self.style,
                     );
                 }
                 if cell.get_wall(CellWall::Bottom) && iy != maze.size().1 - 1 {
-                    self.renderer.draw_str(
-                        ix as u16 * 2 + 1 + pos.0,
-                        iy as u16 * 2 + 2 + pos.1,
+                    self.draw_str(
+                        ix as i32 * 2 + 1 + pos.0,
+                        iy as i32 * 2 + 2 + pos.1,
                         helpers::double_line_corner(true, false, true, false),
                         self.style,
                     );
@@ -513,9 +529,9 @@ impl Game {
 
                 let cell2 = &maze.get_cells()[iy + 1][ix + 1];
 
-                self.renderer.draw_str(
-                    ix as u16 * 2 + 2 + pos.0,
-                    iy as u16 * 2 + 2 + pos.1,
+                self.draw_str(
+                    ix as i32 * 2 + 2 + pos.0,
+                    iy as i32 * 2 + 2 + pos.1,
                     helpers::double_line_corner(
                         cell.get_wall(CellWall::Bottom),
                         cell.get_wall(CellWall::Right),
@@ -527,7 +543,7 @@ impl Game {
             }
         }
 
-        self.renderer.draw_char(
+        self.draw_char(
             goal_pos.0 * 2 + 1 + pos.0,
             goal_pos.1 * 2 + 1 + pos.1,
             '$',
@@ -538,7 +554,7 @@ impl Game {
             },
         );
 
-        self.renderer.draw_char(
+        self.draw_char(
             player_pos.0 * 2 + 1 + pos.0,
             player_pos.1 * 2 + 1 + pos.1,
             'O',
@@ -550,21 +566,17 @@ impl Game {
         );
 
         let str_pos_tl = (pos.0, pos.1 - 1);
-        let str_pos_tr = (pos.0 + real_size.0 - texts.1.len() as u16, pos.1 - 1);
+        let str_pos_tr = (pos.0 + real_size.0 - texts.1.len() as i32, pos.1 - 1);
         let str_pos_bl = (pos.0, pos.1 + real_size.1);
         let str_pos_br = (
-            pos.0 + real_size.0 - texts.3.len() as u16,
+            pos.0 + real_size.0 - texts.3.len() as i32,
             pos.1 + real_size.1,
         );
 
-        self.renderer
-            .draw_str(str_pos_tl.0, str_pos_tl.1, texts.0, self.style);
-        self.renderer
-            .draw_str(str_pos_tr.0, str_pos_tr.1, texts.1, self.style);
-        self.renderer
-            .draw_str(str_pos_bl.0, str_pos_bl.1, texts.2, self.style);
-        self.renderer
-            .draw_str(str_pos_br.0, str_pos_br.1, texts.3, self.style);
+        self.draw_str(str_pos_tl.0, str_pos_tl.1, texts.0, self.style);
+        self.draw_str(str_pos_tr.0, str_pos_tr.1, texts.1, self.style);
+        self.draw_str(str_pos_bl.0, str_pos_bl.1, texts.2, self.style);
+        self.draw_str(str_pos_br.0, str_pos_br.1, texts.3, self.style);
 
         self.renderer.end(&mut self.stdout)?;
 
@@ -589,12 +601,11 @@ impl Game {
     fn render_popup(&mut self, text: &str) -> Result<(), Error> {
         self.renderer.begin()?;
 
-        let box_size = (text.len() as u16 + 4, 3);
+        let box_size = (text.len() as i32 + 4, 3);
         let pos = self.box_center(box_size)?;
 
         self.draw_box(pos, box_size, self.style);
-        self.renderer
-            .draw_str(pos.0 + 1, pos.1 + 1, &format!(" {} ", text), self.style);
+        self.draw_str(pos.0 + 1, pos.1 + 1, &format!(" {} ", text), self.style);
 
         self.renderer.end(&mut self.stdout)?;
 
@@ -674,9 +685,8 @@ impl Game {
 
         self.draw_box(pos, menu_size, self.style);
 
-        self.renderer
-            .draw_str(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title), self.style);
-        self.renderer.draw_str(
+        self.draw_str(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title), self.style);
+        self.draw_str(
             pos.0 + 1,
             pos.1 + 1 + 1,
             &"─".repeat(menu_size.0 as usize - 2),
@@ -700,9 +710,9 @@ impl Game {
                 0
             };
 
-            self.renderer.draw_str(
+            self.draw_str(
                 pos.0 + 1,
-                i as u16 + pos.1 + 2 + 1,
+                i as i32 + pos.1 + 2 + 1,
                 &format!(
                     "{} {}{}",
                     if i == selected { ">" } else { " " },
@@ -728,11 +738,16 @@ impl Game {
     // Helpers
 
     fn box_center(&self, box_dims: Dims) -> Result<Dims, Error> {
-        Ok(helpers::box_center((0, 0), size()?, box_dims))
+        let size_u16 = size()?;
+        Ok(helpers::box_center(
+            (0, 0),
+            (size_u16.0 as i32, size_u16.1 as i32),
+            box_dims,
+        ))
     }
 
     fn draw_box(&mut self, pos: Dims, size: Dims, style: ContentStyle) {
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0,
             pos.1,
             &format!("╭{}╮", "─".repeat(size.0 as usize - 2)),
@@ -740,15 +755,40 @@ impl Game {
         );
 
         for y in pos.1 + 1..pos.1 + size.1 - 1 {
-            self.renderer.draw_char(pos.0, y, '│', style);
-            self.renderer.draw_char(pos.0 + size.0 - 1, y, '│', style);
+            self.draw_char(pos.0, y, '│', style);
+            self.draw_char(pos.0 + size.0 - 1, y, '│', style);
         }
 
-        self.renderer.draw_str(
+        self.draw_str(
             pos.0,
             pos.1 + size.1 - 1,
             &format!("╰{}╯", "─".repeat(size.0 as usize - 2)),
             style,
         );
+    }
+
+    fn draw_str(&mut self, mut x: i32, y: i32, mut text: &str, style: ContentStyle) {
+        if y < 0 {
+            return;
+        }
+
+        if x < 0 && text.len() as i32 > -x + 1 {
+            text = text.substring(-x as usize, text.len() - 1);
+            x = 0;
+        }
+
+        if x > u16::MAX as i32 || y > u16::MAX as i32 {
+            return;
+        }
+
+        self.renderer.draw_str(x as u16, y as u16, text, style);
+    }
+
+    fn draw_char(&mut self, mut x: i32, y: i32, mut text: char, style: ContentStyle) {
+        if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32{
+            return;
+        }
+
+        self.renderer.draw_char(x as u16, y as u16, text, style);
     }
 }

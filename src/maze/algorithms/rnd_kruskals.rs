@@ -29,12 +29,12 @@ impl MazeAlgorithm for RndKruskals {
                 if iy == h - 1 && ix == w - 1 {
                     continue;
                 } else if iy == h - 1 {
-                    walls.push(((ix as u16, iy as u16), CellWall::Right));
+                    walls.push(((ix as i32, iy as i32), CellWall::Right));
                 } else if ix == w - 1 {
-                    walls.push(((ix as u16, iy as u16), CellWall::Bottom));
+                    walls.push(((ix as i32, iy as i32), CellWall::Bottom));
                 } else {
-                    walls.push(((ix as u16, iy as u16), CellWall::Right));
-                    walls.push(((ix as u16, iy as u16), CellWall::Bottom));
+                    walls.push(((ix as i32, iy as i32), CellWall::Right));
+                    walls.push(((ix as i32, iy as i32), CellWall::Bottom));
                 }
             }
         }
@@ -42,15 +42,15 @@ impl MazeAlgorithm for RndKruskals {
         let mut sets = Vec::<HashSet<Dims>>::with_capacity(cell_count);
         for iy in 0..cells.len() {
             for ix in 0..cells[0].len() {
-                sets.push(vec![(ix as u16, iy as u16)].into_iter().collect());
+                sets.push(vec![(ix as i32, iy as i32)].into_iter().collect());
             }
         }
 
         walls.shuffle(&mut thread_rng());
         while let Some(((ix0, iy0), wall)) = walls.pop() {
             let (ix1, iy1) = (
-                (wall.to_coord().0 + ix0 as isize) as u16,
-                (wall.to_coord().1 + iy0 as isize) as u16,
+                (wall.to_coord().0 + ix0 as isize) as i32,
+                (wall.to_coord().1 + iy0 as isize) as i32,
             );
 
             let set0_i = sets
