@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+
 #[derive(Clone)]
 pub struct Cell {
     left: bool,
@@ -48,6 +50,12 @@ impl PartialEq for Cell {
 }
 
 impl Eq for Cell {}
+
+impl Hash for Cell {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.coord.hash(state);
+    }
+}
 
 #[derive(Copy, Clone)]
 pub enum CellWall {

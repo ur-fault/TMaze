@@ -6,7 +6,7 @@ use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-use helpers::Dims;
+pub use helpers::Dims;
 use masof::{Color, ContentStyle, Renderer};
 use std::time::{Duration, Instant};
 use thiserror::Error;
@@ -157,7 +157,7 @@ impl Game {
             1 => (30, 10),
             2 => (60, 30),
             3 => (100, 30),
-            4 => (100, 100),
+            4 => (2, 2),
             5 => (500, 500),
             _ => (0, 0),
         };
@@ -172,8 +172,8 @@ impl Game {
                 msize.0,
                 msize.1,
                 Some((player_pos.0 as usize, player_pos.1 as usize)),
-                Some(|visited| {
-                    let current_progess = visited as f64 / (msize.0 * msize.1) as f64;
+                Some(|visited, all| {
+                    let current_progess = visited as f64 / all as f64;
                     if current_progess - last_progress > 0.05 {
                         let res = self.render_progress(
                             &format!("Generating maze ({}x{})", msize.0, msize.1),
@@ -516,14 +516,22 @@ impl Game {
             goal_pos.0 * 2 + 1 + pos.0,
             goal_pos.1 * 2 + 1 + pos.1,
             '$',
-            ContentStyle::new().foreground(Color::DarkYellow),
+            ContentStyle {
+                foreground_color: Some(Color::DarkYellow),
+                background_color: Default::default(),
+                attributes: Default::default()
+            },
         );
 
         self.renderer.draw_char(
             player_pos.0 * 2 + 1 + pos.0,
             player_pos.1 * 2 + 1 + pos.1,
             'O',
-            ContentStyle::new().foreground(Color::Green),
+            ContentStyle {
+                foreground_color: Some(Color::Green),
+                background_color: Default::default(),
+                attributes: Default::default()
+            },
         );
 
         let str_pos_tl = (pos.0, pos.1 - 1);
@@ -662,9 +670,11 @@ impl Game {
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == selected {
-                ContentStyle::default()
-                    .background(Color::White)
-                    .foreground(Color::Black)
+                ContentStyle {
+                    background_color: Some(Color::White),
+                    foreground_color: Some(Color::Black),
+                    attributes: Default::default()
+                }
             } else {
                 ContentStyle::default()
             };

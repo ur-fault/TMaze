@@ -1,6 +1,7 @@
 use crate::game::game::Error;
 use crate::maze::cell::{Cell, CellWall};
 use rand::seq::SliceRandom;
+use crate::game::game::Dims;
 
 pub struct Maze {
     cells: Vec<Vec<Cell>>,
@@ -9,7 +10,8 @@ pub struct Maze {
 }
 
 impl Maze {
-    pub fn new_dfs<T: FnMut(usize) -> Result<(), Error>>(
+    // Depth-first search
+    pub fn new_dfs<T: FnMut(usize, usize) -> Result<(), Error>>(
         w: usize,
         h: usize,
         start_: Option<(usize, usize)>,
@@ -17,6 +19,8 @@ impl Maze {
     ) -> Result<Maze, Error> {
         let mut visited: Vec<(usize, usize)> = Vec::with_capacity(w * h);
         let mut stack: Vec<(usize, usize)> = Vec::with_capacity(w * h);
+
+        let cell_count = w * h;
 
         let (sx, sy) = start_.unwrap_or((0, 0));
 
@@ -55,7 +59,7 @@ impl Maze {
             }
 
             if let Some(_) = report_progress {
-                report_progress.as_mut().unwrap()(visited.len())?;
+                report_progress.as_mut().unwrap()(visited.len(), cell_count)?;
             }
         }
 
