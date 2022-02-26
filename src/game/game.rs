@@ -2,6 +2,7 @@ use std::io::{stdout, Stdout};
 
 use crate::maze::{CellWall, Maze};
 
+use crate::maze::algorithms::*;
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
@@ -39,7 +40,7 @@ mod helpers {
                     0
                 } + l
                     - 2)
-                    .max(title.len() + 2)
+                .max(title.len() + 2)
                     + 2) as u16
                     + 2,
                 options.len() as u16 + 2 + 2,
@@ -157,7 +158,7 @@ impl Game {
             1 => (30, 10),
             2 => (60, 30),
             3 => (100, 30),
-            4 => (2, 2),
+            4 => (100, 100),
             5 => (500, 500),
             _ => (0, 0),
         };
@@ -167,16 +168,25 @@ impl Game {
 
         let mut maze = {
             let mut last_progress = f64::MIN;
-
-            Maze::new_dfs(
+            let generation_func = match self.run_menu(
+                "Maze generation algorithm",
+                &["Depth-first search", "Randomized Kruskal's"],
+                0,
+                true,
+            )? {
+                0 => DepthFirstSearch::new,
+                1 => RndKruskals::new,
+                _ => panic!(),
+            };
+            generation_func(
                 msize.0,
                 msize.1,
                 Some((player_pos.0 as usize, player_pos.1 as usize)),
-                Some(|visited, all| {
-                    let current_progess = visited as f64 / all as f64;
-                    if current_progess - last_progress > 0.05 {
+                Some(|done, all| {
+                    let current_progess = done as f64 / all as f64;
+                    if current_progess - last_progress > 0.01 {
                         let res = self.render_progress(
-                            &format!("Generating maze ({}x{})", msize.0, msize.1),
+                            &format!("Generating maze ({}x{}) {}/{}", msize.0, msize.1, done, all),
                             current_progess,
                         );
                         last_progress = current_progess;
@@ -294,7 +304,12 @@ impl Game {
                     &format!("Dims: {}w{}h", maze.size().0, maze.size().1),
                     "",
                     &format!("{} moves", move_count),
-                    &format!("{}m{}s{}ms", from_start.as_secs() / 60, from_start.as_secs() % 60, from_start.subsec_millis()),
+                    &format!(
+                        "{}m{}s{}ms",
+                        from_start.as_secs() / 60,
+                        from_start.as_secs() % 60,
+                        from_start.subsec_millis()
+                    ),
                 ),
             )?;
 
@@ -365,19 +380,19 @@ impl Game {
         self.renderer.draw_str(
             pos.0,
             pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
+            &format!("{}", helpers::double_line_corner(false, true, false, true),),
             self.style,
         );
         self.renderer.draw_str(
             pos.0,
             pos.1 + real_size.1 - 1,
-            &format!("{}", helpers::double_line_corner(false, true, true, false), ),
+            &format!("{}", helpers::double_line_corner(false, true, true, false),),
             self.style,
         );
         self.renderer.draw_str(
             pos.0 + real_size.0 - 1,
             pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
+            &format!("{}", helpers::double_line_corner(false, true, false, true),),
             self.style,
         );
         self.renderer.draw_str(
@@ -519,7 +534,7 @@ impl Game {
             ContentStyle {
                 foreground_color: Some(Color::DarkYellow),
                 background_color: Default::default(),
-                attributes: Default::default()
+                attributes: Default::default(),
             },
         );
 
@@ -530,7 +545,7 @@ impl Game {
             ContentStyle {
                 foreground_color: Some(Color::Green),
                 background_color: Default::default(),
-                attributes: Default::default()
+                attributes: Default::default(),
             },
         );
 
@@ -673,7 +688,7 @@ impl Game {
                 ContentStyle {
                     background_color: Some(Color::White),
                     foreground_color: Some(Color::Black),
-                    attributes: Default::default()
+                    attributes: Default::default(),
                 }
             } else {
                 ContentStyle::default()
