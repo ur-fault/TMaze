@@ -70,10 +70,13 @@ impl MazeAlgorithm for RndKruskals {
             cells[iy1 as usize][ix1 as usize].remove_wall(wall.reverse_wall());
             let set0 = sets.swap_remove(set0_i);
 
-            let set1_i = sets
-                .iter()
-                .position(|set| set.contains(&(ix1, iy1)))
-                .unwrap();
+            let set1_i = if set1_i == sets.len() - 1 {
+                sets.len() - 1
+            } else {
+                sets.iter()
+                    .position(|set| set.contains(&(ix1, iy1)))
+                    .unwrap()
+            };
             sets[set1_i].extend(set0);
 
             if let Some(_) = report_progress {

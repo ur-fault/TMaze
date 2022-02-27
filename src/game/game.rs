@@ -10,8 +10,8 @@ use crossterm::{
 pub use helpers::{Dims, MasofDims};
 use masof::{Color, ContentStyle, Renderer};
 use std::time::{Duration, Instant};
-use thiserror::Error;
 use substring::Substring;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -42,7 +42,7 @@ mod helpers {
                     0
                 } + l
                     - 2)
-                    .max(title.len() + 2)
+                .max(title.len() + 2)
                     + 2) as i32
                     + 2,
                 options.len() as i32 + 2 + 2,
@@ -100,7 +100,6 @@ pub struct GameSettings {
 
 pub struct Game {
     player: Vec<Dims>,
-    start_time: Option<u64>,
     renderer: Renderer,
     stdout: Stdout,
     style: ContentStyle,
@@ -110,7 +109,6 @@ impl Game {
     pub fn new() -> Self {
         Game {
             player: vec![],
-            start_time: None,
             renderer: Renderer::default(),
             stdout: stdout(),
             style: ContentStyle::default(),
@@ -236,7 +234,7 @@ impl Game {
         let mut move_count = 0;
 
         loop {
-            if let Ok(true) = poll(Duration::from_millis(30)) {
+            if let Ok(true) = poll(Duration::from_millis(90)) {
                 let event = read();
 
                 fn move_player(maze: &Maze, mut pos: Dims, wall: CellWall, slow: bool) -> Dims {
@@ -311,10 +309,9 @@ impl Game {
                     "",
                     &format!("{} moves", move_count),
                     &format!(
-                        "{}m{}s{}ms",
+                        "{}m{:.1}s",
                         from_start.as_secs() / 60,
-                        from_start.as_secs() % 60,
-                        from_start.subsec_millis()
+                        from_start.as_secs_f32(),
                     ),
                 ),
             )?;
@@ -360,164 +357,195 @@ impl Game {
         texts: (&str, &str, &str, &str),
     ) -> Result<(), Error> {
         let real_size = helpers::maze_render_size(maze);
-        let pos = if real_size.0 > size()?.0 as i32 || real_size.1 + 2 > size()?.1 as i32 {
-            let player_real_pos = (size()?.0 as i32 / 2, size()?.1 as i32 / 2);
+        let size = {
+            let size = size()?;
+            (size.0 as i32, size.1 as i32)
+        };
+        let is_around_player = real_size.0 > size.0 as i32 || real_size.1 + 2 > size.1 as i32;
+
+        let pos = if is_around_player {
+            let player_real_pos = (size.0 as i32 / 2, size.1 as i32 / 2);
             let player_real_maze_pos = helpers::from_maze_to_real(player_pos);
-            (player_real_pos.0 - player_real_maze_pos.0, player_real_pos.1 - player_real_maze_pos.1)
+            (
+                player_real_pos.0 - player_real_maze_pos.0,
+                player_real_pos.1 - player_real_maze_pos.1,
+            )
         } else {
             self.box_center((real_size.0 as i32, real_size.1 as i32))?
         };
 
         self.renderer.begin()?;
 
-        // self.clear_screen(self.style)?;
-
         // corners
-        self.draw_str(
-            pos.0,
-            pos.1,
-            &format!(
-                "{}{}",
-                helpers::double_line_corner(false, false, true, true),
-                helpers::double_line_corner(true, false, true, false)
-            ),
-            self.style,
-        );
-        self.draw_str(
-            pos.0 + real_size.0 - 2,
-            pos.1,
-            &format!(
-                "{}{}",
-                helpers::double_line_corner(true, false, true, false),
-                helpers::double_line_corner(true, false, false, true)
-            ),
-            self.style,
-        );
-        self.draw_str(
-            pos.0,
-            pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
-            self.style,
-        );
-        self.draw_str(
-            pos.0,
-            pos.1 + real_size.1 - 1,
-            &format!("{}", helpers::double_line_corner(false, true, true, false), ),
-            self.style,
-        );
-        self.draw_str(
-            pos.0 + real_size.0 - 1,
-            pos.1 + real_size.1 - 2,
-            &format!("{}", helpers::double_line_corner(false, true, false, true), ),
-            self.style,
-        );
-        self.draw_str(
-            pos.0 + real_size.0 - 2,
-            pos.1 + real_size.1 - 1,
-            &format!(
-                "{}{}",
-                helpers::double_line_corner(true, false, true, false),
-                helpers::double_line_corner(true, true, false, false)
-            ),
-            self.style,
-        );
-
-        // horizontal edge lines
-        for x in 0..maze.size().0 - 1 {
+        if pos.1 > 0 {
             self.draw_str(
-                x as i32 * 2 + pos.0 + 1,
+                pos.0,
+                pos.1,
+                &format!(
+                    "{}{}",
+                    helpers::double_line_corner(false, false, true, true),
+                    helpers::double_line_corner(true, false, true, false)
+                ),
+                self.style,
+            );
+            self.draw_str(
+                pos.0 + real_size.0 - 2,
                 pos.1,
                 &format!(
                     "{}{}",
                     helpers::double_line_corner(true, false, true, false),
-                    helpers::double_line_corner(
-                        true,
-                        false,
-                        true,
-                        maze.get_cells()[0][x].get_wall(CellWall::Right),
-                    )
-                ),
-                self.style,
-            );
-
-            self.draw_str(
-                x as i32 * 2 + pos.0 + 1,
-                pos.1 + real_size.1 - 1,
-                &format!(
-                    "{}{}",
-                    helpers::double_line_corner(true, false, true, false),
-                    helpers::double_line_corner(
-                        true,
-                        maze.get_cells()[maze.size().1 - 1][x].get_wall(CellWall::Right),
-                        true,
-                        false,
-                    )
+                    helpers::double_line_corner(true, false, false, true)
                 ),
                 self.style,
             );
         }
+        if pos.1 + real_size.1 - 2 < size.1 - 1 {
+            self.draw_str(
+                pos.0,
+                pos.1 + real_size.1 - 2,
+                &format!("{}", helpers::double_line_corner(false, true, false, true),),
+                self.style,
+            );
+            self.draw_str(
+                pos.0 + real_size.0 - 1,
+                pos.1 + real_size.1 - 2,
+                &format!("{}", helpers::double_line_corner(false, true, false, true),),
+                self.style,
+            );
+        }
+        if pos.1 + real_size.1 - 1 < size.1 - 1 {
+            self.draw_str(
+                pos.0,
+                pos.1 + real_size.1 - 1,
+                &format!("{}", helpers::double_line_corner(false, true, true, false),),
+                self.style,
+            );
+            self.draw_str(
+                pos.0 + real_size.0 - 2,
+                pos.1 + real_size.1 - 1,
+                &format!(
+                    "{}{}",
+                    helpers::double_line_corner(true, false, true, false),
+                    helpers::double_line_corner(true, true, false, false)
+                ),
+                self.style,
+            );
+        }
+        // horizontal edge lines
+        for x in 0..maze.size().0 - 1 {
+            if pos.1 > 0 {
+                self.draw_str(
+                    x as i32 * 2 + pos.0 + 1,
+                    pos.1,
+                    &format!(
+                        "{}{}",
+                        helpers::double_line_corner(true, false, true, false),
+                        helpers::double_line_corner(
+                            true,
+                            false,
+                            true,
+                            maze.get_cells()[0][x].get_wall(CellWall::Right),
+                        )
+                    ),
+                    self.style,
+                );
+            }
+            if pos.1 + real_size.1 - 1 > 0 {
+                self.draw_str(
+                    x as i32 * 2 + pos.0 + 1,
+                    pos.1 + real_size.1 - 1,
+                    &format!(
+                        "{}{}",
+                        helpers::double_line_corner(true, false, true, false),
+                        helpers::double_line_corner(
+                            true,
+                            maze.get_cells()[maze.size().1 - 1][x].get_wall(CellWall::Right),
+                            true,
+                            false,
+                        )
+                    ),
+                    self.style,
+                );
+            }
+        }
 
         // vertical edge lines
         for y in 0..maze.size().1 - 1 {
+            let ypos = y as i32 * 2 + pos.1 + 1;
+            if ypos >= size.1 - 2 {
+                break;
+            }
+
             self.draw_str(
                 pos.0,
-                y as i32 * 2 + pos.1 + 1,
+                ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
                 self.style,
             );
 
-            self.draw_str(
-                pos.0,
-                y as i32 * 2 + pos.1 + 2,
-                &format!(
-                    "{}",
-                    helpers::double_line_corner(
-                        false,
-                        true,
-                        maze.get_cells()[y][0].get_wall(CellWall::Bottom),
-                        true,
-                    )
-                ),
-                self.style,
-            );
+            if ypos + 1 < size.1 {
+                self.draw_str(
+                    pos.0,
+                    y as i32 * 2 + pos.1 + 2,
+                    &format!(
+                        "{}",
+                        helpers::double_line_corner(
+                            false,
+                            true,
+                            maze.get_cells()[y][0].get_wall(CellWall::Bottom),
+                            true,
+                        )
+                    ),
+                    self.style,
+                );
+
+                self.draw_str(
+                    pos.0 + real_size.0 - 1,
+                    y as i32 * 2 + pos.1 + 2,
+                    &format!(
+                        "{}",
+                        helpers::double_line_corner(
+                            maze.get_cells()[y][maze.size().0 as usize - 1]
+                                .get_wall(CellWall::Bottom),
+                            true,
+                            false,
+                            true,
+                        )
+                    ),
+                    self.style,
+                );
+            }
 
             self.draw_str(
                 pos.0 + real_size.0 - 1,
-                y as i32 * 2 + pos.1 + 1,
+                ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
-                self.style,
-            );
-
-            self.draw_str(
-                pos.0 + real_size.0 - 1,
-                y as i32 * 2 + pos.1 + 2,
-                &format!(
-                    "{}",
-                    helpers::double_line_corner(
-                        maze.get_cells()[y][maze.size().0 as usize - 1].get_wall(CellWall::Bottom),
-                        true,
-                        false,
-                        true,
-                    )
-                ),
                 self.style,
             );
         }
 
         for (iy, row) in maze.get_cells().iter().enumerate() {
+            let ypos = iy as i32 * 2 + 1 + pos.1;
+            if ypos >= size.1 - 2 {
+                break;
+            }
+
             for (ix, cell) in row.iter().enumerate() {
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 - 1 {
                     self.draw_str(
                         ix as i32 * 2 + 2 + pos.0,
-                        iy as i32 * 2 + 1 + pos.1,
+                        ypos,
                         helpers::double_line_corner(false, true, false, true),
                         self.style,
                     );
                 }
-                if cell.get_wall(CellWall::Bottom) && iy != maze.size().1 - 1 {
+                if iy as i32 * 2 + 2 + pos.1 < size.1 as i32 - 2
+                    && cell.get_wall(CellWall::Bottom)
+                    && iy != maze.size().1 - 1
+                {
                     self.draw_str(
                         ix as i32 * 2 + 1 + pos.0,
-                        iy as i32 * 2 + 2 + pos.1,
+                        ypos + 1,
                         helpers::double_line_corner(true, false, true, false),
                         self.style,
                     );
@@ -529,17 +557,19 @@ impl Game {
 
                 let cell2 = &maze.get_cells()[iy + 1][ix + 1];
 
-                self.draw_str(
-                    ix as i32 * 2 + 2 + pos.0,
-                    iy as i32 * 2 + 2 + pos.1,
-                    helpers::double_line_corner(
-                        cell.get_wall(CellWall::Bottom),
-                        cell.get_wall(CellWall::Right),
-                        cell2.get_wall(CellWall::Top),
-                        cell2.get_wall(CellWall::Left),
-                    ),
-                    self.style,
-                );
+                if ypos < size.1 as i32 - 3 {
+                    self.draw_str(
+                        ix as i32 * 2 + 2 + pos.0,
+                        iy as i32 * 2 + 2 + pos.1,
+                        helpers::double_line_corner(
+                            cell.get_wall(CellWall::Bottom),
+                            cell.get_wall(CellWall::Right),
+                            cell2.get_wall(CellWall::Top),
+                            cell2.get_wall(CellWall::Left),
+                        ),
+                        self.style,
+                    );
+                }
             }
         }
 
@@ -565,13 +595,29 @@ impl Game {
             },
         );
 
-        let str_pos_tl = (pos.0, pos.1 - 1);
-        let str_pos_tr = (pos.0 + real_size.0 - texts.1.len() as i32, pos.1 - 1);
-        let str_pos_bl = (pos.0, pos.1 + real_size.1);
-        let str_pos_br = (
-            pos.0 + real_size.0 - texts.3.len() as i32,
-            pos.1 + real_size.1,
-        );
+        let str_pos_tl = if is_around_player {
+            (0, 0)
+        } else {
+            (pos.0, pos.1 - 1)
+        };
+        let str_pos_tr = if is_around_player {
+            (size.0 as i32 - texts.1.len() as i32, 0)
+        } else {
+            (pos.0 + real_size.0 - texts.1.len() as i32, pos.1 - 1)
+        };
+        let str_pos_bl = if is_around_player {
+            (0, size.1 as i32 - 2)
+        } else {
+            (pos.0, pos.1 + real_size.1)
+        };
+        let str_pos_br = if is_around_player {
+            (size.0 as i32 - texts.3.len() as i32, size.1 as i32 - 2)
+        } else {
+            (
+                pos.0 + real_size.0 - texts.3.len() as i32,
+                pos.1 + real_size.1,
+            )
+        };
 
         self.draw_str(str_pos_tl.0, str_pos_tl.1, texts.0, self.style);
         self.draw_str(str_pos_tr.0, str_pos_tr.1, texts.1, self.style);
@@ -633,14 +679,17 @@ impl Game {
 
             match event {
                 Event::Key(KeyEvent { code, modifiers }) => match code {
-                    KeyCode::Up => {
+                    KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                         selected = if selected == 0 {
                             opt_count - 1
                         } else {
                             selected - 1
                         }
                     }
-                    KeyCode::Down => selected = (selected + 1) % opt_count,
+                    KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
+                        selected = (selected + 1) % opt_count
+                    }
+                    KeyCode::Enter | KeyCode::Char(' ') => return Ok(selected as u16),
                     KeyCode::Char(ch) => match ch {
                         'q' | 'Q' => return Err(Error::Quit),
                         '1' if counted && 1 <= opt_count => selected = 1 - 1,
@@ -654,7 +703,6 @@ impl Game {
                         '9' if counted && 9 <= opt_count => selected = 9 - 1,
                         _ => {}
                     },
-                    KeyCode::Enter => return Ok(selected as u16),
                     KeyCode::Esc => return Err(Error::Quit),
                     _ => {}
                 },
@@ -785,7 +833,7 @@ impl Game {
     }
 
     fn draw_char(&mut self, mut x: i32, y: i32, mut text: char, style: ContentStyle) {
-        if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32{
+        if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32 {
             return;
         }
 
