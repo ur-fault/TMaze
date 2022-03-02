@@ -1,7 +1,7 @@
 # TMaze
 Simple multiplatform maze solvnig game for terminal written in Rust
 
-Features
+## Features
 - Responsive to terminal size and resize events
 - Variable maze sizes
 - Variable maze generation algorithms: Randomized Kruskal's, Depth-First Search
@@ -9,7 +9,7 @@ Features
 - Show visited places
 - Spectator mode, where you can fly and see the map
 
-To do
+## To do
 - Add compiled executables
 - Settings, Controls and About screen
 - Render path (you will be able to disable this)
