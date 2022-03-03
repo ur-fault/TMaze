@@ -7,7 +7,7 @@ use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use helpers::{Dims, MasofDims};
+pub use helpers::{Dims, Dims3D};
 use masof::{Color, ContentStyle, Renderer};
 use std::time::{Duration, Instant};
 use substring::Substring;
@@ -29,9 +29,10 @@ pub enum Error {
 
 mod helpers {
     use crate::maze::Maze;
+    use std::time::Duration;
 
     pub type Dims = (i32, i32);
-    pub type MasofDims = (u16, u16);
+    pub type Dims3D = (i32, i32, i32);
 
     pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
         match options.iter().map(|opt| opt.len()).max() {
@@ -49,6 +50,24 @@ mod helpers {
             ),
             None => (0, 0),
         }
+    }
+
+    pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
+        match texts.iter().map(|text| text.len()).max() {
+            Some(l) => (
+                2 + 2 + l.max(title.len()) as i32,
+                2 + 2 + texts.len() as i32,
+            ),
+            None => (4 + title.len() as i32, 3),
+        }
+    }
+
+    pub fn format_duration(dur: Duration) -> String {
+        format!(
+            "{}m{:.1}s",
+            dur.as_secs() / 60,
+            (dur.as_secs() % 60) as f32 + dur.subsec_millis() as f32 / 1000f32,
+        )
     }
 
     pub fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
@@ -152,13 +171,13 @@ impl Game {
                     },
 
                     1 => {
-                        self.run_popup("Not implemented yet")?;
+                        self.run_popup("Not implemented yet", &[])?;
                     }
                     2 => {
-                        self.run_popup("Not implemented yet")?;
+                        self.run_popup("Not implemented yet", &[])?;
                     }
                     3 => {
-                        self.run_popup("Not implemented yet")?;
+                        self.run_popup("Not implemented yet", &[])?;
                     }
                     4 => break,
                     _ => break,
@@ -396,21 +415,25 @@ impl Game {
                 player_offset,
                 goal_pos,
                 (
-                    &format!("Dims: {}w{}h", maze.size().0, maze.size().1),
+                    &format!("Dims: {}x{}", maze.size().0, maze.size().1),
                     if spectator { "Spectator" } else { "Adventure" },
                     &format!("{} moves", move_count),
-                    &format!(
-                        "{}m{:.1}s",
-                        from_start.as_secs() / 60,
-                        from_start.as_secs_f32(),
-                    ),
+                    &helpers::format_duration(from_start),
                 ),
                 &moves,
             )?;
 
+            let play_time = Instant::now() - start_time;
+
             // check if player won
             if player_pos == goal_pos {
-                self.run_popup("You won")?;
+                self.run_popup(
+                    "You won",
+                    &[
+                        &format!("Time: {}", helpers::format_duration(play_time)),
+                        &format!("Moves: {}", move_count),
+                    ],
+                )?;
                 break Ok(());
             }
         }
@@ -732,8 +755,8 @@ impl Game {
         Ok(())
     }
 
-    fn run_popup(&mut self, text: &str) -> Result<(), Error> {
-        self.render_popup(text)?;
+    fn run_popup(&mut self, title: &str, texts: &[&str]) -> Result<(), Error> {
+        self.render_popup(title, texts)?;
 
         loop {
             let event = read()?;
@@ -743,18 +766,31 @@ impl Game {
 
             self.renderer.event(&event);
 
-            self.render_popup(text)?;
+            self.render_popup(title, texts)?;
         }
     }
 
-    fn render_popup(&mut self, text: &str) -> Result<(), Error> {
+    fn render_popup(&mut self, title: &str, texts: &[&str]) -> Result<(), Error> {
         self.renderer.begin()?;
 
-        let box_size = (text.len() as i32 + 4, 3);
+        let box_size = helpers::popup_size(title, texts);
+        let title_pos = self.box_center((title.len() as i32 + 2, 1))?.0;
         let pos = self.box_center(box_size)?;
 
         self.draw_box(pos, box_size, self.style);
-        self.draw_str(pos.0 + 1, pos.1 + 1, &format!(" {} ", text), self.style);
+        self.draw_str(title_pos, pos.1 + 1, &format!(" {} ", title), self.style);
+
+        if texts.len() != 0 {
+            self.draw_str(
+                pos.0 + 1,
+                pos.1 + 2,
+                &"─".repeat(box_size.0 as usize - 2),
+                self.style,
+            );
+            for (i, text) in texts.iter().enumerate() {
+                self.draw_str(pos.0 + 2, pos.1 + 3 + i as i32, text, self.style);
+            }
+        }
 
         self.renderer.end(&mut self.stdout)?;
 
