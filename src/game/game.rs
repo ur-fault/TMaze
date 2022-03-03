@@ -7,7 +7,7 @@ use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use helpers::{Dims, Dims3D};
+pub use helpers::{Dims, Dims3D, DimsU};
 use masof::{Color, ContentStyle, Renderer};
 use std::time::{Duration, Instant};
 use substring::Substring;
@@ -25,6 +25,8 @@ pub enum Error {
     FullQuit,
     #[error("EmptyMenu")]
     EmptyMenu,
+    #[error("InvalidValue")]
+    InvalidValue,
 }
 
 mod helpers {
@@ -33,6 +35,7 @@ mod helpers {
 
     pub type Dims = (i32, i32);
     pub type Dims3D = (i32, i32, i32);
+    pub type DimsU = (usize, usize);
 
     pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
         match options.iter().map(|opt| opt.len()).max() {
@@ -128,7 +131,7 @@ mod helpers {
         }
     }
 
-    pub fn from_maze_to_real(maze_pos: Dims) -> Dims {
+    pub fn from_maze_to_real(maze_pos: Dims3D) -> Dims {
         (maze_pos.0 * 2 + 1, maze_pos.1 * 2 + 1)
     }
 }
@@ -192,25 +195,27 @@ impl Game {
     }
 
     fn run_game(&mut self) -> Result<(), Error> {
-        let mut msize: (usize, usize) = match self.run_menu(
+        let mut msize: Dims3D = match self.run_menu(
             "Maze size",
-            &["10x5", "30x10", "60x30", "100x30", "debug", "xtreme"],
+            &[
+                "10x5x1", "30x10x3", "10x10x10", "100x30x1", "debug", "xtreme",
+            ],
             0,
             false,
         )? {
-            0 => (10, 5),
-            1 => (30, 10),
-            2 => (60, 30),
-            3 => (100, 30),
-            4 => (100, 100),
-            5 => (500, 500),
-            _ => (0, 0),
+            0 => (10, 5, 1),
+            1 => (30, 10, 3),
+            2 => (10, 10, 10),
+            3 => (100, 30, 1),
+            4 => (5, 5, 5),
+            5 => (500, 500, 1),
+            _ => (0, 0, 0),
         };
 
-        let mut player_pos: Dims = (0, 0);
-        let goal_pos: Dims = (msize.0 as i32 - 1, msize.1 as i32 - 1);
+        let mut player_pos = (0, 0, 0);
+        let goal_pos = (msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let mut player_offset: Dims = (0, 0);
+        let mut player_offset = (0, 0, 0);
         let mut spectator = false;
 
         let mut maze = {
@@ -226,9 +231,7 @@ impl Game {
                 _ => panic!(),
             };
             generation_func(
-                msize.0,
-                msize.1,
-                Some((player_pos.0 as usize, player_pos.1 as usize)),
+                msize,
                 Some(|done, all| {
                     let current_progess = done as f64 / all as f64;
                     if current_progess - last_progress > 0.01 {
@@ -269,7 +272,7 @@ impl Game {
             player_offset,
             goal_pos,
             (
-                &format!("Dims: {}w{}h", maze.size().0, maze.size().1),
+                &format!("{}x{}x{}", player_pos.0, player_pos.1, player_pos.2),
                 if spectator { "Spectator" } else { "Adventure" },
                 &format!("{} moves", move_count),
                 "",
@@ -283,20 +286,23 @@ impl Game {
 
                 fn move_player(
                     maze: &Maze,
-                    mut pos: Dims,
+                    mut pos: Dims3D,
                     wall: CellWall,
                     slow: bool,
-                    mut moves: &mut Vec<(Dims, CellWall)>,
-                ) -> (Dims, i32) {
+                    mut moves: &mut Vec<(Dims3D, CellWall)>,
+                ) -> (Dims3D, i32) {
                     if slow {
-                        if maze.get_cells()[pos.1 as usize][pos.0 as usize].get_wall(wall) {
+                        if maze.get_cells()[pos.2 as usize][pos.1 as usize][pos.0 as usize]
+                            .get_wall(wall)
+                        {
                             (pos, 0)
                         } else {
-                            moves.push(((pos.0, pos.1), wall));
+                            moves.push(((pos.0, pos.1, pos.2), wall));
                             (
                                 (
-                                    pos.0 + wall.to_coord().0 as i32,
-                                    pos.1 + wall.to_coord().1 as i32,
+                                    pos.0 + wall.to_coord().0,
+                                    pos.1 + wall.to_coord().1,
+                                    pos.2 + wall.to_coord().2,
                                 ),
                                 1,
                             )
@@ -304,20 +310,27 @@ impl Game {
                     } else {
                         let mut count = 0;
                         loop {
-                            let mut cell = &maze.get_cells()[pos.1 as usize][pos.0 as usize];
+                            let mut cell =
+                                &maze.get_cells()[pos.2 as usize][pos.1 as usize][pos.0 as usize];
                             if cell.get_wall(wall) {
                                 break (pos, count);
                             }
                             count += 1;
-                            moves.push(((pos.0, pos.1), wall));
+                            moves.push(((pos.0, pos.1, pos.2), wall));
                             pos = (
-                                (pos.0 + wall.to_coord().0 as i32),
-                                (pos.1 + wall.to_coord().1 as i32),
+                                pos.0 + wall.to_coord().0,
+                                pos.1 + wall.to_coord().1,
+                                pos.2 + wall.to_coord().2,
                             );
-                            cell = &maze.get_cells()[pos.1 as usize][pos.0 as usize];
+                            cell =
+                                &maze.get_cells()[pos.2 as usize][pos.1 as usize][pos.0 as usize];
 
                             let perp = wall.perpendicular_walls();
-                            if !cell.get_wall(perp.0) || !cell.get_wall(perp.1) {
+                            if !cell.get_wall(perp.0)
+                                || !cell.get_wall(perp.1)
+                                || !cell.get_wall(perp.2)
+                                || !cell.get_wall(perp.3)
+                            {
                                 break (pos, count);
                             }
                         }
@@ -328,7 +341,8 @@ impl Game {
                     Ok(Event::Key(KeyEvent { code, modifiers })) => match code {
                         KeyCode::Up | KeyCode::Char('w' | 'W') => {
                             if spectator {
-                                player_offset = (player_offset.0, player_offset.1 + 1)
+                                player_offset =
+                                    (player_offset.0, player_offset.1 + 1, player_offset.2)
                             } else {
                                 let pmove = move_player(
                                     &maze,
@@ -343,7 +357,8 @@ impl Game {
                         }
                         KeyCode::Down | KeyCode::Char('s' | 'S') => {
                             if spectator {
-                                player_offset = (player_offset.0, player_offset.1 - 1)
+                                player_offset =
+                                    (player_offset.0, player_offset.1 - 1, player_offset.2)
                             } else {
                                 let pmove = move_player(
                                     &maze,
@@ -358,7 +373,8 @@ impl Game {
                         }
                         KeyCode::Left | KeyCode::Char('a' | 'A') => {
                             if spectator {
-                                player_offset = (player_offset.0 + 1, player_offset.1)
+                                player_offset =
+                                    (player_offset.0 + 1, player_offset.1, player_offset.2)
                             } else {
                                 let pmove = move_player(
                                     &maze,
@@ -373,7 +389,8 @@ impl Game {
                         }
                         KeyCode::Right | KeyCode::Char('d' | 'D') => {
                             if spectator {
-                                player_offset = (player_offset.0 - 1, player_offset.1)
+                                player_offset =
+                                    (player_offset.0 - 1, player_offset.1, player_offset.2)
                             } else {
                                 let pmove = move_player(
                                     &maze,
@@ -386,15 +403,44 @@ impl Game {
                                 move_count += pmove.1;
                             }
                         }
+                        KeyCode::Char('q' | 'Q') => {
+                            if spectator {
+                                player_offset =
+                                    (player_offset.0, player_offset.1, (-player_pos.2).max(player_offset.2 - 1))
+                            } else {
+                                let pmove = move_player(
+                                    &maze,
+                                    player_pos,
+                                    CellWall::Down,
+                                    false,
+                                    &mut moves,
+                                );
+                                player_pos = pmove.0;
+                                move_count += pmove.1;
+                            }
+                        }
+                        KeyCode::Char('e' | 'E') => {
+                            if spectator {
+                                player_offset = (
+                                    player_offset.0,
+                                    player_offset.1,
+                                    (maze.size().2 - player_pos.2 - 1).min(player_offset.2 + 1),
+                                )
+                            } else {
+                                let pmove =
+                                    move_player(&maze, player_pos, CellWall::Up, false, &mut moves);
+                                player_pos = pmove.0;
+                                move_count += pmove.1;
+                            }
+                        }
                         KeyCode::Char(' ') => {
                             if spectator {
-                                player_offset = (0, 0);
+                                player_offset = (0, 0, 0);
                                 spectator = false
                             } else {
                                 spectator = true
                             }
                         }
-                        KeyCode::Char('q' | 'Q') => break Err(Error::FullQuit),
                         KeyCode::Enter => {}
                         KeyCode::Esc => break Err(Error::Quit),
                         _ => {}
@@ -415,7 +461,7 @@ impl Game {
                 player_offset,
                 goal_pos,
                 (
-                    &format!("Dims: {}x{}", maze.size().0, maze.size().1),
+                    &format!("{}x{}x{}", player_pos.0, player_pos.1, player_pos.2),
                     if spectator { "Spectator" } else { "Adventure" },
                     &format!("{} moves", move_count),
                     &helpers::format_duration(from_start),
@@ -467,11 +513,11 @@ impl Game {
     fn render_game(
         &mut self,
         maze: &Maze,
-        player_pos: Dims,
-        player_offset: Dims,
-        goal_pos: Dims,
+        player_pos: Dims3D,
+        player_offset: Dims3D,
+        goal_pos: Dims3D,
         texts: (&str, &str, &str, &str),
-        moves: &[(Dims, CellWall)],
+        moves: &[(Dims3D, CellWall)],
     ) -> Result<(), Error> {
         let real_size = helpers::maze_render_size(maze);
         let size = {
@@ -493,6 +539,8 @@ impl Game {
 
             (pos.0 + player_offset.0 * 2, pos.1 + player_offset.1 * 2)
         };
+
+        let floor = player_pos.2 + player_offset.2;
 
         self.renderer.begin()?;
 
@@ -564,7 +612,8 @@ impl Game {
                             true,
                             false,
                             true,
-                            maze.get_cells()[0][x].get_wall(CellWall::Right),
+                            maze.get_cells()[floor as usize][0][x as usize]
+                                .get_wall(CellWall::Right),
                         )
                     ),
                     self.style,
@@ -579,7 +628,9 @@ impl Game {
                         helpers::double_line_corner(true, false, true, false),
                         helpers::double_line_corner(
                             true,
-                            maze.get_cells()[maze.size().1 - 1][x].get_wall(CellWall::Right),
+                            maze.get_cells()[floor as usize][maze.size().1 as usize - 1]
+                                [x as usize]
+                                .get_wall(CellWall::Right),
                             true,
                             false,
                         )
@@ -612,7 +663,8 @@ impl Game {
                         helpers::double_line_corner(
                             false,
                             true,
-                            maze.get_cells()[y][0].get_wall(CellWall::Bottom),
+                            maze.get_cells()[floor as usize][y as usize][0]
+                                .get_wall(CellWall::Bottom),
                             true,
                         )
                     ),
@@ -625,7 +677,8 @@ impl Game {
                     &format!(
                         "{}",
                         helpers::double_line_corner(
-                            maze.get_cells()[y][maze.size().0 as usize - 1]
+                            maze.get_cells()[floor as usize][y as usize]
+                                [maze.size().0 as usize - 1]
                                 .get_wall(CellWall::Bottom),
                             true,
                             false,
@@ -644,38 +697,52 @@ impl Game {
             );
         }
 
-        for (iy, row) in maze.get_cells().iter().enumerate() {
+        for (move_pos, wall) in moves {
+            let real_pos = helpers::from_maze_to_real(*move_pos);
+            self.draw_char(pos.0 + real_pos.0, pos.1 + real_pos.1, '.', self.style)
+        }
+
+        for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
             let ypos = iy as i32 * 2 + 1 + pos.1;
             if ypos >= size.1 - 2 {
                 break;
             }
 
             for (ix, cell) in row.iter().enumerate() {
-                if cell.get_wall(CellWall::Right) && ix != maze.size().0 - 1 {
+                let xpos = ix as i32 * 2 + 1 + pos.0;
+                if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
                     self.draw_str(
-                        ix as i32 * 2 + 2 + pos.0,
+                        xpos + 1,
                         ypos,
                         helpers::double_line_corner(false, true, false, true),
                         self.style,
                     );
                 }
-                if iy as i32 * 2 + 2 + pos.1 < size.1 as i32 - 2
+                if ypos + 1 < size.1 as i32 - 2
                     && cell.get_wall(CellWall::Bottom)
-                    && iy != maze.size().1 - 1
+                    && iy != maze.size().1 as usize - 1
                 {
                     self.draw_str(
-                        ix as i32 * 2 + 1 + pos.0,
+                        xpos,
                         ypos + 1,
                         helpers::double_line_corner(true, false, true, false),
                         self.style,
                     );
                 }
 
-                if iy == maze.size().1 - 1 || ix == maze.size().0 - 1 {
+                if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
+                    self.draw_char(xpos, ypos, 'X', self.style);
+                } else if !cell.get_wall(CellWall::Up) {
+                    self.draw_char(xpos, ypos, '/', self.style);
+                } else if !cell.get_wall(CellWall::Down) {
+                    self.draw_char(xpos, ypos, '\\', self.style);
+                }
+
+                if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
                     continue;
                 }
 
-                let cell2 = &maze.get_cells()[iy + 1][ix + 1];
+                let cell2 = &maze.get_cells()[floor as usize][iy + 1][ix + 1];
 
                 if ypos < size.1 as i32 - 3 {
                     self.draw_str(
@@ -693,32 +760,31 @@ impl Game {
             }
         }
 
-        for (move_pos, wall) in moves {
-            let real_pos = helpers::from_maze_to_real(*move_pos);
-            self.draw_char(pos.0 + real_pos.0, pos.1 + real_pos.1, '.', self.style)
+        if floor == goal_pos.2 {
+            self.draw_char(
+                goal_pos.0 * 2 + 1 + pos.0,
+                goal_pos.1 * 2 + 1 + pos.1,
+                '$',
+                ContentStyle {
+                    foreground_color: Some(Color::DarkYellow),
+                    background_color: Default::default(),
+                    attributes: Default::default(),
+                },
+            );
         }
 
-        self.draw_char(
-            goal_pos.0 * 2 + 1 + pos.0,
-            goal_pos.1 * 2 + 1 + pos.1,
-            '$',
-            ContentStyle {
-                foreground_color: Some(Color::DarkYellow),
-                background_color: Default::default(),
-                attributes: Default::default(),
-            },
-        );
-
-        self.draw_char(
-            player_pos.0 * 2 + 1 + pos.0,
-            player_pos.1 * 2 + 1 + pos.1,
-            'O',
-            ContentStyle {
-                foreground_color: Some(Color::Green),
-                background_color: Default::default(),
-                attributes: Default::default(),
-            },
-        );
+        if floor == player_pos.2 {
+            self.draw_char(
+                player_pos.0 * 2 + 1 + pos.0,
+                player_pos.1 * 2 + 1 + pos.1,
+                'O',
+                ContentStyle {
+                    foreground_color: Some(Color::Green),
+                    background_color: Default::default(),
+                    attributes: Default::default(),
+                },
+            );
+        }
 
         // Print texts
         let str_pos_tl = if is_around_player {

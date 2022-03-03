@@ -1,72 +1,100 @@
+use self::CellWall::*;
+use crate::game::{Dims, Dims3D, DimsU};
 use crate::maze::cell::{Cell, CellWall};
 
 pub struct Maze {
-    pub(crate) cells: Vec<Vec<Cell>>,
+    pub(crate) cells: Vec<Vec<Vec<Cell>>>,
     pub(crate) width: usize,
     pub(crate) height: usize,
+    pub(crate) depth: usize,
 }
 
 impl Maze {
-    pub fn size(&self) -> (usize, usize) {
-        (self.cells[0].len(), self.cells.len())
+    pub fn size(&self) -> Dims3D {
+        (
+            // self.cells[0][0].len() as i32,
+            // self.cells[0].len() as i32,
+            // self.cells.len() as i32,
+            self.width as i32,
+            self.height as i32,
+            self.depth as i32,
+        )
     }
 
-    pub fn is_in_bounds(&self, x: isize, y: isize) -> bool {
-        0 <= x && x < self.width as isize && 0 <= y && y < self.height as isize
+    pub fn is_in_bounds(&self, pos: Dims3D) -> bool {
+        // 0 <= x && x < self.width as isize && 0 <= y && y < self.height as isize
+        0 <= pos.0
+            && pos.0 < self.width as i32
+            && 0 <= pos.1
+            && pos.1 < self.height as i32
+            && 0 <= pos.2
+            && pos.2 < self.depth as i32
     }
 
-    pub fn is_valid_neighbor(&self, cell: (usize, usize), off_x: isize, off_y: isize) -> bool {
-        (off_x == -1 || off_x == 1 || off_x == 0)
-            && (off_y == -1 || off_y == 1 || off_y == 0)
-            && ((off_x == 0) ^ (off_y == 0))
-            && self.is_in_bounds(cell.0 as isize, cell.1 as isize)
-            && self.is_in_bounds(cell.0 as isize + off_x, cell.1 as isize + off_y)
+    pub fn is_valid_neighbor(&self, cell: Dims3D, off: Dims3D) -> bool {
+        (off.0 == -1 || off.0 == 1 || off.0 == 0)
+            && (off.1 == -1 || off.1 == 1 || off.1 == 0)
+            && (off.2 == -1 || off.2 == 1 || off.2 == 0)
+            && ((off.0 == 1 || off.0 == -1) as u8
+                + (off.1 == 1 || off.1 == -1) as u8
+                + (off.2 == 1 || off.2 == -1) as u8)
+                == 1
+            && self.is_in_bounds(cell)
+            && self.is_in_bounds((cell.0 + off.0, cell.1 + off.1, cell.2 + off.2))
     }
 
-    pub fn is_valid_wall(&self, cell: (usize, usize), wall: CellWall) -> bool {
+    pub fn is_valid_wall(&self, cell: Dims3D, wall: CellWall) -> bool {
         let neighbor_offset = wall.to_coord();
-        self.is_valid_neighbor(cell, neighbor_offset.0, neighbor_offset.1)
+        self.is_valid_neighbor(cell, neighbor_offset)
     }
 
-    pub fn which_wall(cell: (usize, usize), cell2: (usize, usize)) -> CellWall {
-        match (
-            cell.0 as isize - cell2.0 as isize,
-            cell.1 as isize - cell2.1 as isize,
-        ) {
-            (-1, 0) => CellWall::Right,
-            (1, 0) => CellWall::Left,
-            (0, -1) => CellWall::Bottom,
-            (0, 1) => CellWall::Top,
+    pub fn which_wall(cell: Dims3D, cell2: Dims3D) -> CellWall {
+        match (cell.0 - cell2.0, cell.1 - cell2.1, cell.2 - cell2.2) {
+            (-1, 0, 0) => Right,
+            (1, 0, 0) => Left,
+            (0, -1, 0) => Bottom,
+            (0, 1, 0) => Top,
+            (0, 0, 1) => Down,
+            (0, 0, -1) => Up,
             _ => panic!(),
         }
     }
 
-    pub fn get_neighbors(&self, cell: (usize, usize)) -> Vec<&Cell> {
-        let offsets: [(isize, isize); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+    pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
+        let offsets = [
+            (-1, 0, 0),
+            (1, 0, 0),
+            (0, -1, 0),
+            (0, 1, 0),
+            (0, 0, -1),
+            (0, 0, 1),
+        ];
         offsets
             .into_iter()
-            .filter(|(x, y)| self.is_valid_neighbor(cell, *x, *y))
-            .map(|(x, y)| {
-                &self.cells[(cell.1 as isize + y) as usize][(cell.0 as isize + x) as usize]
+            .filter(|off| self.is_valid_neighbor(cell, *off))
+            .map(|off| {
+                &self.cells[(cell.2 + off.2) as usize][(cell.1 + off.1) as usize]
+                    [(cell.0 + off.0) as usize]
             })
             .collect()
     }
 
-    pub fn remove_wall(&mut self, cell: (usize, usize), wall: CellWall) {
+    pub fn remove_wall(&mut self, cell: Dims3D, wall: CellWall) {
         if !self.is_valid_wall(cell, wall) {
             return;
         }
 
-        self.cells[cell.1][cell.0].remove_wall(wall);
+        self.cells[cell.2 as usize][cell.1 as usize][cell.0 as usize].remove_wall(wall);
         let neighbor_offset = wall.to_coord();
         {
-            let x2 = (cell.0 as isize + neighbor_offset.0) as usize;
-            let y2 = (cell.1 as isize + neighbor_offset.1) as usize;
-            self.cells[y2][x2].remove_wall(wall.reverse_wall());
+            let x2 = (cell.0 + neighbor_offset.0) as usize;
+            let y2 = (cell.1 + neighbor_offset.1) as usize;
+            let z2 = (cell.2 + neighbor_offset.2) as usize;
+            self.cells[z2][y2][x2].remove_wall(wall.reverse_wall());
         }
     }
 
-    pub fn get_cells(&self) -> &[Vec<Cell>] {
+    pub fn get_cells(&self) -> &[Vec<Vec<Cell>>] {
         &self.cells
     }
 }

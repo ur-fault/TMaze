@@ -1,4 +1,5 @@
-
+use crate::game::Dims3D;
+use crate::maze::cell::CellWall::*;
 
 #[derive(Clone)]
 pub struct Cell {
@@ -6,39 +7,47 @@ pub struct Cell {
     top: bool,
     right: bool,
     bottom: bool,
-    coord: (usize, usize),
+    up: bool,
+    down: bool,
+    coord: Dims3D,
 }
 
 impl Cell {
-    pub fn new(x: usize, y: usize) -> Cell {
+    pub fn new(pos: Dims3D) -> Cell {
         Cell {
             left: true,
             right: true,
             top: true,
             bottom: true,
-            coord: (x, y),
+            up: true,
+            down: true,
+            coord: pos,
         }
     }
 
     pub fn remove_wall(&mut self, wall: CellWall) {
         match wall {
-            CellWall::Left => self.left = false,
-            CellWall::Top => self.top = false,
-            CellWall::Right => self.right = false,
-            CellWall::Bottom => self.bottom = false,
+            Left => self.left = false,
+            Top => self.top = false,
+            Right => self.right = false,
+            Bottom => self.bottom = false,
+            Up => self.up = false,
+            Down => self.down = false,
         }
     }
 
     pub fn get_wall(&self, wall: CellWall) -> bool {
         match wall {
-            CellWall::Left => self.left,
-            CellWall::Top => self.top,
-            CellWall::Right => self.right,
-            CellWall::Bottom => self.bottom,
+            Left => self.left,
+            Top => self.top,
+            Right => self.right,
+            Bottom => self.bottom,
+            Up => self.up,
+            Down => self.down,
         }
     }
 
-    pub fn get_coord(&self) -> (usize, usize) {
+    pub fn get_coord(&self) -> Dims3D {
         self.coord
     }
 }
@@ -57,31 +66,38 @@ pub enum CellWall {
     Right,
     Top,
     Bottom,
+    Up,
+    Down,
 }
 
 impl CellWall {
-    pub fn to_coord(&self) -> (isize, isize) {
+    pub fn to_coord(&self) -> Dims3D {
         match self {
-            Self::Left => (-1, 0),
-            Self::Right => (1, 0),
-            Self::Top => (0, -1),
-            Self::Bottom => (0, 1),
+            Self::Left => (-1, 0, 0),
+            Self::Right => (1, 0, 0),
+            Self::Top => (0, -1, 0),
+            Self::Bottom => (0, 1, 0),
+            Self::Up => (0, 0, 1),
+            Self::Down => (0, 0, -1),
         }
     }
 
     pub fn reverse_wall(&self) -> CellWall {
         match self {
-            CellWall::Left => CellWall::Right,
-            CellWall::Right => CellWall::Left,
-            CellWall::Top => CellWall::Bottom,
-            CellWall::Bottom => CellWall::Top,
+            Left => Right,
+            Right => Left,
+            Top => Bottom,
+            Bottom => Top,
+            Up => Down,
+            Down => Up,
         }
     }
 
-    pub fn perpendicular_walls(&self) -> (CellWall, CellWall) {
-        match *self {
-            Self::Left | Self::Right => (Self::Top, Self::Bottom),
-            Self::Top | Self::Bottom => (Self::Left, Self::Right),
+    pub fn perpendicular_walls(&self) -> (CellWall, CellWall, CellWall, CellWall) {
+        match self {
+            Left | Right => (Top, Bottom, Up, Down),
+            Top | Bottom => (Left, Right, Up, Down),
+            Up | Down => (Top, Bottom, Left, Right),
         }
     }
 }

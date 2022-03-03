@@ -4,8 +4,9 @@
 
 mod game;
 use game::Game;
+use crate::maze::MazeAlgorithm;
+
 mod maze;
-// use maze::{Maze, CellWall, Cell};
 
 fn main() -> Result<(), game::game::Error> {
     Game::new().run()

@@ -1,6 +1,7 @@
+use self::CellWall::*;
 use super::super::cell::{Cell, CellWall};
 use super::{Maze, MazeAlgorithm};
-use crate::game::{Dims, Error};
+use crate::game::{Dims, Dims3D, Error};
 use rand::{seq::SliceRandom, thread_rng};
 use std::collections::HashSet;
 
@@ -8,73 +9,97 @@ pub struct RndKruskals {}
 
 impl MazeAlgorithm for RndKruskals {
     fn new<T: FnMut(usize, usize) -> Result<(), Error>>(
-        w: usize,
-        h: usize,
-        start_: Option<(usize, usize)>,
+        size: Dims3D,
         mut report_progress: Option<T>,
     ) -> Result<Maze, Error> {
-        let cell_count = w * h;
-        let mut cells: Vec<Vec<Cell>> = vec![Vec::with_capacity(w); h];
-        for y in 0..h {
-            for x in 0..w {
-                cells[y].push(Cell::new(x, y));
-            }
-        }
+        let (w, h, d) = size;
+        let (wu, hu, du) = (w as usize, h as usize, d as usize);
+        let cell_count = wu * hu * du;
 
-        let wall_count = h * (w - 1) + w * (h - 1);
-        let mut walls: Vec<(Dims, CellWall)> = Vec::with_capacity(wall_count);
+        let mut cells: Vec<Vec<Vec<Cell>>> = vec![vec![Vec::with_capacity(wu); hu]; du];
 
-        for (iy, row) in cells.iter().enumerate() {
-            for ix in 0..row.len() {
-                if iy == h - 1 && ix == w - 1 {
-                    continue;
-                } else if iy == h - 1 {
-                    walls.push(((ix as i32, iy as i32), CellWall::Right));
-                } else if ix == w - 1 {
-                    walls.push(((ix as i32, iy as i32), CellWall::Bottom));
-                } else {
-                    walls.push(((ix as i32, iy as i32), CellWall::Right));
-                    walls.push(((ix as i32, iy as i32), CellWall::Bottom));
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    cells[z as usize][y as usize].push(Cell::new((x, y, z)));
                 }
             }
         }
 
-        let mut sets = Vec::<HashSet<Dims>>::with_capacity(cell_count);
-        for iy in 0..cells.len() {
-            for ix in 0..cells[0].len() {
-                sets.push(vec![(ix as i32, iy as i32)].into_iter().collect());
+        let wall_count = (hu * (wu - 1) + wu * (hu - 1)) * du + wu * hu * (du - 1);
+        let mut walls: Vec<(Dims3D, CellWall)> = Vec::with_capacity(wall_count);
+
+        for (iz, floor) in cells.iter().enumerate() {
+            for (iy, row) in floor.iter().enumerate() {
+                for ix in 0..row.len() {
+                    // if iy == hu - 1 && ix == wu - 1 && iz == du - 1 {
+                    //     continue;
+                    // } else if iy == hu - 1 {
+                    //     walls.push(((ix as i32, iy as i32, iz as i32), Right));
+                    // } else if ix == wu - 1 {
+                    //     walls.push(((ix as i32, iy as i32, iz as i32), Bottom));
+                    // } else {
+                    //     walls.push(((ix as i32, iy as i32, iz as i32), Right));
+                    //     walls.push(((ix as i32, iy as i32, iz as i32), Bottom));
+                    // }
+                    if ix != wu - 1 {
+                        walls.push(((ix as i32, iy as i32, iz as i32), Right));
+                    }
+
+                    if iy != hu - 1 {
+                        walls.push(((ix as i32, iy as i32, iz as i32), Bottom));
+                    }
+
+                    if iz != du - 1 {
+                        walls.push(((ix as i32, iy as i32, iz as i32), Up));
+                    }
+                }
+            }
+        }
+
+        let mut sets = Vec::<HashSet<Dims3D>>::with_capacity(cell_count);
+        for iz in 0..cells.len() {
+            for iy in 0..cells[0].len() {
+                for ix in 0..cells[0][0].len() {
+                    sets.push(
+                        vec![(ix as i32, iy as i32, iz as i32)]
+                            .into_iter()
+                            .collect(),
+                    );
+                }
             }
         }
 
         walls.shuffle(&mut thread_rng());
-        while let Some(((ix0, iy0), wall)) = walls.pop() {
-            let (ix1, iy1) = (
-                (wall.to_coord().0 + ix0 as isize) as i32,
-                (wall.to_coord().1 + iy0 as isize) as i32,
+        while let Some(((ix0, iy0, iz0), wall)) = walls.pop() {
+            let (ix1, iy1, iz1) = (
+                (wall.to_coord().0 + ix0),
+                (wall.to_coord().1 + iy0),
+                (wall.to_coord().2 + iz0),
             );
 
             let set0_i = sets
                 .iter()
-                .position(|set| set.contains(&(ix0, iy0)))
+                .position(|set| set.contains(&(ix0, iy0, iz0)))
                 .unwrap();
             let set1_i = sets
                 .iter()
-                .position(|set| set.contains(&(ix1, iy1)))
+                .position(|set| set.contains(&(ix1, iy1, iz1)))
                 .unwrap();
 
             if set0_i == set1_i {
                 continue;
             }
 
-            cells[iy0 as usize][ix0 as usize].remove_wall(wall);
-            cells[iy1 as usize][ix1 as usize].remove_wall(wall.reverse_wall());
+            cells[iz0 as usize][iy0 as usize][ix0 as usize].remove_wall(wall);
+            cells[iz1 as usize][iy1 as usize][ix1 as usize].remove_wall(wall.reverse_wall());
             let set0 = sets.swap_remove(set0_i);
 
             let set1_i = if set1_i == sets.len() - 1 {
                 sets.len() - 1
             } else {
                 sets.iter()
-                    .position(|set| set.contains(&(ix1, iy1)))
+                    .position(|set| set.contains(&(ix1, iy1, iz1)))
                     .unwrap()
             };
             sets[set1_i].extend(set0);
@@ -86,8 +111,9 @@ impl MazeAlgorithm for RndKruskals {
 
         Ok(Maze {
             cells,
-            width: w,
-            height: h,
+            width: wu,
+            height: hu,
+            depth: du,
         })
     }
 }

@@ -1,38 +1,45 @@
 use super::super::cell::Cell;
 use super::{Maze, MazeAlgorithm};
-use crate::game::Error;
+use crate::game::{Dims3D, Error};
 use rand::seq::SliceRandom;
 
 pub struct DepthFirstSearch {}
 
 impl MazeAlgorithm for DepthFirstSearch {
     fn new<T: FnMut(usize, usize) -> Result<(), Error>>(
-        w: usize,
-        h: usize,
-        start_: Option<(usize, usize)>,
+        size: Dims3D,
         mut report_progress: Option<T>,
     ) -> Result<Maze, Error> {
-        let mut visited: Vec<(usize, usize)> = Vec::with_capacity(w * h);
-        let mut stack: Vec<(usize, usize)> = Vec::with_capacity(w * h);
+        if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
+            return Err(Error::InvalidValue);
+        }
 
-        let cell_count = w * h;
+        let (w, h, d) = size;
+        let (wu, hu, du) = (w as usize, h as usize, d as usize);
+        let cell_count = wu * hu * du;
 
-        let (sx, sy) = start_.unwrap_or((0, 0));
+        let mut visited: Vec<Dims3D> = Vec::with_capacity(cell_count);
+        let mut stack: Vec<Dims3D> = Vec::with_capacity(cell_count);
 
-        let mut cells: Vec<Vec<Cell>> = vec![Vec::with_capacity(w); h];
-        for y in 0..h {
-            for x in 0..w {
-                cells[y].push(Cell::new(x, y));
+        let (sx, sy, sz) = (0, 0, 0);
+
+        let mut cells: Vec<Vec<Vec<Cell>>> = vec![vec![Vec::with_capacity(wu); hu]; du];
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    cells[z as usize][y as usize].push(Cell::new((x, y, z)));
+                }
             }
         }
 
         let mut maze = Maze {
             cells,
-            width: w,
-            height: h,
+            width: wu,
+            height: hu,
+            depth: du,
         };
 
-        let mut current = (sx, sy);
+        let mut current = (sx, sy, sz);
         visited.push(current);
         stack.push(current);
         while !stack.is_empty() {
@@ -42,7 +49,7 @@ impl MazeAlgorithm for DepthFirstSearch {
                 .into_iter()
                 .map(|cell| cell.get_coord())
                 .filter(|cell| !visited.contains(cell))
-                .collect::<Vec<(usize, usize)>>();
+                .collect::<Vec<_>>();
 
             if !unvisited_neighbors.is_empty() {
                 stack.push(current);
