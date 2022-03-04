@@ -20,6 +20,8 @@ Simple multiplatform maze solvnig game for terminal written in Rust
 - Settings, Controls and About screen
 - Render path (you will be able to disable this)
 - Maybe multiplayer (depends on difficulty of adding it)
+- Separate UI to different crate
+- Saving and exporting game state, mazes and their generators
 
 ## How to run
 
@@ -30,6 +32,6 @@ Simple multiplatform maze solvnig game for terminal written in Rust
 
 1. Clone Github repository or download as zip, then extract it
 2. Go to that folder
-3. Run `cargo build --release` to run
+3. Run `cargo run --release` to run
 4. Alternatively you can only build it with `cargo build --release`
 5. Compiled executable is in the folder `./target/release/`
