@@ -30,7 +30,7 @@ Simple multiplatform maze solvnig game for terminal written in entirely Rust
 
 ### How to build from source
 
-1. Clone Github repository or download as zip, then extract it
+1. Clone GitHub repository or download as zip, then extract it
 2. Go to that folder
 3. Run `cargo run --release` to run
 4. Alternatively you can only build it with `cargo build --release`
