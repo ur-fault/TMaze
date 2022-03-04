@@ -32,16 +32,6 @@ impl MazeAlgorithm for RndKruskals {
         for (iz, floor) in cells.iter().enumerate() {
             for (iy, row) in floor.iter().enumerate() {
                 for ix in 0..row.len() {
-                    // if iy == hu - 1 && ix == wu - 1 && iz == du - 1 {
-                    //     continue;
-                    // } else if iy == hu - 1 {
-                    //     walls.push(((ix as i32, iy as i32, iz as i32), Right));
-                    // } else if ix == wu - 1 {
-                    //     walls.push(((ix as i32, iy as i32, iz as i32), Bottom));
-                    // } else {
-                    //     walls.push(((ix as i32, iy as i32, iz as i32), Right));
-                    //     walls.push(((ix as i32, iy as i32, iz as i32), Bottom));
-                    // }
                     if ix != wu - 1 {
                         walls.push(((ix as i32, iy as i32, iz as i32), Right));
                     }
@@ -82,14 +72,18 @@ impl MazeAlgorithm for RndKruskals {
                 .iter()
                 .position(|set| set.contains(&(ix0, iy0, iz0)))
                 .unwrap();
+
+            // if set0_i == set1_i {
+            //     continue;
+            // }
+            if sets[set0_i].contains(&(ix1, iy1, iz1)) {
+                continue;
+            }
+
             let set1_i = sets
                 .iter()
                 .position(|set| set.contains(&(ix1, iy1, iz1)))
                 .unwrap();
-
-            if set0_i == set1_i {
-                continue;
-            }
 
             cells[iz0 as usize][iy0 as usize][ix0 as usize].remove_wall(wall);
             cells[iz1 as usize][iy1 as usize][ix1 as usize].remove_wall(wall.reverse_wall());
