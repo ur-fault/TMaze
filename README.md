@@ -1,6 +1,6 @@
 # TMaze
 
-Simple multiplatform maze solvnig game for terminal written in Rust
+Simple multiplatform maze solvnig game for terminal written in entirely Rust
 
 ## What it can do
 
@@ -25,7 +25,7 @@ Simple multiplatform maze solvnig game for terminal written in Rust
 
 ## How to run
 
-- Download from Github, althought there are old builds, and I won't update them so frequently
+- Download from Github, althought there are old builds, and I won't update them so frequently, maybe in the future
 - Build from source
 
 ### How to build from source
