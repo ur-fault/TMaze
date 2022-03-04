@@ -20,6 +20,8 @@ Simple multiplatform maze solvnig game for terminal written in Rust
 - Settings, Controls and About screen
 - Render path (you will be able to disable this)
 - Maybe multiplayer (depends on difficulty of adding it)
+- Separate UI to different crate
+- Saving and exporting game state, mazes and their generators
 
 ## How to run
 
