@@ -1,6 +1,6 @@
 use super::super::cell::Cell;
 use super::{Maze, MazeAlgorithm};
-use crate::game::{Dims3D, Error};
+use crate::tmcore::*;
 use rand::seq::SliceRandom;
 
 pub struct DepthFirstSearch {}

@@ -1,5 +1,5 @@
 use self::CellWall::*;
-use crate::game::{Dims, Dims3D, DimsU};
+use crate::tmcore::*;
 use crate::maze::cell::{Cell, CellWall};
 
 pub struct Maze {

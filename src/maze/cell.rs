@@ -1,4 +1,4 @@
-use crate::game::Dims3D;
+use crate::tmcore::*;
 use crate::maze::cell::CellWall::*;
 
 #[derive(Clone)]

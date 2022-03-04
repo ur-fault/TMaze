@@ -7,35 +7,17 @@ use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use helpers::{Dims, Dims3D, DimsU};
 use masof::{Color, ContentStyle, Renderer};
 use std::time::{Duration, Instant};
 use substring::Substring;
-use thiserror::Error;
+use crate::tmcore::*;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("CrossTerm error; {0}")]
-    CrossTermError(#[from] crossterm::ErrorKind),
-    #[error("Renderer error; {0}")]
-    DrawBufferError(#[from] masof::renderer::Error),
-    #[error("Quit")]
-    Quit,
-    #[error("FullQuit")]
-    FullQuit,
-    #[error("EmptyMenu")]
-    EmptyMenu,
-    #[error("InvalidValue")]
-    InvalidValue,
-}
 
 mod helpers {
     use crate::maze::Maze;
     use std::time::Duration;
+    use crate::tmcore::*;
 
-    pub type Dims = (i32, i32);
-    pub type Dims3D = (i32, i32, i32);
-    pub type DimsU = (usize, usize);
 
     pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
         match options.iter().map(|opt| opt.len()).max() {
@@ -197,7 +179,7 @@ impl Game {
     fn run_game(&mut self) -> Result<(), Error> {
         let mut msize: Dims3D = match self.run_menu(
             "Maze size",
-            &["10x5x1", "30x10x3", "5x5x5", "100x30x1", "debug", "xtreme"],
+            &["10x5", "30x10x3", "5x5x5", "100x30", "300x100", "debug", "xtreme"],
             0,
             false,
         )? {
@@ -205,8 +187,9 @@ impl Game {
             1 => (30, 10, 3),
             2 => (5, 5, 5),
             3 => (100, 30, 1),
-            4 => (10, 10, 10),
-            5 => (500, 500, 1),
+            4 => (300, 100, 1),
+            5 => (10, 10, 10),
+            6 => (500, 500, 1),
             _ => (0, 0, 0),
         };
 
@@ -241,7 +224,7 @@ impl Game {
 
                         // check for quit keys from user
                         if let Ok(true) = poll(Duration::from_nanos(1)) {
-                            if let Ok(Event::Key(KeyEvent { code, modifiers })) = read() {
+                            if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
                                 match code {
                                     KeyCode::Esc => {
                                         return Err(Error::Quit);
