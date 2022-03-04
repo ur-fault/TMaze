@@ -6,13 +6,11 @@ use crossterm::{
     terminal::size,
 };
 use masof::{Color, ContentStyle, Renderer};
-use substring::Substring;
 
 use crate::maze::algorithms::*;
 use crate::maze::{CellWall, Maze};
 use crate::tmcore::*;
 use crate::{helpers, ui};
-use std::fs::rename;
 
 pub struct GameSettings {
     slow: bool,
@@ -55,13 +53,31 @@ impl Game {
                     },
 
                     1 => {
-                        self.run_popup("Not implemented yet", &[])?;
+                        ui::run_popup(
+                            &mut self.renderer,
+                            self.style,
+                            &mut self.stdout,
+                            "Not implemented yet",
+                            &[],
+                        )?;
                     }
                     2 => {
-                        self.run_popup("Not implemented yet", &[])?;
+                        ui::run_popup(
+                            &mut self.renderer,
+                            self.style,
+                            &mut self.stdout,
+                            "Not implemented yet",
+                            &[],
+                        )?;
                     }
                     3 => {
-                        self.run_popup("Not implemented yet", &[])?;
+                        ui::run_popup(
+                            &mut self.renderer,
+                            self.style,
+                            &mut self.stdout,
+                            "Not implemented yet",
+                            &[],
+                        )?;
                     }
                     4 => break,
                     _ => break,
@@ -123,7 +139,10 @@ impl Game {
                 Some(|done, all| {
                     let current_progess = done as f64 / all as f64;
                     if current_progess - last_progress > 0.01 {
-                        let res = self.render_progress(
+                        let res = ui::render_progress(
+                            &mut self.renderer,
+                            self.style,
+                            &mut self.stdout,
                             &format!("Generating maze ({}x{}) {}/{}", msize.0, msize.1, done, all),
                             current_progess,
                         );
@@ -364,7 +383,10 @@ impl Game {
 
             // check if player won
             if player_pos == goal_pos {
-                self.run_popup(
+                ui::run_popup(
+                    &mut self.renderer,
+                    self.style,
+                    &mut self.stdout,
                     "You won",
                     &[
                         &format!("Time: {}", ui::format_duration(play_time)),
@@ -374,32 +396,6 @@ impl Game {
                 break Ok(());
             }
         }
-    }
-
-    fn render_progress(&mut self, title: &str, progress: f64) -> Result<(), Error> {
-        let progress_size = (title.len() as i32 + 2, 4);
-        let pos = ui::box_center_screen(progress_size)?;
-
-        self.renderer.begin()?;
-
-        ui::draw_box(&mut self.renderer, pos, progress_size, self.style);
-        if pos.1 + 1 >= 0 {
-            self.renderer
-                .draw_str(pos.0 as u16 + 1, pos.1 as u16 + 1, title, self.style);
-        }
-        if pos.1 + 2 >= 0 {
-            ui::draw_str(
-                &mut self.renderer,
-                pos.0 + 1,
-                pos.1 + 2,
-                &"#".repeat((title.len() as f64 * progress) as usize),
-                self.style,
-            );
-        }
-
-        self.renderer.end(&mut self.stdout)?;
-
-        Ok(())
     }
 
     fn render_game(
@@ -757,61 +753,6 @@ impl Game {
             texts.3,
             self.style,
         );
-
-        self.renderer.end(&mut self.stdout)?;
-
-        Ok(())
-    }
-
-    fn run_popup(&mut self, title: &str, texts: &[&str]) -> Result<(), Error> {
-        self.render_popup(title, texts)?;
-
-        loop {
-            let event = read()?;
-            if let Event::Key(KeyEvent { code, modifiers }) = event {
-                break Ok(());
-            }
-
-            self.renderer.event(&event);
-
-            self.render_popup(title, texts)?;
-        }
-    }
-
-    fn render_popup(&mut self, title: &str, texts: &[&str]) -> Result<(), Error> {
-        self.renderer.begin()?;
-
-        let box_size = ui::popup_size(title, texts);
-        let title_pos = ui::box_center_screen((title.len() as i32 + 2, 1))?.0;
-        let pos = ui::box_center_screen(box_size)?;
-
-        ui::draw_box(&mut self.renderer, pos, box_size, self.style);
-        ui::draw_str(
-            &mut self.renderer,
-            title_pos,
-            pos.1 + 1,
-            &format!(" {} ", title),
-            self.style,
-        );
-
-        if texts.len() != 0 {
-            ui::draw_str(
-                &mut self.renderer,
-                pos.0 + 1,
-                pos.1 + 2,
-                &"─".repeat(box_size.0 as usize - 2),
-                self.style,
-            );
-            for (i, text) in texts.iter().enumerate() {
-                ui::draw_str(
-                    &mut self.renderer,
-                    pos.0 + 2,
-                    pos.1 + 3 + i as i32,
-                    text,
-                    self.style,
-                );
-            }
-        }
 
         self.renderer.end(&mut self.stdout)?;
 

@@ -106,7 +106,8 @@ pub fn format_duration(dur: Duration) -> String {
 
 pub fn run_menu(
     renderer: &mut Renderer,
-    style: ContentStyle, stdout: &mut Stdout,
+    style: ContentStyle,
+    stdout: &mut Stdout,
     title: &str,
     options: &[&str],
     default: usize,
@@ -159,13 +160,14 @@ pub fn run_menu(
 
         renderer.event(&event);
 
-        render_menu(renderer,style, stdout, title, options, selected, counted)?;
+        render_menu(renderer, style, stdout, title, options, selected, counted)?;
     }
 }
 
 pub fn render_menu(
     renderer: &mut Renderer,
-    style: ContentStyle, stdout: &mut Stdout,
+    style: ContentStyle,
+    stdout: &mut Stdout,
     title: &str,
     options: &[&str],
     selected: usize,
@@ -234,6 +236,99 @@ pub fn render_menu(
             style,
         );
     }
+    renderer.end(stdout)?;
+
+    Ok(())
+}
+
+pub fn run_popup(
+    renderer: &mut Renderer,
+    style: ContentStyle,
+    stdout: &mut Stdout,
+    title: &str,
+    texts: &[&str],
+) -> Result<(), Error> {
+    render_popup(renderer, style, stdout, title, texts)?;
+
+    loop {
+        let event = read()?;
+        if let Event::Key(KeyEvent { code, modifiers }) = event {
+            break Ok(());
+        }
+
+        renderer.event(&event);
+
+        render_popup(renderer, style, stdout, title, texts)?;
+    }
+}
+
+pub fn render_popup(
+    renderer: &mut Renderer,
+    style: ContentStyle,
+    stdout: &mut Stdout,
+    title: &str,
+    texts: &[&str],
+) -> Result<(), Error> {
+    renderer.begin()?;
+
+    let box_size = popup_size(title, texts);
+    let title_pos = box_center_screen((title.len() as i32 + 2, 1))?.0;
+    let pos = box_center_screen(box_size)?;
+
+    draw_box(renderer, pos, box_size, style);
+    draw_str(
+        renderer,
+        title_pos,
+        pos.1 + 1,
+        &format!(" {} ", title),
+        style,
+    );
+
+    if texts.len() != 0 {
+        draw_str(
+            renderer,
+            pos.0 + 1,
+            pos.1 + 2,
+            &"─".repeat(box_size.0 as usize - 2),
+            style,
+        );
+        for (i, text) in texts.iter().enumerate() {
+            draw_str(renderer, pos.0 + 2, pos.1 + 3 + i as i32, text, style);
+        }
+    }
+
+    renderer.end(stdout)?;
+
+    Ok(())
+}
+
+pub fn render_progress(
+    renderer: &mut Renderer,
+    style: ContentStyle,
+    stdout: &mut Stdout,
+    title: &str,
+    progress: f64,
+) -> Result<(), Error> {
+    let progress_size = (title.len() as i32 + 2, 4);
+    let pos = box_center_screen(progress_size)?;
+
+    renderer.begin()?;
+
+    draw_box(renderer, pos, progress_size, style);
+    if pos.1 + 1 >= 0 {
+        renderer
+            .draw_str(pos.0 as u16 + 1, pos.1 as u16 + 1, title, style);
+    }
+    if pos.1 + 2 >= 0 {
+        draw_str(
+            renderer,
+            pos.0 + 1,
+            pos.1 + 2,
+            &"#".repeat((title.len() as f64 * progress) as usize),
+            style,
+        );
+    }
+
     renderer.end(stdout)?;
 
     Ok(())
