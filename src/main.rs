@@ -1,7 +1,9 @@
 mod game;
 use game::Game;
 mod maze;
-pub mod tmcore;
+mod tmcore;
+mod ui;
+mod helpers;
 
 fn main() -> Result<(), tmcore::Error> {
     Game::new().run()

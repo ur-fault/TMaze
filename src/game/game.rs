@@ -1,122 +1,18 @@
 use std::io::{stdout, Stdout};
+use std::time::{Duration, Instant};
 
-use crate::maze::{CellWall, Maze};
-
-use crate::maze::algorithms::*;
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
 use masof::{Color, ContentStyle, Renderer};
-use std::time::{Duration, Instant};
 use substring::Substring;
+
+use crate::maze::algorithms::*;
+use crate::maze::{CellWall, Maze};
 use crate::tmcore::*;
-
-
-mod helpers {
-    use crate::maze::Maze;
-    use std::time::Duration;
-    use crate::tmcore::*;
-
-
-    pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
-        match options.iter().map(|opt| opt.len()).max() {
-            Some(l) => (
-                ((2 + if counted {
-                    (options.len() + 1).to_string().len() + 2
-                } else {
-                    0
-                } + l
-                    - 2)
-                .max(title.len() + 2)
-                    + 2) as i32
-                    + 2,
-                options.len() as i32 + 2 + 2,
-            ),
-            None => (0, 0),
-        }
-    }
-
-    pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
-        match texts.iter().map(|text| text.len()).max() {
-            Some(l) => (
-                2 + 2 + l.max(title.len()) as i32,
-                2 + 2 + texts.len() as i32,
-            ),
-            None => (4 + title.len() as i32, 3),
-        }
-    }
-
-    pub fn format_duration(dur: Duration) -> String {
-        format!(
-            "{}m{:.1}s",
-            dur.as_secs() / 60,
-            (dur.as_secs() % 60) as f32 + dur.subsec_millis() as f32 / 1000f32,
-        )
-    }
-
-    pub fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
-        (container_end - container_start - item_width) / 2 + container_start
-    }
-
-    pub fn box_center(container_start: Dims, container_end: Dims, box_dims: Dims) -> Dims {
-        (
-            line_center(container_start.0, container_end.0, box_dims.0),
-            line_center(container_start.1, container_end.1, box_dims.1),
-        )
-    }
-
-    pub fn maze_render_size(maze: &Maze) -> Dims {
-        let msize = maze.size();
-        ((msize.0 * 2 + 1) as i32, (msize.1 * 2 + 1) as i32)
-    }
-
-    pub fn double_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &'static str {
-        match (left, top, right, bottom) {
-            (false, false, false, false) => "#",
-            (false, false, false, true) => "#",
-            (false, false, true, false) => "#",
-            (false, false, true, true) => "╔",
-            (false, true, false, false) => "#",
-            (false, true, false, true) => "║",
-            (false, true, true, false) => "╚",
-            (false, true, true, true) => "╠",
-            (true, false, false, false) => "#",
-            (true, false, false, true) => "╗",
-            (true, false, true, false) => "═",
-            (true, false, true, true) => "╦",
-            (true, true, false, false) => "╝",
-            (true, true, false, true) => "╣",
-            (true, true, true, false) => "╩",
-            (true, true, true, true) => "╬",
-        }
-    }
-
-    pub fn round_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &'static str {
-        match (left, top, right, bottom) {
-            (false, false, false, false) => "#",
-            (false, false, false, true) => "#",
-            (false, false, true, false) => "#",
-            (false, false, true, true) => "╭",
-            (false, true, false, false) => "#",
-            (false, true, false, true) => "│",
-            (false, true, true, false) => "╰",
-            (false, true, true, true) => "├",
-            (true, false, false, false) => "#",
-            (true, false, false, true) => "╮",
-            (true, false, true, false) => "─",
-            (true, false, true, true) => "┬",
-            (true, true, false, false) => "╯",
-            (true, true, false, true) => "┤",
-            (true, true, true, false) => "┴",
-            (true, true, true, true) => "┼",
-        }
-    }
-
-    pub fn from_maze_to_real(maze_pos: Dims3D) -> Dims {
-        (maze_pos.0 * 2 + 1, maze_pos.1 * 2 + 1)
-    }
-}
+use crate::{helpers, ui};
+use std::fs::rename;
 
 pub struct GameSettings {
     slow: bool,
@@ -143,7 +39,10 @@ impl Game {
     pub fn run(mut self) -> Result<(), Error> {
         self.renderer.term_on(&mut self.stdout)?;
         loop {
-            match self.run_menu(
+            match ui::run_menu(
+                &mut self.renderer,
+                self.style,
+                &mut self.stdout,
                 "TMaze",
                 &["New Game", "Settings", "Controls", "About", "Quit"],
                 0,
@@ -177,9 +76,14 @@ impl Game {
     }
 
     fn run_game(&mut self) -> Result<(), Error> {
-        let mut msize: Dims3D = match self.run_menu(
+        let mut msize: Dims3D = match ui::run_menu(
+            &mut self.renderer,
+            self.style,
+            &mut self.stdout,
             "Maze size",
-            &["10x5", "30x10x3", "5x5x5", "100x30", "300x100", "debug", "xtreme"],
+            &[
+                "10x5", "30x10x3", "5x5x5", "100x30", "300x100", "debug", "xtreme",
+            ],
             0,
             false,
         )? {
@@ -201,7 +105,10 @@ impl Game {
 
         let mut maze = {
             let mut last_progress = f64::MIN;
-            let generation_func = match self.run_menu(
+            let generation_func = match ui::run_menu(
+                &mut self.renderer,
+                self.style,
+                &mut self.stdout,
                 "Maze generation algorithm",
                 &["Depth-first search", "Randomized Kruskal's"],
                 0,
@@ -448,7 +355,7 @@ impl Game {
                     &format!("{}x{}x{}", player_pos.0, player_pos.1, player_pos.2),
                     if spectator { "Spectator" } else { "Adventure" },
                     &format!("{} moves", move_count),
-                    &helpers::format_duration(from_start),
+                    &ui::format_duration(from_start),
                 ),
                 &moves,
             )?;
@@ -460,7 +367,7 @@ impl Game {
                 self.run_popup(
                     "You won",
                     &[
-                        &format!("Time: {}", helpers::format_duration(play_time)),
+                        &format!("Time: {}", ui::format_duration(play_time)),
                         &format!("Moves: {}", move_count),
                     ],
                 )?;
@@ -471,17 +378,18 @@ impl Game {
 
     fn render_progress(&mut self, title: &str, progress: f64) -> Result<(), Error> {
         let progress_size = (title.len() as i32 + 2, 4);
-        let pos = self.box_center(progress_size)?;
+        let pos = ui::box_center_screen(progress_size)?;
 
         self.renderer.begin()?;
 
-        self.draw_box(pos, progress_size, self.style);
+        ui::draw_box(&mut self.renderer, pos, progress_size, self.style);
         if pos.1 + 1 >= 0 {
             self.renderer
                 .draw_str(pos.0 as u16 + 1, pos.1 as u16 + 1, title, self.style);
         }
         if pos.1 + 2 >= 0 {
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0 + 1,
                 pos.1 + 2,
                 &"#".repeat((title.len() as f64 * progress) as usize),
@@ -518,7 +426,7 @@ impl Game {
                     size.1 as i32 / 2 - player_real_maze_pos.1,
                 )
             } else {
-                self.box_center((real_size.0 as i32, real_size.1 as i32))?
+                ui::box_center_screen((real_size.0 as i32, real_size.1 as i32))?
             };
 
             (pos.0 + player_offset.0 * 2, pos.1 + player_offset.1 * 2)
@@ -530,7 +438,8 @@ impl Game {
 
         // corners
         if pos.1 > 0 {
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0,
                 pos.1,
                 &format!(
@@ -540,7 +449,8 @@ impl Game {
                 ),
                 self.style,
             );
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0 + real_size.0 - 2,
                 pos.1,
                 &format!(
@@ -552,13 +462,15 @@ impl Game {
             );
         }
         if pos.1 + real_size.1 - 2 < size.1 - 3 {
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0,
                 pos.1 + real_size.1 - 2,
                 &format!("{}", helpers::double_line_corner(false, true, false, true),),
                 self.style,
             );
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0 + real_size.0 - 1,
                 pos.1 + real_size.1 - 2,
                 &format!("{}", helpers::double_line_corner(false, true, false, true),),
@@ -566,13 +478,15 @@ impl Game {
             );
         }
         if pos.1 + real_size.1 - 1 < size.1 - 2 {
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0,
                 pos.1 + real_size.1 - 1,
                 &format!("{}", helpers::double_line_corner(false, true, true, false),),
                 self.style,
             );
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0 + real_size.0 - 2,
                 pos.1 + real_size.1 - 1,
                 &format!(
@@ -586,7 +500,8 @@ impl Game {
         // horizontal edge lines
         for x in 0..maze.size().0 - 1 {
             if pos.1 > 0 {
-                self.draw_str(
+                ui::draw_str(
+                    &mut self.renderer,
                     x as i32 * 2 + pos.0 + 1,
                     pos.1,
                     &format!(
@@ -604,7 +519,8 @@ impl Game {
                 );
             }
             if pos.1 + real_size.1 - 1 < size.1 - 2 {
-                self.draw_str(
+                ui::draw_str(
+                    &mut self.renderer,
                     x as i32 * 2 + pos.0 + 1,
                     pos.1 + real_size.1 - 1,
                     &format!(
@@ -631,7 +547,8 @@ impl Game {
                 break;
             }
 
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0,
                 ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
@@ -639,7 +556,8 @@ impl Game {
             );
 
             if ypos + 1 < size.1 {
-                self.draw_str(
+                ui::draw_str(
+                    &mut self.renderer,
                     pos.0,
                     y as i32 * 2 + pos.1 + 2,
                     &format!(
@@ -655,7 +573,8 @@ impl Game {
                     self.style,
                 );
 
-                self.draw_str(
+                ui::draw_str(
+                    &mut self.renderer,
                     pos.0 + real_size.0 - 1,
                     y as i32 * 2 + pos.1 + 2,
                     &format!(
@@ -673,7 +592,8 @@ impl Game {
                 );
             }
 
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0 + real_size.0 - 1,
                 ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
@@ -685,7 +605,13 @@ impl Game {
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
                 let real_pos = helpers::from_maze_to_real(*move_pos);
-                self.draw_char(pos.0 + real_pos.0, pos.1 + real_pos.1, '.', self.style);
+                ui::draw_char(
+                    &mut self.renderer,
+                    pos.0 + real_pos.0,
+                    pos.1 + real_pos.1,
+                    '.',
+                    self.style,
+                );
             }
         }
 
@@ -698,7 +624,8 @@ impl Game {
             for (ix, cell) in row.iter().enumerate() {
                 let xpos = ix as i32 * 2 + 1 + pos.0;
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
-                    self.draw_str(
+                    ui::draw_str(
+                        &mut self.renderer,
                         xpos + 1,
                         ypos,
                         helpers::double_line_corner(false, true, false, true),
@@ -709,7 +636,8 @@ impl Game {
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
-                    self.draw_str(
+                    ui::draw_str(
+                        &mut self.renderer,
                         xpos,
                         ypos + 1,
                         helpers::double_line_corner(true, false, true, false),
@@ -718,11 +646,11 @@ impl Game {
                 }
 
                 if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-                    self.draw_char(xpos, ypos, 'X', self.style);
+                    ui::draw_char(&mut self.renderer, xpos, ypos, 'X', self.style);
                 } else if !cell.get_wall(CellWall::Up) {
-                    self.draw_char(xpos, ypos, '/', self.style);
+                    ui::draw_char(&mut self.renderer, xpos, ypos, '/', self.style);
                 } else if !cell.get_wall(CellWall::Down) {
-                    self.draw_char(xpos, ypos, '\\', self.style);
+                    ui::draw_char(&mut self.renderer, xpos, ypos, '\\', self.style);
                 }
 
                 if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
@@ -732,7 +660,8 @@ impl Game {
                 let cell2 = &maze.get_cells()[floor as usize][iy + 1][ix + 1];
 
                 if ypos < size.1 as i32 - 3 {
-                    self.draw_str(
+                    ui::draw_str(
+                        &mut self.renderer,
                         ix as i32 * 2 + 2 + pos.0,
                         iy as i32 * 2 + 2 + pos.1,
                         helpers::double_line_corner(
@@ -748,7 +677,8 @@ impl Game {
         }
 
         if floor == goal_pos.2 {
-            self.draw_char(
+            ui::draw_char(
+                &mut self.renderer,
                 goal_pos.0 * 2 + 1 + pos.0,
                 goal_pos.1 * 2 + 1 + pos.1,
                 '$',
@@ -761,7 +691,8 @@ impl Game {
         }
 
         if floor == player_pos.2 {
-            self.draw_char(
+            ui::draw_char(
+                &mut self.renderer,
                 player_pos.0 * 2 + 1 + pos.0,
                 player_pos.1 * 2 + 1 + pos.1,
                 'O',
@@ -798,10 +729,34 @@ impl Game {
             )
         };
 
-        self.draw_str(str_pos_tl.0, str_pos_tl.1, texts.0, self.style);
-        self.draw_str(str_pos_tr.0, str_pos_tr.1, texts.1, self.style);
-        self.draw_str(str_pos_bl.0, str_pos_bl.1, texts.2, self.style);
-        self.draw_str(str_pos_br.0, str_pos_br.1, texts.3, self.style);
+        ui::draw_str(
+            &mut self.renderer,
+            str_pos_tl.0,
+            str_pos_tl.1,
+            texts.0,
+            self.style,
+        );
+        ui::draw_str(
+            &mut self.renderer,
+            str_pos_tr.0,
+            str_pos_tr.1,
+            texts.1,
+            self.style,
+        );
+        ui::draw_str(
+            &mut self.renderer,
+            str_pos_bl.0,
+            str_pos_bl.1,
+            texts.2,
+            self.style,
+        );
+        ui::draw_str(
+            &mut self.renderer,
+            str_pos_br.0,
+            str_pos_br.1,
+            texts.3,
+            self.style,
+        );
 
         self.renderer.end(&mut self.stdout)?;
 
@@ -826,209 +781,40 @@ impl Game {
     fn render_popup(&mut self, title: &str, texts: &[&str]) -> Result<(), Error> {
         self.renderer.begin()?;
 
-        let box_size = helpers::popup_size(title, texts);
-        let title_pos = self.box_center((title.len() as i32 + 2, 1))?.0;
-        let pos = self.box_center(box_size)?;
+        let box_size = ui::popup_size(title, texts);
+        let title_pos = ui::box_center_screen((title.len() as i32 + 2, 1))?.0;
+        let pos = ui::box_center_screen(box_size)?;
 
-        self.draw_box(pos, box_size, self.style);
-        self.draw_str(title_pos, pos.1 + 1, &format!(" {} ", title), self.style);
+        ui::draw_box(&mut self.renderer, pos, box_size, self.style);
+        ui::draw_str(
+            &mut self.renderer,
+            title_pos,
+            pos.1 + 1,
+            &format!(" {} ", title),
+            self.style,
+        );
 
         if texts.len() != 0 {
-            self.draw_str(
+            ui::draw_str(
+                &mut self.renderer,
                 pos.0 + 1,
                 pos.1 + 2,
                 &"─".repeat(box_size.0 as usize - 2),
                 self.style,
             );
             for (i, text) in texts.iter().enumerate() {
-                self.draw_str(pos.0 + 2, pos.1 + 3 + i as i32, text, self.style);
+                ui::draw_str(
+                    &mut self.renderer,
+                    pos.0 + 2,
+                    pos.1 + 3 + i as i32,
+                    text,
+                    self.style,
+                );
             }
         }
 
         self.renderer.end(&mut self.stdout)?;
 
         Ok(())
-    }
-
-    fn run_menu(
-        &mut self,
-        title: &str,
-        options: &[&str],
-        default: usize,
-        counted: bool,
-    ) -> Result<u16, Error> {
-        let mut selected: usize = default;
-        let opt_count = options.len();
-
-        if opt_count == 0 {
-            return Err(Error::EmptyMenu);
-        }
-
-        self.render_menu(title, options, selected, counted)?;
-
-        loop {
-            let event = read()?;
-
-            match event {
-                Event::Key(KeyEvent { code, modifiers }) => match code {
-                    KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                        selected = if selected == 0 {
-                            opt_count - 1
-                        } else {
-                            selected - 1
-                        }
-                    }
-                    KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
-                        selected = (selected + 1) % opt_count
-                    }
-                    KeyCode::Enter | KeyCode::Char(' ') => return Ok(selected as u16),
-                    KeyCode::Char(ch) => match ch {
-                        'q' | 'Q' => return Err(Error::FullQuit),
-                        '1' if counted && 1 <= opt_count => selected = 1 - 1,
-                        '2' if counted && 2 <= opt_count => selected = 2 - 1,
-                        '3' if counted && 3 <= opt_count => selected = 3 - 1,
-                        '4' if counted && 4 <= opt_count => selected = 4 - 1,
-                        '5' if counted && 5 <= opt_count => selected = 5 - 1,
-                        '6' if counted && 6 <= opt_count => selected = 6 - 1,
-                        '7' if counted && 7 <= opt_count => selected = 7 - 1,
-                        '8' if counted && 8 <= opt_count => selected = 8 - 1,
-                        '9' if counted && 9 <= opt_count => selected = 9 - 1,
-                        _ => {}
-                    },
-                    KeyCode::Esc => return Err(Error::Quit),
-                    _ => {}
-                },
-                Event::Mouse(_) => {}
-                _ => {}
-            }
-
-            self.renderer.event(&event);
-
-            self.render_menu(title, options, selected, counted)?;
-        }
-    }
-
-    fn render_menu(
-        &mut self,
-        title: &str,
-        options: &[&str],
-        selected: usize,
-        counted: bool,
-    ) -> Result<(), Error> {
-        let menu_size = helpers::menu_size(title, options, counted);
-        let pos = self.box_center(menu_size)?;
-        let opt_count = options.len();
-
-        let max_count = opt_count.to_string().len();
-
-        self.renderer.begin()?;
-
-        self.draw_box(pos, menu_size, self.style);
-
-        self.draw_str(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title), self.style);
-        self.draw_str(
-            pos.0 + 1,
-            pos.1 + 1 + 1,
-            &"─".repeat(menu_size.0 as usize - 2),
-            self.style,
-        );
-
-        for (i, option) in options.iter().enumerate() {
-            let style = if i == selected {
-                ContentStyle {
-                    background_color: Some(Color::White),
-                    foreground_color: Some(Color::Black),
-                    attributes: Default::default(),
-                }
-            } else {
-                ContentStyle::default()
-            };
-
-            let off_x = if counted {
-                i.to_string().len() as u16 + 2
-            } else {
-                0
-            };
-
-            self.draw_str(
-                pos.0 + 1,
-                i as i32 + pos.1 + 2 + 1,
-                &format!(
-                    "{} {}{}",
-                    if i == selected { ">" } else { " " },
-                    if counted {
-                        format!(
-                            "{}. {}",
-                            i + 1,
-                            " ".repeat(max_count - (i + 1).to_string().len())
-                        )
-                    } else {
-                        String::from("")
-                    },
-                    option
-                ),
-                style,
-            );
-        }
-        self.renderer.end(&mut self.stdout)?;
-
-        Ok(())
-    }
-
-    // Helpers
-
-    fn box_center(&self, box_dims: Dims) -> Result<Dims, Error> {
-        let size_u16 = size()?;
-        Ok(helpers::box_center(
-            (0, 0),
-            (size_u16.0 as i32, size_u16.1 as i32),
-            box_dims,
-        ))
-    }
-
-    fn draw_box(&mut self, pos: Dims, size: Dims, style: ContentStyle) {
-        self.draw_str(
-            pos.0,
-            pos.1,
-            &format!("╭{}╮", "─".repeat(size.0 as usize - 2)),
-            style,
-        );
-
-        for y in pos.1 + 1..pos.1 + size.1 - 1 {
-            self.draw_char(pos.0, y, '│', style);
-            self.draw_char(pos.0 + size.0 - 1, y, '│', style);
-        }
-
-        self.draw_str(
-            pos.0,
-            pos.1 + size.1 - 1,
-            &format!("╰{}╯", "─".repeat(size.0 as usize - 2)),
-            style,
-        );
-    }
-
-    fn draw_str(&mut self, mut x: i32, y: i32, mut text: &str, style: ContentStyle) {
-        if y < 0 {
-            return;
-        }
-
-        if x < 0 && text.len() as i32 > -x + 1 {
-            text = text.substring(-x as usize, text.len() - 1);
-            x = 0;
-        }
-
-        if x > u16::MAX as i32 || y > u16::MAX as i32 {
-            return;
-        }
-
-        self.renderer.draw_str(x as u16, y as u16, text, style);
-    }
-
-    fn draw_char(&mut self, mut x: i32, y: i32, mut text: char, style: ContentStyle) {
-        if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32 {
-            return;
-        }
-
-        self.renderer.draw_char(x as u16, y as u16, text, style);
     }
 }
