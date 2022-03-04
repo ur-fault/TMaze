@@ -197,9 +197,7 @@ impl Game {
     fn run_game(&mut self) -> Result<(), Error> {
         let mut msize: Dims3D = match self.run_menu(
             "Maze size",
-            &[
-                "10x5x1", "30x10x3", "5x5x5", "100x30x1", "debug", "xtreme",
-            ],
+            &["10x5x1", "30x10x3", "5x5x5", "100x30x1", "debug", "xtreme"],
             0,
             false,
         )? {
@@ -405,8 +403,11 @@ impl Game {
                         }
                         KeyCode::Char('q' | 'Q') => {
                             if spectator {
-                                player_offset =
-                                    (player_offset.0, player_offset.1, (-player_pos.2).max(player_offset.2 - 1))
+                                player_offset = (
+                                    player_offset.0,
+                                    player_offset.1,
+                                    (-player_pos.2).max(player_offset.2 - 1),
+                                )
                             } else {
                                 let pmove = move_player(
                                     &maze,
@@ -697,9 +698,12 @@ impl Game {
             );
         }
 
-        for (move_pos, wall) in moves {
-            let real_pos = helpers::from_maze_to_real(*move_pos);
-            self.draw_char(pos.0 + real_pos.0, pos.1 + real_pos.1, '.', self.style)
+        // Drawing visited places (moves)
+        for (move_pos, _) in moves {
+            if move_pos.2 == floor {
+                let real_pos = helpers::from_maze_to_real(*move_pos);
+                self.draw_char(pos.0 + real_pos.0, pos.1 + real_pos.1, '.', self.style);
+            }
         }
 
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
