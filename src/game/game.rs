@@ -197,6 +197,7 @@ impl Game {
                 &format!("{} moves", move_count),
                 "",
             ),
+            1,
             &moves,
         )?;
 
@@ -394,6 +395,7 @@ impl Game {
                     &format!("{} moves", move_count),
                     &ui::format_duration(from_start),
                 ),
+                1,
                 &moves,
             )?;
 
@@ -409,6 +411,7 @@ impl Game {
                     &[
                         &format!("Time: {}", ui::format_duration(play_time)),
                         &format!("Moves: {}", move_count),
+                        &format!("Size: {}x{}x{}", msize.0, msize.1, msize.2),
                     ],
                 )?;
                 break Ok(());
@@ -423,6 +426,7 @@ impl Game {
         player_offset: Dims3D,
         goal_pos: Dims3D,
         texts: (&str, &str, &str, &str),
+        text_horizontal_margin: i32,
         moves: &[(Dims3D, CellWall)],
     ) -> Result<(), Error> {
         let real_size = helpers::maze_render_size(maze);
@@ -629,6 +633,7 @@ impl Game {
             }
         }
 
+        // drawing maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
             let ypos = iy as i32 * 2 + 1 + pos.1;
             if ypos >= size.1 - 2 {
@@ -719,29 +724,16 @@ impl Game {
         }
 
         // Print texts
-        let str_pos_tl = if is_around_player {
-            (0, 0)
-        } else {
-            (pos.0, pos.1 - 1)
-        };
-        let str_pos_tr = if is_around_player {
-            (size.0 as i32 - texts.1.len() as i32, 0)
-        } else {
-            (pos.0 + real_size.0 - texts.1.len() as i32, pos.1 - 1)
-        };
-        let str_pos_bl = if is_around_player {
-            (0, size.1 as i32 - 2)
-        } else {
-            (pos.0, pos.1 + real_size.1)
-        };
-        let str_pos_br = if is_around_player {
-            (size.0 as i32 - texts.3.len() as i32, size.1 as i32 - 2)
-        } else {
-            (
-                pos.0 + real_size.0 - texts.3.len() as i32,
-                pos.1 + real_size.1,
-            )
-        };
+        let str_pos_tl = (text_horizontal_margin, 0);
+        let str_pos_tr = (
+            size.0 as i32 - text_horizontal_margin - texts.1.len() as i32,
+            0,
+        );
+        let str_pos_bl = (text_horizontal_margin, size.1 as i32 - 2);
+        let str_pos_br = (
+            size.0 as i32 - text_horizontal_margin - texts.3.len() as i32,
+            size.1 as i32 - 2,
+        );
 
         ui::draw_str(
             &mut self.renderer,
