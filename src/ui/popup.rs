@@ -19,7 +19,7 @@ pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
     }
 }
 
-pub fn run_popup(
+pub fn popup(
     renderer: &mut Renderer,
     style: ContentStyle,
     stdout: &mut Stdout,

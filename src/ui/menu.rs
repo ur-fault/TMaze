@@ -27,7 +27,7 @@ pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
     }
 }
 
-pub fn run_menu(
+pub fn menu(
     renderer: &mut Renderer,
     style: ContentStyle,
     stdout: &mut Stdout,
@@ -85,6 +85,19 @@ pub fn run_menu(
 
         render_menu(renderer, style, stdout, title, options, selected, counted)?;
     }
+}
+
+pub fn choice_menu<'a, T>(
+    renderer: &mut Renderer,
+    style: ContentStyle,
+    stdout: &mut Stdout,
+    title: &str,
+    options: &'a [(T, &str)],
+    default: usize,
+    counted: bool,
+) -> Result<&'a T, Error> {
+    let _options: Vec<&str> = options.iter().map(|opt| opt.1).collect();
+    Ok(&options[menu(renderer, style, stdout, title, &_options, default, counted)? as usize].0)
 }
 
 pub fn render_menu(

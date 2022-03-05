@@ -36,7 +36,7 @@ impl Game {
     pub fn run(mut self) -> Result<(), Error> {
         self.renderer.term_on(&mut self.stdout)?;
         loop {
-            match ui::run_menu(
+            match ui::menu(
                 &mut self.renderer,
                 self.style,
                 &mut self.stdout,
@@ -52,7 +52,7 @@ impl Game {
                     },
 
                     1 => {
-                        ui::run_popup(
+                        ui::popup(
                             &mut self.renderer,
                             self.style,
                             &mut self.stdout,
@@ -61,7 +61,7 @@ impl Game {
                         )?;
                     }
                     2 => {
-                        ui::run_popup(
+                        ui::popup(
                             &mut self.renderer,
                             self.style,
                             &mut self.stdout,
@@ -70,7 +70,7 @@ impl Game {
                         )?;
                     }
                     3 => {
-                        ui::run_popup(
+                        ui::popup(
                             &mut self.renderer,
                             self.style,
                             &mut self.stdout,
@@ -91,26 +91,35 @@ impl Game {
     }
 
     fn run_game(&mut self) -> Result<(), Error> {
-        let msize: Dims3D = match ui::run_menu(
+        // let msize: Dims3D = match ui::menu(
+        //     &mut self.renderer,
+        //     self.style,
+        //     &mut self.stdout,
+        //     "Maze size",
+        //     &[
+        //         "10x5", "30x10x3", "5x5x5", "100x30", "300x100", "debug", "xtreme",
+        //     ],
+        //     0,
+        //     false,
+        // )? {
+        //     0 => (10, 5, 1),
+        //     1 => (30, 10, 3),
+        //     2 => (5, 5, 5),
+        //     3 => (100, 30, 1),
+        //     4 => (300, 100, 1),
+        //     5 => (10, 10, 10),
+        //     6 => (500, 500, 1),
+        //     _ => (0, 0, 0),
+        // };
+        let msize: Dims3D = *ui::choice_menu(
             &mut self.renderer,
             self.style,
             &mut self.stdout,
             "Maze size",
-            &[
-                "10x5", "30x10x3", "5x5x5", "100x30", "300x100", "debug", "xtreme",
-            ],
+            &[((5, 5, 5), "5x5x5")],
             0,
             false,
-        )? {
-            0 => (10, 5, 1),
-            1 => (30, 10, 3),
-            2 => (5, 5, 5),
-            3 => (100, 30, 1),
-            4 => (300, 100, 1),
-            5 => (10, 10, 10),
-            6 => (500, 500, 1),
-            _ => (0, 0, 0),
-        };
+        )?;
 
         let mut player_pos = (0, 0, 0);
         let goal_pos = (msize.0 - 1, msize.1 - 1, msize.2 - 1);
@@ -120,7 +129,7 @@ impl Game {
 
         let maze = {
             let mut last_progress = f64::MIN;
-            let generation_func = match ui::run_menu(
+            let generation_func = match ui::menu(
                 &mut self.renderer,
                 self.style,
                 &mut self.stdout,
@@ -178,7 +187,12 @@ impl Game {
             player_offset,
             goal_pos,
             (
-                &format!("{}x{}x{}", player_pos.0, player_pos.1, player_pos.2),
+                &format!(
+                    "{}x{}x{}",
+                    player_pos.0 + 1,
+                    player_pos.1 + 1,
+                    player_pos.2 + 1
+                ),
                 if spectator { "Spectator" } else { "Adventure" },
                 &format!("{} moves", move_count),
                 "",
@@ -370,7 +384,12 @@ impl Game {
                 player_offset,
                 goal_pos,
                 (
-                    &format!("{}x{}x{}", player_pos.0, player_pos.1, player_pos.2),
+                    &format!(
+                        "{}x{}x{}",
+                        player_pos.0 + 1,
+                        player_pos.1 + 1,
+                        player_pos.2 + 1
+                    ),
                     if spectator { "Spectator" } else { "Adventure" },
                     &format!("{} moves", move_count),
                     &ui::format_duration(from_start),
@@ -382,7 +401,7 @@ impl Game {
 
             // check if player won
             if player_pos == goal_pos {
-                ui::run_popup(
+                ui::popup(
                     &mut self.renderer,
                     self.style,
                     &mut self.stdout,
