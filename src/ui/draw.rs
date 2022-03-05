@@ -49,7 +49,7 @@ pub fn draw_str(renderer: &mut Renderer, mut x: i32, y: i32, mut text: &str, sty
     renderer.draw_str(x as u16, y as u16, text, style);
 }
 
-pub fn draw_char(renderer: &mut Renderer, mut x: i32, y: i32, mut text: char, style: ContentStyle) {
+pub fn draw_char(renderer: &mut Renderer, x: i32, y: i32, text: char, style: ContentStyle) {
     if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32 {
         return;
     }

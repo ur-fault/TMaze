@@ -49,7 +49,7 @@ pub fn run_menu(
         let event = read()?;
 
         match event {
-            Event::Key(KeyEvent { code, modifiers }) => match code {
+            Event::Key(KeyEvent { code, modifiers: _ }) => match code {
                 KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                     selected = if selected == 0 {
                         opt_count - 1
@@ -130,12 +130,6 @@ pub fn render_menu(
             }
         } else {
             ContentStyle::default()
-        };
-
-        let off_x = if counted {
-            i.to_string().len() as u16 + 2
-        } else {
-            0
         };
 
         draw_str(

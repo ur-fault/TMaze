@@ -12,13 +12,13 @@ use crate::maze::{CellWall, Maze};
 use crate::tmcore::*;
 use crate::{helpers, ui};
 
+#[allow(dead_code)]
 pub struct GameSettings {
     slow: bool,
     show_path: bool,
 }
 
 pub struct Game {
-    player: Vec<Dims>,
     renderer: Renderer,
     stdout: Stdout,
     style: ContentStyle,
@@ -27,7 +27,6 @@ pub struct Game {
 impl Game {
     pub fn new() -> Self {
         Game {
-            player: vec![],
             renderer: Renderer::default(),
             stdout: stdout(),
             style: ContentStyle::default(),
@@ -92,7 +91,7 @@ impl Game {
     }
 
     fn run_game(&mut self) -> Result<(), Error> {
-        let mut msize: Dims3D = match ui::run_menu(
+        let msize: Dims3D = match ui::run_menu(
             &mut self.renderer,
             self.style,
             &mut self.stdout,
@@ -119,7 +118,7 @@ impl Game {
         let mut player_offset = (0, 0, 0);
         let mut spectator = false;
 
-        let mut maze = {
+        let maze = {
             let mut last_progress = f64::MIN;
             let generation_func = match ui::run_menu(
                 &mut self.renderer,
@@ -196,7 +195,7 @@ impl Game {
                     mut pos: Dims3D,
                     wall: CellWall,
                     slow: bool,
-                    mut moves: &mut Vec<(Dims3D, CellWall)>,
+                    moves: &mut Vec<(Dims3D, CellWall)>,
                 ) -> (Dims3D, i32) {
                     if slow {
                         if maze.get_cells()[pos.2 as usize][pos.1 as usize][pos.0 as usize]
@@ -245,7 +244,7 @@ impl Game {
                 }
 
                 match event {
-                    Ok(Event::Key(KeyEvent { code, modifiers })) => match code {
+                    Ok(Event::Key(KeyEvent { code, modifiers: _ })) => match code {
                         KeyCode::Up | KeyCode::Char('w' | 'W') => {
                             if spectator {
                                 player_offset =

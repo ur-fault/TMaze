@@ -38,6 +38,7 @@ pub fn double_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &
     }
 }
 
+#[allow(dead_code)]
 pub fn round_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &'static str {
     match (left, top, right, bottom) {
         (false, false, false, false) => "#",
