@@ -11,6 +11,7 @@ use crate::maze::algorithms::*;
 use crate::maze::{CellWall, Maze};
 use crate::tmcore::*;
 use crate::{helpers, ui};
+use pausable_clock::PausableClock;
 
 pub struct Game {
     renderer: Renderer,
@@ -144,7 +145,10 @@ impl Game {
                             &mut self.renderer,
                             self.style,
                             &mut self.stdout,
-                            &format!("Generating maze ({}x{}) {}/{}", msize.0, msize.1, done, all),
+                            &format!(
+                                "Generating maze ({}x{}x{}) {}/{}",
+                                msize.0, msize.1, msize.2, done, all
+                            ),
                             current_progess,
                         );
                         last_progress = current_progess;
@@ -157,7 +161,8 @@ impl Game {
             )?
         };
         let mut moves = vec![];
-        let start_time = Instant::now();
+        let clock = PausableClock::default();
+        let start_time = clock.now();
         let mut move_count = 0;
 
         self.render_game(
@@ -184,7 +189,7 @@ impl Game {
             if let Ok(true) = poll(Duration::from_millis(90)) {
                 let event = read();
 
-                fn move_player(
+                fn get_new_player_pos(
                     maze: &Maze,
                     mut pos: Dims3D,
                     wall: CellWall,
@@ -237,104 +242,52 @@ impl Game {
                     }
                 }
 
+                let mut move_player = |wall: CellWall| {
+                    if spectator {
+                        player_offset = {
+                            let off = match wall {
+                                CellWall::Top => (0, 1, 0),
+                                CellWall::Bottom => (0, -1, 0),
+                                CellWall::Left => (1, 0, 0),
+                                CellWall::Right => (-1, 0, 0),
+                                CellWall::Up => (0, 0, 1),
+                                CellWall::Down => (0, 0, -1),
+                            };
+
+                            (
+                                player_offset.0 + off.0,
+                                player_offset.1 + off.1,
+                                (-player_pos.2).max(
+                                    (maze.size().2 - player_pos.2 - 1).min(player_offset.2 + off.2),
+                                ),
+                            )
+                        };
+                    } else {
+                        let pmove = get_new_player_pos(&maze, player_pos, wall, false, &mut moves);
+                        player_pos = pmove.0;
+                        move_count += pmove.1;
+                    }
+                };
+
                 match event {
                     Ok(Event::Key(KeyEvent { code, modifiers: _ })) => match code {
                         KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                            if spectator {
-                                player_offset =
-                                    (player_offset.0, player_offset.1 + 1, player_offset.2)
-                            } else {
-                                let pmove = move_player(
-                                    &maze,
-                                    player_pos,
-                                    CellWall::Top,
-                                    false,
-                                    &mut moves,
-                                );
-                                player_pos = pmove.0;
-                                move_count += pmove.1;
-                            }
+                            move_player(CellWall::Top);
                         }
                         KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                            if spectator {
-                                player_offset =
-                                    (player_offset.0, player_offset.1 - 1, player_offset.2)
-                            } else {
-                                let pmove = move_player(
-                                    &maze,
-                                    player_pos,
-                                    CellWall::Bottom,
-                                    false,
-                                    &mut moves,
-                                );
-                                player_pos = pmove.0;
-                                move_count += pmove.1;
-                            }
+                            move_player(CellWall::Bottom);
                         }
                         KeyCode::Left | KeyCode::Char('a' | 'A') => {
-                            if spectator {
-                                player_offset =
-                                    (player_offset.0 + 1, player_offset.1, player_offset.2)
-                            } else {
-                                let pmove = move_player(
-                                    &maze,
-                                    player_pos,
-                                    CellWall::Left,
-                                    false,
-                                    &mut moves,
-                                );
-                                player_pos = pmove.0;
-                                move_count += pmove.1;
-                            }
+                            move_player(CellWall::Left);
                         }
                         KeyCode::Right | KeyCode::Char('d' | 'D') => {
-                            if spectator {
-                                player_offset =
-                                    (player_offset.0 - 1, player_offset.1, player_offset.2)
-                            } else {
-                                let pmove = move_player(
-                                    &maze,
-                                    player_pos,
-                                    CellWall::Right,
-                                    false,
-                                    &mut moves,
-                                );
-                                player_pos = pmove.0;
-                                move_count += pmove.1;
-                            }
+                            move_player(CellWall::Right);
                         }
                         KeyCode::Char('q' | 'Q') => {
-                            if spectator {
-                                player_offset = (
-                                    player_offset.0,
-                                    player_offset.1,
-                                    (-player_pos.2).max(player_offset.2 - 1),
-                                )
-                            } else {
-                                let pmove = move_player(
-                                    &maze,
-                                    player_pos,
-                                    CellWall::Down,
-                                    false,
-                                    &mut moves,
-                                );
-                                player_pos = pmove.0;
-                                move_count += pmove.1;
-                            }
+                            move_player(CellWall::Down);
                         }
                         KeyCode::Char('e' | 'E') => {
-                            if spectator {
-                                player_offset = (
-                                    player_offset.0,
-                                    player_offset.1,
-                                    (maze.size().2 - player_pos.2 - 1).min(player_offset.2 + 1),
-                                )
-                            } else {
-                                let pmove =
-                                    move_player(&maze, player_pos, CellWall::Up, false, &mut moves);
-                                player_pos = pmove.0;
-                                move_count += pmove.1;
-                            }
+                            move_player(CellWall::Up);
                         }
                         KeyCode::Char(' ') => {
                             if spectator {
@@ -345,7 +298,16 @@ impl Game {
                             }
                         }
                         KeyCode::Enter => {}
-                        KeyCode::Esc => break Err(Error::Quit),
+                        KeyCode::Esc => {
+                            clock.pause();
+                            match ui::menu(&mut self.renderer, self.style, &mut self.stdout, "Paused", &["Resume", "Main Menu", "Quit"], 0, false)? {
+                                0 => {}
+                                1 => break Err(Error::Quit),
+                                2 => break Err(Error::FullQuit),
+                                _ => {}
+                            }
+                            clock.resume();
+                        },
                         _ => {}
                     },
                     Err(err) => {
@@ -357,7 +319,7 @@ impl Game {
                 self.renderer.event(&event.unwrap());
             }
 
-            let from_start = Instant::now() - start_time;
+            let from_start = start_time.elapsed(&clock);
             self.render_game(
                 &maze,
                 player_pos,
@@ -378,7 +340,7 @@ impl Game {
                 &moves,
             )?;
 
-            let play_time = Instant::now() - start_time;
+            let play_time = start_time.elapsed(&clock);
 
             // check if player won
             if player_pos == goal_pos {
