@@ -1,5 +1,3 @@
-
-
 use crate::tmcore::*;
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
@@ -55,4 +53,35 @@ pub fn draw_char(renderer: &mut Renderer, x: i32, y: i32, text: char, style: Con
     }
 
     renderer.draw_char(x as u16, y as u16, text, style);
+}
+
+pub struct DrawContext<'a> {
+    pub renderer: &'a mut Renderer,
+    pub style: ContentStyle,
+}
+
+impl<'a> DrawContext<'a> {
+    pub fn draw_char(&mut self, x: i32, y: i32, text: char) {
+        draw_char(self.renderer, x, y, text, self.style);
+    }
+
+    pub fn draw_str(&mut self, x: i32, y: i32, text: &str) {
+        draw_str(self.renderer, x, y, text, self.style);
+    }
+
+    pub fn draw_box(&mut self, pos: Dims, size: Dims) {
+        draw_box(self.renderer, pos, size, self.style);
+    }
+
+    pub fn draw_char_styled(&mut self, x: i32, y: i32, text: char, style: ContentStyle) {
+        draw_char(self.renderer, x, y, text, style);
+    }
+
+    pub fn draw_str_styled(&mut self, x: i32, y: i32, text: &str, style: ContentStyle) {
+        draw_str(self.renderer, x, y, text, style);
+    }
+
+    pub fn draw_box_styled(&mut self, pos: Dims, size: Dims, style: ContentStyle) {
+        draw_box(self.renderer, pos, size, style);
+    }
 }

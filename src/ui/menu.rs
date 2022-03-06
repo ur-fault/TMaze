@@ -117,54 +117,49 @@ pub fn render_menu(
 
     renderer.begin()?;
 
-    draw_box(renderer, pos, menu_size, style);
+    {
+        let mut context = DrawContext { renderer, style };
 
-    draw_str(
-        renderer,
-        pos.0 + 2 + 1,
-        pos.1 + 1,
-        &format!("{}", &title),
-        style,
-    );
-    draw_str(
-        renderer,
-        pos.0 + 1,
-        pos.1 + 1 + 1,
-        &"─".repeat(menu_size.0 as usize - 2),
-        style,
-    );
+        context.draw_box(pos, menu_size);
 
-    for (i, option) in options.iter().enumerate() {
-        let style = if i == selected {
-            ContentStyle {
-                background_color: Some(Color::White),
-                foreground_color: Some(Color::Black),
-                attributes: Default::default(),
-            }
-        } else {
-            ContentStyle::default()
-        };
-
-        draw_str(
-            renderer,
+        context.draw_str(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title));
+        context.draw_str(
             pos.0 + 1,
-            i as i32 + pos.1 + 2 + 1,
-            &format!(
-                "{} {}{}",
-                if i == selected { ">" } else { " " },
-                if counted {
-                    format!(
-                        "{}. {}",
-                        i + 1,
-                        " ".repeat(max_count - (i + 1).to_string().len())
-                    )
-                } else {
-                    String::from("")
-                },
-                option
-            ),
-            style,
+            pos.1 + 1 + 1,
+            &"─".repeat(menu_size.0 as usize - 2),
         );
+
+        for (i, option) in options.iter().enumerate() {
+            let style = if i == selected {
+                ContentStyle {
+                    background_color: Some(Color::White),
+                    foreground_color: Some(Color::Black),
+                    attributes: Default::default(),
+                }
+            } else {
+                ContentStyle::default()
+            };
+
+            context.draw_str_styled(
+                pos.0 + 1,
+                i as i32 + pos.1 + 2 + 1,
+                &format!(
+                    "{} {}{}",
+                    if i == selected { ">" } else { " " },
+                    if counted {
+                        format!(
+                            "{}. {}",
+                            i + 1,
+                            " ".repeat(max_count - (i + 1).to_string().len())
+                        )
+                    } else {
+                        String::from("")
+                    },
+                    option
+                ),
+                style,
+            );
+        }
     }
     renderer.end(stdout)?;
 

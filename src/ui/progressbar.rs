@@ -20,19 +20,20 @@ pub fn render_progress(
 
     renderer.begin()?;
 
-    draw_box(renderer, pos, progress_size, style);
-    if pos.1 + 1 >= 0 {
-        renderer
-            .draw_str(pos.0 as u16 + 1, pos.1 as u16 + 1, title, style);
-    }
-    if pos.1 + 2 >= 0 {
-        draw_str(
-            renderer,
-            pos.0 + 1,
-            pos.1 + 2,
-            &"#".repeat((title.len() as f64 * progress) as usize),
-            style,
-        );
+    {
+        let mut context = DrawContext { renderer, style };
+
+        context.draw_box(pos, progress_size);
+        if pos.1 + 1 >= 0 {
+            context.draw_str(pos.0 + 1, pos.1 + 1, title);
+        }
+        if pos.1 + 2 >= 0 {
+            context.draw_str(
+                pos.0 + 1,
+                pos.1 + 2,
+                &"#".repeat((title.len() as f64 * progress) as usize),
+            );
+        }
     }
 
     renderer.end(stdout)?;

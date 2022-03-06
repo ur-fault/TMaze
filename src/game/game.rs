@@ -12,12 +12,6 @@ use crate::maze::{CellWall, Maze};
 use crate::tmcore::*;
 use crate::{helpers, ui};
 
-#[allow(dead_code)]
-pub struct GameSettings {
-    slow: bool,
-    show_path: bool,
-}
-
 pub struct Game {
     renderer: Renderer,
     stdout: Stdout,
@@ -91,32 +85,17 @@ impl Game {
     }
 
     fn run_game(&mut self) -> Result<(), Error> {
-        // let msize: Dims3D = match ui::menu(
-        //     &mut self.renderer,
-        //     self.style,
-        //     &mut self.stdout,
-        //     "Maze size",
-        //     &[
-        //         "10x5", "30x10x3", "5x5x5", "100x30", "300x100", "debug", "xtreme",
-        //     ],
-        //     0,
-        //     false,
-        // )? {
-        //     0 => (10, 5, 1),
-        //     1 => (30, 10, 3),
-        //     2 => (5, 5, 5),
-        //     3 => (100, 30, 1),
-        //     4 => (300, 100, 1),
-        //     5 => (10, 10, 10),
-        //     6 => (500, 500, 1),
-        //     _ => (0, 0, 0),
-        // };
         let msize: Dims3D = *ui::choice_menu(
             &mut self.renderer,
             self.style,
             &mut self.stdout,
             "Maze size",
-            &[((5, 5, 5), "5x5x5")],
+            &[
+                ((10, 5, 1), "10x5"),
+                ((5, 5, 5), "5^3"),
+                ((10, 10, 10), "10^3"),
+                ((300, 100, 1), "300x100"),
+            ],
             0,
             false,
         )?;
@@ -146,6 +125,20 @@ impl Game {
                 msize,
                 Some(|done, all| {
                     let current_progess = done as f64 / all as f64;
+                    // check for quit keys from user
+                    if let Ok(true) = poll(Duration::from_nanos(1)) {
+                        if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
+                            match code {
+                                KeyCode::Esc => {
+                                    return Err(Error::Quit);
+                                }
+                                KeyCode::Char('q' | 'Q') => {
+                                    return Err(Error::FullQuit);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                     if current_progess - last_progress > 0.01 {
                         let res = ui::render_progress(
                             &mut self.renderer,
@@ -156,20 +149,6 @@ impl Game {
                         );
                         last_progress = current_progess;
 
-                        // check for quit keys from user
-                        if let Ok(true) = poll(Duration::from_nanos(1)) {
-                            if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
-                                match code {
-                                    KeyCode::Esc => {
-                                        return Err(Error::Quit);
-                                    }
-                                    KeyCode::Char('q' | 'Q') => {
-                                        return Err(Error::FullQuit);
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
                         res
                     } else {
                         Ok(())
