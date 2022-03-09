@@ -26,12 +26,13 @@ Simple multiplatform maze solvnig game for terminal written in entirely Rust
 ## How to run
 
 - Download from GitHub, althought there are old builds, and I won't update them so frequently, maybe in the future
-- Build from source
+- Build from source, you need cargo installed on your system
 
 ### How to build from source
 
+1. Make sure you have [cargo](https://crates.io/) installed
 1. Clone GitHub repository or download as zip, then extract it
-2. Go to that folder
-3. Run `cargo run --release` to run
-4. Alternatively you can only build it with `cargo build --release`
-5. Compiled executable is in the folder `./target/release/`
+1. Go to that folder
+1. Run `cargo run --release` to run
+1. Alternatively you can only build it with `cargo build --release`
+1. Compiled executable is in the folder `./target/release/`
