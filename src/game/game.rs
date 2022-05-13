@@ -1,5 +1,5 @@
 use std::io::{stdout, Stdout};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
@@ -608,11 +608,11 @@ impl Game {
                 }
 
                 if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-                    ui::draw_char(&mut self.renderer, xpos, ypos, 'X', self.style);
+                    ui::draw_char(&mut self.renderer, xpos, ypos, '⥮', self.style);
                 } else if !cell.get_wall(CellWall::Up) {
-                    ui::draw_char(&mut self.renderer, xpos, ypos, '/', self.style);
+                    ui::draw_char(&mut self.renderer, xpos, ypos, '↑', self.style);
                 } else if !cell.get_wall(CellWall::Down) {
-                    ui::draw_char(&mut self.renderer, xpos, ypos, '\\', self.style);
+                    ui::draw_char(&mut self.renderer, xpos, ypos, '↓', self.style);
                 }
 
                 if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
