@@ -1,6 +1,6 @@
 # TMaze
 
-Simple multiplatform maze solvnig game for terminal written in entirely Rust
+Simple multiplatform maze solving game for terminal written entirely in  Rust
 
 ## What it can do
 
@@ -8,11 +8,11 @@ Simple multiplatform maze solvnig game for terminal written in entirely Rust
 
 - Responsive to terminal size and resize events
 - Variable maze sizes
-- Variable maze generation algorithms: Randomized Kruskal's, Depth-First Search
+- Various maze generation algorithms: Randomized Kruskal's, Depth-First Search
 - Timer and move counter
 - Show visited places
 - Spectator mode, where you can fly and see the map
-- Floors, basically 3D mazes (that's what spectator mode is for)
+- Floors, basically 3D mazes (that's what spectator mode is mainly for)
 
 ### To do
 
@@ -31,8 +31,8 @@ Simple multiplatform maze solvnig game for terminal written in entirely Rust
 ### How to build from source
 
 1. Make sure you have [cargo](https://crates.io/) installed
-1. Clone GitHub repository or download as zip, then extract it
+1. Clone GitHub repository or download it as zip, then extract it
 1. Go to that folder
 1. Run `cargo run --release` to run
-1. Alternatively you can only build it with `cargo build --release`
+1. Alternatively you can just build it with `cargo build --release`
 1. Compiled executable is in the folder `./target/release/`
