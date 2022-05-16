@@ -317,7 +317,7 @@ impl Game {
                                 _ => {}
                             }
                             clock.resume();
-                        },
+                        }
                         _ => {}
                     },
                     Err(err) => {
@@ -584,6 +584,7 @@ impl Game {
             }
         }
 
+        // drawing stairs
         let draw_stairs =
             |renderer: &mut Renderer, cell: &Cell, style: ContentStyle, pos: (i32, i32)| {
                 if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
@@ -625,6 +626,7 @@ impl Game {
                         self.style,
                     );
                 }
+
                 draw_stairs(&mut self.renderer, cell, self.style, (xpos, ypos));
 
                 if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
@@ -675,6 +677,17 @@ impl Game {
                     background_color: Default::default(),
                     attributes: Default::default(),
                 },
+            );
+
+            draw_stairs(
+                &mut self.renderer,
+                &maze.get_cells()[floor as usize][player_pos.1 as usize][player_pos.0 as usize],
+                ContentStyle {
+                    foreground_color: Some(Color::Green),
+                    background_color: Default::default(),
+                    attributes: Default::default(),
+                },
+                (player_pos.0 * 2 + 1 + pos.0, player_pos.1 * 2 + 1 + pos.1),
             );
         }
 
