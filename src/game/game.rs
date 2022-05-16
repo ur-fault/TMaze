@@ -116,12 +116,12 @@ impl Game {
                 self.style,
                 &mut self.stdout,
                 "Maze generation algorithm",
-                &["Depth-first search", "Randomized Kruskal's"],
+                &["Randomized Kruskal's", "Depth-first search"],
                 0,
                 true,
             )? {
-                0 => DepthFirstSearch::new,
-                1 => RndKruskals::new,
+                0 => RndKruskals::new,
+                1 => DepthFirstSearch::new,
                 _ => panic!(),
             };
             generation_func(
