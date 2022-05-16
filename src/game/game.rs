@@ -7,7 +7,7 @@ use crossterm::{
 };
 use masof::{Color, ContentStyle, Renderer};
 
-use crate::maze::algorithms::*;
+use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
 use crate::tmcore::*;
 use crate::{helpers, ui};
@@ -302,7 +302,15 @@ impl Game {
                         KeyCode::Enter => {}
                         KeyCode::Esc => {
                             clock.pause();
-                            match ui::menu(&mut self.renderer, self.style, &mut self.stdout, "Paused", &["Resume", "Main Menu", "Quit"], 0, false)? {
+                            match ui::menu(
+                                &mut self.renderer,
+                                self.style,
+                                &mut self.stdout,
+                                "Paused",
+                                &["Resume", "Main Menu", "Quit"],
+                                0,
+                                false,
+                            )? {
                                 0 => {}
                                 1 => break Err(Error::Quit),
                                 2 => break Err(Error::FullQuit),
@@ -576,6 +584,17 @@ impl Game {
             }
         }
 
+        let draw_stairs =
+            |renderer: &mut Renderer, cell: &Cell, style: ContentStyle, pos: (i32, i32)| {
+                if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
+                    ui::draw_char(renderer, pos.0, pos.1, '⥮', style);
+                } else if !cell.get_wall(CellWall::Up) {
+                    ui::draw_char(renderer, pos.0, pos.1, '↑', style);
+                } else if !cell.get_wall(CellWall::Down) {
+                    ui::draw_char(renderer, pos.0, pos.1, '↓', style);
+                }
+            };
+
         // drawing maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
             let ypos = iy as i32 * 2 + 1 + pos.1;
@@ -606,14 +625,7 @@ impl Game {
                         self.style,
                     );
                 }
-
-                if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-                    ui::draw_char(&mut self.renderer, xpos, ypos, '⥮', self.style);
-                } else if !cell.get_wall(CellWall::Up) {
-                    ui::draw_char(&mut self.renderer, xpos, ypos, '↑', self.style);
-                } else if !cell.get_wall(CellWall::Down) {
-                    ui::draw_char(&mut self.renderer, xpos, ypos, '↓', self.style);
-                }
+                draw_stairs(&mut self.renderer, cell, self.style, (xpos, ypos));
 
                 if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
                     continue;
