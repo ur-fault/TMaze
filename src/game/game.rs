@@ -285,10 +285,10 @@ impl Game {
                         KeyCode::Right | KeyCode::Char('d' | 'D') => {
                             move_player(CellWall::Right);
                         }
-                        KeyCode::Char('q' | 'Q') => {
+                        KeyCode::Char('f' | 'F' | 'q' | 'Q') => {
                             move_player(CellWall::Down);
                         }
-                        KeyCode::Char('e' | 'E') => {
+                        KeyCode::Char('r' | 'R' | 'e' | 'E') => {
                             move_player(CellWall::Up);
                         }
                         KeyCode::Char(' ') => {
