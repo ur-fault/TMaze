@@ -95,8 +95,8 @@ impl Game {
                 ((10, 5, 1), "10x5"),
                 ((30, 10, 1), "30x10"),
                 ((60, 20, 1), "60x20"),
-                ((5, 5, 5), "5^3"),
-                ((10, 10, 10), "10^3"),
+                ((5, 5, 5), "5x5x5"),
+                ((10, 10, 10), "10x10x10"),
                 ((300, 100, 1), "300x100"),
             ],
             0,
@@ -285,10 +285,10 @@ impl Game {
                         KeyCode::Right | KeyCode::Char('d' | 'D') => {
                             move_player(CellWall::Right);
                         }
-                        KeyCode::Char('f' | 'F' | 'q' | 'Q') => {
+                        KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
                             move_player(CellWall::Down);
                         }
-                        KeyCode::Char('r' | 'R' | 'e' | 'E') => {
+                        KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
                             move_player(CellWall::Up);
                         }
                         KeyCode::Char(' ') => {
