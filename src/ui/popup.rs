@@ -25,17 +25,17 @@ pub fn popup(
     stdout: &mut Stdout,
     title: &str,
     texts: &[&str],
-) -> Result<(), Error> {
+) -> Result<KeyCode, Error> {
     render_popup(renderer, style, stdout, title, texts)?;
 
     loop {
         let event = read()?;
         if let Event::Key(KeyEvent {
-            code: _,
+            code,
             modifiers: _,
         }) = event
         {
-            break Ok(());
+            break Ok(code);
         }
 
         renderer.event(&event);

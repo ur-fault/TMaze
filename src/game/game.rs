@@ -30,7 +30,21 @@ impl Game {
 
     pub fn run(mut self) -> Result<(), Error> {
         self.renderer.term_on(&mut self.stdout)?;
+        let mut game_restart_reqested = false;
+
         loop {
+            if game_restart_reqested {
+                game_restart_reqested = false;
+                match self.run_game() {
+                    Ok(_) | Err(Error::Quit) => {}
+                    Err(Error::NewGame) => {
+                        game_restart_reqested = true;
+                    }
+                    Err(_) => break,
+                }
+                continue;
+            }
+
             match ui::menu(
                 &mut self.renderer,
                 self.style,
@@ -43,6 +57,9 @@ impl Game {
                 Ok(res) => match res {
                     0 => match self.run_game() {
                         Ok(_) | Err(Error::Quit) => {}
+                        Err(Error::NewGame) => {
+                            game_restart_reqested = true;
+                        }
                         Err(_) => break,
                     },
 
@@ -385,7 +402,7 @@ impl Game {
 
             // check if player won
             if player_pos == goal_pos {
-                ui::popup(
+                if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
                     self.style,
                     &mut self.stdout,
@@ -394,8 +411,12 @@ impl Game {
                         &format!("Time: {}", ui::format_duration(play_time)),
                         &format!("Moves: {}", move_count),
                         &format!("Size: {}x{}x{}", msize.0, msize.1, msize.2),
+                        "",
+                        "R for new game",
                     ],
-                )?;
+                )? {
+                    break Err(Error::NewGame);
+                }
                 break Ok(());
             }
         }

@@ -14,6 +14,8 @@ pub enum Error {
     EmptyMenu,
     #[error("InvalidValue")]
     InvalidValue,
+    #[error("NewGame")]
+    NewGame,
 }
 
 pub type Dims = (i32, i32);

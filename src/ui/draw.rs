@@ -61,6 +61,7 @@ pub struct DrawContext<'a> {
 }
 
 impl<'a> DrawContext<'a> {
+    #[allow(dead_code)]
     pub fn draw_char(&mut self, x: i32, y: i32, text: char) {
         draw_char(self.renderer, x, y, text, self.style);
     }
@@ -73,6 +74,7 @@ impl<'a> DrawContext<'a> {
         draw_box(self.renderer, pos, size, self.style);
     }
 
+    #[allow(dead_code)]
     pub fn draw_char_styled(&mut self, x: i32, y: i32, text: char, style: ContentStyle) {
         draw_char(self.renderer, x, y, text, style);
     }
@@ -81,6 +83,7 @@ impl<'a> DrawContext<'a> {
         draw_str(self.renderer, x, y, text, style);
     }
 
+    #[allow(dead_code)]
     pub fn draw_box_styled(&mut self, pos: Dims, size: Dims, style: ContentStyle) {
         draw_box(self.renderer, pos, size, style);
     }
