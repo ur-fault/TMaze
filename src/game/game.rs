@@ -288,6 +288,13 @@ impl Game {
                         let pmove = get_new_player_pos(&maze, player_pos, wall, false, &mut moves);
                         player_pos = pmove.0;
                         move_count += pmove.1;
+
+                        if is_tower && !maze.get_cells()[pmove.0.2 as usize][pmove.0.1 as usize][pmove.0.0 as usize]
+                            .get_wall(CellWall::Up)
+                        {
+                            player_pos.2 += 1;
+                            move_count += 1;
+                        }
                     }
                 };
 
