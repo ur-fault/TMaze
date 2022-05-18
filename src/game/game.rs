@@ -192,6 +192,7 @@ impl Game {
             player_pos,
             player_offset,
             goal_pos,
+            is_tower,
             (
                 &format!(
                     "{}x{}x{}",
@@ -289,8 +290,10 @@ impl Game {
                         player_pos = pmove.0;
                         move_count += pmove.1;
 
-                        if is_tower && !maze.get_cells()[pmove.0.2 as usize][pmove.0.1 as usize][pmove.0.0 as usize]
-                            .get_wall(CellWall::Up)
+                        if is_tower
+                            && !maze.get_cells()[pmove.0 .2 as usize][pmove.0 .1 as usize]
+                                [pmove.0 .0 as usize]
+                                .get_wall(CellWall::Up)
                         {
                             player_pos.2 += 1;
                             move_count += 1;
@@ -362,6 +365,7 @@ impl Game {
                 player_pos,
                 player_offset,
                 goal_pos,
+                is_tower,
                 (
                     &format!(
                         "{}x{}x{}",
@@ -403,6 +407,7 @@ impl Game {
         player_pos: Dims3D,
         player_offset: Dims3D,
         goal_pos: Dims3D,
+        ups_as_goal: bool,
         texts: (&str, &str, &str, &str),
         text_horizontal_margin: i32,
         moves: &[(Dims3D, CellWall)],
@@ -617,7 +622,21 @@ impl Game {
                 if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
                     ui::draw_char(renderer, pos.0, pos.1, '⥮', style);
                 } else if !cell.get_wall(CellWall::Up) {
-                    ui::draw_char(renderer, pos.0, pos.1, '↑', style);
+                    ui::draw_char(
+                        renderer,
+                        pos.0,
+                        pos.1,
+                        '↑',
+                        if ups_as_goal {
+                            ContentStyle {
+                                foreground_color: Some(Color::DarkYellow),
+                                background_color: Default::default(),
+                                attributes: Default::default(),
+                            }
+                        } else {
+                            style
+                        },
+                    );
                 } else if !cell.get_wall(CellWall::Down) {
                     ui::draw_char(renderer, pos.0, pos.1, '↓', style);
                 }
