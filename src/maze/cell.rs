@@ -1,5 +1,5 @@
-use crate::tmcore::*;
 use crate::maze::cell::CellWall::*;
+use crate::tmcore::*;
 
 #[derive(Clone)]
 pub struct Cell {

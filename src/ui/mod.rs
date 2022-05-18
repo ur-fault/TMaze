@@ -10,15 +10,15 @@ pub use substring::Substring;
 use crate::helpers;
 use crate::tmcore::*;
 
-mod popup;
-mod progressbar;
 mod draw;
 mod menu;
+mod popup;
+mod progressbar;
 
+pub use draw::*;
+pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
-pub use menu::*;
-pub use draw::*;
 
 pub fn box_center_screen(box_dims: Dims) -> Result<Dims, Error> {
     let size_u16 = size()?;

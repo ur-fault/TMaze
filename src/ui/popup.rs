@@ -60,18 +60,10 @@ pub fn render_popup(
         let mut context = DrawContext { renderer, style };
 
         context.draw_box(pos, box_size);
-        context.draw_str(
-            title_pos,
-            pos.1 + 1,
-            &format!(" {} ", title),
-        );
+        context.draw_str(title_pos, pos.1 + 1, &format!(" {} ", title));
 
         if texts.len() != 0 {
-            context.draw_str(
-                pos.0 + 1,
-                pos.1 + 2,
-                &"─".repeat(box_size.0 as usize - 2),
-            );
+            context.draw_str(pos.0 + 1, pos.1 + 2, &"─".repeat(box_size.0 as usize - 2));
             for (i, text) in texts.iter().enumerate() {
                 context.draw_str(pos.0 + 2, pos.1 + 3 + i as i32, text);
             }

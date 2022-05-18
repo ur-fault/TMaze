@@ -1,6 +1,6 @@
 use self::CellWall::*;
-use crate::tmcore::*;
 use crate::maze::cell::{Cell, CellWall};
+use crate::tmcore::*;
 
 pub struct Maze {
     pub(crate) cells: Vec<Vec<Vec<Cell>>>,
@@ -11,18 +11,10 @@ pub struct Maze {
 
 impl Maze {
     pub fn size(&self) -> Dims3D {
-        (
-            // self.cells[0][0].len() as i32,
-            // self.cells[0].len() as i32,
-            // self.cells.len() as i32,
-            self.width as i32,
-            self.height as i32,
-            self.depth as i32,
-        )
+        (self.width as i32, self.height as i32, self.depth as i32)
     }
 
     pub fn is_in_bounds(&self, pos: Dims3D) -> bool {
-        // 0 <= x && x < self.width as isize && 0 <= y && y < self.height as isize
         0 <= pos.0
             && pos.0 < self.width as i32
             && 0 <= pos.1

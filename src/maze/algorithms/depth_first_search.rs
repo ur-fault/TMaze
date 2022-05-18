@@ -1,19 +1,60 @@
 use super::super::cell::Cell;
 use super::{Maze, MazeAlgorithm};
+use crate::maze::CellWall;
 use crate::tmcore::*;
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, thread_rng, Rng};
 
 pub struct DepthFirstSearch {}
 
 impl MazeAlgorithm for DepthFirstSearch {
-    fn new<T: FnMut(usize, usize) -> Result<(), Error>>(
+    fn generate<T: FnMut(usize, usize) -> Result<(), Error>>(
         size: Dims3D,
+        floored: bool,
         mut report_progress: Option<T>,
     ) -> Result<Maze, Error> {
-        if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
+        if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(Error::InvalidValue);
         }
 
+        let (w, h, d) = size;
+        let (wu, hu, du) = (w as usize, h as usize, d as usize);
+
+        Ok(Maze {
+            cells: if size.2 > 1 && floored {
+                let mut cells = (0..d)
+                    .map(|_| {
+                        Self::generate_individual((w, h, 1), report_progress.as_mut())
+                            .unwrap()
+                            .cells
+                            .remove(0)
+                    })
+                    .collect::<Vec<_>>();
+
+                for floor in 0..du - 1 {
+                    let (x, y) = (thread_rng().gen_range(0..wu), thread_rng().gen_range(0..hu));
+                    cells[floor][y][x].remove_wall(CellWall::Up);
+                    cells[floor + 1][y][x].remove_wall(CellWall::Down);
+                }
+
+                cells
+            } else {
+                Self::generate_individual((w, h, d), report_progress.as_mut())
+                    .unwrap()
+                    .cells
+            },
+            width: wu,
+            height: hu,
+            depth: du,
+        })
+    }
+
+    fn generate_individual<T: FnMut(usize, usize) -> Result<(), Error>>(
+        size: Dims3D,
+        mut report_progress: Option<T>,
+    ) -> Result<Maze, Error> {
+        if size.0 == 0 || size.1 == 0 || size.2 == 0 {
+            return Err(Error::InvalidValue);
+        }
         let (w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
         let cell_count = wu * hu * du;
