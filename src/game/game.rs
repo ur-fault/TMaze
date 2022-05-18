@@ -118,24 +118,7 @@ impl Game {
     }
 
     fn run_game(&mut self) -> Result<(), Error> {
-        let maze_mode: GameMode = *ui::choice_menu(
-            &mut self.renderer,
-            self.style,
-            &mut self.stdout,
-            "Maze size",
-            &[
-                ((10, 5, 1, false), "10x5"),
-                ((30, 10, 1, false), "30x10"),
-                ((60, 20, 1, false), "60x20"),
-                ((5, 5, 5, false), "5x5x5"),
-                ((10, 10, 10, false), "10x10x10"),
-                ((300, 100, 1, false), "300x100"),
-                ((10, 10, 5, true), "10x10x5 Tower"),
-                ((40, 15, 10, true), "40x15x10 Tower"),
-            ],
-            0,
-            false,
-        )?;
+        let (maze_mode, generation_func) = self.get_game_properities()?;
         let msize: Dims3D = (maze_mode.0, maze_mode.1, maze_mode.2);
         let is_tower = maze_mode.3;
 
@@ -147,19 +130,6 @@ impl Game {
 
         let maze = {
             let mut last_progress = f64::MIN;
-            let generation_func = match ui::menu(
-                &mut self.renderer,
-                self.style,
-                &mut self.stdout,
-                "Maze generation algorithm",
-                &["Randomized Kruskal's", "Depth-first search"],
-                0,
-                true,
-            )? {
-                0 => RndKruskals::generate,
-                1 => DepthFirstSearch::generate,
-                _ => panic!(),
-            };
             generation_func(
                 msize,
                 is_tower,
@@ -802,5 +772,50 @@ impl Game {
         self.renderer.end(&mut self.stdout)?;
 
         Ok(())
+    }
+
+    // fn((i32, i32, i32), bool, Option<|{unknown}, {unknown}| -> Result<(), Error>>) -> Result<Maze, Error>
+    fn get_game_properities<T: FnMut(usize, usize) -> Result<(), Error>>(
+        &mut self,
+    ) -> Result<
+        (
+            GameMode,
+            fn((i32, i32, i32), bool, Option<T>) -> Result<Maze, Error>,
+        ),
+        Error,
+    > {
+        Ok((
+            *ui::choice_menu(
+                &mut self.renderer,
+                self.style,
+                &mut self.stdout,
+                "Maze size",
+                &[
+                    ((10, 5, 1, false), "10x5"),
+                    ((30, 10, 1, false), "30x10"),
+                    ((60, 20, 1, false), "60x20"),
+                    ((5, 5, 5, false), "5x5x5"),
+                    ((10, 10, 10, false), "10x10x10"),
+                    ((300, 100, 1, false), "300x100"),
+                    ((10, 10, 5, true), "10x10x5 Tower"),
+                    ((40, 15, 10, true), "40x15x10 Tower"),
+                ],
+                0,
+                false,
+            )?,
+            match ui::menu(
+                &mut self.renderer,
+                self.style,
+                &mut self.stdout,
+                "Maze generation algorithm",
+                &["Randomized Kruskal's", "Depth-first search"],
+                0,
+                true,
+            )? {
+                0 => RndKruskals::generate,
+                1 => DepthFirstSearch::generate,
+                _ => panic!(),
+            },
+        ))
     }
 }
