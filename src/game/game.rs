@@ -60,8 +60,14 @@ impl Game {
                             &mut self.renderer,
                             self.style,
                             &mut self.stdout,
-                            "Not implemented yet",
-                            &[],
+                            "Controls",
+                            &[
+                                "WASD and arrows: move",
+                                "Space: spectaror mode",
+                                "Q, F and L: move down",
+                                "E, R and P: move up",
+                                "Escape: pause",
+                            ],
                         )?;
                     }
                     3 => {
@@ -69,8 +75,17 @@ impl Game {
                             &mut self.renderer,
                             self.style,
                             &mut self.stdout,
-                            "Not implemented yet",
-                            &[],
+                            "About",
+                            &[
+                                "This is simple maze solving game",
+                                "Supported algorithms:",
+                                "    - Depth-first search",
+                                "    - Kruskal's algorithm",
+                                "Supports 3D mazes",
+                                "",
+                                "Created by:",
+                                "    - morsee",
+                            ],
                         )?;
                     }
                     4 => break,
