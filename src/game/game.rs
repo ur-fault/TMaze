@@ -9,6 +9,7 @@ use masof::{Color, ContentStyle, Renderer};
 
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
+use crate::settings::{ColorScheme, Settings};
 use crate::tmcore::*;
 use crate::{helpers, ui};
 use pausable_clock::PausableClock;
@@ -16,7 +17,7 @@ use pausable_clock::PausableClock;
 pub struct Game {
     renderer: Renderer,
     stdout: Stdout,
-    style: ContentStyle,
+    settings: Settings,
 }
 
 impl Game {
@@ -24,7 +25,17 @@ impl Game {
         Game {
             renderer: Renderer::default(),
             stdout: stdout(),
-            style: ContentStyle::default(),
+            settings: Settings::new().color_scheme(
+                ColorScheme::new()
+                    .player(ContentStyle {
+                        foreground_color: Some(Color::Green),
+                        ..Default::default()
+                    })
+                    .goal(ContentStyle {
+                        foreground_color: Some(Color::DarkYellow),
+                        ..Default::default()
+                    }),
+            ),
         }
     }
 
@@ -47,7 +58,7 @@ impl Game {
 
             match ui::menu(
                 &mut self.renderer,
-                self.style,
+                self.settings.color_scheme.normal,
                 &mut self.stdout,
                 "TMaze",
                 &["New Game", "Settings", "Controls", "About", "Quit"],
@@ -66,7 +77,7 @@ impl Game {
                     1 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.style,
+                            self.settings.color_scheme.normal,
                             &mut self.stdout,
                             "Not implemented yet",
                             &[],
@@ -75,7 +86,7 @@ impl Game {
                     2 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.style,
+                            self.settings.color_scheme.normal,
                             &mut self.stdout,
                             "Controls",
                             &[
@@ -90,7 +101,7 @@ impl Game {
                     3 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.style,
+                            self.settings.color_scheme.normal,
                             &mut self.stdout,
                             "About",
                             &[
@@ -152,7 +163,7 @@ impl Game {
                     if current_progess - last_progress > 0.01 {
                         let res = ui::render_progress(
                             &mut self.renderer,
-                            self.style,
+                            self.settings.color_scheme.normal,
                             &mut self.stdout,
                             &format!(
                                 "Generating maze ({}x{}x{}) {}/{}",
@@ -277,7 +288,8 @@ impl Game {
                         player_pos = pmove.0;
                         move_count += pmove.1;
 
-                        if is_tower
+                        if !self.settings.disable_tower_auto_up
+                            && is_tower
                             && !maze.get_cells()[pmove.0 .2 as usize][pmove.0 .1 as usize]
                                 [pmove.0 .0 as usize]
                                 .get_wall(CellWall::Up)
@@ -321,7 +333,7 @@ impl Game {
                             clock.pause();
                             match ui::menu(
                                 &mut self.renderer,
-                                self.style,
+                                self.settings.color_scheme.normal,
                                 &mut self.stdout,
                                 "Paused",
                                 &["Resume", "Main Menu", "Quit"],
@@ -374,7 +386,7 @@ impl Game {
             if player_pos == goal_pos {
                 if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
-                    self.style,
+                    self.settings.color_scheme.normal,
                     &mut self.stdout,
                     "You won",
                     &[
@@ -439,7 +451,7 @@ impl Game {
                     helpers::double_line_corner(false, false, true, true),
                     helpers::double_line_corner(true, false, true, false)
                 ),
-                self.style,
+                self.settings.color_scheme.normal,
             );
             ui::draw_str(
                 &mut self.renderer,
@@ -450,7 +462,7 @@ impl Game {
                     helpers::double_line_corner(true, false, true, false),
                     helpers::double_line_corner(true, false, false, true)
                 ),
-                self.style,
+                self.settings.color_scheme.normal,
             );
         }
         if pos.1 + real_size.1 - 2 < size.1 - 3 {
@@ -459,14 +471,14 @@ impl Game {
                 pos.0,
                 pos.1 + real_size.1 - 2,
                 &format!("{}", helpers::double_line_corner(false, true, false, true),),
-                self.style,
+                self.settings.color_scheme.normal,
             );
             ui::draw_str(
                 &mut self.renderer,
                 pos.0 + real_size.0 - 1,
                 pos.1 + real_size.1 - 2,
                 &format!("{}", helpers::double_line_corner(false, true, false, true),),
-                self.style,
+                self.settings.color_scheme.normal,
             );
         }
         if pos.1 + real_size.1 - 1 < size.1 - 2 {
@@ -475,7 +487,7 @@ impl Game {
                 pos.0,
                 pos.1 + real_size.1 - 1,
                 &format!("{}", helpers::double_line_corner(false, true, true, false),),
-                self.style,
+                self.settings.color_scheme.normal,
             );
             ui::draw_str(
                 &mut self.renderer,
@@ -486,7 +498,7 @@ impl Game {
                     helpers::double_line_corner(true, false, true, false),
                     helpers::double_line_corner(true, true, false, false)
                 ),
-                self.style,
+                self.settings.color_scheme.normal,
             );
         }
         // horizontal edge lines
@@ -507,7 +519,7 @@ impl Game {
                                 .get_wall(CellWall::Right),
                         )
                     ),
-                    self.style,
+                    self.settings.color_scheme.normal,
                 );
             }
             if pos.1 + real_size.1 - 1 < size.1 - 2 {
@@ -527,7 +539,7 @@ impl Game {
                             false,
                         )
                     ),
-                    self.style,
+                    self.settings.color_scheme.normal,
                 );
             }
         }
@@ -544,7 +556,7 @@ impl Game {
                 pos.0,
                 ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
-                self.style,
+                self.settings.color_scheme.normal,
             );
 
             if ypos + 1 < size.1 {
@@ -562,7 +574,7 @@ impl Game {
                             true,
                         )
                     ),
-                    self.style,
+                    self.settings.color_scheme.normal,
                 );
 
                 ui::draw_str(
@@ -580,7 +592,7 @@ impl Game {
                             true,
                         )
                     ),
-                    self.style,
+                    self.settings.color_scheme.normal,
                 );
             }
 
@@ -589,7 +601,7 @@ impl Game {
                 pos.0 + real_size.0 - 1,
                 ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
-                self.style,
+                self.settings.color_scheme.normal,
             );
         }
 
@@ -602,36 +614,35 @@ impl Game {
                     pos.0 + real_pos.0,
                     pos.1 + real_pos.1,
                     '.',
-                    self.style,
+                    self.settings.color_scheme.normal,
                 );
             }
         }
 
         // drawing stairs
-        let draw_stairs =
-            |renderer: &mut Renderer, cell: &Cell, style: ContentStyle, pos: (i32, i32)| {
-                if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-                    ui::draw_char(renderer, pos.0, pos.1, '⥮', style);
-                } else if !cell.get_wall(CellWall::Up) {
-                    ui::draw_char(
-                        renderer,
-                        pos.0,
-                        pos.1,
-                        '↑',
-                        if ups_as_goal {
-                            ContentStyle {
-                                foreground_color: Some(Color::DarkYellow),
-                                background_color: Default::default(),
-                                attributes: Default::default(),
-                            }
-                        } else {
-                            style
-                        },
-                    );
-                } else if !cell.get_wall(CellWall::Down) {
-                    ui::draw_char(renderer, pos.0, pos.1, '↓', style);
-                }
-            };
+        let draw_stairs = |renderer: &mut Renderer,
+                           cell: &Cell,
+                           style: ContentStyle,
+                           pos: (i32, i32),
+                           force_style: bool| {
+            if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
+                ui::draw_char(renderer, pos.0, pos.1, '⥮', style);
+            } else if !cell.get_wall(CellWall::Up) {
+                ui::draw_char(
+                    renderer,
+                    pos.0,
+                    pos.1,
+                    '↑',
+                    if ups_as_goal && !force_style {
+                        self.settings.color_scheme.goal
+                    } else {
+                        style
+                    },
+                );
+            } else if !cell.get_wall(CellWall::Down) {
+                ui::draw_char(renderer, pos.0, pos.1, '↓', style);
+            }
+        };
 
         // drawing maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
@@ -648,7 +659,7 @@ impl Game {
                         xpos + 1,
                         ypos,
                         helpers::double_line_corner(false, true, false, true),
-                        self.style,
+                        self.settings.color_scheme.normal,
                     );
                 }
                 if ypos + 1 < size.1 as i32 - 2
@@ -660,11 +671,17 @@ impl Game {
                         xpos,
                         ypos + 1,
                         helpers::double_line_corner(true, false, true, false),
-                        self.style,
+                        self.settings.color_scheme.normal,
                     );
                 }
 
-                draw_stairs(&mut self.renderer, cell, self.style, (xpos, ypos));
+                draw_stairs(
+                    &mut self.renderer,
+                    cell,
+                    self.settings.color_scheme.normal,
+                    (xpos, ypos),
+                    false,
+                );
 
                 if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
                     continue;
@@ -683,7 +700,7 @@ impl Game {
                             cell2.get_wall(CellWall::Top),
                             cell2.get_wall(CellWall::Left),
                         ),
-                        self.style,
+                        self.settings.color_scheme.normal,
                     );
                 }
             }
@@ -695,11 +712,7 @@ impl Game {
                 goal_pos.0 * 2 + 1 + pos.0,
                 goal_pos.1 * 2 + 1 + pos.1,
                 '$',
-                ContentStyle {
-                    foreground_color: Some(Color::DarkYellow),
-                    background_color: Default::default(),
-                    attributes: Default::default(),
-                },
+                self.settings.color_scheme.goal,
             );
         }
 
@@ -709,22 +722,15 @@ impl Game {
                 player_pos.0 * 2 + 1 + pos.0,
                 player_pos.1 * 2 + 1 + pos.1,
                 'O',
-                ContentStyle {
-                    foreground_color: Some(Color::Green),
-                    background_color: Default::default(),
-                    attributes: Default::default(),
-                },
+                self.settings.color_scheme.player,
             );
 
             draw_stairs(
                 &mut self.renderer,
                 &maze.get_cells()[floor as usize][player_pos.1 as usize][player_pos.0 as usize],
-                ContentStyle {
-                    foreground_color: Some(Color::Green),
-                    background_color: Default::default(),
-                    attributes: Default::default(),
-                },
+                self.settings.color_scheme.player,
                 (player_pos.0 * 2 + 1 + pos.0, player_pos.1 * 2 + 1 + pos.1),
+                true,
             );
         }
 
@@ -745,28 +751,28 @@ impl Game {
             str_pos_tl.0,
             str_pos_tl.1,
             texts.0,
-            self.style,
+            self.settings.color_scheme.normal,
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_tr.0,
             str_pos_tr.1,
             texts.1,
-            self.style,
+            self.settings.color_scheme.normal,
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_bl.0,
             str_pos_bl.1,
             texts.2,
-            self.style,
+            self.settings.color_scheme.normal,
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_br.0,
             str_pos_br.1,
             texts.3,
-            self.style,
+            self.settings.color_scheme.normal,
         );
 
         self.renderer.end(&mut self.stdout)?;
@@ -786,7 +792,7 @@ impl Game {
         Ok((
             *ui::choice_menu(
                 &mut self.renderer,
-                self.style,
+                self.settings.color_scheme.normal,
                 &mut self.stdout,
                 "Maze size",
                 &[
@@ -804,7 +810,7 @@ impl Game {
             )?,
             match ui::menu(
                 &mut self.renderer,
-                self.style,
+                self.settings.color_scheme.normal,
                 &mut self.stdout,
                 "Maze generation algorithm",
                 &["Randomized Kruskal's", "Depth-first search"],
