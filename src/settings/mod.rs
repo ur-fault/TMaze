@@ -2,6 +2,18 @@
 // use serde::{Deserialize, Serialize};
 use masof::ContentStyle;
 
+#[derive(Debug, Clone, Copy)]
+pub enum CameraMode {
+    CloseFollow,
+    EdgeFollow(i32, i32),
+}
+
+impl Default for CameraMode {
+    fn default() -> Self {
+        CameraMode::CloseFollow
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct ColorScheme {
     pub normal: ContentStyle,
@@ -35,6 +47,7 @@ pub struct Settings {
     pub color_scheme: ColorScheme,
     pub slow: bool,
     pub disable_tower_auto_up: bool,
+    pub camera_mode: CameraMode,
 }
 
 impl Settings {
@@ -54,6 +67,11 @@ impl Settings {
 
     pub fn disable_tower_auto_up(mut self, value: bool) -> Self {
         self.disable_tower_auto_up = value;
+        self
+    }
+
+    pub fn camera_mode(mut self, value: CameraMode) -> Self {
+        self.camera_mode = value;
         self
     }
 }

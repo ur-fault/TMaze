@@ -9,7 +9,7 @@ use masof::{Color, ContentStyle, Renderer};
 
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
-use crate::settings::{ColorScheme, Settings};
+use crate::settings::{CameraMode, ColorScheme, Settings};
 use crate::tmcore::*;
 use crate::{helpers, ui};
 use pausable_clock::PausableClock;
@@ -18,6 +18,7 @@ pub struct Game {
     renderer: Renderer,
     stdout: Stdout,
     settings: Settings,
+    last_edge_follow_offset: Dims,
 }
 
 impl Game {
@@ -25,17 +26,19 @@ impl Game {
         Game {
             renderer: Renderer::default(),
             stdout: stdout(),
-            settings: Settings::new().color_scheme(
-                ColorScheme::new()
-                    .player(ContentStyle {
-                        foreground_color: Some(Color::Green),
-                        ..Default::default()
-                    })
-                    .goal(ContentStyle {
-                        foreground_color: Some(Color::DarkYellow),
-                        ..Default::default()
-                    }),
-            ),
+            settings: Settings::new()
+                .color_scheme(
+                    ColorScheme::new()
+                        .player(ContentStyle {
+                            foreground_color: Some(Color::Green),
+                            ..Default::default()
+                        })
+                        .goal(ContentStyle {
+                            foreground_color: Some(Color::DarkYellow),
+                            ..Default::default()
+                        }),
+                ),
+            last_edge_follow_offset: (0, 0),
         }
     }
 
@@ -136,7 +139,7 @@ impl Game {
         let mut player_pos = (0, 0, 0);
         let goal_pos = (msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let mut player_offset = (0, 0, 0);
+        let mut camera_offset = (0, 0, 0);
         let mut spectator = false;
 
         let maze = {
@@ -180,6 +183,7 @@ impl Game {
                 }),
             )?
         };
+
         let mut moves = vec![];
         let clock = PausableClock::default();
         let start_time = clock.now();
@@ -188,7 +192,8 @@ impl Game {
         self.render_game(
             &maze,
             player_pos,
-            player_offset,
+            camera_offset,
+            self.settings.camera_mode,
             goal_pos,
             is_tower,
             (
@@ -265,7 +270,7 @@ impl Game {
 
                 let mut move_player = |wall: CellWall| {
                     if spectator {
-                        player_offset = {
+                        camera_offset = {
                             let off = match wall {
                                 CellWall::Top => (0, 1, 0),
                                 CellWall::Bottom => (0, -1, 0),
@@ -276,10 +281,10 @@ impl Game {
                             };
 
                             (
-                                player_offset.0 + off.0,
-                                player_offset.1 + off.1,
+                                camera_offset.0 + off.0,
+                                camera_offset.1 + off.1,
                                 (-player_pos.2).max(
-                                    (maze.size().2 - player_pos.2 - 1).min(player_offset.2 + off.2),
+                                    (maze.size().2 - player_pos.2 - 1).min(camera_offset.2 + off.2),
                                 ),
                             )
                         };
@@ -322,7 +327,7 @@ impl Game {
                         }
                         KeyCode::Char(' ') => {
                             if spectator {
-                                player_offset = (0, 0, 0);
+                                camera_offset = (0, 0, 0);
                                 spectator = false
                             } else {
                                 spectator = true
@@ -362,7 +367,8 @@ impl Game {
             self.render_game(
                 &maze,
                 player_pos,
-                player_offset,
+                camera_offset,
+                self.settings.camera_mode,
                 goal_pos,
                 is_tower,
                 (
@@ -408,35 +414,64 @@ impl Game {
         &mut self,
         maze: &Maze,
         player_pos: Dims3D,
-        player_offset: Dims3D,
+        camera_offset: Dims3D,
+        camera_mode: CameraMode,
         goal_pos: Dims3D,
         ups_as_goal: bool,
         texts: (&str, &str, &str, &str),
         text_horizontal_margin: i32,
         moves: &[(Dims3D, CellWall)],
     ) -> Result<(), Error> {
-        let real_size = helpers::maze_render_size(maze);
+        let maze_render_size = helpers::maze_render_size(maze);
         let size = {
             let size = size()?;
             (size.0 as i32, size.1 as i32)
         };
-        let is_around_player = real_size.0 > size.0 as i32 || real_size.1 + 2 > size.1 as i32;
+        let is_around_player =
+            maze_render_size.0 > size.0 as i32 || maze_render_size.1 + 2 > size.1 as i32;
 
         let pos = {
             let pos = if is_around_player {
                 let player_real_maze_pos = helpers::from_maze_to_real(player_pos);
-                (
-                    size.0 as i32 / 2 - player_real_maze_pos.0,
-                    size.1 as i32 / 2 - player_real_maze_pos.1,
-                )
+
+                match camera_mode {
+                    CameraMode::CloseFollow => (
+                        size.0 / 2 - player_real_maze_pos.0,
+                        size.1 / 2 - player_real_maze_pos.1,
+                    ),
+                    CameraMode::EdgeFollow(margin_x, margin_y) => {
+                        let current_player_real_pos = (
+                            self.last_edge_follow_offset.0 + player_real_maze_pos.0,
+                            self.last_edge_follow_offset.1 + player_real_maze_pos.1,
+                        );
+
+                        self.last_edge_follow_offset = (
+                            if current_player_real_pos.0 < margin_x
+                                || current_player_real_pos.0 > size.0 - margin_x
+                            {
+                                -player_real_maze_pos.0 + size.0 / 2
+                            } else {
+                                self.last_edge_follow_offset.0
+                            },
+                            if current_player_real_pos.1 < margin_y
+                                || current_player_real_pos.1 > size.1 - margin_y
+                            {
+                                -player_real_maze_pos.1 + size.1 / 2
+                            } else {
+                                self.last_edge_follow_offset.1
+                            },
+                        );
+                        self.last_edge_follow_offset
+                    }
+                }
             } else {
-                ui::box_center_screen((real_size.0 as i32, real_size.1 as i32))?
+                ui::box_center_screen((maze_render_size.0 as i32, maze_render_size.1 as i32))?
             };
 
-            (pos.0 + player_offset.0 * 2, pos.1 + player_offset.1 * 2)
+            (pos.0 + camera_offset.0 * 2, pos.1 + camera_offset.1 * 2)
         };
 
-        let floor = player_pos.2 + player_offset.2;
+        let floor = player_pos.2 + camera_offset.2;
 
         self.renderer.begin()?;
 
@@ -455,7 +490,7 @@ impl Game {
             );
             ui::draw_str(
                 &mut self.renderer,
-                pos.0 + real_size.0 - 2,
+                pos.0 + maze_render_size.0 - 2,
                 pos.1,
                 &format!(
                     "{}{}",
@@ -465,34 +500,34 @@ impl Game {
                 self.settings.color_scheme.normal,
             );
         }
-        if pos.1 + real_size.1 - 2 < size.1 - 3 {
+        if pos.1 + maze_render_size.1 - 2 < size.1 - 3 {
             ui::draw_str(
                 &mut self.renderer,
                 pos.0,
-                pos.1 + real_size.1 - 2,
+                pos.1 + maze_render_size.1 - 2,
                 &format!("{}", helpers::double_line_corner(false, true, false, true),),
                 self.settings.color_scheme.normal,
             );
             ui::draw_str(
                 &mut self.renderer,
-                pos.0 + real_size.0 - 1,
-                pos.1 + real_size.1 - 2,
+                pos.0 + maze_render_size.0 - 1,
+                pos.1 + maze_render_size.1 - 2,
                 &format!("{}", helpers::double_line_corner(false, true, false, true),),
                 self.settings.color_scheme.normal,
             );
         }
-        if pos.1 + real_size.1 - 1 < size.1 - 2 {
+        if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
             ui::draw_str(
                 &mut self.renderer,
                 pos.0,
-                pos.1 + real_size.1 - 1,
+                pos.1 + maze_render_size.1 - 1,
                 &format!("{}", helpers::double_line_corner(false, true, true, false),),
                 self.settings.color_scheme.normal,
             );
             ui::draw_str(
                 &mut self.renderer,
-                pos.0 + real_size.0 - 2,
-                pos.1 + real_size.1 - 1,
+                pos.0 + maze_render_size.0 - 2,
+                pos.1 + maze_render_size.1 - 1,
                 &format!(
                     "{}{}",
                     helpers::double_line_corner(true, false, true, false),
@@ -522,11 +557,11 @@ impl Game {
                     self.settings.color_scheme.normal,
                 );
             }
-            if pos.1 + real_size.1 - 1 < size.1 - 2 {
+            if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
                 ui::draw_str(
                     &mut self.renderer,
                     x as i32 * 2 + pos.0 + 1,
-                    pos.1 + real_size.1 - 1,
+                    pos.1 + maze_render_size.1 - 1,
                     &format!(
                         "{}{}",
                         helpers::double_line_corner(true, false, true, false),
@@ -579,7 +614,7 @@ impl Game {
 
                 ui::draw_str(
                     &mut self.renderer,
-                    pos.0 + real_size.0 - 1,
+                    pos.0 + maze_render_size.0 - 1,
                     y as i32 * 2 + pos.1 + 2,
                     &format!(
                         "{}",
@@ -598,7 +633,7 @@ impl Game {
 
             ui::draw_str(
                 &mut self.renderer,
-                pos.0 + real_size.0 - 1,
+                pos.0 + maze_render_size.0 - 1,
                 ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
                 self.settings.color_scheme.normal,

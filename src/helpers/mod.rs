@@ -60,6 +60,6 @@ pub fn round_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &'
     }
 }
 
-pub fn from_maze_to_real(maze_pos: Dims3D) -> Dims {
-    (maze_pos.0 * 2 + 1, maze_pos.1 * 2 + 1)
+pub fn from_maze_to_real(pos_on_maze: Dims3D) -> Dims {
+    (pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1)
 }
