@@ -26,18 +26,17 @@ impl Game {
         Game {
             renderer: Renderer::default(),
             stdout: stdout(),
-            settings: Settings::new()
-                .color_scheme(
-                    ColorScheme::new()
-                        .player(ContentStyle {
-                            foreground_color: Some(Color::Green),
-                            ..Default::default()
-                        })
-                        .goal(ContentStyle {
-                            foreground_color: Some(Color::DarkYellow),
-                            ..Default::default()
-                        }),
-                ),
+            settings: Settings::new().color_scheme(
+                ColorScheme::new()
+                    .player(ContentStyle {
+                        foreground_color: Some(Color::Green),
+                        ..Default::default()
+                    })
+                    .goal(ContentStyle {
+                        foreground_color: Some(Color::DarkYellow),
+                        ..Default::default()
+                    }),
+            ),
             last_edge_follow_offset: (0, 0),
         }
     }
@@ -475,106 +474,108 @@ impl Game {
 
         self.renderer.begin()?;
 
+        let draw_corner_double =
+            |self_: &mut Game, x, y, c1: (bool, bool, bool, bool), c2: (bool, bool, bool, bool)| {
+                ui::draw_str(
+                    &mut self_.renderer,
+                    x,
+                    y,
+                    &format!(
+                        "{}{}",
+                        helpers::double_line_corner(c1.0, c1.1, c1.2, c1.3),
+                        helpers::double_line_corner(c1.0, c1.1, c2.2, c2.3)
+                    ),
+                    self_.settings.color_scheme.normal,
+                )
+            };
+
+        let draw_corner_single = |self_: &mut Game, x, y, c: (bool, bool, bool, bool)| {
+            ui::draw_str(
+                &mut self_.renderer,
+                x,
+                y,
+                &format!("{}", helpers::double_line_corner(c.0, c.1, c.2, c.3),),
+                self_.settings.color_scheme.normal,
+            )
+        };
+
         // corners
         if pos.1 > 0 {
-            ui::draw_str(
-                &mut self.renderer,
+            draw_corner_double(
+                self,
                 pos.0,
                 pos.1,
-                &format!(
-                    "{}{}",
-                    helpers::double_line_corner(false, false, true, true),
-                    helpers::double_line_corner(true, false, true, false)
-                ),
-                self.settings.color_scheme.normal,
+                (false, false, true, true),
+                (true, false, true, false),
             );
-            ui::draw_str(
-                &mut self.renderer,
+            draw_corner_double(
+                self,
                 pos.0 + maze_render_size.0 - 2,
                 pos.1,
-                &format!(
-                    "{}{}",
-                    helpers::double_line_corner(true, false, true, false),
-                    helpers::double_line_corner(true, false, false, true)
-                ),
-                self.settings.color_scheme.normal,
+                (true, false, true, false),
+                (true, false, false, true),
             );
         }
+
         if pos.1 + maze_render_size.1 - 2 < size.1 - 3 {
-            ui::draw_str(
-                &mut self.renderer,
+            draw_corner_single(
+                self,
                 pos.0,
                 pos.1 + maze_render_size.1 - 2,
-                &format!("{}", helpers::double_line_corner(false, true, false, true),),
-                self.settings.color_scheme.normal,
+                (false, true, false, true),
             );
-            ui::draw_str(
-                &mut self.renderer,
+            draw_corner_single(
+                self,
                 pos.0 + maze_render_size.0 - 1,
                 pos.1 + maze_render_size.1 - 2,
-                &format!("{}", helpers::double_line_corner(false, true, false, true),),
-                self.settings.color_scheme.normal,
+                (false, true, false, true),
             );
         }
         if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
-            ui::draw_str(
-                &mut self.renderer,
+            draw_corner_single(
+                self,
                 pos.0,
                 pos.1 + maze_render_size.1 - 1,
-                &format!("{}", helpers::double_line_corner(false, true, true, false),),
-                self.settings.color_scheme.normal,
+                (false, true, true, false),
             );
-            ui::draw_str(
-                &mut self.renderer,
+            draw_corner_double(
+                self,
                 pos.0 + maze_render_size.0 - 2,
                 pos.1 + maze_render_size.1 - 1,
-                &format!(
-                    "{}{}",
-                    helpers::double_line_corner(true, false, true, false),
-                    helpers::double_line_corner(true, true, false, false)
-                ),
-                self.settings.color_scheme.normal,
+                (true, false, true, false),
+                (true, true, false, false),
             );
         }
         // horizontal edge lines
         for x in 0..maze.size().0 - 1 {
             if pos.1 > 0 {
-                ui::draw_str(
-                    &mut self.renderer,
+                draw_corner_double(
+                    self,
                     x as i32 * 2 + pos.0 + 1,
                     pos.1,
-                    &format!(
-                        "{}{}",
-                        helpers::double_line_corner(true, false, true, false),
-                        helpers::double_line_corner(
-                            true,
-                            false,
-                            true,
-                            maze.get_cells()[floor as usize][0][x as usize]
-                                .get_wall(CellWall::Right),
-                        )
+                    (true, false, true, false),
+                    (
+                        true,
+                        false,
+                        true,
+                        maze.get_cells()[floor as usize][0][x as usize].get_wall(CellWall::Right),
                     ),
-                    self.settings.color_scheme.normal,
                 );
             }
+
             if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
-                ui::draw_str(
-                    &mut self.renderer,
+                draw_corner_double(
+                    self,
                     x as i32 * 2 + pos.0 + 1,
                     pos.1 + maze_render_size.1 - 1,
-                    &format!(
-                        "{}{}",
-                        helpers::double_line_corner(true, false, true, false),
-                        helpers::double_line_corner(
-                            true,
-                            maze.get_cells()[floor as usize][maze.size().1 as usize - 1]
-                                [x as usize]
-                                .get_wall(CellWall::Right),
-                            true,
-                            false,
-                        )
+                    (true, false, true, false),
+                    (
+                        true,
+                        maze.get_cells()[floor as usize][maze.size().1 as usize - 1][x as usize]
+                            .get_wall(CellWall::Right),
+                        true,
+                        false,
                     ),
-                    self.settings.color_scheme.normal,
                 );
             }
         }
@@ -595,48 +596,37 @@ impl Game {
             );
 
             if ypos + 1 < size.1 {
-                ui::draw_str(
-                    &mut self.renderer,
+                draw_corner_single(
+                    self,
                     pos.0,
                     y as i32 * 2 + pos.1 + 2,
-                    &format!(
-                        "{}",
-                        helpers::double_line_corner(
-                            false,
-                            true,
-                            maze.get_cells()[floor as usize][y as usize][0]
-                                .get_wall(CellWall::Bottom),
-                            true,
-                        )
+                    (
+                        false,
+                        true,
+                        maze.get_cells()[floor as usize][y as usize][0].get_wall(CellWall::Bottom),
+                        true,
                     ),
-                    self.settings.color_scheme.normal,
                 );
 
-                ui::draw_str(
-                    &mut self.renderer,
+                draw_corner_single(
+                    self,
                     pos.0 + maze_render_size.0 - 1,
                     y as i32 * 2 + pos.1 + 2,
-                    &format!(
-                        "{}",
-                        helpers::double_line_corner(
-                            maze.get_cells()[floor as usize][y as usize]
-                                [maze.size().0 as usize - 1]
-                                .get_wall(CellWall::Bottom),
-                            true,
-                            false,
-                            true,
-                        )
+                    (
+                        maze.get_cells()[floor as usize][y as usize][maze.size().0 as usize - 1]
+                            .get_wall(CellWall::Bottom),
+                        true,
+                        false,
+                        true,
                     ),
-                    self.settings.color_scheme.normal,
                 );
             }
 
-            ui::draw_str(
-                &mut self.renderer,
+            draw_corner_single(
+                self,
                 pos.0 + maze_render_size.0 - 1,
-                ypos,
-                &format!("{}", helpers::double_line_corner(false, true, false, true)),
-                self.settings.color_scheme.normal,
+                y as i32 * 2 + pos.1 + 1,
+                (false, true, false, true),
             );
         }
 
