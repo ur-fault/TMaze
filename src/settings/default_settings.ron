@@ -1,0 +1,45 @@
+Settings (
+    // color scheme:
+    // - valid colors:
+    //  - black
+    //  - dark_grey
+    //  - red
+    //  - dark_red
+    //  - green
+    //  - dark_green
+    //  - yellow
+    //  - dark_yellow
+    //  - blue
+    //  - dark_blue
+    //  - magenta
+    //  - dark_magenta
+    //  - cyan
+    //  - dark_cyan
+    //  - white
+    //  - grey
+    color_scheme: ColorScheme (
+        normal: "white",
+        player: "green",
+        goal: "dark_yellow"
+    ),
+
+    // player will move only one space at the time,
+    // otherwise it will move until other possible move
+    slow: false,
+    // slow: true,
+
+    // in tower maze, player will automatically move up when possible
+    disable_tower_auto_up: false,
+    // disable_tower_auto_up: true,
+
+
+    // when maze cannot fit on the screen
+    // camera_mode:
+    // - valid modes
+    //  - CloseFollow - player will always be centered
+    //  - EdgeFollow(horizontal margin, vertical margin)
+    //     player will move on screen, but when he hits margin
+    //     he will be centered on that axis
+    camera_mode: CloseFollow,
+    // camera_mode: EdgeFollow(10, 5),
+)

@@ -30,11 +30,7 @@ pub fn popup(
 
     loop {
         let event = read()?;
-        if let Event::Key(KeyEvent {
-            code,
-            modifiers: _,
-        }) = event
-        {
+        if let Event::Key(KeyEvent { code, modifiers: _ }) = event {
             break Ok(code);
         }
 

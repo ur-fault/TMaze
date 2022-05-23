@@ -1,17 +1,19 @@
 use std::io::{stdout, Stdout};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-use masof::{Color, ContentStyle, Renderer};
+use masof::{ContentStyle, Renderer};
 
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
-use crate::settings::{CameraMode, ColorScheme, Settings};
+use crate::settings::{CameraMode, Settings};
 use crate::tmcore::*;
 use crate::{helpers, ui};
+use dirs::preference_dir;
 use pausable_clock::PausableClock;
 
 pub struct Game {
@@ -19,25 +21,18 @@ pub struct Game {
     stdout: Stdout,
     settings: Settings,
     last_edge_follow_offset: Dims,
+    settings_file_path: PathBuf,
 }
 
 impl Game {
     pub fn new() -> Self {
+        let settings_path = preference_dir().unwrap().join("tmaze").join("settings.ron");
         Game {
             renderer: Renderer::default(),
             stdout: stdout(),
-            settings: Settings::new().color_scheme(
-                ColorScheme::new()
-                    .player(ContentStyle {
-                        foreground_color: Some(Color::Green),
-                        ..Default::default()
-                    })
-                    .goal(ContentStyle {
-                        foreground_color: Some(Color::DarkYellow),
-                        ..Default::default()
-                    }),
-            ),
+            settings: Settings::load(settings_path.clone()),
             last_edge_follow_offset: (0, 0),
+            settings_file_path: settings_path,
         }
     }
 
@@ -60,7 +55,7 @@ impl Game {
 
             match ui::menu(
                 &mut self.renderer,
-                self.settings.color_scheme.normal,
+                self.settings.color_scheme.normals(),
                 &mut self.stdout,
                 "TMaze",
                 &["New Game", "Settings", "Controls", "About", "Quit"],
@@ -79,16 +74,19 @@ impl Game {
                     1 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.settings.color_scheme.normal,
+                            self.settings.color_scheme.normals(),
                             &mut self.stdout,
-                            "Not implemented yet",
-                            &[],
+                            "Settings",
+                            &[
+                                "Settings file is located at:",
+                                &format!(" {}", self.settings_file_path.to_str().unwrap()),
+                            ],
                         )?;
                     }
                     2 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.settings.color_scheme.normal,
+                            self.settings.color_scheme.normals(),
                             &mut self.stdout,
                             "Controls",
                             &[
@@ -103,7 +101,7 @@ impl Game {
                     3 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.settings.color_scheme.normal,
+                            self.settings.color_scheme.normals(),
                             &mut self.stdout,
                             "About",
                             &[
@@ -165,7 +163,7 @@ impl Game {
                     if current_progess - last_progress > 0.01 {
                         let res = ui::render_progress(
                             &mut self.renderer,
-                            self.settings.color_scheme.normal,
+                            self.settings.color_scheme.normals(),
                             &mut self.stdout,
                             &format!(
                                 "Generating maze ({}x{}x{}) {}/{}",
@@ -337,7 +335,7 @@ impl Game {
                             clock.pause();
                             match ui::menu(
                                 &mut self.renderer,
-                                self.settings.color_scheme.normal,
+                                self.settings.color_scheme.normals(),
                                 &mut self.stdout,
                                 "Paused",
                                 &["Resume", "Main Menu", "Quit"],
@@ -391,7 +389,7 @@ impl Game {
             if player_pos == goal_pos {
                 if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
-                    self.settings.color_scheme.normal,
+                    self.settings.color_scheme.normals(),
                     &mut self.stdout,
                     "You won",
                     &[
@@ -480,7 +478,7 @@ impl Game {
                         helpers::double_line_corner(c1.0, c1.1, c1.2, c1.3),
                         helpers::double_line_corner(c1.0, c1.1, c2.2, c2.3)
                     ),
-                    self_.settings.color_scheme.normal,
+                    self_.settings.color_scheme.normals(),
                 )
             };
 
@@ -490,7 +488,7 @@ impl Game {
                 x,
                 y,
                 &format!("{}", helpers::double_line_corner(c.0, c.1, c.2, c.3),),
-                self_.settings.color_scheme.normal,
+                self_.settings.color_scheme.normals(),
             )
         };
 
@@ -587,7 +585,7 @@ impl Game {
                 pos.0,
                 ypos,
                 &format!("{}", helpers::double_line_corner(false, true, false, true)),
-                self.settings.color_scheme.normal,
+                self.settings.color_scheme.normals(),
             );
 
             if ypos + 1 < size.1 {
@@ -634,7 +632,7 @@ impl Game {
                     pos.0 + real_pos.0,
                     pos.1 + real_pos.1,
                     '.',
-                    self.settings.color_scheme.normal,
+                    self.settings.color_scheme.normals(),
                 );
             }
         }
@@ -654,7 +652,7 @@ impl Game {
                     pos.1,
                     '↑',
                     if ups_as_goal && !force_style {
-                        self.settings.color_scheme.goal
+                        self.settings.color_scheme.goals()
                     } else {
                         style
                     },
@@ -679,7 +677,7 @@ impl Game {
                         xpos + 1,
                         ypos,
                         helpers::double_line_corner(false, true, false, true),
-                        self.settings.color_scheme.normal,
+                        self.settings.color_scheme.normals(),
                     );
                 }
                 if ypos + 1 < size.1 as i32 - 2
@@ -691,14 +689,14 @@ impl Game {
                         xpos,
                         ypos + 1,
                         helpers::double_line_corner(true, false, true, false),
-                        self.settings.color_scheme.normal,
+                        self.settings.color_scheme.normals(),
                     );
                 }
 
                 draw_stairs(
                     &mut self.renderer,
                     cell,
-                    self.settings.color_scheme.normal,
+                    self.settings.color_scheme.normals(),
                     (xpos, ypos),
                     false,
                 );
@@ -720,7 +718,7 @@ impl Game {
                             cell2.get_wall(CellWall::Top),
                             cell2.get_wall(CellWall::Left),
                         ),
-                        self.settings.color_scheme.normal,
+                        self.settings.color_scheme.normals(),
                     );
                 }
             }
@@ -732,7 +730,7 @@ impl Game {
                 goal_pos.0 * 2 + 1 + pos.0,
                 goal_pos.1 * 2 + 1 + pos.1,
                 '$',
-                self.settings.color_scheme.goal,
+                self.settings.color_scheme.goals(),
             );
         }
 
@@ -742,13 +740,13 @@ impl Game {
                 player_pos.0 * 2 + 1 + pos.0,
                 player_pos.1 * 2 + 1 + pos.1,
                 'O',
-                self.settings.color_scheme.player,
+                self.settings.color_scheme.players(),
             );
 
             draw_stairs(
                 &mut self.renderer,
                 &maze.get_cells()[floor as usize][player_pos.1 as usize][player_pos.0 as usize],
-                self.settings.color_scheme.player,
+                self.settings.color_scheme.players(),
                 (player_pos.0 * 2 + 1 + pos.0, player_pos.1 * 2 + 1 + pos.1),
                 true,
             );
@@ -771,28 +769,28 @@ impl Game {
             str_pos_tl.0,
             str_pos_tl.1,
             texts.0,
-            self.settings.color_scheme.normal,
+            self.settings.color_scheme.normals(),
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_tr.0,
             str_pos_tr.1,
             texts.1,
-            self.settings.color_scheme.normal,
+            self.settings.color_scheme.normals(),
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_bl.0,
             str_pos_bl.1,
             texts.2,
-            self.settings.color_scheme.normal,
+            self.settings.color_scheme.normals(),
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_br.0,
             str_pos_br.1,
             texts.3,
-            self.settings.color_scheme.normal,
+            self.settings.color_scheme.normals(),
         );
 
         self.renderer.end(&mut self.stdout)?;
@@ -812,7 +810,7 @@ impl Game {
         Ok((
             *ui::choice_menu(
                 &mut self.renderer,
-                self.settings.color_scheme.normal,
+                self.settings.color_scheme.normals(),
                 &mut self.stdout,
                 "Maze size",
                 &[
@@ -830,7 +828,7 @@ impl Game {
             )?,
             match ui::menu(
                 &mut self.renderer,
-                self.settings.color_scheme.normal,
+                self.settings.color_scheme.normals(),
                 &mut self.stdout,
                 "Maze generation algorithm",
                 &["Randomized Kruskal's", "Depth-first search"],

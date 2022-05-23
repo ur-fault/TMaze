@@ -75,6 +75,7 @@ dependencies = [
  "libc",
  "mio",
  "parking_lot",
+ "serde",
  "signal-hook",
  "signal-hook-mio",
  "winapi",
@@ -90,21 +91,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "encoding_rs"
-version = "0.8.31"
+name = "dirs"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9852635589dc9f9ea1b6fe9f05b50ef208c85c834a562f0c6abb1c475736ec2b"
+checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
 dependencies = [
- "cfg-if",
+ "dirs-sys",
 ]
 
 [[package]]
-name = "encoding_rs_io"
-version = "0.1.7"
+name = "dirs-sys"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cc3c5651fb62ab8aa3103998dade57efdd028544bd300516baa31840c252a83"
+checksum = "1b1d1d91c932ef41c0f2663aa8b0ca0342d444d842c06914aa0a7e352d0bada6"
 dependencies = [
- "encoding_rs",
+ "libc",
+ "redox_users",
+ "winapi",
 ]
 
 [[package]]
@@ -179,9 +182,9 @@ dependencies = [
 
 [[package]]
 name = "loom"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85eb735cf3c8ebac6cc3655c5da2f4a088b6a19133aa482471a21ba0eb5d83ab"
+checksum = "ff50ecb28bb86013e935fb6683ab1f6d3a20016f123c76fd4c27470076ac30f5"
 dependencies = [
  "cfg-if",
  "generator",
@@ -225,9 +228,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
+checksum = "7b10983b38c53aebdf33f542c6275b0f58a238129d00c4ae0e6fb59738d783ca"
 
 [[package]]
 name = "parking_lot"
@@ -331,10 +334,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex"
-version = "1.5.5"
+name = "redox_users"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a11647b6b25ff05a515cb92c365cec08801e83423a235b51e231e1808747286"
+checksum = "b033d837a7cf162d7993aded9304e30a83213c648b6e389db233191f891e5c2b"
+dependencies = [
+ "getrandom",
+ "redox_syscall",
+ "thiserror",
+]
+
+[[package]]
+name = "regex"
+version = "1.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d83f127d94bdbcda4c8cc2e50f6f84f4b611f69c902699ca385a39c3a75f9ff1"
 dependencies = [
  "regex-syntax",
 ]
@@ -350,29 +364,18 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.25"
+version = "0.6.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
+checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 
 [[package]]
 name = "ron"
-version = "0.6.6"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86018df177b1beef6c7c8ef949969c4f7cb9a9344181b92486b23c79995bdaa4"
+checksum = "1b861ecaade43ac97886a512b360d01d66be9f41f3c61088b42cedf92e03d678"
 dependencies = [
  "base64",
  "bitflags",
- "serde",
-]
-
-[[package]]
-name = "ronfig"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4302a5cfd1b715584659a0714cdc8cb5d609d57e9f6577822351962db3112e57"
-dependencies = [
- "encoding_rs_io",
- "ron",
  "serde",
 ]
 
@@ -514,10 +517,11 @@ version = "1.4.0"
 dependencies = [
  "colored",
  "crossterm",
+ "dirs",
  "masof",
  "pausable_clock",
  "rand",
- "ronfig",
+ "ron",
  "serde",
  "substring",
  "thiserror",

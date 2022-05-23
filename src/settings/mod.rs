@@ -1,8 +1,9 @@
-// use ronfig::*;
-// use serde::{Deserialize, Serialize};
-use masof::ContentStyle;
+use masof::{Color, ContentStyle};
+use ron;
+use serde::{Deserialize, Serialize};
+use std::{fs, path::PathBuf};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CameraMode {
     CloseFollow,
     EdgeFollow(i32, i32),
@@ -14,35 +15,69 @@ impl Default for CameraMode {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorScheme {
-    pub normal: ContentStyle,
-    pub player: ContentStyle,
-    pub goal: ContentStyle,
+    pub normal: Color,
+    pub player: Color,
+    pub goal: Color,
 }
 
+impl ColorScheme {
+    pub fn normals(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.normal),
+            ..Default::default()
+        }
+    }
+
+    pub fn players(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.player),
+            ..Default::default()
+        }
+    }
+
+    pub fn goals(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.goal),
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for ColorScheme {
+    fn default() -> Self {
+        ColorScheme {
+            normal: Color::White,
+            player: Color::White,
+            goal: Color::White,
+        }
+    }
+}
+
+#[allow(dead_code)]
 impl ColorScheme {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn normal(mut self, value: ContentStyle) -> Self {
+    pub fn normal(mut self, value: Color) -> Self {
         self.normal = value;
         self
     }
 
-    pub fn player(mut self, value: ContentStyle) -> Self {
+    pub fn player(mut self, value: Color) -> Self {
         self.player = value;
         self
     }
 
-    pub fn goal(mut self, value: ContentStyle) -> Self {
+    pub fn goal(mut self, value: Color) -> Self {
         self.goal = value;
         self
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub color_scheme: ColorScheme,
     pub slow: bool,
@@ -50,6 +85,7 @@ pub struct Settings {
     pub camera_mode: CameraMode,
 }
 
+#[allow(dead_code)]
 impl Settings {
     pub fn new() -> Self {
         Self::default()
@@ -73,5 +109,29 @@ impl Settings {
     pub fn camera_mode(mut self, value: CameraMode) -> Self {
         self.camera_mode = value;
         self
+    }
+
+    pub fn load(path: PathBuf) -> Self {
+        let settings_string = fs::read_to_string(&path);
+        // match ron::from_str() {
+        //     Ok(value) => value,
+        //     Err(err) => match err.code {
+        //         _ => {
+        //             eprintln!("{}", err);
+        //             panic!("Failed to load settings");
+        //         }
+        //     },
+        // }
+        if let Ok(settings_string) = settings_string {
+            if let Ok(settings) = ron::de::from_str(&settings_string) {
+                settings
+            } else {
+                panic!("Invalid settings file");
+            }
+        } else {
+            let default_settings_string = include_str!("./default_settings.ron");
+            fs::write(&path, default_settings_string).unwrap();
+            ron::from_str(default_settings_string).unwrap()
+        }
     }
 }
