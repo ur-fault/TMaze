@@ -113,15 +113,6 @@ impl Settings {
 
     pub fn load(path: PathBuf) -> Self {
         let settings_string = fs::read_to_string(&path);
-        // match ron::from_str() {
-        //     Ok(value) => value,
-        //     Err(err) => match err.code {
-        //         _ => {
-        //             eprintln!("{}", err);
-        //             panic!("Failed to load settings");
-        //         }
-        //     },
-        // }
         if let Ok(settings_string) = settings_string {
             if let Ok(settings) = ron::de::from_str(&settings_string) {
                 settings
@@ -130,6 +121,7 @@ impl Settings {
             }
         } else {
             let default_settings_string = include_str!("./default_settings.ron");
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(&path, default_settings_string).unwrap();
             ron::from_str(default_settings_string).unwrap()
         }
