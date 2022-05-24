@@ -42,4 +42,12 @@ Settings (
     //     he will be centered on that axis
     camera_mode: CloseFollow,
     // camera_mode: EdgeFollow(10, 5),
+
+    // default algorithm used for maze generation
+    default_maze_gen_algo: RandomKruskals,
+    // default_maze_gen_algo: DepthFirstSearch,
+
+    // skip prompt for maze generation algorithm
+    dont_ask_for_maze_algo: true,
+    // dont_ask_for_maze_algo: false,
 )

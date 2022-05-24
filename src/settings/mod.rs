@@ -78,12 +78,26 @@ impl Default for ColorScheme {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum MazeGenAlgo {
+    RandomKruskals,
+    DepthFirstSearch,
+}
+
+impl Default for MazeGenAlgo {
+    fn default() -> Self {
+        MazeGenAlgo::RandomKruskals
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub color_scheme: ColorScheme,
     pub slow: bool,
     pub disable_tower_auto_up: bool,
     pub camera_mode: CameraMode,
+    pub default_maze_gen_algo: MazeGenAlgo,
+    pub dont_ask_for_maze_algo: bool,
 }
 
 #[allow(dead_code)]
@@ -112,7 +126,14 @@ impl Settings {
         self
     }
 
+    pub fn maze_gen_algo(mut self, value: MazeGenAlgo) -> Self {
+        self.default_maze_gen_algo = value;
+        self
+    }
+
     pub fn load(path: PathBuf) -> Self {
+        let default_settings_string = include_str!("./default_settings.ron");
+
         let settings_string = fs::read_to_string(&path);
         if let Ok(settings_string) = settings_string {
             if let Ok(settings) = ron::de::from_str(&settings_string) {
@@ -121,7 +142,6 @@ impl Settings {
                 panic!("Invalid settings file");
             }
         } else {
-            let default_settings_string = include_str!("./default_settings.ron");
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(&path, default_settings_string).unwrap();
             ron::from_str(default_settings_string).unwrap()

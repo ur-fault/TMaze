@@ -10,7 +10,7 @@ use masof::{ContentStyle, Renderer};
 
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
-use crate::settings::{CameraMode, Settings};
+use crate::settings::{CameraMode, MazeGenAlgo, Settings};
 use crate::tmcore::*;
 use crate::{helpers, ui};
 use dirs::preference_dir;
@@ -284,7 +284,13 @@ impl Game {
                             )
                         };
                     } else {
-                        let pmove = get_new_player_pos(&maze, player_pos, wall, self.settings.slow, &mut moves);
+                        let pmove = get_new_player_pos(
+                            &maze,
+                            player_pos,
+                            wall,
+                            self.settings.slow,
+                            &mut moves,
+                        );
                         player_pos = pmove.0;
                         move_count += pmove.1;
 
@@ -821,17 +827,27 @@ impl Game {
                 0,
                 false,
             )?,
-            match ui::menu(
-                &mut self.renderer,
-                self.settings.color_scheme.normals(),
-                "Maze generation algorithm",
-                &["Randomized Kruskal's", "Depth-first search"],
-                0,
-                true,
-            )? {
-                0 => RndKruskals::generate,
-                1 => DepthFirstSearch::generate,
-                _ => panic!(),
+            if self.settings.dont_ask_for_maze_algo {
+                match self.settings.default_maze_gen_algo {
+                    MazeGenAlgo::RandomKruskals => RndKruskals::generate,
+                    MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
+                }
+            } else {
+                match ui::menu(
+                    &mut self.renderer,
+                    self.settings.color_scheme.normals(),
+                    "Maze generation algorithm",
+                    &["Randomized Kruskal's", "Depth-first search"],
+                    match self.settings.default_maze_gen_algo {
+                        MazeGenAlgo::RandomKruskals => 0,
+                        MazeGenAlgo::DepthFirstSearch => 1,
+                    },
+                    true,
+                )? {
+                    0 => RndKruskals::generate,
+                    1 => DepthFirstSearch::generate,
+                    _ => panic!(),
+                }
             },
         ))
     }
