@@ -113,6 +113,9 @@ impl Game {
                                 "",
                                 "Created by:",
                                 "    - morsee",
+                                "",
+                                "Version:",
+                                &format!("    {}", env!("CARGO_PKG_VERSION")),
                             ],
                         )?;
                     }
