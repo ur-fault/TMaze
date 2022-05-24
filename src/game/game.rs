@@ -56,7 +56,6 @@ impl Game {
             match ui::menu(
                 &mut self.renderer,
                 self.settings.color_scheme.normals(),
-                &mut self.stdout,
                 "TMaze",
                 &["New Game", "Settings", "Controls", "About", "Quit"],
                 0,
@@ -75,7 +74,6 @@ impl Game {
                         ui::popup(
                             &mut self.renderer,
                             self.settings.color_scheme.normals(),
-                            &mut self.stdout,
                             "Settings",
                             &[
                                 "Settings file is located at:",
@@ -87,7 +85,6 @@ impl Game {
                         ui::popup(
                             &mut self.renderer,
                             self.settings.color_scheme.normals(),
-                            &mut self.stdout,
                             "Controls",
                             &[
                                 "WASD and arrows: move",
@@ -102,7 +99,6 @@ impl Game {
                         ui::popup(
                             &mut self.renderer,
                             self.settings.color_scheme.normals(),
-                            &mut self.stdout,
                             "About",
                             &[
                                 "This is simple maze solving game",
@@ -167,7 +163,6 @@ impl Game {
                         let res = ui::render_progress(
                             &mut self.renderer,
                             self.settings.color_scheme.normals(),
-                            &mut self.stdout,
                             &format!(
                                 "Generating maze ({}x{}x{}) {}/{}",
                                 msize.0, msize.1, msize.2, done, all
@@ -339,7 +334,6 @@ impl Game {
                             match ui::menu(
                                 &mut self.renderer,
                                 self.settings.color_scheme.normals(),
-                                &mut self.stdout,
                                 "Paused",
                                 &["Resume", "Main Menu", "Quit"],
                                 0,
@@ -393,7 +387,6 @@ impl Game {
                 if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
                     self.settings.color_scheme.normals(),
-                    &mut self.stdout,
                     "You won",
                     &[
                         &format!("Time: {}", ui::format_duration(play_time)),
@@ -814,7 +807,6 @@ impl Game {
             *ui::choice_menu(
                 &mut self.renderer,
                 self.settings.color_scheme.normals(),
-                &mut self.stdout,
                 "Maze size",
                 &[
                     ((10, 5, 1, false), "10x5"),
@@ -832,7 +824,6 @@ impl Game {
             match ui::menu(
                 &mut self.renderer,
                 self.settings.color_scheme.normals(),
-                &mut self.stdout,
                 "Maze generation algorithm",
                 &["Randomized Kruskal's", "Depth-first search"],
                 0,

@@ -4,7 +4,7 @@ pub use crossterm::{
     terminal::size,
 };
 pub use masof::{Color, ContentStyle, Renderer};
-use std::io::Stdout;
+use std::io::stdout;
 
 use super::draw::*;
 use super::*;
@@ -30,7 +30,6 @@ pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
 pub fn menu(
     renderer: &mut Renderer,
     style: ContentStyle,
-    stdout: &mut Stdout,
     title: &str,
     options: &[&str],
     default: usize,
@@ -43,7 +42,7 @@ pub fn menu(
         return Err(Error::EmptyMenu);
     }
 
-    render_menu(renderer, style, stdout, title, options, selected, counted)?;
+    render_menu(renderer, style, title, options, selected, counted)?;
 
     loop {
         let event = read()?;
@@ -83,27 +82,25 @@ pub fn menu(
 
         renderer.event(&event);
 
-        render_menu(renderer, style, stdout, title, options, selected, counted)?;
+        render_menu(renderer, style, title, options, selected, counted)?;
     }
 }
 
 pub fn choice_menu<'a, T>(
     renderer: &mut Renderer,
     style: ContentStyle,
-    stdout: &mut Stdout,
     title: &str,
     options: &'a [(T, &str)],
     default: usize,
     counted: bool,
 ) -> Result<&'a T, Error> {
     let _options: Vec<&str> = options.iter().map(|opt| opt.1).collect();
-    Ok(&options[menu(renderer, style, stdout, title, &_options, default, counted)? as usize].0)
+    Ok(&options[menu(renderer, style, title, &_options, default, counted)? as usize].0)
 }
 
 pub fn render_menu(
     renderer: &mut Renderer,
     style: ContentStyle,
-    stdout: &mut Stdout,
     title: &str,
     options: &[&str],
     selected: usize,
@@ -161,7 +158,7 @@ pub fn render_menu(
             );
         }
     }
-    renderer.end(stdout)?;
+    renderer.end(&mut stdout())?;
 
     Ok(())
 }

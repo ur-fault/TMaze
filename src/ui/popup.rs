@@ -4,7 +4,7 @@ pub use crossterm::{
     terminal::size,
 };
 pub use masof::{Color, ContentStyle, Renderer};
-use std::io::Stdout;
+use std::io::stdout;
 
 use super::draw::*;
 use super::*;
@@ -22,11 +22,10 @@ pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
 pub fn popup(
     renderer: &mut Renderer,
     style: ContentStyle,
-    stdout: &mut Stdout,
     title: &str,
     texts: &[&str],
 ) -> Result<KeyCode, Error> {
-    render_popup(renderer, style, stdout, title, texts)?;
+    render_popup(renderer, style, title, texts)?;
 
     loop {
         let event = read()?;
@@ -36,14 +35,13 @@ pub fn popup(
 
         renderer.event(&event);
 
-        render_popup(renderer, style, stdout, title, texts)?;
+        render_popup(renderer, style, title, texts)?;
     }
 }
 
 pub fn render_popup(
     renderer: &mut Renderer,
     style: ContentStyle,
-    stdout: &mut Stdout,
     title: &str,
     texts: &[&str],
 ) -> Result<(), Error> {
@@ -66,7 +64,7 @@ pub fn render_popup(
         }
     }
 
-    renderer.end(stdout)?;
+    renderer.end(&mut stdout())?;
 
     Ok(())
 }

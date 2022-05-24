@@ -1,9 +1,10 @@
+use std::io::stdout;
+
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
 pub use masof::{Color, ContentStyle, Renderer};
-use std::io::Stdout;
 
 use super::draw::*;
 use super::*;
@@ -11,7 +12,6 @@ use super::*;
 pub fn render_progress(
     renderer: &mut Renderer,
     style: ContentStyle,
-    stdout: &mut Stdout,
     title: &str,
     progress: f64,
 ) -> Result<(), Error> {
@@ -36,7 +36,7 @@ pub fn render_progress(
         }
     }
 
-    renderer.end(stdout)?;
+    renderer.end(&mut stdout())?;
 
     Ok(())
 }
