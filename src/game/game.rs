@@ -284,7 +284,7 @@ impl Game {
                             )
                         };
                     } else {
-                        let pmove = get_new_player_pos(&maze, player_pos, wall, false, &mut moves);
+                        let pmove = get_new_player_pos(&maze, player_pos, wall, self.settings.slow, &mut moves);
                         player_pos = pmove.0;
                         move_count += pmove.1;
 
