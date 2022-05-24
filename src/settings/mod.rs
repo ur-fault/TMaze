@@ -22,39 +22,6 @@ pub struct ColorScheme {
     pub goal: Color,
 }
 
-impl ColorScheme {
-    pub fn normals(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.normal),
-            ..Default::default()
-        }
-    }
-
-    pub fn players(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.player),
-            ..Default::default()
-        }
-    }
-
-    pub fn goals(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.goal),
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for ColorScheme {
-    fn default() -> Self {
-        ColorScheme {
-            normal: Color::White,
-            player: Color::White,
-            goal: Color::White,
-        }
-    }
-}
-
 #[allow(dead_code)]
 impl ColorScheme {
     pub fn new() -> Self {
@@ -74,6 +41,40 @@ impl ColorScheme {
     pub fn goal(mut self, value: Color) -> Self {
         self.goal = value;
         self
+    }
+
+    pub fn normals(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.normal),
+            background_color: Some(Color::Black),
+            ..Default::default()
+        }
+    }
+
+    pub fn players(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.player),
+            background_color: Some(Color::Black),
+            ..Default::default()
+        }
+    }
+
+    pub fn goals(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.goal),
+            background_color: Some(Color::Black),
+            ..Default::default()
+        }
+    }
+}
+
+impl Default for ColorScheme {
+    fn default() -> Self {
+        ColorScheme {
+            normal: Color::White,
+            player: Color::White,
+            goal: Color::White,
+        }
     }
 }
 

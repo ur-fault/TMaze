@@ -132,12 +132,12 @@ pub fn render_menu(
         for (i, option) in options.iter().enumerate() {
             let style = if i == selected {
                 ContentStyle {
-                    background_color: Some(Color::White),
-                    foreground_color: Some(Color::Black),
+                    background_color: style.foreground_color,
+                    foreground_color: style.background_color,
                     attributes: Default::default(),
                 }
             } else {
-                ContentStyle::default()
+                style
             };
 
             context.draw_str_styled(
