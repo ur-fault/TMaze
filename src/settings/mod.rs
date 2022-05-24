@@ -92,11 +92,17 @@ impl Default for MazeGenAlgo {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(default)]
     pub color_scheme: ColorScheme,
+    #[serde(default)]
     pub slow: bool,
+    #[serde(default)]
     pub disable_tower_auto_up: bool,
+    #[serde(default)]
     pub camera_mode: CameraMode,
+    #[serde(default)]
     pub default_maze_gen_algo: MazeGenAlgo,
+    #[serde(default)]
     pub dont_ask_for_maze_algo: bool,
 }
 
