@@ -19,15 +19,15 @@ pub fn maze_render_size(maze: &Maze) -> Dims {
 
 pub fn double_line_corner(left: bool, top: bool, right: bool, bottom: bool) -> &'static str {
     match (left, top, right, bottom) {
-        (false, false, false, false) => "#",
-        (false, false, false, true) => "#",
-        (false, false, true, false) => "#",
+        (false, false, false, false) => "▪",
+        (false, false, false, true) => "▪",
+        (false, false, true, false) => "▪",
         (false, false, true, true) => "╔",
-        (false, true, false, false) => "#",
+        (false, true, false, false) => "▪",
         (false, true, false, true) => "║",
         (false, true, true, false) => "╚",
         (false, true, true, true) => "╠",
-        (true, false, false, false) => "#",
+        (true, false, false, false) => "▪",
         (true, false, false, true) => "╗",
         (true, false, true, false) => "═",
         (true, false, true, true) => "╦",
