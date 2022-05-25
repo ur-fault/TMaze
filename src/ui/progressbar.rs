@@ -32,7 +32,7 @@ pub fn render_progress(
             context.draw_str(
                 pos.0 + 1,
                 pos.1 + 2,
-                &"#".repeat((title.len() as f64 * progress) as usize),
+                &"█".repeat((title.len() as f64 * progress) as usize),
             );
         }
     }
