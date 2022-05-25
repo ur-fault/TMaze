@@ -24,6 +24,8 @@ pub struct Maze {
     pub depth: u16,
     #[serde(default)]
     pub tower: bool,
+    #[serde(default)]
+    pub default: bool,
 }
 
 fn default_depth() -> u16 {

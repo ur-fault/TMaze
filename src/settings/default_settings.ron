@@ -59,10 +59,12 @@ Settings (
         // - height - height of the maze
         // - depth - depth of the maze
         // - tower - if true, maze will be a tower (only if depth is >1)
+        // - default - first maze with "default: true", will be used as default in the menu
         Maze (
             title: "10x5",
             width: 10,
             height: 5,
+            default: true,
         ), Maze (
             title: "30x10",
             width: 30,

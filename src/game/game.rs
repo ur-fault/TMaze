@@ -820,12 +820,21 @@ impl Game {
                     .iter()
                     .map(|maze| {
                         (
-                            (maze.width as i32, maze.height as i32, maze.depth as i32, maze.tower),
+                            (
+                                maze.width as i32,
+                                maze.height as i32,
+                                maze.depth as i32,
+                                maze.tower,
+                            ),
                             maze.title.as_str(),
                         )
                     })
                     .collect::<Vec<_>>(),
-                0,
+                self.settings
+                    .mazes
+                    .iter()
+                    .position(|maze| maze.default)
+                    .unwrap_or(0),
                 false,
             )?,
             if self.settings.dont_ask_for_maze_algo {
