@@ -16,6 +16,21 @@ impl Default for CameraMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Maze {
+    pub title: String,
+    pub width: u16,
+    pub height: u16,
+    #[serde(default = "default_depth")]
+    pub depth: u16,
+    #[serde(default)]
+    pub tower: bool,
+}
+
+fn default_depth() -> u16 {
+    1
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorScheme {
     pub normal: Color,
     pub player: Color,
@@ -104,6 +119,8 @@ pub struct Settings {
     pub default_maze_gen_algo: MazeGenAlgo,
     #[serde(default)]
     pub dont_ask_for_maze_algo: bool,
+    #[serde(default)]
+    pub mazes: Vec<Maze>,
 }
 
 #[allow(dead_code)]
@@ -142,10 +159,11 @@ impl Settings {
 
         let settings_string = fs::read_to_string(&path);
         if let Ok(settings_string) = settings_string {
-            if let Ok(settings) = ron::de::from_str(&settings_string) {
-                settings
-            } else {
-                panic!("Invalid settings file");
+            match ron::de::from_str(&settings_string) {
+                Ok(settings) => settings,
+                Err(err) => {
+                    panic!("Invalid settings file, {}", err);
+                }
             }
         } else {
             fs::create_dir_all(path.parent().unwrap()).unwrap();

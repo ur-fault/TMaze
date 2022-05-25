@@ -814,16 +814,17 @@ impl Game {
                 &mut self.renderer,
                 self.settings.color_scheme.normals(),
                 "Maze size",
-                &[
-                    ((10, 5, 1, false), "10x5"),
-                    ((30, 10, 1, false), "30x10"),
-                    ((60, 20, 1, false), "60x20"),
-                    ((5, 5, 5, false), "5x5x5"),
-                    ((10, 10, 10, false), "10x10x10"),
-                    ((300, 100, 1, false), "300x100"),
-                    ((10, 10, 5, true), "10x10x5 Tower"),
-                    ((40, 15, 10, true), "40x15x10 Tower"),
-                ],
+                &self
+                    .settings
+                    .mazes
+                    .iter()
+                    .map(|maze| {
+                        (
+                            (maze.width as i32, maze.height as i32, maze.depth as i32, maze.tower),
+                            maze.title.as_str(),
+                        )
+                    })
+                    .collect::<Vec<_>>(),
                 0,
                 false,
             )?,
