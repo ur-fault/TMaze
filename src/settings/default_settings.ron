@@ -21,6 +21,7 @@ Settings (
         normal: "white",
         player: "green",
         goal: "dark_yellow",
+        text: "white",
     ),
 
     // player will move only one space at the time,

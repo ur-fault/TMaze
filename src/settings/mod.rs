@@ -37,6 +37,7 @@ pub struct ColorScheme {
     pub normal: Color,
     pub player: Color,
     pub goal: Color,
+    pub text: Color,
 }
 
 #[allow(dead_code)]
@@ -57,6 +58,11 @@ impl ColorScheme {
 
     pub fn goal(mut self, value: Color) -> Self {
         self.goal = value;
+        self
+    }
+
+    pub fn text(mut self, value: Color) -> Self {
+        self.text = value;
         self
     }
 
@@ -83,6 +89,14 @@ impl ColorScheme {
             ..Default::default()
         }
     }
+
+    pub fn texts(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.text),
+            background_color: Some(Color::Black),
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for ColorScheme {
@@ -91,6 +105,7 @@ impl Default for ColorScheme {
             normal: Color::White,
             player: Color::White,
             goal: Color::White,
+            text: Color::White,
         }
     }
 }

@@ -29,7 +29,8 @@ pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
 
 pub fn menu(
     renderer: &mut Renderer,
-    style: ContentStyle,
+    box_style: ContentStyle,
+    text_style: ContentStyle,
     title: &str,
     options: &[&str],
     default: usize,
@@ -42,7 +43,7 @@ pub fn menu(
         return Err(Error::EmptyMenu);
     }
 
-    render_menu(renderer, style, title, options, selected, counted)?;
+    render_menu(renderer, box_style, text_style, title, options, selected, counted)?;
 
     loop {
         let event = read()?;
@@ -82,25 +83,27 @@ pub fn menu(
 
         renderer.event(&event);
 
-        render_menu(renderer, style, title, options, selected, counted)?;
+        render_menu(renderer, box_style, text_style, title, options, selected, counted)?;
     }
 }
 
 pub fn choice_menu<'a, T>(
     renderer: &mut Renderer,
-    style: ContentStyle,
+    box_style: ContentStyle,
+    text_style: ContentStyle,
     title: &str,
     options: &'a [(T, &str)],
     default: usize,
     counted: bool,
 ) -> Result<&'a T, Error> {
     let _options: Vec<&str> = options.iter().map(|opt| opt.1).collect();
-    Ok(&options[menu(renderer, style, title, &_options, default, counted)? as usize].0)
+    Ok(&options[menu(renderer, box_style, text_style, title, &_options, default, counted)? as usize].0)
 }
 
 pub fn render_menu(
     renderer: &mut Renderer,
-    style: ContentStyle,
+    box_style: ContentStyle,
+    text_style: ContentStyle,
     title: &str,
     options: &[&str],
     selected: usize,
@@ -115,11 +118,11 @@ pub fn render_menu(
     renderer.begin()?;
 
     {
-        let mut context = DrawContext { renderer, style };
+        let mut context = DrawContext { renderer, style: box_style };
 
         context.draw_box(pos, menu_size);
 
-        context.draw_str(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title));
+        context.draw_str_styled(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title), text_style);
         context.draw_str(
             pos.0 + 1,
             pos.1 + 1 + 1,
@@ -129,12 +132,12 @@ pub fn render_menu(
         for (i, option) in options.iter().enumerate() {
             let style = if i == selected {
                 ContentStyle {
-                    background_color: style.foreground_color,
-                    foreground_color: style.background_color,
+                    background_color: text_style.foreground_color,
+                    foreground_color: text_style.background_color,
                     attributes: Default::default(),
                 }
             } else {
-                style
+                text_style
             };
 
             context.draw_str_styled(
