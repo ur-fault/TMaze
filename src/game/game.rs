@@ -434,7 +434,7 @@ impl Game {
             (size.0 as i32, size.1 as i32)
         };
         let is_around_player =
-            maze_render_size.0 > size.0 as i32 || maze_render_size.1 + 2 > size.1 as i32;
+            maze_render_size.0 > size.0 as i32 || maze_render_size.1 + 3 > size.1 as i32;
 
         let pos = {
             let pos = if is_around_player {
@@ -589,19 +589,16 @@ impl Game {
                 break;
             }
 
-            ui::draw_str(
-                &mut self.renderer,
-                pos.0,
-                ypos,
-                &format!("{}", helpers::double_line_corner(false, true, false, true)),
-                self.settings.color_scheme.normals(),
-            );
+            if ypos == -1 {
+                continue;
+            }
 
             if ypos + 1 < size.1 {
                 draw_corner_single(
                     self,
                     pos.0,
-                    y as i32 * 2 + pos.1 + 2,
+                    // y as i32 * 2 + pos.1 + 2,
+                    ypos + 1,
                     (
                         false,
                         true,
@@ -613,7 +610,8 @@ impl Game {
                 draw_corner_single(
                     self,
                     pos.0 + maze_render_size.0 - 1,
-                    y as i32 * 2 + pos.1 + 2,
+                    // y as i32 * 2 + pos.1 + 2,
+                    ypos + 1,
                     (
                         maze.get_cells()[floor as usize][y as usize][maze.size().0 as usize - 1]
                             .get_wall(CellWall::Bottom),
@@ -623,6 +621,20 @@ impl Game {
                     ),
                 );
             }
+
+            // ui::draw_str(
+            //     &mut self.renderer,
+            //     pos.0,
+            //     ypos,
+            //     &format!("{}", helpers::double_line_corner(false, true, false, true)),
+            //     self.settings.color_scheme.normals(),
+            // );
+
+            draw_corner_single(
+                self,
+                pos.0,
+                ypos, (false, true, false, true)
+            );
 
             draw_corner_single(
                 self,
