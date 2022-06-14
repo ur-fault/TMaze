@@ -4,9 +4,9 @@ use game::Game;
 mod helpers;
 mod maze;
 mod settings;
-mod tmcore;
+mod core;
 mod ui;
 
-fn main() -> Result<(), tmcore::Error> {
+fn main() -> Result<(), core::Error> {
     Game::new().run()
 }

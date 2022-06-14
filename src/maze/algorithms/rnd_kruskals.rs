@@ -1,7 +1,7 @@
 use self::CellWall::*;
 use super::super::cell::{Cell, CellWall};
 use super::{Maze, MazeAlgorithm};
-use crate::tmcore::*;
+use crate::core::*;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::collections::HashSet;
 

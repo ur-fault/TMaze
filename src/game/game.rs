@@ -11,7 +11,7 @@ use masof::{ContentStyle, Renderer};
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
-use crate::tmcore::*;
+use crate::core::*;
 use crate::{helpers, ui};
 use dirs::preference_dir;
 use pausable_clock::PausableClock;

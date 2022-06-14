@@ -1,7 +1,7 @@
 use super::super::cell::Cell;
 use super::{Maze, MazeAlgorithm};
 use crate::maze::CellWall;
-use crate::tmcore::*;
+use crate::core::*;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 
 pub struct DepthFirstSearch {}

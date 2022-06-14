@@ -2,7 +2,7 @@ use super::Maze;
 mod depth_first_search;
 pub use depth_first_search::DepthFirstSearch;
 mod rnd_kruskals;
-pub use crate::tmcore::*;
+pub use crate::core::*;
 pub use rnd_kruskals::RndKruskals;
 
 pub trait MazeAlgorithm {

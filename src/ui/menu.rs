@@ -1,4 +1,4 @@
-use crate::tmcore::*;
+use crate::core::*;
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,

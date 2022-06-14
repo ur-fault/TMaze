@@ -8,7 +8,7 @@ pub use masof::{Color, ContentStyle, Renderer};
 pub use substring::Substring;
 
 use crate::helpers;
-use crate::tmcore::*;
+use crate::core::*;
 
 mod draw;
 mod menu;

@@ -1,5 +1,5 @@
 use crate::maze::Maze;
-use crate::tmcore::*;
+use crate::core::*;
 
 pub fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
     (container_end - container_start - item_width) / 2 + container_start
