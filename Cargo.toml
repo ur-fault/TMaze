@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 colored = "^2"
 rand = "^0.8.5"
-crossterm = {version = "^0.23.0", features = ["serde"]}
+crossterm = {version = "^0.24.0", features = ["serde"]}
 masof = {git = "https://github.com/MineFuf/masof.git"}
 thiserror = "^1.0.30"
 substring = "^1.4.5"
@@ -17,3 +17,4 @@ pausable_clock = "^1.0.1"
 dirs = "^4.0.0"
 ron = "^0.7"
 clap = { version = "^3.2.2", features = ["derive"] }
+rayon = "^1.5.3"

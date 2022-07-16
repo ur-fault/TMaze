@@ -134,6 +134,7 @@ pub fn render_menu(
                 ContentStyle {
                     background_color: text_style.foreground_color,
                     foreground_color: text_style.background_color,
+                    underline_color: None,
                     attributes: Default::default(),
                 }
             } else {

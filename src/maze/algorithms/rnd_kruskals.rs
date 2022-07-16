@@ -4,6 +4,7 @@ use super::{Maze, MazeAlgorithm};
 use crate::core::*;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use std::collections::HashSet;
+use rayon::prelude::*;
 
 pub struct RndKruskals {}
 
@@ -116,8 +117,8 @@ impl MazeAlgorithm for RndKruskals {
             );
 
             let set0_i = sets
-                .iter()
-                .position(|set| set.contains(&(ix0, iy0, iz0)))
+                .par_iter()
+                .position_any(|set| set.contains(&(ix0, iy0, iz0)))
                 .unwrap();
 
             if sets[set0_i].contains(&(ix1, iy1, iz1)) {
@@ -125,8 +126,8 @@ impl MazeAlgorithm for RndKruskals {
             }
 
             let set1_i = sets
-                .iter()
-                .position(|set| set.contains(&(ix1, iy1, iz1)))
+                .par_iter()
+                .position_any(|set| set.contains(&(ix1, iy1, iz1)))
                 .unwrap();
 
             cells[iz0 as usize][iy0 as usize][ix0 as usize].remove_wall(wall);
