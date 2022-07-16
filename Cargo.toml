@@ -1,20 +1,2 @@
-[package]
-name = "tmaze"
-version = "1.6.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-colored = "^2"
-rand = "^0.8.5"
-crossterm = {version = "^0.24.0", features = ["serde"]}
-masof = {git = "https://github.com/MineFuf/masof.git"}
-thiserror = "^1.0.30"
-substring = "^1.4.5"
-serde = {version = "^1.0.136", features = ["derive"]}
-pausable_clock = "^1.0.1"
-dirs = "^4.0.0"
-ron = "^0.7"
-clap = { version = "^3.2.2", features = ["derive"] }
-rayon = "^1.5.3"
+[workspace]
+members = ["tmaze", "cmaze"]
