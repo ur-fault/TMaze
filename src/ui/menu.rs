@@ -132,8 +132,8 @@ pub fn render_menu(
         for (i, option) in options.iter().enumerate() {
             let style = if i == selected {
                 ContentStyle {
-                    background_color: text_style.foreground_color,
-                    foreground_color: text_style.background_color,
+                    background_color: Some(text_style.foreground_color.unwrap_or(Color::White)),
+                    foreground_color: Some(text_style.background_color.unwrap_or(Color::Black)),
                     underline_color: None,
                     attributes: Default::default(),
                 }
