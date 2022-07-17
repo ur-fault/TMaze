@@ -4,18 +4,16 @@ mod settings;
 // mod core;
 mod ui;
 
-use game::{Game, game::GameError};
 use clap::Parser;
 use cmaze::{core, maze};
+use game::{game::GameError, App};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
-struct Args {
-
-}
+struct Args {}
 
 fn main() -> Result<(), GameError> {
     let _args = Args::parse();
 
-    Game::new().run()
+    App::new().run()
 }

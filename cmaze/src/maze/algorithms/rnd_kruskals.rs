@@ -19,14 +19,14 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
             return Err(GenerationError::InvalidSize(size));
         }
 
-        let (w, h, d) = size;
+        let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
         let cells: Vec<_> = if floored && d > 1 {
             let mut cells: Vec<_> = (0..d)
                 .map(|_| -> Result<Vec<Vec<Cell>>, GenerationError<R, A>> {
                     Ok(
-                        Self::generate_individual((w, h, 1), report_progress.as_mut())?
+                        Self::generate_individual(Dims3D(w, h, 1), report_progress.as_mut())?
                             .cells
                             .remove(0),
                     )
@@ -41,7 +41,7 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
 
             cells
         } else {
-            Self::generate_individual((w, h, d), report_progress.as_mut())?.cells
+            Self::generate_individual(Dims3D(w, h, d), report_progress.as_mut())?.cells
         };
 
         Ok(Maze {
@@ -60,7 +60,7 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
             return Err(GenerationError::InvalidSize(size));
         }
 
-        let (w, h, d) = size;
+        let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
         let cell_count = wu * hu * du;
 
@@ -69,7 +69,7 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
-                    cells[z as usize][y as usize].push(Cell::new((x, y, z)));
+                    cells[z as usize][y as usize].push(Cell::new(Dims3D(x, y, z)));
                 }
             }
         }
@@ -81,15 +81,15 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
             for (iy, row) in floor.iter().enumerate() {
                 for ix in 0..row.len() {
                     if ix != wu - 1 {
-                        walls.push(((ix as i32, iy as i32, iz as i32), Right));
+                        walls.push((Dims3D(ix as i32, iy as i32, iz as i32), Right));
                     }
 
                     if iy != hu - 1 {
-                        walls.push(((ix as i32, iy as i32, iz as i32), Bottom));
+                        walls.push((Dims3D(ix as i32, iy as i32, iz as i32), Bottom));
                     }
 
                     if iz != du - 1 {
-                        walls.push(((ix as i32, iy as i32, iz as i32), Up));
+                        walls.push((Dims3D(ix as i32, iy as i32, iz as i32), Up));
                     }
                 }
             }
@@ -100,7 +100,7 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
             for iy in 0..cells[0].len() {
                 for ix in 0..cells[0][0].len() {
                     sets.push(
-                        vec![(ix as i32, iy as i32, iz as i32)]
+                        vec![Dims3D(ix as i32, iy as i32, iz as i32)]
                             .into_iter()
                             .collect(),
                     );
@@ -109,7 +109,7 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
         }
 
         walls.shuffle(&mut thread_rng());
-        while let Some(((ix0, iy0, iz0), wall)) = walls.pop() {
+        while let Some((Dims3D(ix0, iy0, iz0), wall)) = walls.pop() {
             let (ix1, iy1, iz1) = (
                 (wall.to_coord().0 + ix0),
                 (wall.to_coord().1 + iy0),
@@ -118,16 +118,16 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
 
             let set0_i = sets
                 .par_iter()
-                .position_any(|set| set.contains(&(ix0, iy0, iz0)))
+                .position_any(|set| set.contains(&Dims3D(ix0, iy0, iz0)))
                 .unwrap();
 
-            if sets[set0_i].contains(&(ix1, iy1, iz1)) {
+            if sets[set0_i].contains(&Dims3D(ix1, iy1, iz1)) {
                 continue;
             }
 
             let set1_i = sets
                 .par_iter()
-                .position_any(|set| set.contains(&(ix1, iy1, iz1)))
+                .position_any(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
                 .unwrap();
 
             cells[iz0 as usize][iy0 as usize][ix0 as usize].remove_wall(wall);
@@ -138,7 +138,7 @@ impl<R, A> MazeAlgorithm<R, A> for RndKruskals where R: fmt::Debug, A: fmt::Debu
                 sets.len() - 1
             } else {
                 sets.iter()
-                    .position(|set| set.contains(&(ix1, iy1, iz1)))
+                    .position(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
                     .unwrap()
             };
             sets[set1_i].extend(set0);

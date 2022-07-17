@@ -73,12 +73,12 @@ pub enum CellWall {
 impl CellWall {
     pub fn to_coord(&self) -> Dims3D {
         match self {
-            Self::Left => (-1, 0, 0),
-            Self::Right => (1, 0, 0),
-            Self::Top => (0, -1, 0),
-            Self::Bottom => (0, 1, 0),
-            Self::Up => (0, 0, 1),
-            Self::Down => (0, 0, -1),
+            Self::Left => Dims3D(-1, 0, 0),
+            Self::Right => Dims3D(1, 0, 0),
+            Self::Top => Dims3D(0, -1, 0),
+            Self::Bottom => Dims3D(0, 1, 0),
+            Self::Up => Dims3D(0, 0, 1),
+            Self::Down => Dims3D(0, 0, -1),
         }
     }
 

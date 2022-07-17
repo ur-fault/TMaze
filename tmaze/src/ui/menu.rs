@@ -29,7 +29,7 @@ impl From<crossterm::ErrorKind> for MenuError {
 
 pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
     match options.iter().map(|opt| opt.len()).max() {
-        Some(l) => (
+        Some(l) => Dims(
             ((2 + if counted {
                 (options.len() + 1).to_string().len() + 2
             } else {
@@ -41,7 +41,7 @@ pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
                 + 2,
             options.len() as i32 + 2 + 2,
         ),
-        None => (0, 0),
+        None => Dims(0, 0),
     }
 }
 

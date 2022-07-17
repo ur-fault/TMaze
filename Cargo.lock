@@ -95,6 +95,7 @@ dependencies = [
 name = "cmaze"
 version = "0.1.0"
 dependencies = [
+ "pausable_clock",
  "rand",
  "rayon",
  "thiserror",

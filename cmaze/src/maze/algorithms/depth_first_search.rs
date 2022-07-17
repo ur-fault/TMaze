@@ -18,14 +18,14 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
             return Err(GenerationError::InvalidSize(size));
         }
 
-        let (w, h, d) = size;
+        let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
         Ok(Maze {
             cells: if size.2 > 1 && floored {
                 let mut cells: Vec<_> = (0..d)
                     .map(|_| {
-                        Ok(Self::generate_individual((w, h, 1), report_progress.as_mut())?
+                        Ok(Self::generate_individual(Dims3D(w, h, 1), report_progress.as_mut())?
                             .cells
                             .remove(0))
                     })
@@ -39,7 +39,7 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
 
                 cells
             } else {
-                Self::generate_individual((w, h, d), report_progress.as_mut())
+                Self::generate_individual(Dims3D(w, h, d), report_progress.as_mut())
                     .unwrap()
                     .cells
             },
@@ -56,7 +56,7 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(GenerationError::InvalidSize(size));
         }
-        let (w, h, d) = size;
+        let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
         let cell_count = wu * hu * du;
 
@@ -69,7 +69,7 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
-                    cells[z as usize][y as usize].push(Cell::new((x, y, z)));
+                    cells[z as usize][y as usize].push(Cell::new(Dims3D(x, y, z)));
                 }
             }
         }
@@ -81,7 +81,7 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
             depth: du,
         };
 
-        let mut current = (sx, sy, sz);
+        let mut current = Dims3D(sx, sy, sz);
         visited.push(current);
         stack.push(current);
         while !stack.is_empty() {

@@ -11,7 +11,7 @@ pub struct Maze {
 
 impl Maze {
     pub fn size(&self) -> Dims3D {
-        (self.width as i32, self.height as i32, self.depth as i32)
+        Dims3D(self.width as i32, self.height as i32, self.depth as i32)
     }
 
     pub fn is_in_bounds(&self, pos: Dims3D) -> bool {
@@ -32,7 +32,7 @@ impl Maze {
                 + (off.2 == 1 || off.2 == -1) as u8)
                 == 1
             && self.is_in_bounds(cell)
-            && self.is_in_bounds((cell.0 + off.0, cell.1 + off.1, cell.2 + off.2))
+            && self.is_in_bounds(Dims3D(cell.0 + off.0, cell.1 + off.1, cell.2 + off.2))
     }
 
     pub fn is_valid_wall(&self, cell: Dims3D, wall: CellWall) -> bool {
@@ -54,12 +54,12 @@ impl Maze {
 
     pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
         let offsets = [
-            (-1, 0, 0),
-            (1, 0, 0),
-            (0, -1, 0),
-            (0, 1, 0),
-            (0, 0, -1),
-            (0, 0, 1),
+           Dims3D(-1, 0, 0),
+           Dims3D(1, 0, 0),
+           Dims3D(0, -1, 0),
+           Dims3D(0, 1, 0),
+           Dims3D(0, 0, -1),
+           Dims3D(0, 0, 1),
         ];
         offsets
             .into_iter()
@@ -88,5 +88,13 @@ impl Maze {
 
     pub fn get_cells(&self) -> &[Vec<Vec<Cell>>] {
         &self.cells
+    }
+
+    pub fn get_cell(&self, pos: Dims3D) -> Option<&Cell> {
+        if self.is_in_bounds(pos) {
+            Some(&self.cells[pos.2 as usize][pos.1 as usize][pos.0 as usize])
+        } else {
+            None
+        }
     }
 }

@@ -13,8 +13,8 @@ use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
 use crate::ui::MenuError;
 // use crate::core::*;
+use crate::{helpers, ui, ui::CrosstermError};
 use cmaze::core::*;
-use crate::{helpers, ui, ui::{CrosstermError}};
 use dirs::preference_dir;
 use pausable_clock::PausableClock;
 
@@ -56,7 +56,7 @@ impl From<masof::renderer::Error> for GameError {
     }
 }
 
-pub struct Game {
+pub struct App {
     renderer: Renderer,
     stdout: Stdout,
     settings: Settings,
@@ -64,14 +64,14 @@ pub struct Game {
     settings_file_path: PathBuf,
 }
 
-impl Game {
+impl App {
     pub fn new() -> Self {
         let settings_path = preference_dir().unwrap().join("tmaze").join("settings.ron");
-        Game {
+        App {
             renderer: Renderer::default(),
             stdout: stdout(),
             settings: Settings::load(settings_path.clone()),
-            last_edge_follow_offset: (0, 0),
+            last_edge_follow_offset: Dims(0, 0),
             settings_file_path: settings_path,
         }
     }
@@ -173,13 +173,14 @@ impl Game {
 
     fn run_game(&mut self) -> Result<(), GameError> {
         let (maze_mode, generation_func) = self.get_game_properities()?;
-        let msize: Dims3D = (maze_mode.0, maze_mode.1, maze_mode.2);
-        let is_tower = maze_mode.3;
 
-        let mut player_pos = (0, 0, 0);
-        let goal_pos = (msize.0 - 1, msize.1 - 1, msize.2 - 1);
+        let msize = Dims3D(maze_mode.size.0, maze_mode.size.1, maze_mode.size.2);
+        let is_tower = maze_mode.is_tower;
 
-        let mut camera_offset = (0, 0, 0);
+        let mut player_pos = Dims3D(0, 0, 0);
+        let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
+
+        let mut camera_offset = Dims3D(0, 0, 0);
         let mut spectator = false;
 
         let maze = {
@@ -194,10 +195,14 @@ impl Game {
                         if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
                             match code {
                                 KeyCode::Esc => {
-                                    return Err(ReportCallbackError::AbortGeneration(GameError::Back));
+                                    return Err(ReportCallbackError::AbortGeneration(
+                                        GameError::Back,
+                                    ));
                                 }
                                 KeyCode::Char('q' | 'Q') => {
-                                    return Err(ReportCallbackError::AbortGeneration(GameError::FullQuit));
+                                    return Err(ReportCallbackError::AbortGeneration(
+                                        GameError::FullQuit,
+                                    ));
                                 }
                                 _ => {}
                             }
@@ -217,7 +222,9 @@ impl Game {
                         last_progress = current_progess;
 
                         if let Err(e) = res {
-                            Err(ReportCallbackError::ReportFunctionError(GameError::CrosstermError(e)))
+                            Err(ReportCallbackError::ReportFunctionError(
+                                GameError::CrosstermError(e),
+                            ))
                         } else {
                             Ok(())
                         }
@@ -242,8 +249,12 @@ impl Game {
                     )?;
                     return Err(GameError::NewGame);
                 }
-                Err(GenerationError::ReportFunctionError(ReportCallbackError::ReportFunctionError(e))) => panic!("Unexpected error:\n{:?}", e),
-                Err(GenerationError::ReportFunctionError(ReportCallbackError::AbortGeneration(e))) => return Err(e),
+                Err(GenerationError::ReportFunctionError(
+                    ReportCallbackError::ReportFunctionError(e),
+                )) => panic!("Unexpected error:\n{:?}", e),
+                Err(GenerationError::ReportFunctionError(
+                    ReportCallbackError::AbortGeneration(e),
+                )) => return Err(e),
             }
         };
 
@@ -291,9 +302,9 @@ impl Game {
                         {
                             (pos, 0)
                         } else {
-                            moves.push(((pos.0, pos.1, pos.2), wall));
+                            moves.push((Dims3D(pos.0, pos.1, pos.2), wall));
                             (
-                                (
+                                Dims3D(
                                     pos.0 + wall.to_coord().0,
                                     pos.1 + wall.to_coord().1,
                                     pos.2 + wall.to_coord().2,
@@ -310,8 +321,8 @@ impl Game {
                                 break (pos, count);
                             }
                             count += 1;
-                            moves.push(((pos.0, pos.1, pos.2), wall));
-                            pos = (
+                            moves.push((Dims3D(pos.0, pos.1, pos.2), wall));
+                            pos = Dims3D(
                                 pos.0 + wall.to_coord().0,
                                 pos.1 + wall.to_coord().1,
                                 pos.2 + wall.to_coord().2,
@@ -343,7 +354,7 @@ impl Game {
                                 CellWall::Down => (0, 0, -1),
                             };
 
-                            (
+                            Dims3D(
                                 camera_offset.0 + off.0,
                                 camera_offset.1 + off.1,
                                 (-player_pos.2).max(
@@ -396,7 +407,7 @@ impl Game {
                         }
                         KeyCode::Char(' ') => {
                             if spectator {
-                                camera_offset = (0, 0, 0);
+                                camera_offset = Dims3D(0, 0, 0);
                                 spectator = false
                             } else {
                                 spectator = true
@@ -504,12 +515,12 @@ impl Game {
                 let player_real_maze_pos = helpers::from_maze_to_real(player_pos);
 
                 match camera_mode {
-                    CameraMode::CloseFollow => (
+                    CameraMode::CloseFollow => Dims(
                         size.0 / 2 - player_real_maze_pos.0,
                         size.1 / 2 - player_real_maze_pos.1,
                     ),
                     CameraMode::EdgeFollow(margin_x, margin_y) => {
-                        let current_player_real_pos = (
+                        let current_player_real_pos = Dims(
                             self.last_edge_follow_offset.0 + player_real_maze_pos.0,
                             self.last_edge_follow_offset.1 + player_real_maze_pos.1,
                         );
@@ -529,7 +540,7 @@ impl Game {
                     }
                 }
             } else {
-                ui::box_center_screen((maze_render_size.0 as i32, maze_render_size.1 as i32))?
+                ui::box_center_screen(Dims(maze_render_size.0 as i32, maze_render_size.1 as i32))?
             };
 
             (pos.0 + camera_offset.0 * 2, pos.1 + camera_offset.1 * 2)
@@ -540,7 +551,7 @@ impl Game {
         self.renderer.begin()?;
 
         let draw_corner_double =
-            |self_: &mut Game, x, y, c1: (bool, bool, bool, bool), c2: (bool, bool, bool, bool)| {
+            |self_: &mut App, x, y, c1: (bool, bool, bool, bool), c2: (bool, bool, bool, bool)| {
                 ui::draw_str(
                     &mut self_.renderer,
                     x,
@@ -554,7 +565,7 @@ impl Game {
                 )
             };
 
-        let draw_corner_single = |self_: &mut Game, x, y, c: (bool, bool, bool, bool)| {
+        let draw_corner_single = |self_: &mut App, x, y, c: (bool, bool, bool, bool)| {
             ui::draw_str(
                 &mut self_.renderer,
                 x,
@@ -685,19 +696,7 @@ impl Game {
                 );
             }
 
-            // ui::draw_str(
-            //     &mut self.renderer,
-            //     pos.0,
-            //     ypos,
-            //     &format!("{}", helpers::double_line_corner(false, true, false, true)),
-            //     self.settings.color_scheme.normals(),
-            // );
-
-            draw_corner_single(
-                self,
-                pos.0,
-                ypos, (false, true, false, true)
-            );
+            draw_corner_single(self, pos.0, ypos, (false, true, false, true));
 
             draw_corner_single(
                 self,
@@ -882,12 +881,14 @@ impl Game {
         Ok(())
     }
 
-    fn get_game_properities<T: FnMut(usize, usize) -> Result<(), ReportCallbackError<GameError, GameError>>>(
+    fn get_game_properities<
+        T: FnMut(usize, usize) -> Result<(), ReportCallbackError<GameError, GameError>>,
+    >(
         &mut self,
     ) -> Result<
         (
             GameMode,
-            fn((i32, i32, i32), bool, Option<T>) -> Result<Maze, GenerationError<GameError, GameError>>,
+            fn(Dims3D, bool, Option<T>) -> Result<Maze, GenerationError<GameError, GameError>>,
         ),
         GameError,
     > {
@@ -903,12 +904,14 @@ impl Game {
                     .iter()
                     .map(|maze| {
                         (
-                            (
-                                maze.width as i32,
-                                maze.height as i32,
-                                maze.depth as i32,
-                                maze.tower,
-                            ),
+                            GameMode {
+                                size: Dims3D(
+                                    maze.width as i32,
+                                    maze.height as i32,
+                                    maze.depth as i32,
+                                ),
+                                is_tower: maze.tower,
+                            },
                             maze.title.as_str(),
                         )
                     })
