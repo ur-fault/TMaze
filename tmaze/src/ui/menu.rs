@@ -1,4 +1,3 @@
-use crate::tmcore::*;
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
@@ -8,6 +7,25 @@ use std::io::stdout;
 
 use super::draw::*;
 use super::*;
+
+pub enum MenuError {
+    CrosstermError(CrosstermError),
+    EmptyMenu,
+    Exit,
+    FullQuit,
+}
+
+impl From<CrosstermError> for MenuError {
+    fn from(error: CrosstermError) -> Self {
+        Self::CrosstermError(error)
+    }
+}
+
+impl From<crossterm::ErrorKind> for MenuError {
+    fn from(error: crossterm::ErrorKind) -> Self {
+        Self::CrosstermError(error.try_into().expect("Cannot convert crossterm error"))
+    }
+}
 
 pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
     match options.iter().map(|opt| opt.len()).max() {
@@ -35,12 +53,12 @@ pub fn menu(
     options: &[&str],
     default: usize,
     counted: bool,
-) -> Result<u16, Error> {
+) -> Result<u16, MenuError> {
     let mut selected: usize = default;
     let opt_count = options.len();
 
     if opt_count == 0 {
-        return Err(Error::EmptyMenu);
+        return Err(MenuError::EmptyMenu);
     }
 
     render_menu(renderer, box_style, text_style, title, options, selected, counted)?;
@@ -62,7 +80,7 @@ pub fn menu(
                 }
                 KeyCode::Enter | KeyCode::Char(' ') => return Ok(selected as u16),
                 KeyCode::Char(ch) => match ch {
-                    'q' | 'Q' => return Err(Error::FullQuit),
+                    'q' | 'Q' => return Err(MenuError::FullQuit),
                     '1' if counted && 1 <= opt_count => selected = 1 - 1,
                     '2' if counted && 2 <= opt_count => selected = 2 - 1,
                     '3' if counted && 3 <= opt_count => selected = 3 - 1,
@@ -74,7 +92,7 @@ pub fn menu(
                     '9' if counted && 9 <= opt_count => selected = 9 - 1,
                     _ => {}
                 },
-                KeyCode::Esc => return Err(Error::Quit),
+                KeyCode::Esc => return Err(MenuError::Exit),
                 _ => {}
             },
             Event::Mouse(_) => {}
@@ -95,7 +113,7 @@ pub fn choice_menu<'a, T>(
     options: &'a [(T, &str)],
     default: usize,
     counted: bool,
-) -> Result<&'a T, Error> {
+) -> Result<&'a T, MenuError> {
     let _options: Vec<&str> = options.iter().map(|opt| opt.1).collect();
     Ok(&options[menu(renderer, box_style, text_style, title, &_options, default, counted)? as usize].0)
 }
@@ -108,7 +126,7 @@ pub fn render_menu(
     options: &[&str],
     selected: usize,
     counted: bool,
-) -> Result<(), Error> {
+) -> Result<(), CrosstermError> {
     let menu_size = menu_size(title, options, counted);
     let pos = box_center_screen(menu_size)?;
     let opt_count = options.len();
@@ -132,8 +150,9 @@ pub fn render_menu(
         for (i, option) in options.iter().enumerate() {
             let style = if i == selected {
                 ContentStyle {
-                    background_color: text_style.foreground_color,
-                    foreground_color: text_style.background_color,
+                    background_color: Some(text_style.foreground_color.unwrap_or(Color::White)),
+                    foreground_color: Some(text_style.background_color.unwrap_or(Color::Black)),
+                    underline_color: None,
                     attributes: Default::default(),
                 }
             } else {

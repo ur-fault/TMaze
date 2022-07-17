@@ -11,10 +11,50 @@ use masof::{ContentStyle, Renderer};
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
-use crate::tmcore::*;
-use crate::{helpers, ui};
+use crate::ui::MenuError;
+// use crate::core::*;
+use cmaze::core::*;
+use crate::{helpers, ui, ui::{CrosstermError}};
 use dirs::preference_dir;
 use pausable_clock::PausableClock;
+
+#[derive(Debug)]
+pub enum GameError {
+    CrosstermError(CrosstermError),
+    EmptyMaze,
+    Back,
+    FullQuit,
+    NewGame,
+}
+
+impl From<MenuError> for GameError {
+    fn from(error: MenuError) -> Self {
+        match error {
+            MenuError::CrosstermError(error) => Self::CrosstermError(error),
+            MenuError::EmptyMenu => Self::EmptyMaze,
+            MenuError::Exit => Self::Back,
+            MenuError::FullQuit => Self::FullQuit,
+        }
+    }
+}
+
+impl From<CrosstermError> for GameError {
+    fn from(error: CrosstermError) -> Self {
+        Self::CrosstermError(error)
+    }
+}
+
+impl From<crossterm::ErrorKind> for GameError {
+    fn from(error: crossterm::ErrorKind) -> Self {
+        Self::CrosstermError(CrosstermError::from(error))
+    }
+}
+
+impl From<masof::renderer::Error> for GameError {
+    fn from(error: masof::renderer::Error) -> Self {
+        Self::CrosstermError(CrosstermError::from(error))
+    }
+}
 
 pub struct Game {
     renderer: Renderer,
@@ -36,7 +76,7 @@ impl Game {
         }
     }
 
-    pub fn run(mut self) -> Result<(), Error> {
+    pub fn run(mut self) -> Result<(), GameError> {
         self.renderer.term_on(&mut self.stdout)?;
         let mut game_restart_reqested = false;
 
@@ -44,8 +84,8 @@ impl Game {
             if game_restart_reqested {
                 game_restart_reqested = false;
                 match self.run_game() {
-                    Ok(_) | Err(Error::Quit) => {}
-                    Err(Error::NewGame) => {
+                    Ok(_) | Err(GameError::Back) => {}
+                    Err(GameError::NewGame) => {
                         game_restart_reqested = true;
                     }
                     Err(_) => break,
@@ -64,8 +104,8 @@ impl Game {
             ) {
                 Ok(res) => match res {
                     0 => match self.run_game() {
-                        Ok(_) | Err(Error::Quit) => {}
-                        Err(Error::NewGame) => {
+                        Ok(_) | Err(GameError::Back) => {}
+                        Err(GameError::NewGame) => {
                             game_restart_reqested = true;
                         }
                         Err(_) => break,
@@ -122,7 +162,7 @@ impl Game {
                     4 => break,
                     _ => break,
                 },
-                Err(Error::Quit) => break,
+                Err(MenuError::Exit) => break,
                 Err(_) => break,
             };
         }
@@ -131,7 +171,7 @@ impl Game {
         Ok(())
     }
 
-    fn run_game(&mut self) -> Result<(), Error> {
+    fn run_game(&mut self) -> Result<(), GameError> {
         let (maze_mode, generation_func) = self.get_game_properities()?;
         let msize: Dims3D = (maze_mode.0, maze_mode.1, maze_mode.2);
         let is_tower = maze_mode.3;
@@ -144,7 +184,7 @@ impl Game {
 
         let maze = {
             let mut last_progress = f64::MIN;
-            generation_func(
+            let res = generation_func(
                 msize,
                 is_tower,
                 Some(|done, all| {
@@ -154,10 +194,10 @@ impl Game {
                         if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
                             match code {
                                 KeyCode::Esc => {
-                                    return Err(Error::Quit);
+                                    return Err(ReportCallbackError::AbortGeneration(GameError::Back));
                                 }
                                 KeyCode::Char('q' | 'Q') => {
-                                    return Err(Error::FullQuit);
+                                    return Err(ReportCallbackError::AbortGeneration(GameError::FullQuit));
                                 }
                                 _ => {}
                             }
@@ -176,12 +216,35 @@ impl Game {
                         );
                         last_progress = current_progess;
 
-                        res
+                        if let Err(e) = res {
+                            Err(ReportCallbackError::ReportFunctionError(GameError::CrosstermError(e)))
+                        } else {
+                            Ok(())
+                        }
                     } else {
                         Ok(())
                     }
                 }),
-            )?
+            );
+
+            match res {
+                Ok(maze) => maze,
+                Err(GenerationError::InvalidSize(dims)) => {
+                    ui::popup(
+                        &mut self.renderer,
+                        self.settings.color_scheme.normals(),
+                        self.settings.color_scheme.texts(),
+                        "Error",
+                        &[
+                            "Invalid maze size",
+                            &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
+                        ],
+                    )?;
+                    return Err(GameError::NewGame);
+                }
+                Err(GenerationError::ReportFunctionError(ReportCallbackError::ReportFunctionError(e))) => panic!("Unexpected error:\n{:?}", e),
+                Err(GenerationError::ReportFunctionError(ReportCallbackError::AbortGeneration(e))) => return Err(e),
+            }
         };
 
         let mut moves = vec![];
@@ -352,8 +415,8 @@ impl Game {
                                 false,
                             )? {
                                 0 => {}
-                                1 => break Err(Error::Quit),
-                                2 => break Err(Error::FullQuit),
+                                1 => break Err(GameError::Back),
+                                2 => break Err(GameError::FullQuit),
                                 _ => {}
                             }
                             clock.resume();
@@ -361,7 +424,7 @@ impl Game {
                         _ => {}
                     },
                     Err(err) => {
-                        break Err(Error::CrossTermError(err));
+                        break Err(CrosstermError(err).into());
                     }
                     _ => {}
                 }
@@ -409,7 +472,7 @@ impl Game {
                         "R for new game",
                     ],
                 )? {
-                    break Err(Error::NewGame);
+                    break Err(GameError::NewGame);
                 }
                 break Ok(());
             }
@@ -427,7 +490,7 @@ impl Game {
         texts: (&str, &str, &str, &str),
         text_horizontal_margin: i32,
         moves: &[(Dims3D, CellWall)],
-    ) -> Result<(), Error> {
+    ) -> Result<(), GameError> {
         let maze_render_size = helpers::maze_render_size(maze);
         let size = {
             let size = size()?;
@@ -819,14 +882,14 @@ impl Game {
         Ok(())
     }
 
-    fn get_game_properities<T: FnMut(usize, usize) -> Result<(), Error>>(
+    fn get_game_properities<T: FnMut(usize, usize) -> Result<(), ReportCallbackError<GameError, GameError>>>(
         &mut self,
     ) -> Result<
         (
             GameMode,
-            fn((i32, i32, i32), bool, Option<T>) -> Result<Maze, Error>,
+            fn((i32, i32, i32), bool, Option<T>) -> Result<Maze, GenerationError<GameError, GameError>>,
         ),
-        Error,
+        GameError,
     > {
         Ok((
             *ui::choice_menu(

@@ -8,7 +8,7 @@ pub use masof::{Color, ContentStyle, Renderer};
 pub use substring::Substring;
 
 use crate::helpers;
-use crate::tmcore::*;
+use crate::core::*;
 
 mod draw;
 mod menu;
@@ -20,7 +20,27 @@ pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
 
-pub fn box_center_screen(box_dims: Dims) -> Result<Dims, Error> {
+#[derive(Debug)]
+pub struct CrosstermError(pub crossterm::ErrorKind);
+
+impl From<masof::renderer::Error> for CrosstermError {
+    fn from(error: masof::renderer::Error) -> Self {
+        match error {
+            masof::renderer::Error::CrossTermError(e) => {
+                Self(e)
+            }
+            _ => panic!("Unexpected error: {}", error),
+        }
+    }
+}
+
+impl From<crossterm::ErrorKind> for CrosstermError {
+    fn from(error: crossterm::ErrorKind) -> Self {
+        Self(error)
+    }
+}
+
+pub fn box_center_screen(box_dims: Dims) -> Result<Dims, CrosstermError> {
     let size_u16 = size()?;
     Ok(helpers::box_center(
         (0, 0),

@@ -1,6 +1,6 @@
 use self::CellWall::*;
 use crate::maze::cell::{Cell, CellWall};
-use crate::tmcore::*;
+use crate::core::*;
 
 pub struct Maze {
     pub(crate) cells: Vec<Vec<Vec<Cell>>>,

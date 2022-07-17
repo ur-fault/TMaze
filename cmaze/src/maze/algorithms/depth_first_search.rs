@@ -1,19 +1,21 @@
 use super::super::cell::Cell;
-use super::{Maze, MazeAlgorithm};
+use super::{Maze, MazeAlgorithm, ReportCallbackError, GenerationError};
 use crate::maze::CellWall;
-use crate::tmcore::*;
+use crate::core::*;
 use rand::{seq::SliceRandom, thread_rng, Rng};
+use rayon::prelude::*;
+use std::fmt;
 
 pub struct DepthFirstSearch {}
 
-impl MazeAlgorithm for DepthFirstSearch {
-    fn generate<T: FnMut(usize, usize) -> Result<(), Error>>(
+impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt::Debug {
+    fn generate<T: FnMut(usize, usize) -> Result<(), ReportCallbackError<R, A>>>(
         size: Dims3D,
         floored: bool,
         mut report_progress: Option<T>,
-    ) -> Result<Maze, Error> {
+    ) -> Result<Maze, GenerationError<R, A>> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
-            return Err(Error::InvalidValue);
+            return Err(GenerationError::InvalidSize(size));
         }
 
         let (w, h, d) = size;
@@ -21,14 +23,13 @@ impl MazeAlgorithm for DepthFirstSearch {
 
         Ok(Maze {
             cells: if size.2 > 1 && floored {
-                let mut cells = (0..d)
+                let mut cells: Vec<_> = (0..d)
                     .map(|_| {
-                        Self::generate_individual((w, h, 1), report_progress.as_mut())
-                            .unwrap()
+                        Ok(Self::generate_individual((w, h, 1), report_progress.as_mut())?
                             .cells
-                            .remove(0)
+                            .remove(0))
                     })
-                    .collect::<Vec<_>>();
+                    .collect::<Result<_, GenerationError<R, A>>>()?;
 
                 for floor in 0..du - 1 {
                     let (x, y) = (thread_rng().gen_range(0..wu), thread_rng().gen_range(0..hu));
@@ -48,12 +49,12 @@ impl MazeAlgorithm for DepthFirstSearch {
         })
     }
 
-    fn generate_individual<T: FnMut(usize, usize) -> Result<(), Error>>(
+    fn generate_individual<T: FnMut(usize, usize) -> Result<(), ReportCallbackError<R, A>>>(
         size: Dims3D,
         mut report_progress: Option<T>,
-    ) -> Result<Maze, Error> {
+    ) -> Result<Maze, GenerationError<R, A>> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
-            return Err(Error::InvalidValue);
+            return Err(GenerationError::InvalidSize(size));
         }
         let (w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
@@ -87,7 +88,7 @@ impl MazeAlgorithm for DepthFirstSearch {
             current = stack.pop().unwrap();
             let unvisited_neighbors = maze
                 .get_neighbors(current)
-                .into_iter()
+                .into_par_iter()
                 .map(|cell| cell.get_coord())
                 .filter(|cell| !visited.contains(cell))
                 .collect::<Vec<_>>();

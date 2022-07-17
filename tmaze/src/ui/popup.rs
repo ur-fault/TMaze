@@ -1,4 +1,3 @@
-use crate::tmcore::*;
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
@@ -25,7 +24,7 @@ pub fn popup(
     text_style: ContentStyle,
     title: &str,
     texts: &[&str],
-) -> Result<KeyCode, Error> {
+) -> Result<KeyCode, CrosstermError> {
     render_popup(renderer, box_style, text_style, title, texts)?;
 
     loop {
@@ -46,7 +45,7 @@ pub fn render_popup(
     text_style: ContentStyle,
     title: &str,
     texts: &[&str],
-) -> Result<(), Error> {
+) -> Result<(), CrosstermError> {
     let box_size = popup_size(title, texts);
     let title_pos = box_center_screen((title.len() as i32 + 2, 1))?.0;
     let pos = box_center_screen(box_size)?;

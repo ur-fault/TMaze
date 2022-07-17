@@ -15,7 +15,7 @@ pub fn render_progress(
     text_style: ContentStyle,
     title: &str,
     progress: f64,
-) -> Result<(), Error> {
+) -> Result<(), CrosstermError> {
     let progress_size = (title.len() as i32 + 2, 4);
     let pos = box_center_screen(progress_size)?;
 

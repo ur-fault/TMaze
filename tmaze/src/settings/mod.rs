@@ -69,7 +69,7 @@ impl ColorScheme {
     pub fn normals(&self) -> ContentStyle {
         ContentStyle {
             foreground_color: Some(self.normal),
-            background_color: Some(Color::Black),
+            background_color: None,
             ..Default::default()
         }
     }
@@ -77,7 +77,7 @@ impl ColorScheme {
     pub fn players(&self) -> ContentStyle {
         ContentStyle {
             foreground_color: Some(self.player),
-            background_color: Some(Color::Black),
+            background_color: None,
             ..Default::default()
         }
     }
@@ -85,7 +85,7 @@ impl ColorScheme {
     pub fn goals(&self) -> ContentStyle {
         ContentStyle {
             foreground_color: Some(self.goal),
-            background_color: Some(Color::Black),
+            background_color: None,
             ..Default::default()
         }
     }
@@ -93,7 +93,7 @@ impl ColorScheme {
     pub fn texts(&self) -> ContentStyle {
         ContentStyle {
             foreground_color: Some(self.text),
-            background_color: Some(Color::Black),
+            background_color: None,
             ..Default::default()
         }
     }
