@@ -94,6 +94,10 @@ impl Game {
         &self.moves
     }
 
+    pub fn get_move_count(&self) -> usize {
+        self.moves.len()
+    }
+
     pub fn start(&mut self) -> Result<(), GameAlreadyRunningError> {
         match self.get_state() {
             GameState::NotStarted => {

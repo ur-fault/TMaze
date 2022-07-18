@@ -2,6 +2,7 @@ use std::io::{stdout, Stdout};
 use std::path::PathBuf;
 use std::time::Duration;
 
+use cmaze::game::{Game, GameState};
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
@@ -12,11 +13,9 @@ use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
 use crate::ui::MenuError;
-// use crate::core::*;
 use crate::{helpers, ui, ui::CrosstermError};
 use cmaze::core::*;
 use dirs::preference_dir;
-use pausable_clock::PausableClock;
 
 #[derive(Debug)]
 pub enum GameError {
@@ -172,22 +171,19 @@ impl App {
     }
 
     fn run_game(&mut self) -> Result<(), GameError> {
-        let (maze_mode, generation_func) = self.get_game_properities()?;
-
-        let msize = Dims3D(maze_mode.size.0, maze_mode.size.1, maze_mode.size.2);
-        let is_tower = maze_mode.is_tower;
-
-        let mut player_pos = Dims3D(0, 0, 0);
-        let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
-
-        let mut camera_offset = Dims3D(0, 0, 0);
-        let mut spectator = false;
-
-        let maze = {
-            let mut last_progress = f64::MIN;
-            let res = generation_func(
-                msize,
+        let game_props = self.get_game_properities()?;
+        let (
+            GameMode {
+                size: msize,
                 is_tower,
+            },
+            _,
+        ) = game_props;
+        let mut game = {
+            let mut last_progress = f64::MIN;
+            let game_res = Game::new((
+                game_props.0,
+                game_props.1,
                 Some(|done, all| {
                     let current_progess = done as f64 / all as f64;
                     // check for quit keys from user
@@ -232,10 +228,10 @@ impl App {
                         Ok(())
                     }
                 }),
-            );
+            ));
 
-            match res {
-                Ok(maze) => maze,
+            match game_res {
+                Ok(g) => g,
                 Err(GenerationError::InvalidSize(dims)) => {
                     ui::popup(
                         &mut self.renderer,
@@ -258,152 +254,80 @@ impl App {
             }
         };
 
-        let mut moves = vec![];
-        let clock = PausableClock::default();
-        let start_time = clock.now();
-        let mut move_count = 0;
+        let mut camera_offset = Dims3D(0, 0, 0);
+        let mut spectator = false;
 
         self.render_game(
-            &maze,
-            player_pos,
+            game.get_maze(),
+            game.get_player_pos(),
             camera_offset,
             self.settings.camera_mode,
-            goal_pos,
+            game.get_goal_pos(),
             is_tower,
             (
                 &format!(
                     "{}x{}x{}",
-                    player_pos.0 + 1,
-                    player_pos.1 + 1,
-                    player_pos.2 + 1
+                    game.get_player_pos().0 + 1,
+                    game.get_player_pos().1 + 1,
+                    game.get_player_pos().2 + 1
                 ),
                 if spectator { "Spectator" } else { "Adventure" },
-                &format!("{} moves", move_count),
+                &format!("{} moves", game.get_move_count()),
                 "",
             ),
             1,
-            &moves,
+            game.get_moves(),
         )?;
+
+        game.start().unwrap();
 
         loop {
             if let Ok(true) = poll(Duration::from_millis(90)) {
                 let event = read();
 
-                fn get_new_player_pos(
-                    maze: &Maze,
-                    mut pos: Dims3D,
-                    wall: CellWall,
-                    slow: bool,
-                    moves: &mut Vec<(Dims3D, CellWall)>,
-                ) -> (Dims3D, i32) {
-                    if slow {
-                        if maze.get_cells()[pos.2 as usize][pos.1 as usize][pos.0 as usize]
-                            .get_wall(wall)
-                        {
-                            (pos, 0)
-                        } else {
-                            moves.push((Dims3D(pos.0, pos.1, pos.2), wall));
-                            (
-                                Dims3D(
-                                    pos.0 + wall.to_coord().0,
-                                    pos.1 + wall.to_coord().1,
-                                    pos.2 + wall.to_coord().2,
-                                ),
-                                1,
-                            )
-                        }
-                    } else {
-                        let mut count = 0;
-                        loop {
-                            let mut cell =
-                                &maze.get_cells()[pos.2 as usize][pos.1 as usize][pos.0 as usize];
-                            if cell.get_wall(wall) {
-                                break (pos, count);
-                            }
-                            count += 1;
-                            moves.push((Dims3D(pos.0, pos.1, pos.2), wall));
-                            pos = Dims3D(
-                                pos.0 + wall.to_coord().0,
-                                pos.1 + wall.to_coord().1,
-                                pos.2 + wall.to_coord().2,
-                            );
-                            cell =
-                                &maze.get_cells()[pos.2 as usize][pos.1 as usize][pos.0 as usize];
-
-                            let perp = wall.perpendicular_walls();
-                            if !cell.get_wall(perp.0)
-                                || !cell.get_wall(perp.1)
-                                || !cell.get_wall(perp.2)
-                                || !cell.get_wall(perp.3)
-                            {
-                                break (pos, count);
-                            }
-                        }
-                    }
-                }
-
-                let mut move_player = |wall: CellWall| {
+                let mut apply_move = |wall: CellWall| {
                     if spectator {
                         camera_offset = {
-                            let off = match wall {
-                                CellWall::Top => (0, 1, 0),
-                                CellWall::Bottom => (0, -1, 0),
-                                CellWall::Left => (1, 0, 0),
-                                CellWall::Right => (-1, 0, 0),
-                                CellWall::Up => (0, 0, 1),
-                                CellWall::Down => (0, 0, -1),
-                            };
+                            let cam_off = wall.reverse_wall().to_coord() + camera_offset;
 
                             Dims3D(
-                                camera_offset.0 + off.0,
-                                camera_offset.1 + off.1,
-                                (-player_pos.2).max(
-                                    (maze.size().2 - player_pos.2 - 1).min(camera_offset.2 + off.2),
+                                cam_off.0,
+                                cam_off.1,
+                                (-game.get_player_pos().2).max(
+                                    (game.get_maze().size().2 - game.get_player_pos().2 - 1)
+                                        .min(cam_off.2),
                                 ),
                             )
                         };
                     } else {
-                        let pmove = get_new_player_pos(
-                            &maze,
-                            player_pos,
+                        game.move_player(
                             wall,
                             self.settings.slow,
-                            &mut moves,
-                        );
-                        player_pos = pmove.0;
-                        move_count += pmove.1;
-
-                        if !self.settings.disable_tower_auto_up
-                            && is_tower
-                            && !maze.get_cells()[pmove.0 .2 as usize][pmove.0 .1 as usize]
-                                [pmove.0 .0 as usize]
-                                .get_wall(CellWall::Up)
-                        {
-                            player_pos.2 += 1;
-                            move_count += 1;
-                        }
+                            !self.settings.disable_tower_auto_up,
+                        )
+                        .unwrap();
                     }
                 };
 
                 match event {
                     Ok(Event::Key(KeyEvent { code, modifiers: _ })) => match code {
                         KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                            move_player(CellWall::Top);
+                            apply_move(CellWall::Top);
                         }
                         KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                            move_player(CellWall::Bottom);
+                            apply_move(CellWall::Bottom);
                         }
                         KeyCode::Left | KeyCode::Char('a' | 'A') => {
-                            move_player(CellWall::Left);
+                            apply_move(CellWall::Left);
                         }
                         KeyCode::Right | KeyCode::Char('d' | 'D') => {
-                            move_player(CellWall::Right);
+                            apply_move(CellWall::Right);
                         }
                         KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
-                            move_player(CellWall::Down);
+                            apply_move(CellWall::Down);
                         }
                         KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
-                            move_player(CellWall::Up);
+                            apply_move(CellWall::Up);
                         }
                         KeyCode::Char(' ') => {
                             if spectator {
@@ -413,9 +337,8 @@ impl App {
                                 spectator = true
                             }
                         }
-                        KeyCode::Enter => {}
                         KeyCode::Esc => {
-                            clock.pause();
+                            game.pause().unwrap();
                             match ui::menu(
                                 &mut self.renderer,
                                 self.settings.color_scheme.normals(),
@@ -425,12 +348,11 @@ impl App {
                                 0,
                                 false,
                             )? {
-                                0 => {}
                                 1 => break Err(GameError::Back),
                                 2 => break Err(GameError::FullQuit),
                                 _ => {}
                             }
-                            clock.resume();
+                            game.resume().unwrap();
                         }
                         _ => {}
                     },
@@ -443,33 +365,33 @@ impl App {
                 self.renderer.event(&event.unwrap());
             }
 
-            let from_start = start_time.elapsed(&clock);
+            let from_start = game.get_elapsed().unwrap();
             self.render_game(
-                &maze,
-                player_pos,
+                game.get_maze(),
+                game.get_player_pos(),
                 camera_offset,
                 self.settings.camera_mode,
-                goal_pos,
+                game.get_goal_pos(),
                 is_tower,
                 (
                     &format!(
                         "{}x{}x{}",
-                        player_pos.0 + 1,
-                        player_pos.1 + 1,
-                        player_pos.2 + 1
+                        game.get_player_pos().0 + 1,
+                        game.get_player_pos().1 + 1,
+                        game.get_player_pos().2 + 1
                     ),
                     if spectator { "Spectator" } else { "Adventure" },
-                    &format!("{} moves", move_count),
+                    &format!("{} moves", game.get_move_count()),
                     &ui::format_duration(from_start),
                 ),
                 1,
-                &moves,
+                game.get_moves(),
             )?;
 
-            let play_time = start_time.elapsed(&clock);
+            let play_time = game.get_elapsed().unwrap();
 
             // check if player won
-            if player_pos == goal_pos {
+            if game.get_state() == GameState::Finished {
                 if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
                     self.settings.color_scheme.normals(),
@@ -477,7 +399,7 @@ impl App {
                     "You won",
                     &[
                         &format!("Time: {}", ui::format_duration(play_time)),
-                        &format!("Moves: {}", move_count),
+                        &format!("Moves: {}", game.get_move_count()),
                         &format!("Size: {}x{}x{}", msize.0, msize.1, msize.2),
                         "",
                         "R for new game",
