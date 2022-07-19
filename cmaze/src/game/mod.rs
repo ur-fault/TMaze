@@ -166,7 +166,7 @@ impl Game {
 
             if tower_auto_up
                 && self.game_mode.is_tower
-                && self
+                && !self
                     .maze
                     .get_cell(self.player_pos)
                     .unwrap()

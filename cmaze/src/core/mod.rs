@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Dims(pub i32, pub i32);
@@ -7,11 +7,11 @@ pub struct Dims3D(pub i32, pub i32, pub i32);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DimsU(pub usize, pub usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-// pub struct GameMode(pub i32, pub i32, pub i32, pub bool);
 pub struct GameMode {
     pub size: Dims3D,
     pub is_tower: bool,
 }
+
 impl Add for Dims {
     type Output = Dims;
 
@@ -39,6 +39,21 @@ impl SubAssign for Dims {
     fn sub_assign(&mut self, other: Dims) {
         self.0 -= other.0;
         self.1 -= other.1;
+    }
+}
+
+impl Mul<i32> for Dims {
+    type Output = Dims;
+
+    fn mul(self, other: i32) -> Dims {
+        Dims(self.0 * other, self.1 * other)
+    }
+}
+
+impl MulAssign<i32> for Dims {
+    fn mul_assign(&mut self, other: i32) {
+        self.0 *= other;
+        self.1 *= other;
     }
 }
 
@@ -86,6 +101,22 @@ impl SubAssign for Dims3D {
     }
 }
 
+impl Mul<i32> for Dims3D {
+    type Output = Dims3D;
+
+    fn mul(self, other: i32) -> Dims3D {
+        Dims3D(self.0 * other, self.1 * other, self.2 * other)
+    }
+}
+
+impl MulAssign<i32> for Dims3D {
+    fn mul_assign(&mut self, other: i32) {
+        self.0 *= other;
+        self.1 *= other;
+        self.2 *= other;
+    }
+}
+
 impl From<(i32, i32, i32)> for Dims3D {
     fn from(tuple: (i32, i32, i32)) -> Self {
         Dims3D(tuple.0, tuple.1, tuple.2)
@@ -125,6 +156,21 @@ impl SubAssign for DimsU {
     fn sub_assign(&mut self, other: DimsU) {
         self.0 -= other.0;
         self.1 -= other.1;
+    }
+}
+
+impl Mul<usize> for DimsU {
+    type Output = DimsU;
+
+    fn mul(self, other: usize) -> DimsU {
+        DimsU(self.0 * other, self.1 * other)
+    }
+}
+
+impl MulAssign<usize> for DimsU {
+    fn mul_assign(&mut self, other: usize) {
+        self.0 *= other;
+        self.1 *= other;
     }
 }
 

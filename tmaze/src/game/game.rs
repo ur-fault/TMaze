@@ -7,8 +7,9 @@ use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-use masof::{ContentStyle, Renderer};
+use masof::Renderer;
 
+use crate::helpers::LineDir;
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
@@ -287,18 +288,16 @@ impl App {
 
                 let mut apply_move = |wall: CellWall| {
                     if spectator {
-                        camera_offset = {
-                            let cam_off = wall.reverse_wall().to_coord() + camera_offset;
+                        let cam_off = wall.reverse_wall().to_coord() + camera_offset;
 
-                            Dims3D(
-                                cam_off.0,
-                                cam_off.1,
-                                (-game.get_player_pos().2).max(
-                                    (game.get_maze().size().2 - game.get_player_pos().2 - 1)
-                                        .min(cam_off.2),
-                                ),
-                            )
-                        };
+                        camera_offset = Dims3D(
+                            cam_off.0,
+                            cam_off.1,
+                            (-game.get_player_pos().2).max(
+                                (game.get_maze().size().2 - game.get_player_pos().2 - 1)
+                                    .min(cam_off.2),
+                            ),
+                        )
                     } else {
                         game.move_player(
                             wall,
@@ -388,10 +387,10 @@ impl App {
                 game.get_moves(),
             )?;
 
-            let play_time = game.get_elapsed().unwrap();
-
             // check if player won
             if game.get_state() == GameState::Finished {
+                let play_time = game.get_elapsed().unwrap();
+
                 if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
                     self.settings.color_scheme.normals(),
@@ -442,10 +441,8 @@ impl App {
                         size.1 / 2 - player_real_maze_pos.1,
                     ),
                     CameraMode::EdgeFollow(margin_x, margin_y) => {
-                        let current_player_real_pos = Dims(
-                            self.last_edge_follow_offset.0 + player_real_maze_pos.0,
-                            self.last_edge_follow_offset.1 + player_real_maze_pos.1,
-                        );
+                        let current_player_real_pos =
+                            self.last_edge_follow_offset + player_real_maze_pos;
 
                         if current_player_real_pos.0 < margin_x
                             || current_player_real_pos.0 > size.0 - margin_x
@@ -472,108 +469,108 @@ impl App {
 
         self.renderer.begin()?;
 
-        let draw_corner_double =
-            |self_: &mut App, x, y, c1: (bool, bool, bool, bool), c2: (bool, bool, bool, bool)| {
-                ui::draw_str(
-                    &mut self_.renderer,
-                    x,
-                    y,
-                    &format!(
-                        "{}{}",
-                        helpers::double_line_corner(c1.0, c1.1, c1.2, c1.3),
-                        helpers::double_line_corner(c2.0, c2.1, c2.2, c2.3)
-                    ),
-                    self_.settings.color_scheme.normals(),
-                )
-            };
-
-        let draw_corner_single = |self_: &mut App, x, y, c: (bool, bool, bool, bool)| {
+        let draw_line_double_duo = |self_: &mut App, x, y, l1: LineDir, l2: LineDir| {
             ui::draw_str(
                 &mut self_.renderer,
                 x,
                 y,
-                &format!("{}", helpers::double_line_corner(c.0, c.1, c.2, c.3),),
+                &format!("{}{}", l1.double_line(), l2.double_line(),),
+                self_.settings.color_scheme.normals(),
+            )
+        };
+
+        let draw_line_double = |self_: &mut App, x, y, l: LineDir| {
+            ui::draw_str(
+                &mut self_.renderer,
+                x,
+                y,
+                &format!("{}", l.double_line(),),
                 self_.settings.color_scheme.normals(),
             )
         };
 
         // corners
         if pos.1 > 0 {
-            draw_corner_double(
+            draw_line_double_duo(
                 self,
                 pos.0,
                 pos.1,
-                (false, false, true, true),
-                (true, false, true, false),
+                LineDir::BottomRight,
+                LineDir::Horizontal,
             );
-            draw_corner_double(
+            draw_line_double_duo(
                 self,
                 pos.0 + maze_render_size.0 - 2,
                 pos.1,
-                (true, false, true, false),
-                (true, false, false, true),
+                LineDir::Horizontal,
+                LineDir::BottomLeft,
             );
         }
 
         if pos.1 + maze_render_size.1 - 2 < size.1 - 3 {
-            draw_corner_single(
+            draw_line_double(
                 self,
                 pos.0,
                 pos.1 + maze_render_size.1 - 2,
-                (false, true, false, true),
+                LineDir::Vertical,
             );
-            draw_corner_single(
+            draw_line_double(
                 self,
                 pos.0 + maze_render_size.0 - 1,
                 pos.1 + maze_render_size.1 - 2,
-                (false, true, false, true),
+                LineDir::Vertical,
             );
         }
         if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
-            draw_corner_single(
+            draw_line_double(
                 self,
                 pos.0,
                 pos.1 + maze_render_size.1 - 1,
-                (false, true, true, false),
+                LineDir::TopRight,
             );
-            draw_corner_double(
+            draw_line_double_duo(
                 self,
                 pos.0 + maze_render_size.0 - 2,
                 pos.1 + maze_render_size.1 - 1,
-                (true, false, true, false),
-                (true, true, false, false),
+                LineDir::Horizontal,
+                LineDir::TopLeft,
             );
         }
         // horizontal edge lines
         for x in 0..maze.size().0 - 1 {
             if pos.1 > 0 {
-                draw_corner_double(
+                draw_line_double_duo(
                     self,
                     x as i32 * 2 + pos.0 + 1,
                     pos.1,
-                    (true, false, true, false),
-                    (
-                        true,
-                        false,
-                        true,
-                        maze.get_cells()[floor as usize][0][x as usize].get_wall(CellWall::Right),
-                    ),
+                    LineDir::Horizontal,
+                    if maze
+                        .get_cell(Dims3D(x, 0, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Right)
+                    {
+                        LineDir::ClosedTop
+                    } else {
+                        LineDir::Horizontal
+                    },
                 );
             }
 
             if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
-                draw_corner_double(
+                draw_line_double_duo(
                     self,
                     x as i32 * 2 + pos.0 + 1,
                     pos.1 + maze_render_size.1 - 1,
-                    (true, false, true, false),
-                    (
-                        true,
-                        maze.get_cells()[floor as usize][maze.size().1 as usize - 1][x as usize]
-                            .get_wall(CellWall::Right),
-                        true,
-                        false,
-                    ),
+                    LineDir::Horizontal,
+                    if maze
+                        .get_cell(Dims3D(x, maze.size().1 - 1, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Right)
+                    {
+                        LineDir::ClosedBottom
+                    } else {
+                        LineDir::Horizontal
+                    },
                 );
             }
         }
@@ -590,41 +587,44 @@ impl App {
             }
 
             if ypos + 1 < size.1 {
-                draw_corner_single(
+                draw_line_double(
                     self,
                     pos.0,
-                    // y as i32 * 2 + pos.1 + 2,
                     ypos + 1,
-                    (
-                        false,
-                        true,
-                        maze.get_cells()[floor as usize][y as usize][0].get_wall(CellWall::Bottom),
-                        true,
-                    ),
+                    if maze
+                        .get_cell(Dims3D(0, y, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Bottom)
+                    {
+                        LineDir::ClosedLeft
+                    } else {
+                        LineDir::Vertical
+                    },
                 );
 
-                draw_corner_single(
+                draw_line_double(
                     self,
                     pos.0 + maze_render_size.0 - 1,
-                    // y as i32 * 2 + pos.1 + 2,
                     ypos + 1,
-                    (
-                        maze.get_cells()[floor as usize][y as usize][maze.size().0 as usize - 1]
-                            .get_wall(CellWall::Bottom),
-                        true,
-                        false,
-                        true,
-                    ),
+                    if maze
+                        .get_cell(Dims3D(maze.size().0 - 1, y, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Bottom)
+                    {
+                        LineDir::ClosedLeft
+                    } else {
+                        LineDir::Vertical
+                    },
                 );
             }
 
-            draw_corner_single(self, pos.0, ypos, (false, true, false, true));
+            draw_line_double(self, pos.0, ypos, LineDir::Vertical);
 
-            draw_corner_single(
+            draw_line_double(
                 self,
                 pos.0 + maze_render_size.0 - 1,
                 y as i32 * 2 + pos.1 + 1,
-                (false, true, false, true),
+                LineDir::Vertical,
             );
         }
 
@@ -642,28 +642,57 @@ impl App {
             }
         }
 
-        // drawing stairs
-        let draw_stairs = |renderer: &mut Renderer,
-                           cell: &Cell,
-                           style: ContentStyle,
-                           pos: (i32, i32),
-                           force_style: bool| {
+        // helper for drawing the stairs
+        let draw_stairs = |self_: &mut Self, cell: &Cell, stairs_pos: (i32, i32)| {
             if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-                ui::draw_char(renderer, pos.0, pos.1, '⥮', style);
+                ui::draw_char(
+                    &mut self_.renderer,
+                    stairs_pos.0,
+                    stairs_pos.1,
+                    '⥮',
+                    if player_pos.2 == floor
+                        && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
+                        && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
+                    {
+                        self_.settings.color_scheme.players()
+                    } else {
+                        self_.settings.color_scheme.normals()
+                    },
+                );
             } else if !cell.get_wall(CellWall::Up) {
                 ui::draw_char(
-                    renderer,
-                    pos.0,
-                    pos.1,
+                    &mut self_.renderer,
+                    stairs_pos.0,
+                    stairs_pos.1,
                     '↑',
-                    if ups_as_goal && !force_style {
-                        self.settings.color_scheme.goals()
+                    if player_pos.2 == floor
+                        && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
+                        && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
+                    {
+                        self_.settings.color_scheme.players()
                     } else {
-                        style
+                        if ups_as_goal {
+                            self_.settings.color_scheme.goals()
+                        } else {
+                            self_.settings.color_scheme.normals()
+                        }
                     },
                 );
             } else if !cell.get_wall(CellWall::Down) {
-                ui::draw_char(renderer, pos.0, pos.1, '↓', style);
+                ui::draw_char(
+                    &mut self_.renderer,
+                    stairs_pos.0,
+                    stairs_pos.1,
+                    '↓',
+                    if player_pos.2 == floor
+                        && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
+                        && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
+                    {
+                        self_.settings.color_scheme.players()
+                    } else {
+                        self_.settings.color_scheme.normals()
+                    },
+                );
             }
         };
 
@@ -677,34 +706,16 @@ impl App {
             for (ix, cell) in row.iter().enumerate() {
                 let xpos = ix as i32 * 2 + 1 + pos.0;
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
-                    ui::draw_str(
-                        &mut self.renderer,
-                        xpos + 1,
-                        ypos,
-                        helpers::double_line_corner(false, true, false, true),
-                        self.settings.color_scheme.normals(),
-                    );
+                    draw_line_double(self, xpos + 1, ypos, LineDir::Vertical);
                 }
                 if ypos + 1 < size.1 as i32 - 2
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
-                    ui::draw_str(
-                        &mut self.renderer,
-                        xpos,
-                        ypos + 1,
-                        helpers::double_line_corner(true, false, true, false),
-                        self.settings.color_scheme.normals(),
-                    );
+                    draw_line_double(self, xpos, ypos + 1, LineDir::Horizontal);
                 }
 
-                draw_stairs(
-                    &mut self.renderer,
-                    cell,
-                    self.settings.color_scheme.normals(),
-                    (xpos, ypos),
-                    false,
-                );
+                draw_stairs(self, cell, (xpos, ypos));
 
                 if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
                     continue;
@@ -717,12 +728,13 @@ impl App {
                         &mut self.renderer,
                         ix as i32 * 2 + 2 + pos.0,
                         iy as i32 * 2 + 2 + pos.1,
-                        helpers::double_line_corner(
+                        LineDir::double_line_bools(
                             cell.get_wall(CellWall::Bottom),
                             cell.get_wall(CellWall::Right),
                             cell2.get_wall(CellWall::Top),
                             cell2.get_wall(CellWall::Left),
-                        ),
+                        )
+                        .double_line(),
                         self.settings.color_scheme.normals(),
                     );
                 }
@@ -749,11 +761,9 @@ impl App {
             );
 
             draw_stairs(
-                &mut self.renderer,
+                self,
                 &maze.get_cells()[floor as usize][player_pos.1 as usize][player_pos.0 as usize],
-                self.settings.color_scheme.players(),
                 (player_pos.0 * 2 + 1 + pos.0, player_pos.1 * 2 + 1 + pos.1),
-                true,
             );
         }
 
