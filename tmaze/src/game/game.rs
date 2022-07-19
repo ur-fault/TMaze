@@ -99,7 +99,7 @@ impl App {
                 self.settings.color_scheme.texts(),
                 "TMaze",
                 &["New Game", "Settings", "Controls", "About", "Quit"],
-                0,
+                None,
                 true,
             ) {
                 Ok(res) => match res {
@@ -344,7 +344,7 @@ impl App {
                                 self.settings.color_scheme.texts(),
                                 "Paused",
                                 &["Resume", "Main Menu", "Quit"],
-                                0,
+                                None,
                                 false,
                             )? {
                                 1 => break Err(GameError::Back),
@@ -848,11 +848,7 @@ impl App {
                         )
                     })
                     .collect::<Vec<_>>(),
-                self.settings
-                    .mazes
-                    .iter()
-                    .position(|maze| maze.default)
-                    .unwrap_or(0),
+                self.settings.mazes.iter().position(|maze| maze.default),
                 false,
             )?,
             if self.settings.dont_ask_for_maze_algo {
@@ -868,8 +864,8 @@ impl App {
                     "Maze generation algorithm",
                     &["Randomized Kruskal's", "Depth-first search"],
                     match self.settings.default_maze_gen_algo {
-                        MazeGenAlgo::RandomKruskals => 0,
-                        MazeGenAlgo::DepthFirstSearch => 1,
+                        MazeGenAlgo::RandomKruskals => Some(0),
+                        MazeGenAlgo::DepthFirstSearch => Some(1),
                     },
                     true,
                 )? {

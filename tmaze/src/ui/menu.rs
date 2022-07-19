@@ -27,7 +27,7 @@ impl From<crossterm::ErrorKind> for MenuError {
     }
 }
 
-pub fn menu_size(title: &str, options: &[&str], counted: bool) -> Dims {
+pub fn menu_size(title: &str, options: &[String], counted: bool) -> Dims {
     match options.iter().map(|opt| opt.len()).max() {
         Some(l) => Dims(
             ((2 + if counted {
@@ -51,17 +51,31 @@ pub fn menu(
     text_style: ContentStyle,
     title: &str,
     options: &[&str],
-    default: usize,
+    default: Option<usize>,
     counted: bool,
 ) -> Result<u16, MenuError> {
-    let mut selected: usize = default;
+    let mut selected = default.unwrap_or(0);
     let opt_count = options.len();
 
     if opt_count == 0 {
         return Err(MenuError::EmptyMenu);
     }
 
-    render_menu(renderer, box_style, text_style, title, options, selected, counted)?;
+    let options = if default.is_some() {
+        options
+            .iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                format!("{} {}", if i == default.unwrap() { "▪" } else { " " }, opt)
+            })
+            .collect::<Vec<_>>()
+    } else {
+        options.iter().map(|opt| String::from(*opt)).collect::<Vec<_>>()
+    };
+
+    render_menu(
+        renderer, box_style, text_style, title, &options, selected, counted,
+    )?;
 
     loop {
         let event = read()?;
@@ -101,7 +115,9 @@ pub fn menu(
 
         renderer.event(&event);
 
-        render_menu(renderer, box_style, text_style, title, options, selected, counted)?;
+        render_menu(
+            renderer, box_style, text_style, title, &options, selected, counted,
+        )?;
     }
 }
 
@@ -111,11 +127,14 @@ pub fn choice_menu<'a, T>(
     text_style: ContentStyle,
     title: &str,
     options: &'a [(T, &str)],
-    default: usize,
+    default: Option<usize>,
     counted: bool,
 ) -> Result<&'a T, MenuError> {
     let _options: Vec<&str> = options.iter().map(|opt| opt.1).collect();
-    Ok(&options[menu(renderer, box_style, text_style, title, &_options, default, counted)? as usize].0)
+    Ok(&options[menu(
+        renderer, box_style, text_style, title, &_options, default, counted,
+    )? as usize]
+        .0)
 }
 
 pub fn render_menu(
@@ -123,11 +142,11 @@ pub fn render_menu(
     box_style: ContentStyle,
     text_style: ContentStyle,
     title: &str,
-    options: &[&str],
+    options: &[String],
     selected: usize,
     counted: bool,
 ) -> Result<(), CrosstermError> {
-    let menu_size = menu_size(title, options, counted);
+    let menu_size = menu_size(title, &options, counted);
     let pos = box_center_screen(menu_size)?;
     let opt_count = options.len();
 
@@ -136,7 +155,10 @@ pub fn render_menu(
     renderer.begin()?;
 
     {
-        let mut context = DrawContext { renderer, style: box_style };
+        let mut context = DrawContext {
+            renderer,
+            style: box_style,
+        };
 
         context.draw_box(pos, menu_size);
 
