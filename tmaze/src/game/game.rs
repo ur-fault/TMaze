@@ -2,7 +2,7 @@ use std::io::{stdout, Stdout};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cmaze::game::{Game, GameState};
+use cmaze::game::{Game, GameProperities, GameState};
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
@@ -172,7 +172,17 @@ impl App {
     }
 
     fn run_game(&mut self) -> Result<(), GameError> {
-        let game_props = self.get_game_properities()?;
+        let props = self.get_game_properities()?;
+        self.run_game_with_props(props)
+    }
+
+    fn run_game_with_props(
+        &mut self,
+        game_props: (
+            GameMode,
+            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+        ),
+    ) -> Result<(), GameError> {
         let (
             GameMode {
                 size: msize,
@@ -180,60 +190,17 @@ impl App {
             },
             _,
         ) = game_props;
+
         let mut game = {
             let mut last_progress = f64::MIN;
-            let game_res = Game::new((
-                game_props.0,
-                game_props.1,
-                Some(|done, all| {
-                    let current_progess = done as f64 / all as f64;
-                    // check for quit keys from user
-                    if let Ok(true) = poll(Duration::from_nanos(1)) {
-                        if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
-                            match code {
-                                KeyCode::Esc => {
-                                    return Err(ReportCallbackError::AbortGeneration(
-                                        GameError::Back,
-                                    ));
-                                }
-                                KeyCode::Char('q' | 'Q') => {
-                                    return Err(ReportCallbackError::AbortGeneration(
-                                        GameError::FullQuit,
-                                    ));
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                    if current_progess - last_progress > 0.01 {
-                        let res = ui::render_progress(
-                            &mut self.renderer,
-                            self.settings.color_scheme.normals(),
-                            self.settings.color_scheme.texts(),
-                            &format!(
-                                "Generating maze ({}x{}x{}) {}/{}",
-                                msize.0, msize.1, msize.2, done, all
-                            ),
-                            current_progess,
-                        );
-                        last_progress = current_progess;
+            let res = Game::new_threaded(GameProperities {
+                game_mode: game_props.0,
+                generator: game_props.1,
+            });
 
-                        if let Err(e) = res {
-                            Err(ReportCallbackError::ReportFunctionError(
-                                GameError::CrosstermError(e),
-                            ))
-                        } else {
-                            Ok(())
-                        }
-                    } else {
-                        Ok(())
-                    }
-                }),
-            ));
-
-            match game_res {
-                Ok(g) => g,
-                Err(GenerationError::InvalidSize(dims)) => {
+            let (handle, stop_flag, progress) = match res {
+                Ok(com) => com,
+                Err(GenerationErrorInstant::InvalidSize(dims)) => {
                     ui::popup(
                         &mut self.renderer,
                         self.settings.color_scheme.normals(),
@@ -244,14 +211,68 @@ impl App {
                             &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                         ],
                     )?;
-                    return Err(GameError::NewGame);
+                    return Err(GameError::EmptyMaze);
                 }
-                Err(GenerationError::ReportFunctionError(
-                    ReportCallbackError::ReportFunctionError(e),
-                )) => panic!("Unexpected error:\n{:?}", e),
-                Err(GenerationError::ReportFunctionError(
-                    ReportCallbackError::AbortGeneration(e),
-                )) => return Err(e),
+            };
+
+            for (done, from) in progress.iter() {
+                let current_progress = done as f64 / from as f64;
+
+                if let Ok(true) = poll(Duration::from_nanos(1)) {
+                    if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
+                        match code {
+                            KeyCode::Esc => {
+                                stop_flag.stop();
+                                let _ = handle.join().unwrap();
+                                return Err(GameError::Back);
+                            }
+                            KeyCode::Char('q' | 'Q') => {
+                                stop_flag.stop();
+                                let _ = handle.join().unwrap();
+                                return Err(GameError::FullQuit);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                if current_progress - last_progress > 0.0001 {
+                    last_progress = current_progress;
+                    ui::render_progress(
+                        &mut self.renderer,
+                        self.settings.color_scheme.normals(),
+                        self.settings.color_scheme.texts(),
+                        &format!(
+                            " Generating maze ({}x{}x{})... {:.2} % ",
+                            msize.0,
+                            msize.1,
+                            msize.2,
+                            current_progress * 100.0
+                        ),
+                        current_progress,
+                    )?;
+                }
+            }
+
+            match handle.join().unwrap() {
+                Ok(game) => game,
+                Err(GenerationErrorThreaded::GenerationError(
+                    GenerationErrorInstant::InvalidSize(dims),
+                )) => {
+                    ui::popup(
+                        &mut self.renderer,
+                        self.settings.color_scheme.normals(),
+                        self.settings.color_scheme.texts(),
+                        "Error",
+                        &[
+                            "Invalid maze size",
+                            &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
+                        ],
+                    )?;
+                    return Err(GameError::EmptyMaze);
+                }
+                Err(GenerationErrorThreaded::AbortGeneration) => return Err(GameError::Back),
+                Err(GenerationErrorThreaded::UnknownError(err)) => panic!("{:?}", err),
             }
         };
 
@@ -813,14 +834,12 @@ impl App {
         Ok(())
     }
 
-    fn get_game_properities<
-        T: FnMut(usize, usize) -> Result<(), ReportCallbackError<GameError, GameError>>,
-    >(
+    fn get_game_properities(
         &mut self,
     ) -> Result<
         (
             GameMode,
-            fn(Dims3D, bool, Option<T>) -> Result<Maze, GenerationError<GameError, GameError>>,
+            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
         ),
         GameError,
     > {

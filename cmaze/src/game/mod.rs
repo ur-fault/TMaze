@@ -1,7 +1,11 @@
 use crate::core::*;
-use crate::maze::{CellWall, GenerationError, Maze, ReportCallbackError};
-use core::fmt;
+use crate::maze::{
+    CellWall, GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeGeneratorComunication,
+    StopGenerationFlag,
+};
+use crossbeam::channel::Receiver;
 use pausable_clock::{PausableClock, PausableInstant};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -20,10 +24,15 @@ pub enum GameState {
     Quitted,
 }
 
-pub type GameProperities<R, A, T> = (
-    GameMode,                                                           // Game mode
-    fn(Dims3D, bool, Option<T>) -> Result<Maze, GenerationError<R, A>>, // Maze generator
-    Option<T>,                                                          // Maze generator callback
+pub struct GameProperities {
+    pub game_mode: GameMode,
+    pub generator: fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+}
+
+pub type GameConstructorComunication = (
+    JoinHandle<Result<Game, GenerationErrorThreaded>>,
+    StopGenerationFlag,
+    Receiver<(usize, usize)>,
 );
 
 pub struct Game {
@@ -39,39 +48,39 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new<R, A, T>(props: GameProperities<R, A, T>) -> Result<Game, GenerationError<R, A>>
-    where
-        R: fmt::Debug,
-        A: fmt::Debug,
-        T: FnMut(usize, usize) -> Result<(), ReportCallbackError<R, A>>,
-    {
-        let maze_mode = props.0;
-        let (
-            GameMode {
-                size: maze_size,
-                is_tower,
-            },
-            generation_func,
-            callback,
-        ) = props;
+    pub fn new_threaded(
+        props: GameProperities,
+    ) -> Result<GameConstructorComunication, GenerationErrorInstant> {
+        let GameProperities {
+            game_mode: maze_mode,
+            generator: generation_func,
+        } = props;
+
+        let GameMode {
+            size: maze_size,
+            is_tower,
+        } = maze_mode;
 
         let msize: Dims3D = Dims3D(maze_size.0, maze_size.1, maze_size.2);
 
         let player_pos = Dims3D(0, 0, 0);
         let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let maze = generation_func(msize, is_tower, callback)?;
+        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower)?;
 
-        Ok(Game {
-            maze,
-            state: GameState::NotStarted,
-            game_mode: maze_mode,
-            clock: None,
-            start: None,
-            player_pos,
-            goal_pos,
-            moves: vec![],
-        })
+        Ok((thread::spawn(move || {
+            let maze = maze_handle.join().unwrap()?;
+            Ok(Game {
+                maze,
+                state: GameState::NotStarted,
+                game_mode: maze_mode,
+                clock: None,
+                start: None,
+                player_pos,
+                goal_pos,
+                moves: vec![],
+            })
+        }), stop_flag, progress))
     }
 
     pub fn get_state(&self) -> GameState {

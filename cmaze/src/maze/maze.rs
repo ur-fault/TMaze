@@ -1,6 +1,6 @@
 use self::CellWall::*;
-use crate::maze::cell::{Cell, CellWall};
 use crate::core::*;
+use crate::maze::cell::{Cell, CellWall};
 
 pub struct Maze {
     pub(crate) cells: Vec<Vec<Vec<Cell>>>,
@@ -54,12 +54,12 @@ impl Maze {
 
     pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
         let offsets = [
-           Dims3D(-1, 0, 0),
-           Dims3D(1, 0, 0),
-           Dims3D(0, -1, 0),
-           Dims3D(0, 1, 0),
-           Dims3D(0, 0, -1),
-           Dims3D(0, 0, 1),
+            Dims3D(-1, 0, 0),
+            Dims3D(1, 0, 0),
+            Dims3D(0, -1, 0),
+            Dims3D(0, 1, 0),
+            Dims3D(0, 0, -1),
+            Dims3D(0, 0, 1),
         ];
         offsets
             .into_iter()
