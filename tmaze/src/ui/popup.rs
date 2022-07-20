@@ -10,11 +10,11 @@ use super::*;
 
 pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
     match texts.iter().map(|text| text.len()).max() {
-        Some(l) => (
+        Some(l) => Dims(
             2 + 2 + l.max(title.len()) as i32,
             2 + 2 + texts.len() as i32,
         ),
-        None => (4 + title.len() as i32, 3),
+        None => Dims(4 + title.len() as i32, 3),
     }
 }
 
@@ -47,7 +47,7 @@ pub fn render_popup(
     texts: &[&str],
 ) -> Result<(), CrosstermError> {
     let box_size = popup_size(title, texts);
-    let title_pos = box_center_screen((title.len() as i32 + 2, 1))?.0;
+    let title_pos = box_center_screen(Dims(title.len() as i32 + 2, 1))?.0;
     let pos = box_center_screen(box_size)?;
 
     renderer.begin()?;

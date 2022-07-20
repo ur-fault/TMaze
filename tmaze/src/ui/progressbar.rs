@@ -16,7 +16,7 @@ pub fn render_progress(
     title: &str,
     progress: f64,
 ) -> Result<(), CrosstermError> {
-    let progress_size = (title.len() as i32 + 2, 4);
+    let progress_size = Dims(title.len() as i32 + 2, 4);
     let pos = box_center_screen(progress_size)?;
 
     renderer.begin()?;

@@ -1,62 +1,110 @@
+use std::thread;
+
 use super::super::cell::Cell;
-use super::{Maze, MazeAlgorithm, ReportCallbackError, GenerationError};
-use crate::maze::CellWall;
+use super::{
+    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm,
+    MazeGeneratorComunication, StopGenerationFlag,
+};
 use crate::core::*;
+use crate::maze::CellWall;
+use crossbeam::channel::{unbounded, Sender};
+use crossbeam::scope;
 use rand::{seq::SliceRandom, thread_rng, Rng};
 use rayon::prelude::*;
-use std::fmt;
 
 pub struct DepthFirstSearch {}
 
-impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt::Debug {
-    fn generate<T: FnMut(usize, usize) -> Result<(), ReportCallbackError<R, A>>>(
+impl MazeAlgorithm for DepthFirstSearch {
+    fn generate(
         size: Dims3D,
         floored: bool,
-        mut report_progress: Option<T>,
-    ) -> Result<Maze, GenerationError<R, A>> {
+    ) -> Result<MazeGeneratorComunication, GenerationErrorInstant> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
-            return Err(GenerationError::InvalidSize(size));
+            return Err(GenerationErrorInstant::InvalidSize(size));
         }
 
-        let (w, h, d) = size;
+        let stop_flag = StopGenerationFlag::new();
+        let (s_progress, r_progress) = unbounded::<(usize, usize)>();
+
+        let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
-        Ok(Maze {
-            cells: if size.2 > 1 && floored {
-                let mut cells: Vec<_> = (0..d)
-                    .map(|_| {
-                        Ok(Self::generate_individual((w, h, 1), report_progress.as_mut())?
-                            .cells
-                            .remove(0))
-                    })
-                    .collect::<Result<_, GenerationError<R, A>>>()?;
+        let stop_flag_clone = stop_flag.clone();
 
-                for floor in 0..du - 1 {
-                    let (x, y) = (thread_rng().gen_range(0..wu), thread_rng().gen_range(0..hu));
-                    cells[floor][y][x].remove_wall(CellWall::Up);
-                    cells[floor + 1][y][x].remove_wall(CellWall::Down);
-                }
+        Ok((
+            thread::spawn(move || {
+                Ok(Maze {
+                    cells: if size.2 > 1 && floored {
+                        let mut cells: Vec<Vec<Vec<Cell>>> = (0..du)
+                            .map(|maze_i| {
+                                let (s, r) = unbounded::<(usize, usize)>();
 
-                cells
-            } else {
-                Self::generate_individual((w, h, d), report_progress.as_mut())
-                    .unwrap()
-                    .cells
-            },
-            width: wu,
-            height: hu,
-            depth: du,
-        })
+                                let s_progress = s_progress.clone();
+                                let stop_flag = stop_flag.clone();
+                                match scope(|scope| {
+                                    scope.spawn(move |_| {
+                                        for (done, from) in r.iter() {
+                                            s_progress
+                                                .send((done + maze_i * from, from * du))
+                                                .unwrap();
+                                        }
+                                    });
+
+                                    if stop_flag.is_stopped() {
+                                        return Err(GenerationErrorThreaded::AbortGeneration);
+                                    }
+
+                                    Self::generate_individual(Dims3D(w, h, 1), stop_flag, s)
+                                })
+                                .map(
+                                    |res| -> Result<Vec<Vec<Cell>>, GenerationErrorThreaded> {
+                                        Ok(res?.cells.remove(0))
+                                    },
+                                ) {
+                                    Ok(Ok(maze)) => Ok(maze),
+                                    Err(e) => Err(GenerationErrorThreaded::UnknownError(e)),
+                                    Ok(Err(e)) => Err(e),
+                                }
+                            })
+                            .collect::<Result<Vec<Vec<Vec<Cell>>>, GenerationErrorThreaded>>()?;
+
+                        for floor in 0..du - 1 {
+                            let (x, y) =
+                                (thread_rng().gen_range(0..wu), thread_rng().gen_range(0..hu));
+                            cells[floor][y][x].remove_wall(CellWall::Up);
+                            cells[floor + 1][y][x].remove_wall(CellWall::Down);
+                        }
+
+                        cells
+                    } else {
+                        Self::generate_individual(
+                            Dims3D(w, h, d),
+                            stop_flag.clone(),
+                            s_progress.clone(),
+                        )?
+                        .cells
+                    },
+                    width: wu,
+                    height: hu,
+                    depth: du,
+                })
+            }),
+            stop_flag_clone,
+            r_progress,
+        ))
     }
 
-    fn generate_individual<T: FnMut(usize, usize) -> Result<(), ReportCallbackError<R, A>>>(
+    fn generate_individual(
         size: Dims3D,
-        mut report_progress: Option<T>,
-    ) -> Result<Maze, GenerationError<R, A>> {
+        stopper: StopGenerationFlag,
+        progress: Sender<(usize, usize)>,
+    ) -> Result<Maze, GenerationErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
-            return Err(GenerationError::InvalidSize(size));
+            return Err(GenerationErrorThreaded::GenerationError(
+                GenerationErrorInstant::InvalidSize(size),
+            ));
         }
-        let (w, h, d) = size;
+        let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
         let cell_count = wu * hu * du;
 
@@ -69,7 +117,7 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
         for z in 0..d {
             for y in 0..h {
                 for x in 0..w {
-                    cells[z as usize][y as usize].push(Cell::new((x, y, z)));
+                    cells[z as usize][y as usize].push(Cell::new(Dims3D(x, y, z)));
                 }
             }
         }
@@ -81,7 +129,7 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
             depth: du,
         };
 
-        let mut current = (sx, sy, sz);
+        let mut current = Dims3D(sx, sy, sz);
         visited.push(current);
         stack.push(current);
         while !stack.is_empty() {
@@ -102,8 +150,10 @@ impl<R, A> MazeAlgorithm<R, A> for DepthFirstSearch where R: fmt::Debug, A: fmt:
                 stack.push(chosen);
             }
 
-            if let Some(_) = report_progress {
-                report_progress.as_mut().unwrap()(visited.len(), cell_count)?;
+            progress.send((visited.len(), cell_count)).unwrap();
+
+            if stopper.is_stopped() {
+                return Err(GenerationErrorThreaded::AbortGeneration);
             }
         }
 

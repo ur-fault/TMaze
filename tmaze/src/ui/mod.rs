@@ -43,8 +43,8 @@ impl From<crossterm::ErrorKind> for CrosstermError {
 pub fn box_center_screen(box_dims: Dims) -> Result<Dims, CrosstermError> {
     let size_u16 = size()?;
     Ok(helpers::box_center(
-        (0, 0),
-        (size_u16.0 as i32, size_u16.1 as i32),
+        Dims(0, 0),
+        Dims(size_u16.0 as i32, size_u16.1 as i32),
         box_dims,
     ))
 }
