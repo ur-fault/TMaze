@@ -11,3 +11,10 @@ rayon = "^1.5.3"
 thiserror = "1.0.31"
 pausable_clock = "^1.0.1"
 crossbeam = "^0.8.1"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "kruskals"
+harness = false

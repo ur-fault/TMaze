@@ -180,7 +180,7 @@ impl App {
         &mut self,
         game_props: (
             GameMode,
-            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+            fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
         ),
     ) -> Result<(), GameError> {
         let (
@@ -839,7 +839,7 @@ impl App {
     ) -> Result<
         (
             GameMode,
-            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+            fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
         ),
         GameError,
     > {

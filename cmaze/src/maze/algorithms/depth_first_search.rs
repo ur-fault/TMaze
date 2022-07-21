@@ -14,6 +14,7 @@ impl MazeAlgorithm for DepthFirstSearch {
         size: Dims3D,
         stopper: StopGenerationFlag,
         progress: Sender<(usize, usize)>,
+        use_rayon: bool,
     ) -> Result<Maze, GenerationErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(GenerationErrorThreaded::GenerationError(
@@ -50,12 +51,19 @@ impl MazeAlgorithm for DepthFirstSearch {
         stack.push(current);
         while !stack.is_empty() {
             current = stack.pop().unwrap();
-            let unvisited_neighbors = maze
-                .get_neighbors(current)
-                .into_par_iter()
-                .map(|cell| cell.get_coord())
-                .filter(|cell| !visited.contains(cell))
-                .collect::<Vec<_>>();
+            let unvisited_neighbors = if use_rayon {
+                maze.get_neighbors(current)
+                    .into_par_iter()
+                    .map(|cell| cell.get_coord())
+                    .filter(|cell| !visited.contains(cell))
+                    .collect::<Vec<_>>()
+            } else {
+                maze.get_neighbors(current)
+                    .into_iter()
+                    .map(|cell| cell.get_coord())
+                    .filter(|cell| !visited.contains(cell))
+                    .collect::<Vec<_>>()
+            };
 
             if !unvisited_neighbors.is_empty() {
                 stack.push(current);
