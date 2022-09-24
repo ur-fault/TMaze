@@ -65,12 +65,13 @@ pub fn menu(
         options
             .iter()
             .enumerate()
-            .map(|(i, opt)| {
-                format!("{} {}", if i == default.unwrap() { "▪" } else { " " }, opt)
-            })
+            .map(|(i, opt)| format!("{} {}", if i == default.unwrap() { "▪" } else { " " }, opt))
             .collect::<Vec<_>>()
     } else {
-        options.iter().map(|opt| String::from(*opt)).collect::<Vec<_>>()
+        options
+            .iter()
+            .map(|opt| String::from(*opt))
+            .collect::<Vec<_>>()
     };
 
     render_menu(
@@ -93,19 +94,23 @@ pub fn menu(
                     selected = (selected + 1) % opt_count
                 }
                 KeyCode::Enter | KeyCode::Char(' ') => return Ok(selected as u16),
-                KeyCode::Char(ch) => match ch {
-                    'q' | 'Q' => return Err(MenuError::FullQuit),
-                    '1' if counted && 1 <= opt_count => selected = 1 - 1,
-                    '2' if counted && 2 <= opt_count => selected = 2 - 1,
-                    '3' if counted && 3 <= opt_count => selected = 3 - 1,
-                    '4' if counted && 4 <= opt_count => selected = 4 - 1,
-                    '5' if counted && 5 <= opt_count => selected = 5 - 1,
-                    '6' if counted && 6 <= opt_count => selected = 6 - 1,
-                    '7' if counted && 7 <= opt_count => selected = 7 - 1,
-                    '8' if counted && 8 <= opt_count => selected = 8 - 1,
-                    '9' if counted && 9 <= opt_count => selected = 9 - 1,
-                    _ => {}
-                },
+                KeyCode::Char(ch) => {
+                    if counted {
+                        selected = match ch {
+                            'q' | 'Q' => return Err(MenuError::FullQuit),
+                            '1' if 1 <= opt_count => 1 - 1,
+                            '2' if 2 <= opt_count => 2 - 1,
+                            '3' if 3 <= opt_count => 3 - 1,
+                            '4' if 4 <= opt_count => 4 - 1,
+                            '5' if 5 <= opt_count => 5 - 1,
+                            '6' if 6 <= opt_count => 6 - 1,
+                            '7' if 7 <= opt_count => 7 - 1,
+                            '8' if 8 <= opt_count => 8 - 1,
+                            '9' if 9 <= opt_count => 9 - 1,
+                            _ => selected,
+                        }
+                    }
+                }
                 KeyCode::Esc => return Err(MenuError::Exit),
                 _ => {}
             },
