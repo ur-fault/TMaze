@@ -3,7 +3,10 @@ pub use crossterm::{
     terminal::size,
 };
 pub use masof::{Color, ContentStyle, Renderer};
+use pad::PadStr;
 use std::io::stdout;
+
+use crate::helpers::value_if;
 
 use super::draw::*;
 use super::*;
@@ -98,17 +101,10 @@ pub fn menu(
                     if counted {
                         selected = match ch {
                             'q' | 'Q' => return Err(MenuError::FullQuit),
-                            '1' if 1 <= opt_count => 1 - 1,
-                            '2' if 2 <= opt_count => 2 - 1,
-                            '3' if 3 <= opt_count => 3 - 1,
-                            '4' if 4 <= opt_count => 4 - 1,
-                            '5' if 5 <= opt_count => 5 - 1,
-                            '6' if 6 <= opt_count => 6 - 1,
-                            '7' if 7 <= opt_count => 7 - 1,
-                            '8' if 8 <= opt_count => 8 - 1,
-                            '9' if 9 <= opt_count => 9 - 1,
+                            '1'..='9' => ch as usize - '1' as usize,
                             _ => selected,
                         }
+                        .clamp(0, opt_count - 1);
                     }
                 }
                 KeyCode::Esc => return Err(MenuError::Exit),
@@ -192,17 +188,11 @@ pub fn render_menu(
                 &format!(
                     "{} {}{}",
                     if i == selected { ">" } else { " " },
-                    if counted {
-                        format!(
-                            "{}. {}",
-                            i + 1,
-                            " ".repeat(max_count - (i + 1).to_string().len())
-                        )
-                    } else {
-                        String::from("")
-                    },
-                    option
-                ),
+                    value_if(counted, || format!("{}.", i + 1)
+                        .pad_to_width((max_count as f64).log10().floor() as usize + 3)),
+                    option,
+                )
+                .pad_to_width(menu_size.0 as usize - 2),
                 style,
             );
         }

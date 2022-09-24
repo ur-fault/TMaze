@@ -17,6 +17,14 @@ pub fn maze_render_size(maze: &Maze) -> Dims {
     Dims((msize.0 * 2 + 1) as i32, (msize.1 * 2 + 1) as i32)
 }
 
+pub fn value_if<T: Default>(cond: bool, fun: impl FnOnce() -> T) -> T {
+    if cond {
+        fun()
+    } else {
+        T::default()
+    }
+}
+
 pub enum LineDir {
     Empty,
     Cross,
