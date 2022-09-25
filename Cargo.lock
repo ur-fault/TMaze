@@ -997,7 +997,7 @@ dependencies = [
 
 [[package]]
 name = "tmaze"
-version = "1.7.0"
+version = "1.7.2"
 dependencies = [
  "clap 3.2.13",
  "cmaze",
