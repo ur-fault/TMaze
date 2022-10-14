@@ -11,6 +11,7 @@ use crate::helpers::value_if;
 use super::draw::*;
 use super::*;
 
+#[derive(Debug)]
 pub enum MenuError {
     CrosstermError(CrosstermError),
     EmptyMenu,
