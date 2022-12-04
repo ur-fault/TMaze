@@ -6,17 +6,14 @@ use super::{
 use crate::core::*;
 use crossbeam::channel::Sender;
 use rand::{seq::SliceRandom, thread_rng};
-use rayon::prelude::*;
 use std::collections::HashSet;
 
 pub struct RndKruskals {}
-
 impl MazeAlgorithm for RndKruskals {
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
         progress: Sender<(usize, usize)>,
-        use_rayon: bool,
     ) -> Result<Maze, GenerationErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(GenerationErrorThreaded::GenerationError(
@@ -80,30 +77,20 @@ impl MazeAlgorithm for RndKruskals {
                 (wall.to_coord().2 + iz0),
             );
 
-            let set0_i = if use_rayon {
-                sets.par_iter()
-                    .position_any(|set| set.contains(&Dims3D(ix0, iy0, iz0)))
-                    .unwrap()
-            } else {
-                sets.iter()
-                    .position(|set| set.contains(&Dims3D(ix0, iy0, iz0)))
-                    .unwrap()
-            };
+            let set0_i = sets
+                .iter()
+                .position(|set| set.contains(&Dims3D(ix0, iy0, iz0)))
+                .unwrap();
 
             if sets[set0_i].contains(&Dims3D(ix1, iy1, iz1)) {
                 continue;
             }
 
-            let set1_i = if use_rayon {
-                sets.par_iter()
-                    .position_any(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
-                    .unwrap()
-            } else {
-                sets.iter()
-                    .position(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
-                    .unwrap()
-            };
-            
+            let set1_i = sets
+                .iter()
+                .position(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
+                .unwrap();
+
             cells[iz0 as usize][iy0 as usize][ix0 as usize].remove_wall(wall);
             cells[iz1 as usize][iy1 as usize][ix1 as usize].remove_wall(wall.reverse_wall());
             let set0 = sets.swap_remove(set0_i);

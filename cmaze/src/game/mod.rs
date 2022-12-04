@@ -27,7 +27,7 @@ pub enum GameState {
 pub struct GameProperities {
     pub game_mode: GameMode,
     pub generator:
-        fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+        fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
 }
 
 pub type GameConstructorComunication = (
@@ -67,7 +67,7 @@ impl Game {
         let player_pos = Dims3D(0, 0, 0);
         let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower, true)?;
+        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower)?;
 
         Ok((
             thread::spawn(move || {

@@ -63,7 +63,6 @@ pub trait MazeAlgorithm {
     fn generate(
         size: Dims3D,
         floored: bool,
-        use_rayon: bool,
     ) -> Result<MazeGeneratorComunication, GenerationErrorInstant> {
         if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
             return Err(GenerationErrorInstant::InvalidSize(size));
@@ -97,7 +96,7 @@ pub trait MazeAlgorithm {
                                     return Err(GenerationErrorThreaded::AbortGeneration);
                                 }
 
-                                Self::generate_individual(Dims3D(w, h, 1), stop_flag, s, use_rayon)
+                                Self::generate_individual(Dims3D(w, h, 1), stop_flag, s)
                             })
                             .map(|res| Ok(res?.cells.remove(0)))
                             {
@@ -120,7 +119,6 @@ pub trait MazeAlgorithm {
                         Dims3D(w, h, d),
                         stop_flag,
                         s_progress.clone(),
-                        use_rayon,
                     )?
                     .cells
                 };
@@ -141,6 +139,5 @@ pub trait MazeAlgorithm {
         size: Dims3D,
         stopper: StopGenerationFlag,
         progress: Sender<(usize, usize)>,
-        use_rayon: bool,
     ) -> Result<Maze, GenerationErrorThreaded>;
 }
