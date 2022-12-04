@@ -1,2 +1,3 @@
 [workspace]
-members = ["tmaze", "cmaze"]
+members = ["tmaze", "cmaze", "ui-examples"]
+default-members = ["tmaze", "cmaze"]

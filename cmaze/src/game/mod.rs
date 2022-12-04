@@ -26,7 +26,8 @@ pub enum GameState {
 
 pub struct GameProperities {
     pub game_mode: GameMode,
-    pub generator: fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+    pub generator:
+        fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
 }
 
 pub type GameConstructorComunication = (
@@ -66,21 +67,25 @@ impl Game {
         let player_pos = Dims3D(0, 0, 0);
         let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower)?;
+        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower, true)?;
 
-        Ok((thread::spawn(move || {
-            let maze = maze_handle.join().unwrap()?;
-            Ok(Game {
-                maze,
-                state: GameState::NotStarted,
-                game_mode: maze_mode,
-                clock: None,
-                start: None,
-                player_pos,
-                goal_pos,
-                moves: vec![],
-            })
-        }), stop_flag, progress))
+        Ok((
+            thread::spawn(move || {
+                let maze = maze_handle.join().unwrap()?;
+                Ok(Game {
+                    maze,
+                    state: GameState::NotStarted,
+                    game_mode: maze_mode,
+                    clock: None,
+                    start: None,
+                    player_pos,
+                    goal_pos,
+                    moves: vec![],
+                })
+            }),
+            stop_flag,
+            progress,
+        ))
     }
 
     pub fn get_state(&self) -> GameState {

@@ -180,7 +180,7 @@ impl App {
         &mut self,
         game_props: (
             GameMode,
-            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+            fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
         ),
     ) -> Result<(), GameError> {
         let (
@@ -490,21 +490,21 @@ impl App {
 
         self.renderer.begin()?;
 
-        let draw_line_double_duo = |self_: &mut App, x, y, l1: LineDir, l2: LineDir| {
+        let draw_line_double_duo = |self_: &mut App, pos: (i32, i32), l1: LineDir, l2: LineDir| {
             ui::draw_str(
                 &mut self_.renderer,
-                x,
-                y,
+                pos.0,
+                pos.1,
                 &format!("{}{}", l1.double_line(), l2.double_line(),),
                 self_.settings.color_scheme.normals(),
             )
         };
 
-        let draw_line_double = |self_: &mut App, x, y, l: LineDir| {
+        let draw_line_double = |self_: &mut App, pos: (i32, i32), l: LineDir| {
             ui::draw_str(
                 &mut self_.renderer,
-                x,
-                y,
+                pos.0,
+                pos.1,
                 &format!("{}", l.double_line(),),
                 self_.settings.color_scheme.normals(),
             )
@@ -512,17 +512,10 @@ impl App {
 
         // corners
         if pos.1 > 0 {
+            draw_line_double_duo(self, pos, LineDir::BottomRight, LineDir::Horizontal);
             draw_line_double_duo(
                 self,
-                pos.0,
-                pos.1,
-                LineDir::BottomRight,
-                LineDir::Horizontal,
-            );
-            draw_line_double_duo(
-                self,
-                pos.0 + maze_render_size.0 - 2,
-                pos.1,
+                (pos.0 + maze_render_size.0 - 2, pos.1),
                 LineDir::Horizontal,
                 LineDir::BottomLeft,
             );
@@ -531,28 +524,30 @@ impl App {
         if pos.1 + maze_render_size.1 - 2 < size.1 - 3 {
             draw_line_double(
                 self,
-                pos.0,
-                pos.1 + maze_render_size.1 - 2,
+                (pos.0, pos.1 + maze_render_size.1 - 2),
                 LineDir::Vertical,
             );
             draw_line_double(
                 self,
-                pos.0 + maze_render_size.0 - 1,
-                pos.1 + maze_render_size.1 - 2,
+                (
+                    pos.0 + maze_render_size.0 - 1,
+                    pos.1 + maze_render_size.1 - 2,
+                ),
                 LineDir::Vertical,
             );
         }
         if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
             draw_line_double(
                 self,
-                pos.0,
-                pos.1 + maze_render_size.1 - 1,
+                (pos.0, pos.1 + maze_render_size.1 - 1),
                 LineDir::TopRight,
             );
             draw_line_double_duo(
                 self,
-                pos.0 + maze_render_size.0 - 2,
-                pos.1 + maze_render_size.1 - 1,
+                (
+                    pos.0 + maze_render_size.0 - 2,
+                    pos.1 + maze_render_size.1 - 1,
+                ),
                 LineDir::Horizontal,
                 LineDir::TopLeft,
             );
@@ -562,8 +557,7 @@ impl App {
             if pos.1 > 0 {
                 draw_line_double_duo(
                     self,
-                    x as i32 * 2 + pos.0 + 1,
-                    pos.1,
+                    (x as i32 * 2 + pos.0 + 1, pos.1),
                     LineDir::Horizontal,
                     if maze
                         .get_cell(Dims3D(x, 0, floor))
@@ -580,8 +574,7 @@ impl App {
             if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
                 draw_line_double_duo(
                     self,
-                    x as i32 * 2 + pos.0 + 1,
-                    pos.1 + maze_render_size.1 - 1,
+                    (x as i32 * 2 + pos.0 + 1, pos.1 + maze_render_size.1 - 1),
                     LineDir::Horizontal,
                     if maze
                         .get_cell(Dims3D(x, maze.size().1 - 1, floor))
@@ -610,8 +603,7 @@ impl App {
             if ypos + 1 < size.1 {
                 draw_line_double(
                     self,
-                    pos.0,
-                    ypos + 1,
+                    (pos.0, ypos + 1),
                     if maze
                         .get_cell(Dims3D(0, y, floor))
                         .unwrap()
@@ -625,8 +617,7 @@ impl App {
 
                 draw_line_double(
                     self,
-                    pos.0 + maze_render_size.0 - 1,
-                    ypos + 1,
+                    (pos.0 + maze_render_size.0 - 1, ypos + 1),
                     if maze
                         .get_cell(Dims3D(maze.size().0 - 1, y, floor))
                         .unwrap()
@@ -639,12 +630,11 @@ impl App {
                 );
             }
 
-            draw_line_double(self, pos.0, ypos, LineDir::Vertical);
+            draw_line_double(self, (pos.0, ypos), LineDir::Vertical);
 
             draw_line_double(
                 self,
-                pos.0 + maze_render_size.0 - 1,
-                y as i32 * 2 + pos.1 + 1,
+                (pos.0 + maze_render_size.0 - 1, y as i32 * 2 + pos.1 + 1),
                 LineDir::Vertical,
             );
         }
@@ -727,13 +717,13 @@ impl App {
             for (ix, cell) in row.iter().enumerate() {
                 let xpos = ix as i32 * 2 + 1 + pos.0;
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
-                    draw_line_double(self, xpos + 1, ypos, LineDir::Vertical);
+                    draw_line_double(self, (xpos + 1, ypos), LineDir::Vertical);
                 }
                 if ypos + 1 < size.1 as i32 - 2
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
-                    draw_line_double(self, xpos, ypos + 1, LineDir::Horizontal);
+                    draw_line_double(self, (xpos, ypos + 1), LineDir::Horizontal);
                 }
 
                 draw_stairs(self, cell, (xpos, ypos));
@@ -839,7 +829,7 @@ impl App {
     ) -> Result<
         (
             GameMode,
-            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+            fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
         ),
         GameError,
     > {

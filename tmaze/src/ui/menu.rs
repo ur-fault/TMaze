@@ -3,11 +3,15 @@ pub use crossterm::{
     terminal::size,
 };
 pub use masof::{Color, ContentStyle, Renderer};
+use pad::PadStr;
 use std::io::stdout;
+
+use crate::helpers::value_if;
 
 use super::draw::*;
 use super::*;
 
+#[derive(Debug)]
 pub enum MenuError {
     CrosstermError(CrosstermError),
     EmptyMenu,
@@ -65,12 +69,13 @@ pub fn menu(
         options
             .iter()
             .enumerate()
-            .map(|(i, opt)| {
-                format!("{} {}", if i == default.unwrap() { "▪" } else { " " }, opt)
-            })
+            .map(|(i, opt)| format!("{} {}", if i == default.unwrap() { "▪" } else { " " }, opt))
             .collect::<Vec<_>>()
     } else {
-        options.iter().map(|opt| String::from(*opt)).collect::<Vec<_>>()
+        options
+            .iter()
+            .map(|opt| String::from(*opt))
+            .collect::<Vec<_>>()
     };
 
     render_menu(
@@ -93,19 +98,16 @@ pub fn menu(
                     selected = (selected + 1) % opt_count
                 }
                 KeyCode::Enter | KeyCode::Char(' ') => return Ok(selected as u16),
-                KeyCode::Char(ch) => match ch {
-                    'q' | 'Q' => return Err(MenuError::FullQuit),
-                    '1' if counted && 1 <= opt_count => selected = 1 - 1,
-                    '2' if counted && 2 <= opt_count => selected = 2 - 1,
-                    '3' if counted && 3 <= opt_count => selected = 3 - 1,
-                    '4' if counted && 4 <= opt_count => selected = 4 - 1,
-                    '5' if counted && 5 <= opt_count => selected = 5 - 1,
-                    '6' if counted && 6 <= opt_count => selected = 6 - 1,
-                    '7' if counted && 7 <= opt_count => selected = 7 - 1,
-                    '8' if counted && 8 <= opt_count => selected = 8 - 1,
-                    '9' if counted && 9 <= opt_count => selected = 9 - 1,
-                    _ => {}
-                },
+                KeyCode::Char(ch) => {
+                    if counted {
+                        selected = match ch {
+                            'q' | 'Q' => return Err(MenuError::FullQuit),
+                            '1'..='9' => ch as usize - '1' as usize,
+                            _ => selected,
+                        }
+                        .clamp(0, opt_count - 1);
+                    }
+                }
                 KeyCode::Esc => return Err(MenuError::Exit),
                 _ => {}
             },
@@ -187,17 +189,11 @@ pub fn render_menu(
                 &format!(
                     "{} {}{}",
                     if i == selected { ">" } else { " " },
-                    if counted {
-                        format!(
-                            "{}. {}",
-                            i + 1,
-                            " ".repeat(max_count - (i + 1).to_string().len())
-                        )
-                    } else {
-                        String::from("")
-                    },
-                    option
-                ),
+                    value_if(counted, || format!("{}.", i + 1)
+                        .pad_to_width((max_count as f64).log10().floor() as usize + 3)),
+                    option,
+                )
+                .pad_to_width(menu_size.0 as usize - 2),
                 style,
             );
         }

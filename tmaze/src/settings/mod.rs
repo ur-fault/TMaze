@@ -179,7 +179,7 @@ impl Settings {
             match ron::de::from_str(&settings_string) {
                 Ok(settings) => settings,
                 Err(err) => {
-                    panic!("Invalid settings file, {}", err);
+                    panic!("Error reading settings file ({:?}), {}", path, err);
                 }
             }
         } else {

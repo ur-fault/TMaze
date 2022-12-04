@@ -10,10 +10,10 @@ pub use substring::Substring;
 use crate::helpers;
 use crate::core::*;
 
-mod draw;
-mod menu;
-mod popup;
-mod progressbar;
+pub mod draw;
+pub mod menu;
+pub mod popup;
+pub mod progressbar;
 
 pub use draw::*;
 pub use menu::*;
