@@ -97,4 +97,12 @@ impl Maze {
             None
         }
     }
+
+    pub fn get_cell_mut(&mut self, pos: Dims3D) -> Option<&mut Cell> {
+        if self.is_in_bounds(pos) {
+            Some(&mut self.cells[pos.2 as usize][pos.1 as usize][pos.0 as usize])
+        } else {
+            None
+        }
+    }
 }
