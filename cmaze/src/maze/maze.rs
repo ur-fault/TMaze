@@ -40,15 +40,15 @@ impl Maze {
         self.is_valid_neighbor(cell, neighbor_offset)
     }
 
-    pub fn which_wall(cell: Dims3D, cell2: Dims3D) -> CellWall {
+    pub fn which_wall_between(cell: Dims3D, cell2: Dims3D) -> Option<CellWall> {
         match (cell.0 - cell2.0, cell.1 - cell2.1, cell.2 - cell2.2) {
-            (-1, 0, 0) => Right,
-            (1, 0, 0) => Left,
-            (0, -1, 0) => Bottom,
-            (0, 1, 0) => Top,
-            (0, 0, 1) => Down,
-            (0, 0, -1) => Up,
-            _ => panic!(),
+            (-1, 0, 0) => Some(Right),
+            (1, 0, 0) => Some(Left),
+            (0, -1, 0) => Some(Bottom),
+            (0, 1, 0) => Some(Top),
+            (0, 0, 1) => Some(Down),
+            (0, 0, -1) => Some(Up),
+            _ => None,
         }
     }
 

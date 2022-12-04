@@ -59,7 +59,7 @@ impl MazeAlgorithm for DepthFirstSearch {
             if !unvisited_neighbors.is_empty() {
                 stack.push(current);
                 let chosen = *unvisited_neighbors.choose(&mut rand::thread_rng()).unwrap();
-                let chosen_wall = Maze::which_wall(current, chosen);
+                let chosen_wall = Maze::which_wall_between(current, chosen).unwrap();
                 maze.remove_wall(current, chosen_wall);
                 visited.push(chosen);
                 stack.push(chosen);
