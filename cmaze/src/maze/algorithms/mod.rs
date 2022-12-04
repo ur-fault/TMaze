@@ -1,16 +1,19 @@
 mod depth_first_search;
 mod rnd_kruskals;
 
-use super::{Maze, Cell, CellWall};
+use super::{Cell, CellWall, Maze};
 pub use crate::core::*;
-use crossbeam::{channel::{Receiver, Sender, unbounded}, scope};
+use crossbeam::{
+    channel::{unbounded, Receiver, Sender},
+    scope,
+};
 pub use depth_first_search::DepthFirstSearch;
 use rand::{thread_rng, Rng};
 pub use rnd_kruskals::RndKruskals;
 use std::{
     any::Any,
     sync::{Arc, RwLock},
-    thread::{JoinHandle, self},
+    thread::{self, JoinHandle},
 };
 
 #[derive(Debug)]
@@ -96,11 +99,8 @@ pub trait MazeAlgorithm {
 
                                 Self::generate_individual(Dims3D(w, h, 1), stop_flag, s, use_rayon)
                             })
-                            .map(
-                                |res| -> Result<Vec<Vec<Cell>>, GenerationErrorThreaded> {
-                                    Ok(res?.cells.remove(0))
-                                },
-                            ) {
+                            .map(|res| Ok(res?.cells.remove(0)))
+                            {
                                 Ok(Ok(maze)) => Ok(maze),
                                 Err(e) => Err(GenerationErrorThreaded::UnknownError(e)),
                                 Ok(Err(e)) => Err(e),
@@ -116,7 +116,13 @@ pub trait MazeAlgorithm {
 
                     cells
                 } else {
-                    Self::generate_individual(Dims3D(w, h, d), stop_flag, s_progress.clone(), use_rayon)?.cells
+                    Self::generate_individual(
+                        Dims3D(w, h, d),
+                        stop_flag,
+                        s_progress.clone(),
+                        use_rayon,
+                    )?
+                    .cells
                 };
 
                 Ok(Maze {
