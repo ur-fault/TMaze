@@ -13,7 +13,7 @@ substring = "^1.4.5"
 serde = {version = "^1.0.136", features = ["derive"]}
 pausable_clock = "^1.0.1"
 dirs = "^4.0.0"
-ron = "^0.7"
-clap = { version = "^3.2.2", features = ["derive"] }
+ron = "0.8.0"
+clap = { version = "4.0.29", features = ["derive"] }
 cmaze = { path = "../cmaze"}
 pad = "0.1.6"
