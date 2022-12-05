@@ -29,6 +29,12 @@ pub struct GameProperities {
     pub generator: fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
 }
 
+pub enum MoveMode {
+    Slow,
+    Normal,
+    Fast,
+}
+
 pub type GameConstructorComunication = (
     JoinHandle<Result<Game, GenerationErrorThreaded>>,
     StopGenerationFlag,
@@ -131,44 +137,55 @@ impl Game {
     pub fn move_player(
         &mut self,
         dir: CellWall,
-        slow: bool,
+        move_mode: MoveMode,
         tower_auto_up: bool,
     ) -> Result<(Dims3D, usize), GameNotRunningError> {
         self.check_running()?;
 
-        if slow {
-            return if self.maze.get_cell(self.player_pos).unwrap().get_wall(dir) {
-                Ok((self.player_pos, 0))
-            } else {
+        let mut count = 0;
+
+        match move_mode {
+            MoveMode::Slow => {
+                return if self.maze.get_cell(self.player_pos).unwrap().get_wall(dir) {
+                    Ok((self.player_pos, 0))
+                } else {
+                    self.moves.push((self.player_pos, dir));
+                    self.player_pos += dir.to_coord();
+                    Ok((self.player_pos, 1))
+                }
+            }
+
+            MoveMode::Fast => {
+                while !self.maze.get_cell(self.player_pos).unwrap().get_wall(dir) {
+                    self.moves.push((self.player_pos, dir));
+                    self.player_pos += dir.to_coord();
+                    count += 1;
+                }
+            }
+
+            MoveMode::Normal => loop {
+                let mut cell = self.maze.get_cell(self.player_pos).unwrap();
+
+                if cell.get_wall(dir) {
+                    break;
+                }
+
+                count += 1;
+
                 self.moves.push((self.player_pos, dir));
                 self.player_pos += dir.to_coord();
-                Ok((self.player_pos, 1))
-            };
-        }
 
-        let mut count = 0;
-        loop {
-            let mut cell = self.maze.get_cell(self.player_pos).unwrap();
+                cell = self.maze.get_cell(self.player_pos).unwrap();
 
-            if cell.get_wall(dir) {
-                break;
-            }
-
-            count += 1;
-
-            self.moves.push((self.player_pos, dir));
-            self.player_pos += dir.to_coord();
-
-            cell = self.maze.get_cell(self.player_pos).unwrap();
-
-            let perps = dir.perpendicular_walls();
-            if !cell.get_wall(perps.0)
-                || !cell.get_wall(perps.1)
-                || !cell.get_wall(perps.2)
-                || !cell.get_wall(perps.3)
-            {
-                break;
-            }
+                let perps = dir.perpendicular_walls();
+                if !cell.get_wall(perps.0)
+                    || !cell.get_wall(perps.1)
+                    || !cell.get_wall(perps.2)
+                    || !cell.get_wall(perps.3)
+                {
+                    break;
+                }
+            },
         }
 
         if tower_auto_up

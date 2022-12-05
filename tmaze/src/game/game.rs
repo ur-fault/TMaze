@@ -2,7 +2,8 @@ use std::io::{stdout, Stdout};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cmaze::game::{Game, GameProperities, GameState};
+use cmaze::game::{Game, GameProperities, GameState, MoveMode};
+use crossterm::event::KeyModifiers;
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
@@ -308,7 +309,7 @@ impl App {
             if let Ok(true) = poll(Duration::from_millis(90)) {
                 let event = read();
 
-                let mut apply_move = |wall: CellWall| {
+                let mut apply_move = |wall: CellWall, fast: bool| {
                     if spectator {
                         let cam_off = wall.reverse_wall().to_coord() + camera_offset;
 
@@ -323,7 +324,15 @@ impl App {
                     } else {
                         game.move_player(
                             wall,
-                            self.settings.slow,
+                            if self.settings.slow {
+                                MoveMode::Slow
+                            } else {
+                                if fast {
+                                    MoveMode::Fast
+                                } else {
+                                    MoveMode::Normal
+                                }
+                            },
                             !self.settings.disable_tower_auto_up,
                         )
                         .unwrap();
@@ -331,24 +340,24 @@ impl App {
                 };
 
                 match event {
-                    Ok(Event::Key(KeyEvent { code, modifiers: _ })) => match code {
+                    Ok(Event::Key(KeyEvent { code, modifiers })) => match code {
                         KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                            apply_move(CellWall::Top);
+                            apply_move(CellWall::Top, modifiers.contains(KeyModifiers::SHIFT));
                         }
                         KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                            apply_move(CellWall::Bottom);
+                            apply_move(CellWall::Bottom, modifiers.contains(KeyModifiers::SHIFT));
                         }
                         KeyCode::Left | KeyCode::Char('a' | 'A') => {
-                            apply_move(CellWall::Left);
+                            apply_move(CellWall::Left, modifiers.contains(KeyModifiers::SHIFT));
                         }
                         KeyCode::Right | KeyCode::Char('d' | 'D') => {
-                            apply_move(CellWall::Right);
+                            apply_move(CellWall::Right, modifiers.contains(KeyModifiers::SHIFT));
                         }
                         KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
-                            apply_move(CellWall::Down);
+                            apply_move(CellWall::Down, modifiers.contains(KeyModifiers::SHIFT));
                         }
                         KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
-                            apply_move(CellWall::Up);
+                            apply_move(CellWall::Up, modifiers.contains(KeyModifiers::SHIFT));
                         }
                         KeyCode::Char(' ') => {
                             if spectator {
