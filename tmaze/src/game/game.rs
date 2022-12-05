@@ -31,6 +31,7 @@ impl From<MenuError> for GameError {
     fn from(error: MenuError) -> Self {
         match error {
             MenuError::CrosstermError(error) => Self::CrosstermError(error),
+            // TODO: this shouldn't be EmptyMaze or at least it doesn't make sense
             MenuError::EmptyMenu => Self::EmptyMaze,
             MenuError::Exit => Self::Back,
             MenuError::FullQuit => Self::FullQuit,
