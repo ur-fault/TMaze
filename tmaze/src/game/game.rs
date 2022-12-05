@@ -633,7 +633,7 @@ impl App {
                         .unwrap()
                         .get_wall(CellWall::Bottom)
                     {
-                        LineDir::ClosedLeft
+                        LineDir::ClosedRight
                     } else {
                         LineDir::Vertical
                     },
