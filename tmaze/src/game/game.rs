@@ -601,7 +601,7 @@ impl App {
                 continue;
             }
 
-            if ypos + 1 < size.1 {
+            if ypos + 3 < size.1 {
                 draw_line_double(
                     self,
                     (pos.0, ypos + 1),
@@ -631,13 +631,15 @@ impl App {
                 );
             }
 
-            draw_line_double(self, (pos.0, ypos), LineDir::Vertical);
+            if ypos + 1 < size.1 {
+                draw_line_double(self, (pos.0, ypos), LineDir::Vertical);
 
-            draw_line_double(
-                self,
-                (pos.0 + maze_render_size.0 - 1, y as i32 * 2 + pos.1 + 1),
-                LineDir::Vertical,
-            );
+                draw_line_double(
+                    self,
+                    (pos.0 + maze_render_size.0 - 1, y as i32 * 2 + pos.1 + 1),
+                    LineDir::Vertical,
+                );
+            }
         }
 
         // Drawing visited places (moves)
