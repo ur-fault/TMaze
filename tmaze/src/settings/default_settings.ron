@@ -18,10 +18,10 @@ Settings (
     //  - white
     //  - grey
     color_scheme: ColorScheme (
-        normal: "white",
-        player: "green",
-        goal: "dark_yellow",
-        text: "white",
+        normal: "black",
+        player: "red",
+        goal: "yellow",
+        text: "grey",
     ),
 
     // player will move only one space at the time,
