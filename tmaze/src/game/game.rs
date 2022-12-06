@@ -478,6 +478,11 @@ impl App {
             (pos.0 + camera_offset.0 * 2, pos.1 + camera_offset.1 * 2)
         };
 
+        let normal_style = self.settings.get_color_scheme().normals();
+        let text_style = self.settings.get_color_scheme().texts();
+        let player_style = self.settings.get_color_scheme().players();
+        let goal_style = self.settings.get_color_scheme().goals();
+
         let floor = player_pos.2 + camera_offset.2;
 
         self.renderer.begin()?;
@@ -488,7 +493,7 @@ impl App {
                 pos.0,
                 pos.1,
                 &format!("{}{}", l1.double_line(), l2.double_line(),),
-                self_.settings.get_color_scheme().normals(),
+                normal_style,
             )
         };
 
@@ -498,7 +503,7 @@ impl App {
                 pos.0,
                 pos.1,
                 &format!("{}", l.double_line(),),
-                self_.settings.get_color_scheme().normals(),
+                normal_style,
             )
         };
 
@@ -659,9 +664,9 @@ impl App {
                         && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
                         && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
                     {
-                        self_.settings.get_color_scheme().players()
+                        player_style
                     } else {
-                        self_.settings.get_color_scheme().normals()
+                        normal_style
                     },
                 );
             } else if !cell.get_wall(CellWall::Up) {
@@ -674,12 +679,12 @@ impl App {
                         && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
                         && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
                     {
-                        self_.settings.get_color_scheme().players()
+                        player_style
                     } else {
                         if ups_as_goal {
-                            self_.settings.get_color_scheme().goals()
+                            goal_style
                         } else {
-                            self_.settings.get_color_scheme().normals()
+                            normal_style
                         }
                     },
                 );
@@ -693,9 +698,9 @@ impl App {
                         && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
                         && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
                     {
-                        self_.settings.get_color_scheme().players()
+                        player_style
                     } else {
-                        self_.settings.get_color_scheme().normals()
+                        normal_style
                     },
                 );
             }
@@ -752,7 +757,7 @@ impl App {
                 goal_pos.0 * 2 + 1 + pos.0,
                 goal_pos.1 * 2 + 1 + pos.1,
                 constants::GOAL_CHAR,
-                self.settings.get_color_scheme().goals(),
+                goal_style,
             );
         }
 
@@ -762,7 +767,7 @@ impl App {
                 player_pos.0 * 2 + 1 + pos.0,
                 player_pos.1 * 2 + 1 + pos.1,
                 player_char,
-                self.settings.get_color_scheme().players(),
+                player_style,
             );
 
             draw_stairs(
@@ -789,28 +794,28 @@ impl App {
             str_pos_tl.0,
             str_pos_tl.1,
             texts.0,
-            self.settings.get_color_scheme().texts(),
+            text_style,
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_tr.0,
             str_pos_tr.1,
             texts.1,
-            self.settings.get_color_scheme().texts(),
+            text_style,
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_bl.0,
             str_pos_bl.1,
             texts.2,
-            self.settings.get_color_scheme().texts(),
+            text_style,
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_br.0,
             str_pos_br.1,
             texts.3,
-            self.settings.get_color_scheme().texts(),
+            text_style,
         );
 
         self.renderer.end(&mut self.stdout)?;
