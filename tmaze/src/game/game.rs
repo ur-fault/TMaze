@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::io::{stdout, Stdout};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -14,7 +15,7 @@ use crate::helpers::{constants, LineDir};
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
-use crate::ui::MenuError;
+use crate::ui::{DrawContext, MenuError};
 use crate::{helpers, ui, ui::CrosstermError};
 use cmaze::core::*;
 use dirs::preference_dir;
@@ -483,35 +484,50 @@ impl App {
         let player_style = self.settings.get_color_scheme().players();
         let goal_style = self.settings.get_color_scheme().goals();
 
-        let floor = player_pos.2 + camera_offset.2;
-
         self.renderer.begin()?;
+        let renderer_cell = RefCell::new(&mut self.renderer);
 
-        let draw_line_double_duo = |self_: &mut App, pos: (i32, i32), l1: LineDir, l2: LineDir| {
-            ui::draw_str(
-                &mut self_.renderer,
-                pos.0,
-                pos.1,
-                &format!("{}{}", l1.double_line(), l2.double_line(),),
-                normal_style,
-            )
+        let mut normal_context = DrawContext {
+            renderer: &renderer_cell,
+            style: normal_style,
+        };
+        let mut text_context = DrawContext {
+            renderer: &renderer_cell,
+            style: text_style,
+        };
+        let mut player_context = DrawContext {
+            renderer: &renderer_cell,
+            style: player_style,
+        };
+        let mut goal_context = DrawContext {
+            renderer: &renderer_cell,
+            style: goal_style,
         };
 
-        let draw_line_double = |self_: &mut App, pos: (i32, i32), l: LineDir| {
-            ui::draw_str(
-                &mut self_.renderer,
-                pos.0,
-                pos.1,
-                &format!("{}", l.double_line(),),
-                normal_style,
-            )
+        let floor = player_pos.2 + camera_offset.2;
+
+        let draw_line_double_duo =
+            |context: &mut DrawContext, pos: (i32, i32), l1: LineDir, l2: LineDir| {
+                context.draw_str(
+                    pos.into(),
+                    &format!("{}{}", l1.double_line(), l2.double_line(),),
+                )
+            };
+
+        let draw_line_double = |context: &mut DrawContext, pos: (i32, i32), l: LineDir| {
+            context.draw_str(pos.into(), l.double_line())
         };
 
         // corners
         if pos.1 > 0 {
-            draw_line_double_duo(self, pos, LineDir::BottomRight, LineDir::Horizontal);
             draw_line_double_duo(
-                self,
+                &mut normal_context,
+                pos,
+                LineDir::BottomRight,
+                LineDir::Horizontal,
+            );
+            draw_line_double_duo(
+                &mut normal_context,
                 (pos.0 + maze_render_size.0 - 2, pos.1),
                 LineDir::Horizontal,
                 LineDir::BottomLeft,
@@ -520,12 +536,12 @@ impl App {
 
         if pos.1 + maze_render_size.1 - 2 < size.1 - 3 {
             draw_line_double(
-                self,
+                &mut normal_context,
                 (pos.0, pos.1 + maze_render_size.1 - 2),
                 LineDir::Vertical,
             );
             draw_line_double(
-                self,
+                &mut normal_context,
                 (
                     pos.0 + maze_render_size.0 - 1,
                     pos.1 + maze_render_size.1 - 2,
@@ -535,12 +551,12 @@ impl App {
         }
         if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
             draw_line_double(
-                self,
+                &mut normal_context,
                 (pos.0, pos.1 + maze_render_size.1 - 1),
                 LineDir::TopRight,
             );
             draw_line_double_duo(
-                self,
+                &mut normal_context,
                 (
                     pos.0 + maze_render_size.0 - 2,
                     pos.1 + maze_render_size.1 - 1,
@@ -553,7 +569,7 @@ impl App {
         for x in 0..maze.size().0 - 1 {
             if pos.1 > 0 {
                 draw_line_double_duo(
-                    self,
+                    &mut normal_context,
                     (x as i32 * 2 + pos.0 + 1, pos.1),
                     LineDir::Horizontal,
                     if maze
@@ -570,7 +586,7 @@ impl App {
 
             if pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
                 draw_line_double_duo(
-                    self,
+                    &mut normal_context,
                     (x as i32 * 2 + pos.0 + 1, pos.1 + maze_render_size.1 - 1),
                     LineDir::Horizontal,
                     if maze
@@ -599,7 +615,7 @@ impl App {
 
             if ypos + 3 < size.1 {
                 draw_line_double(
-                    self,
+                    &mut normal_context,
                     (pos.0, ypos + 1),
                     if maze
                         .get_cell(Dims3D(0, y, floor))
@@ -613,7 +629,7 @@ impl App {
                 );
 
                 draw_line_double(
-                    self,
+                    &mut normal_context,
                     (pos.0 + maze_render_size.0 - 1, ypos + 1),
                     if maze
                         .get_cell(Dims3D(maze.size().0 - 1, y, floor))
@@ -628,10 +644,10 @@ impl App {
             }
 
             if ypos + 1 < size.1 {
-                draw_line_double(self, (pos.0, ypos), LineDir::Vertical);
+                draw_line_double(&mut normal_context, (pos.0, ypos), LineDir::Vertical);
 
                 draw_line_double(
-                    self,
+                    &mut normal_context,
                     (pos.0 + maze_render_size.0 - 1, y as i32 * 2 + pos.1 + 1),
                     LineDir::Vertical,
                 );
@@ -642,69 +658,9 @@ impl App {
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
                 let real_pos = helpers::from_maze_to_real(*move_pos);
-                ui::draw_char(
-                    &mut self.renderer,
-                    pos.0 + real_pos.0,
-                    pos.1 + real_pos.1,
-                    '.',
-                    self.settings.get_color_scheme().normals(),
-                );
+                normal_context.draw_char(Dims::from(pos) + real_pos, '.');
             }
         }
-
-        // helper for drawing the stairs
-        let draw_stairs = |self_: &mut Self, cell: &Cell, stairs_pos: (i32, i32)| {
-            if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-                ui::draw_char(
-                    &mut self_.renderer,
-                    stairs_pos.0,
-                    stairs_pos.1,
-                    '⥮',
-                    if player_pos.2 == floor
-                        && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
-                        && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
-                    {
-                        player_style
-                    } else {
-                        normal_style
-                    },
-                );
-            } else if !cell.get_wall(CellWall::Up) {
-                ui::draw_char(
-                    &mut self_.renderer,
-                    stairs_pos.0,
-                    stairs_pos.1,
-                    '↑',
-                    if player_pos.2 == floor
-                        && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
-                        && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
-                    {
-                        player_style
-                    } else {
-                        if ups_as_goal {
-                            goal_style
-                        } else {
-                            normal_style
-                        }
-                    },
-                );
-            } else if !cell.get_wall(CellWall::Down) {
-                ui::draw_char(
-                    &mut self_.renderer,
-                    stairs_pos.0,
-                    stairs_pos.1,
-                    '↓',
-                    if player_pos.2 == floor
-                        && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
-                        && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
-                    {
-                        player_style
-                    } else {
-                        normal_style
-                    },
-                );
-            }
-        };
 
         // drawing maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
@@ -716,16 +672,25 @@ impl App {
             for (ix, cell) in row.iter().enumerate() {
                 let xpos = ix as i32 * 2 + 1 + pos.0;
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
-                    draw_line_double(self, (xpos + 1, ypos), LineDir::Vertical);
+                    draw_line_double(&mut normal_context, (xpos + 1, ypos), LineDir::Vertical);
                 }
                 if ypos + 1 < size.1 as i32 - 2
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
-                    draw_line_double(self, (xpos, ypos + 1), LineDir::Horizontal);
+                    draw_line_double(&mut normal_context, (xpos, ypos + 1), LineDir::Horizontal);
                 }
 
-                draw_stairs(self, cell, (xpos, ypos));
+                Self::draw_stairs(
+                    &mut normal_context,
+                    &mut player_context,
+                    &mut goal_context,
+                    cell,
+                    (xpos, ypos),
+                    floor,
+                    player_pos,
+                    ups_as_goal,
+                );
 
                 if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
                     continue;
@@ -734,46 +699,42 @@ impl App {
                 let cell2 = &maze.get_cells()[floor as usize][iy + 1][ix + 1];
 
                 if ypos < size.1 as i32 - 3 {
-                    ui::draw_str(
-                        &mut self.renderer,
-                        ix as i32 * 2 + 2 + pos.0,
-                        iy as i32 * 2 + 2 + pos.1,
+                    draw_line_double(
+                        &mut normal_context,
+                        (xpos + 1, ypos + 1),
                         LineDir::double_line_bools(
                             cell.get_wall(CellWall::Bottom),
                             cell.get_wall(CellWall::Right),
                             cell2.get_wall(CellWall::Top),
                             cell2.get_wall(CellWall::Left),
-                        )
-                        .double_line(),
-                        self.settings.get_color_scheme().normals(),
+                        ),
                     );
                 }
             }
         }
 
         if floor == goal_pos.2 {
-            ui::draw_char(
-                &mut self.renderer,
-                goal_pos.0 * 2 + 1 + pos.0,
-                goal_pos.1 * 2 + 1 + pos.1,
+            goal_context.draw_char(
+                Dims::from(goal_pos) * 2 + pos.into() + Dims(1, 1),
                 constants::GOAL_CHAR,
-                goal_style,
             );
         }
 
         if floor == player_pos.2 {
-            ui::draw_char(
-                &mut self.renderer,
-                player_pos.0 * 2 + 1 + pos.0,
-                player_pos.1 * 2 + 1 + pos.1,
+            player_context.draw_char(
+                Dims::from(player_pos) * 2 + pos.into() + Dims(1, 1),
                 player_char,
-                player_style,
             );
 
-            draw_stairs(
-                self,
+            Self::draw_stairs(
+                &mut normal_context,
+                &mut player_context,
+                &mut goal_context,
                 &maze.get_cells()[floor as usize][player_pos.1 as usize][player_pos.0 as usize],
                 (player_pos.0 * 2 + 1 + pos.0, player_pos.1 * 2 + 1 + pos.1),
+                floor,
+                player_pos,
+                ups_as_goal,
             );
         }
 
@@ -789,38 +750,48 @@ impl App {
             size.1 as i32 - 2,
         );
 
-        ui::draw_str(
-            &mut self.renderer,
-            str_pos_tl.0,
-            str_pos_tl.1,
-            texts.0,
-            text_style,
-        );
-        ui::draw_str(
-            &mut self.renderer,
-            str_pos_tr.0,
-            str_pos_tr.1,
-            texts.1,
-            text_style,
-        );
-        ui::draw_str(
-            &mut self.renderer,
-            str_pos_bl.0,
-            str_pos_bl.1,
-            texts.2,
-            text_style,
-        );
-        ui::draw_str(
-            &mut self.renderer,
-            str_pos_br.0,
-            str_pos_br.1,
-            texts.3,
-            text_style,
-        );
+        text_context.draw_str(str_pos_tl.into(), texts.0);
+        text_context.draw_str(str_pos_tr.into(), texts.1);
+        text_context.draw_str(str_pos_bl.into(), texts.2);
+        text_context.draw_str(str_pos_br.into(), texts.3);
 
         self.renderer.end(&mut self.stdout)?;
 
         Ok(())
+    }
+
+    fn draw_stairs<'a>(
+        normal_context: &'a mut DrawContext,
+        player_context: &'a mut DrawContext,
+        goal_context: &'a mut DrawContext,
+        cell: &Cell,
+        stairs_pos: (i32, i32),
+        floor: i32,
+        player_pos: Dims3D,
+        ups_as_goal: bool,
+    ) {
+        if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
+            if player_pos.2 == floor && Dims::from(player_pos * 2) + Dims(1, 1) == stairs_pos.into()
+            {
+                player_context.draw_char(stairs_pos.into(), '⥮');
+            } else {
+                normal_context.draw_char(stairs_pos.into(), '⥮');
+            };
+        } else if !cell.get_wall(CellWall::Up) {
+            if player_pos.2 == floor && Dims::from(player_pos * 2) == stairs_pos.into() {
+                player_context.draw_char(stairs_pos.into(), '↑');
+            } else if ups_as_goal {
+                goal_context.draw_char(stairs_pos.into(), '↑');
+            } else {
+                normal_context.draw_char(stairs_pos.into(), '↑');
+            }
+        } else if !cell.get_wall(CellWall::Down) {
+            if player_pos.2 == floor && Dims::from(player_pos * 2) == stairs_pos.into() {
+                player_context.draw_char(stairs_pos.into(), '↓');
+            } else {
+                normal_context.draw_char(stairs_pos.into(), '↓');
+            }
+        }
     }
 
     fn get_game_properities(

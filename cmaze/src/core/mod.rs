@@ -69,6 +69,12 @@ impl Into<(i32, i32)> for Dims {
     }
 }
 
+impl From<Dims3D> for Dims {
+    fn from(dims: Dims3D) -> Self {
+        Dims(dims.0, dims.1)
+    }
+}
+
 impl Add for Dims3D {
     type Output = Dims3D;
 
@@ -126,6 +132,12 @@ impl From<(i32, i32, i32)> for Dims3D {
 impl Into<(i32, i32, i32)> for Dims3D {
     fn into(self) -> (i32, i32, i32) {
         (self.0, self.1, self.2)
+    }
+}
+
+impl From<Dims> for Dims3D {
+    fn from(dims: Dims) -> Self {
+        Dims3D(dims.0, dims.1, 0)
     }
 }
 
