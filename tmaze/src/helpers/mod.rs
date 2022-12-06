@@ -1,3 +1,5 @@
+pub mod constants;
+
 use crate::core::*;
 use crate::maze::Maze;
 

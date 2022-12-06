@@ -17,3 +17,4 @@ ron = "0.8.0"
 clap = { version = "4.0.29", features = ["derive"] }
 cmaze = { path = "../cmaze"}
 pad = "0.1.6"
+rand = "^0.8.1"

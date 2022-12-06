@@ -10,7 +10,7 @@ use crossterm::{
 };
 use masof::Renderer;
 
-use crate::helpers::LineDir;
+use crate::helpers::{constants, LineDir};
 use crate::maze::{algorithms::*, Cell};
 use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
@@ -281,29 +281,9 @@ impl App {
         let mut camera_offset = Dims3D(0, 0, 0);
         let mut spectator = false;
 
-        self.render_game(
-            game.get_maze(),
-            game.get_player_pos(),
-            camera_offset,
-            self.settings.camera_mode,
-            game.get_goal_pos(),
-            is_tower,
-            (
-                &format!(
-                    "{}x{}x{}",
-                    game.get_player_pos().0 + 1,
-                    game.get_player_pos().1 + 1,
-                    game.get_player_pos().2 + 1
-                ),
-                if spectator { "Spectator" } else { "Adventure" },
-                &format!("{} moves", game.get_move_count()),
-                "",
-            ),
-            1,
-            game.get_moves(),
-        )?;
-
         game.start().unwrap();
+
+        let player_char = constants::get_random_player_char();
 
         loop {
             if let Ok(true) = poll(Duration::from_millis(90)) {
@@ -416,6 +396,7 @@ impl App {
                 ),
                 1,
                 game.get_moves(),
+                player_char,
             )?;
 
             // check if player won
@@ -453,6 +434,7 @@ impl App {
         texts: (&str, &str, &str, &str),
         text_horizontal_margin: i32,
         moves: &[(Dims3D, CellWall)],
+        player_char: char,
     ) -> Result<(), GameError> {
         let maze_render_size = helpers::maze_render_size(maze);
         let size = {
@@ -769,7 +751,7 @@ impl App {
                 &mut self.renderer,
                 goal_pos.0 * 2 + 1 + pos.0,
                 goal_pos.1 * 2 + 1 + pos.1,
-                '$',
+                constants::GOAL_CHAR,
                 self.settings.color_scheme.goals(),
             );
         }
@@ -779,7 +761,7 @@ impl App {
                 &mut self.renderer,
                 player_pos.0 * 2 + 1 + pos.0,
                 player_pos.1 * 2 + 1 + pos.1,
-                'O',
+                player_char,
                 self.settings.color_scheme.players(),
             );
 
