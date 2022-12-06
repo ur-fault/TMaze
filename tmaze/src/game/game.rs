@@ -97,8 +97,8 @@ impl App {
 
             match ui::menu(
                 &mut self.renderer,
-                self.settings.color_scheme.normals(),
-                self.settings.color_scheme.texts(),
+                self.settings.get_color_scheme().normals(),
+                self.settings.get_color_scheme().texts(),
                 "TMaze",
                 &["New Game", "Settings", "Controls", "About", "Quit"],
                 None,
@@ -116,8 +116,8 @@ impl App {
                     1 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.settings.color_scheme.normals(),
-                            self.settings.color_scheme.texts(),
+                            self.settings.get_color_scheme().normals(),
+                            self.settings.get_color_scheme().texts(),
                             "Settings",
                             &[
                                 "Settings file is located at:",
@@ -128,8 +128,8 @@ impl App {
                     2 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.settings.color_scheme.normals(),
-                            self.settings.color_scheme.texts(),
+                            self.settings.get_color_scheme().normals(),
+                            self.settings.get_color_scheme().texts(),
                             "Controls",
                             &[
                                 "WASD and arrows: move",
@@ -143,8 +143,8 @@ impl App {
                     3 => {
                         ui::popup(
                             &mut self.renderer,
-                            self.settings.color_scheme.normals(),
-                            self.settings.color_scheme.texts(),
+                            self.settings.get_color_scheme().normals(),
+                            self.settings.get_color_scheme().texts(),
                             "About",
                             &[
                                 "This is simple maze solving game",
@@ -205,8 +205,8 @@ impl App {
                 Err(GenerationErrorInstant::InvalidSize(dims)) => {
                     ui::popup(
                         &mut self.renderer,
-                        self.settings.color_scheme.normals(),
-                        self.settings.color_scheme.texts(),
+                        self.settings.get_color_scheme().normals(),
+                        self.settings.get_color_scheme().texts(),
                         "Error",
                         &[
                             "Invalid maze size",
@@ -242,8 +242,8 @@ impl App {
                     last_progress = current_progress;
                     ui::render_progress(
                         &mut self.renderer,
-                        self.settings.color_scheme.normals(),
-                        self.settings.color_scheme.texts(),
+                        self.settings.get_color_scheme().normals(),
+                        self.settings.get_color_scheme().texts(),
                         &format!(
                             " Generating maze ({}x{}x{})... {:.2} % ",
                             msize.0,
@@ -263,8 +263,8 @@ impl App {
                 )) => {
                     ui::popup(
                         &mut self.renderer,
-                        self.settings.color_scheme.normals(),
-                        self.settings.color_scheme.texts(),
+                        self.settings.get_color_scheme().normals(),
+                        self.settings.get_color_scheme().texts(),
                         "Error",
                         &[
                             "Invalid maze size",
@@ -304,7 +304,7 @@ impl App {
                     } else {
                         game.move_player(
                             wall,
-                            if self.settings.slow {
+                            if self.settings.get_slow() {
                                 MoveMode::Slow
                             } else {
                                 if fast {
@@ -313,7 +313,7 @@ impl App {
                                     MoveMode::Normal
                                 }
                             },
-                            !self.settings.disable_tower_auto_up,
+                            !self.settings.get_disable_tower_auto_up(),
                         )
                         .unwrap();
                     }
@@ -351,8 +351,8 @@ impl App {
                             game.pause().unwrap();
                             match ui::menu(
                                 &mut self.renderer,
-                                self.settings.color_scheme.normals(),
-                                self.settings.color_scheme.texts(),
+                                self.settings.get_color_scheme().normals(),
+                                self.settings.get_color_scheme().texts(),
                                 "Paused",
                                 &["Resume", "Main Menu", "Quit"],
                                 None,
@@ -380,7 +380,7 @@ impl App {
                 game.get_maze(),
                 game.get_player_pos(),
                 camera_offset,
-                self.settings.camera_mode,
+                self.settings.get_camera_mode(),
                 game.get_goal_pos(),
                 is_tower,
                 (
@@ -405,8 +405,8 @@ impl App {
 
                 if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
-                    self.settings.color_scheme.normals(),
-                    self.settings.color_scheme.texts(),
+                    self.settings.get_color_scheme().normals(),
+                    self.settings.get_color_scheme().texts(),
                     "You won",
                     &[
                         &format!("Time: {}", ui::format_duration(play_time)),
@@ -488,7 +488,7 @@ impl App {
                 pos.0,
                 pos.1,
                 &format!("{}{}", l1.double_line(), l2.double_line(),),
-                self_.settings.color_scheme.normals(),
+                self_.settings.get_color_scheme().normals(),
             )
         };
 
@@ -498,7 +498,7 @@ impl App {
                 pos.0,
                 pos.1,
                 &format!("{}", l.double_line(),),
-                self_.settings.color_scheme.normals(),
+                self_.settings.get_color_scheme().normals(),
             )
         };
 
@@ -642,7 +642,7 @@ impl App {
                     pos.0 + real_pos.0,
                     pos.1 + real_pos.1,
                     '.',
-                    self.settings.color_scheme.normals(),
+                    self.settings.get_color_scheme().normals(),
                 );
             }
         }
@@ -659,9 +659,9 @@ impl App {
                         && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
                         && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
                     {
-                        self_.settings.color_scheme.players()
+                        self_.settings.get_color_scheme().players()
                     } else {
-                        self_.settings.color_scheme.normals()
+                        self_.settings.get_color_scheme().normals()
                     },
                 );
             } else if !cell.get_wall(CellWall::Up) {
@@ -674,12 +674,12 @@ impl App {
                         && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
                         && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
                     {
-                        self_.settings.color_scheme.players()
+                        self_.settings.get_color_scheme().players()
                     } else {
                         if ups_as_goal {
-                            self_.settings.color_scheme.goals()
+                            self_.settings.get_color_scheme().goals()
                         } else {
-                            self_.settings.color_scheme.normals()
+                            self_.settings.get_color_scheme().normals()
                         }
                     },
                 );
@@ -693,9 +693,9 @@ impl App {
                         && player_pos.0 * 2 + 1 + pos.0 == stairs_pos.0
                         && player_pos.1 * 2 + 1 + pos.1 == stairs_pos.1
                     {
-                        self_.settings.color_scheme.players()
+                        self_.settings.get_color_scheme().players()
                     } else {
-                        self_.settings.color_scheme.normals()
+                        self_.settings.get_color_scheme().normals()
                     },
                 );
             }
@@ -740,7 +740,7 @@ impl App {
                             cell2.get_wall(CellWall::Left),
                         )
                         .double_line(),
-                        self.settings.color_scheme.normals(),
+                        self.settings.get_color_scheme().normals(),
                     );
                 }
             }
@@ -752,7 +752,7 @@ impl App {
                 goal_pos.0 * 2 + 1 + pos.0,
                 goal_pos.1 * 2 + 1 + pos.1,
                 constants::GOAL_CHAR,
-                self.settings.color_scheme.goals(),
+                self.settings.get_color_scheme().goals(),
             );
         }
 
@@ -762,7 +762,7 @@ impl App {
                 player_pos.0 * 2 + 1 + pos.0,
                 player_pos.1 * 2 + 1 + pos.1,
                 player_char,
-                self.settings.color_scheme.players(),
+                self.settings.get_color_scheme().players(),
             );
 
             draw_stairs(
@@ -789,28 +789,28 @@ impl App {
             str_pos_tl.0,
             str_pos_tl.1,
             texts.0,
-            self.settings.color_scheme.texts(),
+            self.settings.get_color_scheme().texts(),
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_tr.0,
             str_pos_tr.1,
             texts.1,
-            self.settings.color_scheme.texts(),
+            self.settings.get_color_scheme().texts(),
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_bl.0,
             str_pos_bl.1,
             texts.2,
-            self.settings.color_scheme.texts(),
+            self.settings.get_color_scheme().texts(),
         );
         ui::draw_str(
             &mut self.renderer,
             str_pos_br.0,
             str_pos_br.1,
             texts.3,
-            self.settings.color_scheme.texts(),
+            self.settings.get_color_scheme().texts(),
         );
 
         self.renderer.end(&mut self.stdout)?;
@@ -830,12 +830,12 @@ impl App {
         Ok((
             *ui::choice_menu(
                 &mut self.renderer,
-                self.settings.color_scheme.normals(),
-                self.settings.color_scheme.texts(),
+                self.settings.get_color_scheme().normals(),
+                self.settings.get_color_scheme().texts(),
                 "Maze size",
                 &self
                     .settings
-                    .mazes
+                    .get_mazes()
                     .iter()
                     .map(|maze| {
                         (
@@ -851,22 +851,25 @@ impl App {
                         )
                     })
                     .collect::<Vec<_>>(),
-                self.settings.mazes.iter().position(|maze| maze.default),
+                self.settings
+                    .get_mazes()
+                    .iter()
+                    .position(|maze| maze.default),
                 false,
             )?,
-            if self.settings.dont_ask_for_maze_algo {
-                match self.settings.default_maze_gen_algo {
+            if self.settings.get_dont_ask_for_maze_algo() {
+                match self.settings.get_default_maze_gen_algo() {
                     MazeGenAlgo::RandomKruskals => RndKruskals::generate,
                     MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
                 }
             } else {
                 match ui::menu(
                     &mut self.renderer,
-                    self.settings.color_scheme.normals(),
-                    self.settings.color_scheme.texts(),
+                    self.settings.get_color_scheme().normals(),
+                    self.settings.get_color_scheme().texts(),
                     "Maze generation algorithm",
                     &["Randomized Kruskal's", "Depth-first search"],
-                    match self.settings.default_maze_gen_algo {
+                    match self.settings.get_default_maze_gen_algo() {
                         MazeGenAlgo::RandomKruskals => Some(0),
                         MazeGenAlgo::DepthFirstSearch => Some(1),
                     },
