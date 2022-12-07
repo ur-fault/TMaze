@@ -163,6 +163,7 @@ dependencies = [
  "crossbeam",
  "pausable_clock",
  "rand",
+ "rayon",
  "thiserror",
 ]
 

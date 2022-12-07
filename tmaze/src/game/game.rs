@@ -183,7 +183,7 @@ impl App {
         &mut self,
         game_props: (
             GameMode,
-            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+            fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
         ),
     ) -> Result<(), GameError> {
         let (
@@ -218,7 +218,7 @@ impl App {
                 }
             };
 
-            for (done, from) in progress.iter() {
+            for Progress { done, from } in progress.iter() {
                 let current_progress = done as f64 / from as f64;
 
                 if let Ok(true) = poll(Duration::from_nanos(1)) {
@@ -791,7 +791,7 @@ impl App {
     ) -> Result<
         (
             GameMode,
-            fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+            fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
         ),
         GameError,
     > {

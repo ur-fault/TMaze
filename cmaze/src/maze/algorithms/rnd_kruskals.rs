@@ -1,7 +1,8 @@
 use self::CellWall::*;
 use super::super::cell::{Cell, CellWall};
 use super::{
-    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, StopGenerationFlag,
+    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, Progress,
+    StopGenerationFlag,
 };
 use crate::core::*;
 use crossbeam::channel::Sender;
@@ -13,7 +14,7 @@ impl MazeAlgorithm for RndKruskals {
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
-        progress: Sender<(usize, usize)>,
+        progress: Sender<Progress>,
     ) -> Result<Maze, GenerationErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(GenerationErrorThreaded::GenerationError(
@@ -102,7 +103,10 @@ impl MazeAlgorithm for RndKruskals {
             sets[set1_i].extend(set0);
 
             progress
-                .send((wall_count - walls.len(), wall_count))
+                .send(Progress {
+                    done: wall_count - walls.len(),
+                    from: wall_count,
+                })
                 .unwrap();
 
             if stopper.is_stopped() {

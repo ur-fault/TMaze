@@ -1,6 +1,7 @@
 use super::super::cell::Cell;
 use super::{
-    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, StopGenerationFlag,
+    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, Progress,
+    StopGenerationFlag,
 };
 use crate::core::*;
 use crossbeam::channel::Sender;
@@ -12,7 +13,7 @@ impl MazeAlgorithm for DepthFirstSearch {
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
-        progress: Sender<(usize, usize)>,
+        progress: Sender<Progress>,
     ) -> Result<Maze, GenerationErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(GenerationErrorThreaded::GenerationError(
@@ -65,7 +66,12 @@ impl MazeAlgorithm for DepthFirstSearch {
                 stack.push(chosen);
             }
 
-            progress.send((visited.len(), cell_count)).unwrap();
+            progress
+                .send(Progress {
+                    done: visited.len(),
+                    from: cell_count,
+                })
+                .unwrap();
 
             if stopper.is_stopped() {
                 return Err(GenerationErrorThreaded::AbortGeneration);

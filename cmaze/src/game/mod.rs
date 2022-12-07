@@ -1,7 +1,7 @@
 use crate::core::*;
 use crate::maze::{
     CellWall, GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeGeneratorComunication,
-    StopGenerationFlag,
+    Progress, StopGenerationFlag,
 };
 use crossbeam::channel::Receiver;
 use pausable_clock::{PausableClock, PausableInstant};
@@ -26,7 +26,7 @@ pub enum GameState {
 
 pub struct GameProperities {
     pub game_mode: GameMode,
-    pub generator: fn(Dims3D, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+    pub generator: fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
 }
 
 pub enum MoveMode {
@@ -38,7 +38,7 @@ pub enum MoveMode {
 pub type GameConstructorComunication = (
     JoinHandle<Result<Game, GenerationErrorThreaded>>,
     StopGenerationFlag,
-    Receiver<(usize, usize)>,
+    Receiver<Progress>,
 );
 
 pub struct Game {
@@ -70,7 +70,7 @@ impl Game {
         let player_pos = Dims3D(0, 0, 0);
         let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower)?;
+        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower, false)?;
 
         Ok((
             thread::spawn(move || {
