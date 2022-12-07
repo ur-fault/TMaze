@@ -739,21 +739,15 @@ impl App {
         }
 
         // Print texts
-        let str_pos_tl = (text_horizontal_margin, 0);
-        let str_pos_tr = (
-            size.0 as i32 - text_horizontal_margin - texts.1.len() as i32,
-            0,
-        );
-        let str_pos_bl = (text_horizontal_margin, size.1 as i32 - 2);
-        let str_pos_br = (
-            size.0 as i32 - text_horizontal_margin - texts.3.len() as i32,
-            size.1 as i32 - 2,
-        );
+        let str_pos_tl = Dims(text_horizontal_margin, 0);
+        let str_pos_tr = Dims(size.0 - text_horizontal_margin - texts.1.len() as i32, 0);
+        let str_pos_bl = Dims(text_horizontal_margin, size.1 - 2);
+        let str_pos_br = Dims::from(size) - Dims(text_horizontal_margin + texts.3.len() as i32, 2);
 
-        text_context.draw_str(str_pos_tl.into(), texts.0);
-        text_context.draw_str(str_pos_tr.into(), texts.1);
-        text_context.draw_str(str_pos_bl.into(), texts.2);
-        text_context.draw_str(str_pos_br.into(), texts.3);
+        text_context.draw_str(str_pos_tl, texts.0);
+        text_context.draw_str(str_pos_tr, texts.1);
+        text_context.draw_str(str_pos_bl, texts.2);
+        text_context.draw_str(str_pos_br, texts.3);
 
         self.renderer.end(&mut self.stdout)?;
 
