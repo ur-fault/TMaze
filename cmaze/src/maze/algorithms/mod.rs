@@ -123,10 +123,10 @@ pub trait MazeAlgorithm {
         stop_flag: StopGenerationFlag,
     ) -> Result<Vec<Vec<Vec<Cell>>>, GenerationErrorThreaded> {
         let Dims3D(w, h, d) = size;
-        let (wu, hu, du) = (w as usize, h as usize, d as usize);
+        let (.., du) = (w as usize, h as usize, d as usize);
         let s_progress = progres_sender;
 
-        let mut cells: Vec<Vec<Vec<Cell>>> = (0..du)
+        let cells: Vec<Vec<Vec<Cell>>> = (0..du)
             .map(|maze_i| {
                 let (s, r) = unbounded();
 
