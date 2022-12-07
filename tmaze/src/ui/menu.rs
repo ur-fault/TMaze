@@ -4,7 +4,7 @@ pub use crossterm::{
 };
 pub use masof::{Color, ContentStyle, Renderer};
 use pad::PadStr;
-use std::io::stdout;
+use std::{cell::RefCell, io::stdout};
 
 use crate::helpers::value_if;
 
@@ -148,7 +148,7 @@ pub fn render_menu(
     selected: usize,
     counted: bool,
 ) -> Result<(), CrosstermError> {
-    let menu_size = menu_size(title, &options, counted);
+    let menu_size = menu_size(title, options, counted);
     let pos = box_center_screen(menu_size)?;
     let opt_count = options.len();
 
@@ -158,18 +158,14 @@ pub fn render_menu(
 
     {
         let mut context = DrawContext {
-            renderer,
+            renderer: &RefCell::new(renderer),
             style: box_style,
         };
 
         context.draw_box(pos, menu_size);
 
-        context.draw_str_styled(pos.0 + 2 + 1, pos.1 + 1, &format!("{}", &title), text_style);
-        context.draw_str(
-            pos.0 + 1,
-            pos.1 + 1 + 1,
-            &"─".repeat(menu_size.0 as usize - 2),
-        );
+        context.draw_str_styled(pos + Dims(3, 1), title, text_style);
+        context.draw_str(pos + Dims(1, 2), &"─".repeat(menu_size.0 as usize - 2));
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == selected {
@@ -184,8 +180,7 @@ pub fn render_menu(
             };
 
             context.draw_str_styled(
-                pos.0 + 1,
-                i as i32 + pos.1 + 2 + 1,
+                pos + Dims(1, i as i32 + 3),
                 &format!(
                     "{} {}{}",
                     if i == selected { ">" } else { " " },

@@ -1,4 +1,4 @@
-use std::io::stdout;
+use std::{io::stdout, cell::RefCell};
 
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
@@ -22,16 +22,18 @@ pub fn render_progress(
     renderer.begin()?;
 
     {
-        let mut context = DrawContext { renderer, style: box_style };
+        let mut context = DrawContext {
+            renderer: &RefCell::new(renderer),
+            style: box_style,
+        };
 
         context.draw_box(pos, progress_size);
         if pos.1 + 1 >= 0 {
-            context.draw_str_styled(pos.0 + 1, pos.1 + 1, title, text_style);
+            context.draw_str_styled(pos + Dims(1, 1), title, text_style);
         }
         if pos.1 + 2 >= 0 {
             context.draw_str(
-                pos.0 + 1,
-                pos.1 + 2,
+                pos + Dims(1, 2),
                 &"█".repeat((title.len() as f64 * progress) as usize),
             );
         }

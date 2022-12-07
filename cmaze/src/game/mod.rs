@@ -1,7 +1,7 @@
 use crate::core::*;
 use crate::maze::{
     CellWall, GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeGeneratorComunication,
-    StopGenerationFlag,
+    Progress, StopGenerationFlag,
 };
 use crossbeam::channel::Receiver;
 use pausable_clock::{PausableClock, PausableInstant};
@@ -26,14 +26,19 @@ pub enum GameState {
 
 pub struct GameProperities {
     pub game_mode: GameMode,
-    pub generator:
-        fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+    pub generator: fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+}
+
+pub enum MoveMode {
+    Slow,
+    Normal,
+    Fast,
 }
 
 pub type GameConstructorComunication = (
     JoinHandle<Result<Game, GenerationErrorThreaded>>,
     StopGenerationFlag,
-    Receiver<(usize, usize)>,
+    Receiver<Progress>,
 );
 
 pub struct Game {
@@ -58,16 +63,14 @@ impl Game {
         } = props;
 
         let GameMode {
-            size: maze_size,
+            size: msize,
             is_tower,
         } = maze_mode;
-
-        let msize: Dims3D = Dims3D(maze_size.0, maze_size.1, maze_size.2);
 
         let player_pos = Dims3D(0, 0, 0);
         let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower, true)?;
+        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower, false)?;
 
         Ok((
             thread::spawn(move || {
@@ -134,30 +137,37 @@ impl Game {
     pub fn move_player(
         &mut self,
         dir: CellWall,
-        slow: bool,
+        move_mode: MoveMode,
         tower_auto_up: bool,
     ) -> Result<(Dims3D, usize), GameNotRunningError> {
         self.check_running()?;
 
-        if slow {
-            if self.maze.get_cells()[self.player_pos.2 as usize][self.player_pos.1 as usize]
-                [self.player_pos.0 as usize]
-                .get_wall(dir)
-            {
-                Ok((self.player_pos, 0))
-            } else {
-                self.moves.push((self.player_pos, dir));
-                self.player_pos += dir.to_coord();
-                Ok((self.player_pos, 1))
+        let mut count = 0;
+
+        match move_mode {
+            MoveMode::Slow => {
+                return if self.maze.get_cell(self.player_pos).unwrap().get_wall(dir) {
+                    Ok((self.player_pos, 0))
+                } else {
+                    self.moves.push((self.player_pos, dir));
+                    self.player_pos += dir.to_coord();
+                    Ok((self.player_pos, 1))
+                }
             }
-        } else {
-            let mut count = 0;
-            loop {
-                let mut cell = &self.maze.get_cells()[self.player_pos.2 as usize]
-                    [self.player_pos.1 as usize][self.player_pos.0 as usize];
+
+            MoveMode::Fast => {
+                while !self.maze.get_cell(self.player_pos).unwrap().get_wall(dir) {
+                    self.moves.push((self.player_pos, dir));
+                    self.player_pos += dir.to_coord();
+                    count += 1;
+                }
+            }
+
+            MoveMode::Normal => loop {
+                let mut cell = self.maze.get_cell(self.player_pos).unwrap();
 
                 if cell.get_wall(dir) {
-                    break Ok((self.player_pos, count));
+                    break;
                 }
 
                 count += 1;
@@ -165,8 +175,7 @@ impl Game {
                 self.moves.push((self.player_pos, dir));
                 self.player_pos += dir.to_coord();
 
-                cell = &self.maze.get_cells()[self.player_pos.2 as usize]
-                    [self.player_pos.1 as usize][self.player_pos.0 as usize];
+                cell = self.maze.get_cell(self.player_pos).unwrap();
 
                 let perps = dir.perpendicular_walls();
                 if !cell.get_wall(perps.0)
@@ -174,30 +183,30 @@ impl Game {
                     || !cell.get_wall(perps.2)
                     || !cell.get_wall(perps.3)
                 {
-                    break Ok((self.player_pos, count));
+                    break;
                 }
-            }?;
-
-            if tower_auto_up
-                && self.game_mode.is_tower
-                && !self
-                    .maze
-                    .get_cell(self.player_pos)
-                    .unwrap()
-                    .get_wall(CellWall::Up)
-            {
-                self.moves.push((self.player_pos, CellWall::Up));
-                self.player_pos += CellWall::Up.to_coord();
-                count += 1;
-            }
-
-            if self.player_pos == self.goal_pos {
-                self.state = GameState::Finished;
-                self.clock.as_mut().unwrap().pause();
-            }
-
-            Ok((self.player_pos, count))
+            },
         }
+
+        if tower_auto_up
+            && self.game_mode.is_tower
+            && !self
+                .maze
+                .get_cell(self.player_pos)
+                .unwrap()
+                .get_wall(CellWall::Up)
+        {
+            self.moves.push((self.player_pos, CellWall::Up));
+            self.player_pos += CellWall::Up.to_coord();
+            count += 1;
+        }
+
+        if self.player_pos == self.goal_pos {
+            self.state = GameState::Finished;
+            self.clock.as_mut().unwrap().pause();
+        }
+
+        Ok((self.player_pos, count))
     }
 
     pub fn check_running(&self) -> Result<(), GameNotRunningError> {

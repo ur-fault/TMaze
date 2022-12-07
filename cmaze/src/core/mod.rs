@@ -63,9 +63,15 @@ impl From<(i32, i32)> for Dims {
     }
 }
 
-impl Into<(i32, i32)> for Dims {
-    fn into(self) -> (i32, i32) {
-        (self.0, self.1)
+impl From<Dims> for (i32, i32) {
+    fn from(val: Dims) -> Self {
+        (val.0, val.1)
+    }
+}
+
+impl From<Dims3D> for Dims {
+    fn from(dims: Dims3D) -> Self {
+        Dims(dims.0, dims.1)
     }
 }
 
@@ -123,9 +129,15 @@ impl From<(i32, i32, i32)> for Dims3D {
     }
 }
 
-impl Into<(i32, i32, i32)> for Dims3D {
-    fn into(self) -> (i32, i32, i32) {
-        (self.0, self.1, self.2)
+impl From<Dims3D> for (i32, i32, i32) {
+    fn from(val: Dims3D) -> Self {
+        (val.0, val.1, val.2)
+    }
+}
+
+impl From<Dims> for Dims3D {
+    fn from(dims: Dims) -> Self {
+        Dims3D(dims.0, dims.1, 0)
     }
 }
 
@@ -180,8 +192,8 @@ impl From<(usize, usize)> for DimsU {
     }
 }
 
-impl Into<(usize, usize)> for DimsU {
-    fn into(self) -> (usize, usize) {
-        (self.0, self.1)
+impl From<DimsU> for (usize, usize) {
+    fn from(val: DimsU) -> Self {
+        (val.0, val.1)
     }
 }

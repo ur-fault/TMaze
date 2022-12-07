@@ -3,7 +3,7 @@ pub use crossterm::{
     terminal::size,
 };
 pub use masof::{Color, ContentStyle, Renderer};
-use std::io::stdout;
+use std::{cell::RefCell, io::stdout};
 
 use super::draw::*;
 use super::*;
@@ -52,15 +52,22 @@ pub fn render_popup(
 
     renderer.begin()?;
     {
-        let mut context = DrawContext { renderer, style: box_style };
+        let mut context = DrawContext {
+            renderer: &RefCell::new(renderer),
+            style: box_style,
+        };
 
         context.draw_box(pos, box_size);
-        context.draw_str_styled(title_pos, pos.1 + 1, &format!(" {} ", title), text_style);
+        context.draw_str_styled(
+            Dims(title_pos, pos.1 + 1),
+            &format!(" {} ", title),
+            text_style,
+        );
 
-        if texts.len() != 0 {
-            context.draw_str(pos.0 + 1, pos.1 + 2, &"─".repeat(box_size.0 as usize - 2));
+        if !texts.is_empty() {
+            context.draw_str(pos + Dims(1, 2), &"─".repeat(box_size.0 as usize - 2));
             for (i, text) in texts.iter().enumerate() {
-                context.draw_str_styled(pos.0 + 2, pos.1 + 3 + i as i32, text, text_style);
+                context.draw_str_styled(pos + Dims(2, i as i32 + 3), text, text_style);
             }
         }
     }

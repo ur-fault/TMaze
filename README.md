@@ -40,5 +40,5 @@ Simple multiplatform maze solving game for terminal written entirely in  Rust
 #### Other option is to just install it using cargo
 
 1. Make sure you have [cargo](https://crates.io/) installed
-1. Run `cargo install --git https://github.com/ur-fault/TMaze.git`
+1. Run `cargo install --git https://github.com/ur-fault/TMaze.git tmaze`
 1. If you want, make sure that `~/.cargo/bin` is in the PATH and enjoy

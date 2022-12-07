@@ -1,22 +1,20 @@
 use self::CellWall::*;
 use super::super::cell::{Cell, CellWall};
 use super::{
-    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, StopGenerationFlag,
+    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, Progress,
+    StopGenerationFlag,
 };
 use crate::core::*;
 use crossbeam::channel::Sender;
 use rand::{seq::SliceRandom, thread_rng};
-use rayon::prelude::*;
 use std::collections::HashSet;
 
 pub struct RndKruskals {}
-
 impl MazeAlgorithm for RndKruskals {
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
-        progress: Sender<(usize, usize)>,
-        use_rayon: bool,
+        progress: Sender<Progress>,
     ) -> Result<Maze, GenerationErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(GenerationErrorThreaded::GenerationError(
@@ -72,53 +70,43 @@ impl MazeAlgorithm for RndKruskals {
             }
         }
 
+        let mut maze = Maze {
+            cells,
+            width: w as usize,
+            height: h as usize,
+            depth: d as usize,
+        };
+
         walls.shuffle(&mut thread_rng());
-        while let Some((Dims3D(ix0, iy0, iz0), wall)) = walls.pop() {
-            let (ix1, iy1, iz1) = (
-                (wall.to_coord().0 + ix0),
-                (wall.to_coord().1 + iy0),
-                (wall.to_coord().2 + iz0),
-            );
+        while let Some((pos0, wall)) = walls.pop() {
+            let pos1 = pos0 + wall.to_coord();
 
-            let set0_i = if use_rayon {
-                sets.par_iter()
-                    .position_any(|set| set.contains(&Dims3D(ix0, iy0, iz0)))
-                    .unwrap()
-            } else {
-                sets.iter()
-                    .position(|set| set.contains(&Dims3D(ix0, iy0, iz0)))
-                    .unwrap()
-            };
+            let set0_i = sets.iter().position(|set| set.contains(&pos0)).unwrap();
 
-            if sets[set0_i].contains(&Dims3D(ix1, iy1, iz1)) {
+            if sets[set0_i].contains(&pos1) {
                 continue;
             }
 
-            let set1_i = if use_rayon {
-                sets.par_iter()
-                    .position_any(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
-                    .unwrap()
-            } else {
-                sets.iter()
-                    .position(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
-                    .unwrap()
-            };
-            
-            cells[iz0 as usize][iy0 as usize][ix0 as usize].remove_wall(wall);
-            cells[iz1 as usize][iy1 as usize][ix1 as usize].remove_wall(wall.reverse_wall());
+            let set1_i = sets.iter().position(|set| set.contains(&pos1)).unwrap();
+
+            maze.get_cell_mut(pos0).unwrap().remove_wall(wall);
+            maze.get_cell_mut(pos1)
+                .unwrap()
+                .remove_wall(wall.reverse_wall());
             let set0 = sets.swap_remove(set0_i);
 
             let set1_i = if set1_i == sets.len() - 1 {
                 sets.len() - 1
             } else {
-                sets.iter()
-                    .position(|set| set.contains(&Dims3D(ix1, iy1, iz1)))
-                    .unwrap()
+                sets.iter().position(|set| set.contains(&pos1)).unwrap()
             };
             sets[set1_i].extend(set0);
 
             progress
-                .send((wall_count - walls.len(), wall_count))
+                .send(Progress {
+                    done: wall_count - walls.len(),
+                    from: wall_count,
+                })
                 .unwrap();
 
             if stopper.is_stopped() {
@@ -126,11 +114,6 @@ impl MazeAlgorithm for RndKruskals {
             }
         }
 
-        Ok(Maze {
-            cells,
-            width: wu,
-            height: hu,
-            depth: du,
-        })
+        Ok(maze)
     }
 }

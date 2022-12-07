@@ -1,11 +1,11 @@
 use super::super::cell::Cell;
 use super::{
-    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, StopGenerationFlag,
+    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, Progress,
+    StopGenerationFlag,
 };
 use crate::core::*;
 use crossbeam::channel::Sender;
 use rand::seq::SliceRandom;
-use rayon::prelude::*;
 
 pub struct DepthFirstSearch {}
 
@@ -13,8 +13,7 @@ impl MazeAlgorithm for DepthFirstSearch {
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
-        progress: Sender<(usize, usize)>,
-        use_rayon: bool,
+        progress: Sender<Progress>,
     ) -> Result<Maze, GenerationErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
             return Err(GenerationErrorThreaded::GenerationError(
@@ -51,30 +50,28 @@ impl MazeAlgorithm for DepthFirstSearch {
         stack.push(current);
         while !stack.is_empty() {
             current = stack.pop().unwrap();
-            let unvisited_neighbors = if use_rayon {
-                maze.get_neighbors(current)
-                    .into_par_iter()
-                    .map(|cell| cell.get_coord())
-                    .filter(|cell| !visited.contains(cell))
-                    .collect::<Vec<_>>()
-            } else {
-                maze.get_neighbors(current)
-                    .into_iter()
-                    .map(|cell| cell.get_coord())
-                    .filter(|cell| !visited.contains(cell))
-                    .collect::<Vec<_>>()
-            };
+            let unvisited_neighbors = maze
+                .get_neighbors(current)
+                .into_iter()
+                .map(|cell| cell.get_coord())
+                .filter(|cell| !visited.contains(cell))
+                .collect::<Vec<_>>();
 
             if !unvisited_neighbors.is_empty() {
                 stack.push(current);
                 let chosen = *unvisited_neighbors.choose(&mut rand::thread_rng()).unwrap();
-                let chosen_wall = Maze::which_wall(current, chosen);
+                let chosen_wall = Maze::which_wall_between(current, chosen).unwrap();
                 maze.remove_wall(current, chosen_wall);
                 visited.push(chosen);
                 stack.push(chosen);
             }
 
-            progress.send((visited.len(), cell_count)).unwrap();
+            progress
+                .send(Progress {
+                    done: visited.len(),
+                    from: cell_count,
+                })
+                .unwrap();
 
             if stopper.is_stopped() {
                 return Err(GenerationErrorThreaded::AbortGeneration);

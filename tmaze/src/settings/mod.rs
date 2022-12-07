@@ -1,5 +1,5 @@
 use masof::{Color, ContentStyle};
-use ron;
+use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
@@ -125,19 +125,19 @@ impl Default for MazeGenAlgo {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Settings {
     #[serde(default)]
-    pub color_scheme: ColorScheme,
+    pub color_scheme: Option<ColorScheme>,
     #[serde(default)]
-    pub slow: bool,
+    pub slow: Option<bool>,
     #[serde(default)]
-    pub disable_tower_auto_up: bool,
+    pub disable_tower_auto_up: Option<bool>,
     #[serde(default)]
-    pub camera_mode: CameraMode,
+    pub camera_mode: Option<CameraMode>,
     #[serde(default)]
-    pub default_maze_gen_algo: MazeGenAlgo,
+    pub default_maze_gen_algo: Option<MazeGenAlgo>,
     #[serde(default)]
-    pub dont_ask_for_maze_algo: bool,
+    pub dont_ask_for_maze_algo: Option<bool>,
     #[serde(default)]
-    pub mazes: Vec<Maze>,
+    pub mazes: Option<Vec<Maze>>,
 }
 
 #[allow(dead_code)]
@@ -146,29 +146,79 @@ impl Settings {
         Self::default()
     }
 
-    pub fn color_scheme(mut self, value: ColorScheme) -> Self {
-        self.color_scheme = value;
+    pub fn populate(mut self) -> Self {
+        self.color_scheme = Some(self.color_scheme.unwrap_or_default());
+        self.slow = Some(self.slow.unwrap_or_default());
+        self.disable_tower_auto_up = Some(self.disable_tower_auto_up.unwrap_or_default());
+        self.camera_mode = Some(self.camera_mode.unwrap_or_default());
+        self.default_maze_gen_algo = Some(self.default_maze_gen_algo.unwrap_or_default());
+        self.dont_ask_for_maze_algo = Some(self.dont_ask_for_maze_algo.unwrap_or_default());
+        self.mazes = Some(self.mazes.unwrap_or_default());
+
         self
     }
 
-    pub fn slow(mut self, value: bool) -> Self {
-        self.slow = value;
+    pub fn set_color_scheme(mut self, value: ColorScheme) -> Self {
+        self.color_scheme = Some(value);
         self
     }
 
-    pub fn disable_tower_auto_up(mut self, value: bool) -> Self {
-        self.disable_tower_auto_up = value;
+    pub fn get_color_scheme(&self) -> ColorScheme {
+        self.color_scheme.clone().unwrap_or_default()
+    }
+
+    pub fn set_slow(mut self, value: bool) -> Self {
+        self.slow = Some(value);
         self
     }
 
-    pub fn camera_mode(mut self, value: CameraMode) -> Self {
-        self.camera_mode = value;
+    pub fn get_slow(&self) -> bool {
+        self.slow.unwrap_or_default()
+    }
+
+    pub fn set_disable_tower_auto_up(mut self, value: bool) -> Self {
+        self.disable_tower_auto_up = Some(value);
         self
     }
 
-    pub fn maze_gen_algo(mut self, value: MazeGenAlgo) -> Self {
-        self.default_maze_gen_algo = value;
+    pub fn get_disable_tower_auto_up(&self) -> bool {
+        self.disable_tower_auto_up.unwrap_or_default()
+    }
+
+    pub fn set_camera_mode(mut self, value: CameraMode) -> Self {
+        self.camera_mode = Some(value);
         self
+    }
+
+    pub fn get_camera_mode(&self) -> CameraMode {
+        self.camera_mode.unwrap_or_default()
+    }
+
+    pub fn set_default_maze_gen_algo(mut self, value: MazeGenAlgo) -> Self {
+        self.default_maze_gen_algo = Some(value);
+        self
+    }
+
+    pub fn get_default_maze_gen_algo(&self) -> MazeGenAlgo {
+        self.default_maze_gen_algo.unwrap_or_default()
+    }
+
+    pub fn set_dont_ask_for_maze_algo(mut self, value: bool) -> Self {
+        self.dont_ask_for_maze_algo = Some(value);
+        self
+    }
+
+    pub fn get_dont_ask_for_maze_algo(&self) -> bool {
+        self.dont_ask_for_maze_algo.unwrap_or_default()
+    }
+
+    pub fn set_mazes(mut self, value: Vec<Maze>) -> Self {
+        self.mazes = Some(value);
+        self
+    }
+
+    pub fn get_mazes(&self) -> Vec<Maze> {
+        self.mazes.clone().unwrap_or_default()
     }
 
     pub fn load(path: PathBuf) -> Self {
@@ -176,7 +226,8 @@ impl Settings {
 
         let settings_string = fs::read_to_string(&path);
         if let Ok(settings_string) = settings_string {
-            match ron::de::from_str(&settings_string) {
+            let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
+            match options.from_str(&settings_string) {
                 Ok(settings) => settings,
                 Err(err) => {
                     panic!("Error reading settings file ({:?}), {}", path, err);
