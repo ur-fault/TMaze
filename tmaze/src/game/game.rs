@@ -307,12 +307,10 @@ impl App {
                             wall,
                             if self.settings.get_slow() {
                                 MoveMode::Slow
+                            } else if fast {
+                                MoveMode::Fast
                             } else {
-                                if fast {
-                                    MoveMode::Fast
-                                } else {
-                                    MoveMode::Normal
-                                }
+                                MoveMode::Normal
                             },
                             !self.settings.get_disable_tower_auto_up(),
                         )
@@ -851,5 +849,11 @@ impl App {
                 }
             },
         ))
+    }
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self::new()
     }
 }

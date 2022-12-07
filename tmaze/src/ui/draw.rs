@@ -1,7 +1,4 @@
-use std::{
-    cell::RefCell,
-    ops::{Deref, DerefMut},
-};
+use std::{cell::RefCell, ops::DerefMut};
 
 use crate::core::*;
 pub use crossterm::{

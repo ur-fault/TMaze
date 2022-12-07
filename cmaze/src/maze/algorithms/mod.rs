@@ -53,6 +53,12 @@ impl StopGenerationFlag {
     }
 }
 
+impl Default for StopGenerationFlag {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub type MazeGeneratorComunication = (
     JoinHandle<Result<Maze, GenerationErrorThreaded>>,
     StopGenerationFlag,
