@@ -401,9 +401,9 @@ impl App {
                     self.settings.get_color_scheme().texts(),
                     "You won",
                     &[
-                        &format!("Time: {}", ui::format_duration(play_time)),
+                        &format!("Time:  {}", ui::format_duration(play_time)),
                         &format!("Moves: {}", game_state.game.get_move_count()),
-                        &format!("Size: {}x{}x{}", msize.0, msize.1, msize.2),
+                        &format!("Size:  {}x{}x{}", msize.0, msize.1, msize.2),
                         "",
                         "R for new game",
                     ],
