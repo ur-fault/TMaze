@@ -16,7 +16,7 @@ impl Default for CameraMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Maze {
+pub struct MazePreset {
     pub title: String,
     pub width: u16,
     pub height: u16,
@@ -137,7 +137,7 @@ pub struct Settings {
     #[serde(default)]
     pub dont_ask_for_maze_algo: Option<bool>,
     #[serde(default)]
-    pub mazes: Option<Vec<Maze>>,
+    pub mazes: Option<Vec<MazePreset>>,
 }
 
 #[allow(dead_code)]
@@ -212,12 +212,12 @@ impl Settings {
         self.dont_ask_for_maze_algo.unwrap_or_default()
     }
 
-    pub fn set_mazes(mut self, value: Vec<Maze>) -> Self {
+    pub fn set_mazes(mut self, value: Vec<MazePreset>) -> Self {
         self.mazes = Some(value);
         self
     }
 
-    pub fn get_mazes(&self) -> Vec<Maze> {
+    pub fn get_mazes(&self) -> Vec<MazePreset> {
         self.mazes.clone().unwrap_or_default()
     }
 
