@@ -18,3 +18,4 @@ criterion = "0.4.0"
 [[bench]]
 name = "kruskals"
 harness = false
+sample_size = 10

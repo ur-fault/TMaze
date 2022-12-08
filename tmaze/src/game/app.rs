@@ -3,7 +3,7 @@ use std::io::{stdout, Stdout};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use cmaze::game::{Game, GameProperities, GameState, MoveMode};
+use cmaze::game::{Game, GameProperities, GameState as GameStatus, MoveMode};
 use crossterm::event::KeyModifiers;
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
@@ -12,13 +12,15 @@ use crossterm::{
 use masof::Renderer;
 
 use crate::helpers::{constants, LineDir};
+use crate::maze::CellWall;
 use crate::maze::{algorithms::*, Cell};
-use crate::maze::{CellWall, Maze};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
 use crate::ui::{DrawContext, MenuError};
 use crate::{helpers, ui, ui::CrosstermError};
 use cmaze::core::*;
 use dirs::preference_dir;
+
+use super::{GameState, GameViewMode};
 
 #[derive(Debug)]
 pub enum GameError {
@@ -194,7 +196,7 @@ impl App {
             _,
         ) = game_props;
 
-        let mut game = {
+        let game = {
             let mut last_progress = f64::MIN;
             let res = Game::new_threaded(GameProperities {
                 game_mode: game_props.0,
@@ -279,42 +281,49 @@ impl App {
             }
         };
 
-        let mut camera_offset = Dims3D(0, 0, 0);
-        let mut spectator = false;
+        let mut game_state = GameState {
+            game,
+            camera_offset: Dims3D(0, 0, 0),
+            is_tower,
+            player_char: constants::get_random_player_char(),
+            view_mode: GameViewMode::Adventure,
+        };
 
-        game.start().unwrap();
-
-        let player_char = constants::get_random_player_char();
+        game_state.game.start().unwrap();
 
         loop {
             if let Ok(true) = poll(Duration::from_millis(90)) {
                 let event = read();
 
                 let mut apply_move = |wall: CellWall, fast: bool| {
-                    if spectator {
-                        let cam_off = wall.reverse_wall().to_coord() + camera_offset;
+                    if game_state.view_mode == GameViewMode::Spectator {
+                        let cam_off = wall.reverse_wall().to_coord() + game_state.camera_offset;
 
-                        camera_offset = Dims3D(
+                        game_state.camera_offset = Dims3D(
                             cam_off.0,
                             cam_off.1,
-                            (-game.get_player_pos().2).max(
-                                (game.get_maze().size().2 - game.get_player_pos().2 - 1)
-                                    .min(cam_off.2),
+                            (-game_state.game.get_player_pos().2).max(
+                                (game_state.game.get_maze().size().2
+                                    - game_state.game.get_player_pos().2
+                                    - 1)
+                                .min(cam_off.2),
                             ),
                         )
                     } else {
-                        game.move_player(
-                            wall,
-                            if self.settings.get_slow() {
-                                MoveMode::Slow
-                            } else if fast {
-                                MoveMode::Fast
-                            } else {
-                                MoveMode::Normal
-                            },
-                            !self.settings.get_disable_tower_auto_up(),
-                        )
-                        .unwrap();
+                        game_state
+                            .game
+                            .move_player(
+                                wall,
+                                if self.settings.get_slow() {
+                                    MoveMode::Slow
+                                } else if fast {
+                                    MoveMode::Fast
+                                } else {
+                                    MoveMode::Normal
+                                },
+                                !self.settings.get_disable_tower_auto_up(),
+                            )
+                            .unwrap();
                     }
                 };
 
@@ -339,20 +348,21 @@ impl App {
                             apply_move(CellWall::Up, modifiers.contains(KeyModifiers::SHIFT));
                         }
                         KeyCode::Char(' ') => {
-                            if spectator {
-                                camera_offset = Dims3D(0, 0, 0);
-                                spectator = false
+                            if game_state.view_mode == GameViewMode::Spectator {
+                                game_state.camera_offset = Dims3D(0, 0, 0);
+                                game_state.view_mode = GameViewMode::Adventure;
                             } else {
-                                spectator = true
+                                game_state.view_mode = GameViewMode::Spectator;
                             }
                         }
                         KeyCode::Char('.') => {
-                            spectator = true;
-                            camera_offset = game.get_player_pos() - game.get_goal_pos();
-                            camera_offset.2 *= -1;
+                            game_state.view_mode = GameViewMode::Spectator;
+                            game_state.camera_offset =
+                                game_state.game.get_player_pos() - game_state.game.get_goal_pos();
+                            game_state.camera_offset.2 *= -1;
                         }
                         KeyCode::Esc => {
-                            game.pause().unwrap();
+                            game_state.game.pause().unwrap();
                             match ui::menu(
                                 &mut self.renderer,
                                 self.settings.get_color_scheme().normals(),
@@ -366,7 +376,7 @@ impl App {
                                 2 => break Err(GameError::FullQuit),
                                 _ => {}
                             }
-                            game.resume().unwrap();
+                            game_state.game.resume().unwrap();
                         }
                         _ => {}
                     },
@@ -379,33 +389,31 @@ impl App {
                 self.renderer.event(&event.unwrap());
             }
 
-            let from_start = game.get_elapsed().unwrap();
+            let from_start = game_state.game.get_elapsed().unwrap();
             self.render_game(
-                game.get_maze(),
-                game.get_player_pos(),
-                camera_offset,
+                &game_state,
                 self.settings.get_camera_mode(),
-                game.get_goal_pos(),
                 is_tower,
                 (
                     &format!(
                         "{}x{}x{}",
-                        game.get_player_pos().0 + 1,
-                        game.get_player_pos().1 + 1,
-                        game.get_player_pos().2 + 1
+                        game_state.game.get_player_pos().0 + 1,
+                        game_state.game.get_player_pos().1 + 1,
+                        game_state.game.get_player_pos().2 + 1
                     ),
-                    if spectator { "Spectator" } else { "Adventure" },
-                    &format!("{} moves", game.get_move_count()),
+                    match game_state.view_mode {
+                        GameViewMode::Adventure => "Adventure",
+                        GameViewMode::Spectator => "Spectator",
+                    },
+                    &format!("{} moves", game_state.game.get_move_count()),
                     &ui::format_duration(from_start),
                 ),
                 1,
-                game.get_moves(),
-                player_char,
             )?;
 
             // Check if player won
-            if game.get_state() == GameState::Finished {
-                let play_time = game.get_elapsed().unwrap();
+            if game_state.game.get_state() == GameStatus::Finished {
+                let play_time = game_state.game.get_elapsed().unwrap();
 
                 if let KeyCode::Char('r' | 'R') = ui::popup(
                     &mut self.renderer,
@@ -414,7 +422,7 @@ impl App {
                     "You won",
                     &[
                         &format!("Time: {}", ui::format_duration(play_time)),
-                        &format!("Moves: {}", game.get_move_count()),
+                        &format!("Moves: {}", game_state.game.get_move_count()),
                         &format!("Size: {}x{}x{}", msize.0, msize.1, msize.2),
                         "",
                         "R for new game",
@@ -429,22 +437,29 @@ impl App {
 
     fn render_game(
         &mut self,
-        maze: &Maze,
-        player_pos: Dims3D,
-        camera_offset: Dims3D,
+        game_state: &GameState,
         camera_mode: CameraMode,
-        goal_pos: Dims3D,
         ups_as_goal: bool,
         texts: (&str, &str, &str, &str),
         text_horizontal_margin: i32,
-        moves: &[(Dims3D, CellWall)],
-        player_char: char,
     ) -> Result<(), GameError> {
+        let GameState {
+            game,
+            camera_offset,
+            player_char,
+            ..
+        } = game_state;
+
+        let player_pos = game.get_player_pos();
+
+        let maze = game.get_maze();
+
         let maze_render_size = helpers::maze_render_size(maze);
         let size = {
             let size = size()?;
             (size.0 as i32, size.1 as i32)
         };
+
         let is_around_player =
             maze_render_size.0 > size.0 as i32 || maze_render_size.1 + 3 > size.1 as i32;
 
@@ -665,6 +680,7 @@ impl App {
             }
         }
 
+        let moves = game.get_moves();
         // Drawing visited places (moves)
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
@@ -726,6 +742,7 @@ impl App {
             }
         }
 
+        let goal_pos = game.get_goal_pos();
         if floor == goal_pos.2 {
             goal_context.draw_char(
                 Dims::from(goal_pos) * 2 + maze_pos.into() + Dims(1, 1),
@@ -736,7 +753,7 @@ impl App {
         if floor == player_pos.2 {
             player_context.draw_char(
                 Dims::from(player_pos) * 2 + maze_pos.into() + Dims(1, 1),
-                player_char,
+                *player_char,
             );
 
             Self::draw_stairs(
@@ -784,23 +801,23 @@ impl App {
 
         if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
             if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos.into(), '⥮');
+                player_context.draw_char(real_pos, '⥮');
             } else {
-                normal_context.draw_char(real_pos.into(), '⥮');
+                normal_context.draw_char(real_pos, '⥮');
             };
         } else if !cell.get_wall(CellWall::Up) {
             if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos.into(), '↑');
+                player_context.draw_char(real_pos, '↑');
             } else if ups_as_goal {
-                goal_context.draw_char(real_pos.into(), '↑');
+                goal_context.draw_char(real_pos, '↑');
             } else {
-                normal_context.draw_char(real_pos.into(), '↑');
+                normal_context.draw_char(real_pos, '↑');
             }
         } else if !cell.get_wall(CellWall::Down) {
             if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos.into(), '↓');
+                player_context.draw_char(real_pos, '↓');
             } else {
-                normal_context.draw_char(real_pos.into(), '↓');
+                normal_context.draw_char(real_pos, '↓');
             }
         }
     }
