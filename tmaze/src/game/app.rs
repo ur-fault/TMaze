@@ -389,27 +389,7 @@ impl App {
                 self.renderer.event(&event.unwrap());
             }
 
-            let from_start = game_state.game.get_elapsed().unwrap();
-            self.render_game(
-                &game_state,
-                self.settings.get_camera_mode(),
-                is_tower,
-                (
-                    &format!(
-                        "{}x{}x{}",
-                        game_state.game.get_player_pos().0 + 1,
-                        game_state.game.get_player_pos().1 + 1,
-                        game_state.game.get_player_pos().2 + 1
-                    ),
-                    match game_state.view_mode {
-                        GameViewMode::Adventure => "Adventure",
-                        GameViewMode::Spectator => "Spectator",
-                    },
-                    &format!("{} moves", game_state.game.get_move_count()),
-                    &ui::format_duration(from_start),
-                ),
-                1,
-            )?;
+            self.render_game(&game_state, self.settings.get_camera_mode(), is_tower, 1)?;
 
             // Check if player won
             if game_state.game.get_state() == GameStatus::Finished {
@@ -440,7 +420,6 @@ impl App {
         game_state: &GameState,
         camera_mode: CameraMode,
         ups_as_goal: bool,
-        texts: (&str, &str, &str, &str),
         text_horizontal_margin: i32,
     ) -> Result<(), GameError> {
         let GameState {
@@ -768,6 +747,22 @@ impl App {
                 ups_as_goal,
             );
         }
+
+        let from_start = game.get_elapsed().unwrap();
+        let texts = (
+            &format!(
+                "{}x{}x{}",
+                game_state.game.get_player_pos().0 + 1,
+                game_state.game.get_player_pos().1 + 1,
+                game_state.game.get_player_pos().2 + 1
+            ),
+            match game_state.view_mode {
+                GameViewMode::Adventure => "Adventure",
+                GameViewMode::Spectator => "Spectator",
+            },
+            &format!("{} moves", game_state.game.get_move_count()),
+            &ui::format_duration(from_start),
+        );
 
         // Print texts
         let str_pos_tl = Dims(text_horizontal_margin, 0);
