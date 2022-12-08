@@ -1,3 +1,3 @@
-pub mod game;
+pub mod app;
 // pub mod ui;
-pub use game::App;
+pub use app::App;
