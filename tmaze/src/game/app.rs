@@ -287,6 +287,7 @@ impl App {
             is_tower,
             player_char: constants::get_random_player_char(),
             view_mode: GameViewMode::Adventure,
+            settings: self.settings.clone(),
         };
 
         game_state.game.start().unwrap();
@@ -295,73 +296,9 @@ impl App {
             if let Ok(true) = poll(Duration::from_millis(90)) {
                 let event = read();
 
-                let mut apply_move = |wall: CellWall, fast: bool| {
-                    if game_state.view_mode == GameViewMode::Spectator {
-                        let cam_off = wall.reverse_wall().to_coord() + game_state.camera_offset;
-
-                        game_state.camera_offset = Dims3D(
-                            cam_off.0,
-                            cam_off.1,
-                            (-game_state.game.get_player_pos().2).max(
-                                (game_state.game.get_maze().size().2
-                                    - game_state.game.get_player_pos().2
-                                    - 1)
-                                .min(cam_off.2),
-                            ),
-                        )
-                    } else {
-                        game_state
-                            .game
-                            .move_player(
-                                wall,
-                                if self.settings.get_slow() {
-                                    MoveMode::Slow
-                                } else if fast {
-                                    MoveMode::Fast
-                                } else {
-                                    MoveMode::Normal
-                                },
-                                !self.settings.get_disable_tower_auto_up(),
-                            )
-                            .unwrap();
-                    }
-                };
-
                 match event {
-                    Ok(Event::Key(KeyEvent { code, modifiers })) => match code {
-                        KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                            apply_move(CellWall::Top, modifiers.contains(KeyModifiers::SHIFT));
-                        }
-                        KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                            apply_move(CellWall::Bottom, modifiers.contains(KeyModifiers::SHIFT));
-                        }
-                        KeyCode::Left | KeyCode::Char('a' | 'A') => {
-                            apply_move(CellWall::Left, modifiers.contains(KeyModifiers::SHIFT));
-                        }
-                        KeyCode::Right | KeyCode::Char('d' | 'D') => {
-                            apply_move(CellWall::Right, modifiers.contains(KeyModifiers::SHIFT));
-                        }
-                        KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
-                            apply_move(CellWall::Down, modifiers.contains(KeyModifiers::SHIFT));
-                        }
-                        KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
-                            apply_move(CellWall::Up, modifiers.contains(KeyModifiers::SHIFT));
-                        }
-                        KeyCode::Char(' ') => {
-                            if game_state.view_mode == GameViewMode::Spectator {
-                                game_state.camera_offset = Dims3D(0, 0, 0);
-                                game_state.view_mode = GameViewMode::Adventure;
-                            } else {
-                                game_state.view_mode = GameViewMode::Spectator;
-                            }
-                        }
-                        KeyCode::Char('.') => {
-                            game_state.view_mode = GameViewMode::Spectator;
-                            game_state.camera_offset =
-                                game_state.game.get_player_pos() - game_state.game.get_goal_pos();
-                            game_state.camera_offset.2 *= -1;
-                        }
-                        KeyCode::Esc => {
+                    Ok(Event::Key(key_event)) => {
+                        if let Err(_) = game_state.handle_event(key_event) {
                             game_state.game.pause().unwrap();
                             match ui::menu(
                                 &mut self.renderer,
@@ -372,14 +309,13 @@ impl App {
                                 None,
                                 false,
                             )? {
-                                1 => break Err(GameError::Back),
-                                2 => break Err(GameError::FullQuit),
+                                1 => return Err(GameError::Back),
+                                2 => return Err(GameError::FullQuit),
                                 _ => {}
                             }
                             game_state.game.resume().unwrap();
                         }
-                        _ => {}
-                    },
+                    }
                     Err(err) => {
                         break Err(CrosstermError(err).into());
                     }
