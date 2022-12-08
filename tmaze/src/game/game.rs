@@ -346,6 +346,11 @@ impl App {
                                 spectator = true
                             }
                         }
+                        KeyCode::Char('.') => {
+                            spectator = true;
+                            camera_offset = game.get_player_pos() - game.get_goal_pos();
+                            camera_offset.2 *= -1;
+                        }
                         KeyCode::Esc => {
                             game.pause().unwrap();
                             match ui::menu(
@@ -398,7 +403,7 @@ impl App {
                 player_char,
             )?;
 
-            // check if player won
+            // Check if player won
             if game.get_state() == GameState::Finished {
                 let play_time = game.get_elapsed().unwrap();
 
