@@ -547,6 +547,7 @@ impl App {
                 LineDir::Vertical,
             );
         }
+
         if maze_pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
             draw_line_double(
                 &mut normal_context,
@@ -563,7 +564,8 @@ impl App {
                 LineDir::TopLeft,
             );
         }
-        // horizontal edge lines
+
+        // Horizontal edge lines
         for x in 0..maze.size().0 - 1 {
             if maze_pos.1 > 0 {
                 draw_line_double_duo(
@@ -603,7 +605,7 @@ impl App {
             }
         }
 
-        // vertical edge lines
+        // Vertical edge lines
         for y in 0..maze.size().1 - 1 {
             let ypos = y as i32 * 2 + maze_pos.1 + 1;
             if ypos >= size.1 - 2 {
@@ -666,7 +668,7 @@ impl App {
             }
         }
 
-        // drawing maze itself
+        // Drawing maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
             let ypos = iy as i32 * 2 + 1 + maze_pos.1;
             if ypos >= size.1 - 2 {
@@ -679,6 +681,7 @@ impl App {
                     draw_line_double(&mut normal_context, (xpos + 1, ypos), LineDir::Vertical);
                 }
                 if ypos + 1 < size.1 as i32 - 2
+                    && ypos > 0
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
@@ -703,7 +706,7 @@ impl App {
 
                 let cell2 = &maze.get_cells()[floor as usize][iy + 1][ix + 1];
 
-                if ypos < size.1 as i32 - 3 {
+                if ypos < size.1 as i32 - 3 && ypos > 0 {
                     draw_line_double(
                         &mut normal_context,
                         (xpos + 1, ypos + 1),
