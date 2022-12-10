@@ -27,25 +27,26 @@ pub struct GameState {
 impl GameState {
     pub fn handle_event(&mut self, event: KeyEvent) -> Result<(), ShowMenu> {
         let KeyEvent { code, modifiers } = event;
+        let is_fast = modifiers.contains(KeyModifiers::SHIFT);
 
         match code {
             KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                self.apply_move(CellWall::Top, modifiers.contains(KeyModifiers::SHIFT));
+                self.apply_move(CellWall::Top, is_fast);
             }
             KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                self.apply_move(CellWall::Bottom, modifiers.contains(KeyModifiers::SHIFT));
+                self.apply_move(CellWall::Bottom, is_fast);
             }
             KeyCode::Left | KeyCode::Char('a' | 'A') => {
-                self.apply_move(CellWall::Left, modifiers.contains(KeyModifiers::SHIFT));
+                self.apply_move(CellWall::Left, is_fast);
             }
             KeyCode::Right | KeyCode::Char('d' | 'D') => {
-                self.apply_move(CellWall::Right, modifiers.contains(KeyModifiers::SHIFT));
+                self.apply_move(CellWall::Right, is_fast);
             }
             KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
-                self.apply_move(CellWall::Down, modifiers.contains(KeyModifiers::SHIFT));
+                self.apply_move(CellWall::Down, is_fast);
             }
             KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
-                self.apply_move(CellWall::Up, modifiers.contains(KeyModifiers::SHIFT));
+                self.apply_move(CellWall::Up, is_fast);
             }
             KeyCode::Char(' ') => {
                 if self.view_mode == GameViewMode::Spectator {
