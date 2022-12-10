@@ -116,53 +116,13 @@ impl App {
                     },
 
                     1 => {
-                        ui::popup(
-                            &mut self.renderer,
-                            self.settings.get_color_scheme().normals(),
-                            self.settings.get_color_scheme().texts(),
-                            "Settings",
-                            &[
-                                "Settings file is located at:",
-                                &format!(" {}", self.settings_file_path.to_str().unwrap()),
-                            ],
-                        )?;
+                        self.show_settings_popup()?;
                     }
                     2 => {
-                        ui::popup(
-                            &mut self.renderer,
-                            self.settings.get_color_scheme().normals(),
-                            self.settings.get_color_scheme().texts(),
-                            "Controls",
-                            &[
-                                "WASD and arrows: move",
-                                "Space: switch adventure/spectaror mode",
-                                "Q, F or L: move down",
-                                "E, R or P: move up",
-                                "With SHIFT move at the end in single dir",
-                                "Escape: pause menu",
-                            ],
-                        )?;
+                        self.show_controls_popup()?;
                     }
                     3 => {
-                        ui::popup(
-                            &mut self.renderer,
-                            self.settings.get_color_scheme().normals(),
-                            self.settings.get_color_scheme().texts(),
-                            "About",
-                            &[
-                                "This is simple maze solving game",
-                                "Supported algorithms:",
-                                "    - Depth-first search",
-                                "    - Kruskal's algorithm",
-                                "Supports 3D mazes",
-                                "",
-                                "Created by:",
-                                &format!("    - {}", env!("CARGO_PKG_AUTHORS")),
-                                "",
-                                "Version:",
-                                &format!("    {}", env!("CARGO_PKG_VERSION")),
-                            ],
-                        )?;
+                        self.show_about_popup()?;
                     }
                     4 => break,
                     _ => break,
@@ -173,6 +133,64 @@ impl App {
         }
 
         self.renderer.term_off(&mut self.stdout)?;
+        Ok(())
+    }
+
+    fn show_settings_popup(&mut self) -> Result<(), GameError> {
+        ui::popup(
+            &mut self.renderer,
+            self.settings.get_color_scheme().normals(),
+            self.settings.get_color_scheme().texts(),
+            "Settings",
+            &[
+                "Settings file is located at:",
+                &format!(" {}", self.settings_file_path.to_str().unwrap()),
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    fn show_controls_popup(&mut self) -> Result<(), GameError> {
+        ui::popup(
+            &mut self.renderer,
+            self.settings.get_color_scheme().normals(),
+            self.settings.get_color_scheme().texts(),
+            "Controls",
+            &[
+                "WASD and arrows: move",
+                "Space: switch adventure/spectaror mode",
+                "Q, F or L: move down",
+                "E, R or P: move up",
+                "With SHIFT move at the end in single dir",
+                "Escape: pause menu",
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    fn show_about_popup(&mut self) -> Result<(), GameError> {
+        ui::popup(
+            &mut self.renderer,
+            self.settings.get_color_scheme().normals(),
+            self.settings.get_color_scheme().texts(),
+            "About",
+            &[
+                "This is simple maze solving game",
+                "Supported algorithms:",
+                "    - Depth-first search",
+                "    - Kruskal's algorithm",
+                "Supports 3D mazes",
+                "",
+                "Created by:",
+                &format!("    - {}", env!("CARGO_PKG_AUTHORS")),
+                "",
+                "Version:",
+                &format!("    {}", env!("CARGO_PKG_VERSION")),
+            ],
+        )?;
+
         Ok(())
     }
 
