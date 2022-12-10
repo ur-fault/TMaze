@@ -135,10 +135,11 @@ impl App {
                             "Controls",
                             &[
                                 "WASD and arrows: move",
-                                "Space: spectaror mode",
-                                "Q, F and L: move down",
-                                "E, R and P: move up",
-                                "Escape: pause",
+                                "Space: switch adventure/spectaror mode",
+                                "Q, F or L: move down",
+                                "E, R or P: move up",
+                                "With SHIFT move at the end in single dir",
+                                "Escape: pause menu",
                             ],
                         )?;
                     }
