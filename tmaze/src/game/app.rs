@@ -729,59 +729,59 @@ impl App {
     }
 
     fn get_game_properities(&mut self) -> Result<GameProperities, GameError> {
-        Ok(GameProperities {
-            game_mode: *ui::choice_menu(
+        let mode = *ui::choice_menu(
+            &mut self.renderer,
+            self.settings.get_color_scheme().normals(),
+            self.settings.get_color_scheme().texts(),
+            "Maze size",
+            &self
+                .settings
+                .get_mazes()
+                .iter()
+                .map(|maze| {
+                    (
+                        GameMode {
+                            size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
+                            is_tower: maze.tower,
+                        },
+                        maze.title.as_str(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            self.settings
+                .get_mazes()
+                .iter()
+                .position(|maze| maze.default),
+            false,
+        )?;
+
+        let gen = if self.settings.get_dont_ask_for_maze_algo() {
+            match self.settings.get_default_maze_gen_algo() {
+                MazeGenAlgo::RandomKruskals => RndKruskals::generate,
+                MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
+            }
+        } else {
+            match ui::menu(
                 &mut self.renderer,
                 self.settings.get_color_scheme().normals(),
                 self.settings.get_color_scheme().texts(),
-                "Maze size",
-                &self
-                    .settings
-                    .get_mazes()
-                    .iter()
-                    .map(|maze| {
-                        (
-                            GameMode {
-                                size: Dims3D(
-                                    maze.width as i32,
-                                    maze.height as i32,
-                                    maze.depth as i32,
-                                ),
-                                is_tower: maze.tower,
-                            },
-                            maze.title.as_str(),
-                        )
-                    })
-                    .collect::<Vec<_>>(),
-                self.settings
-                    .get_mazes()
-                    .iter()
-                    .position(|maze| maze.default),
-                false,
-            )?,
-            generator: if self.settings.get_dont_ask_for_maze_algo() {
+                "Maze generation algorithm",
+                &["Randomized Kruskal's", "Depth-first search"],
                 match self.settings.get_default_maze_gen_algo() {
-                    MazeGenAlgo::RandomKruskals => RndKruskals::generate,
-                    MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
-                }
-            } else {
-                match ui::menu(
-                    &mut self.renderer,
-                    self.settings.get_color_scheme().normals(),
-                    self.settings.get_color_scheme().texts(),
-                    "Maze generation algorithm",
-                    &["Randomized Kruskal's", "Depth-first search"],
-                    match self.settings.get_default_maze_gen_algo() {
-                        MazeGenAlgo::RandomKruskals => Some(0),
-                        MazeGenAlgo::DepthFirstSearch => Some(1),
-                    },
-                    true,
-                )? {
-                    0 => RndKruskals::generate,
-                    1 => DepthFirstSearch::generate,
-                    _ => panic!(),
-                }
-            },
+                    MazeGenAlgo::RandomKruskals => Some(0),
+                    MazeGenAlgo::DepthFirstSearch => Some(1),
+                },
+                true,
+            )? {
+                0 => RndKruskals::generate,
+                1 => DepthFirstSearch::generate,
+                _ => panic!(),
+            }
+        };
+
+        Ok(GameProperities {
+            game_mode: mode,
+            generator: gen,
         })
     }
 }
