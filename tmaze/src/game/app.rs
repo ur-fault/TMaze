@@ -570,14 +570,20 @@ impl App {
             );
         }
 
+        let pos_text = if maze.size().2 > 1 {
+            format!(
+                "x:{} y:{} floor:{}",
+                player_pos.0 + 1,
+                player_pos.1 + 1,
+                player_pos.2 + 1
+            )
+        } else {
+            format!("x:{} y:{}", player_pos.0 + 1, player_pos.1 + 1)
+        };
+
         let from_start = game.get_elapsed().unwrap();
         let texts = (
-            &format!(
-                "{}x{}x{}",
-                game_state.game.get_player_pos().0 + 1,
-                game_state.game.get_player_pos().1 + 1,
-                game_state.game.get_player_pos().2 + 1
-            ),
+            &pos_text,
             match game_state.view_mode {
                 GameViewMode::Adventure => "Adventure",
                 GameViewMode::Spectator => "Spectator",
