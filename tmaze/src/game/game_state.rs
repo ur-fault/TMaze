@@ -5,9 +5,7 @@ use cmaze::{
 use crossterm::event::KeyModifiers;
 use masof::{KeyCode, KeyEvent};
 
-use crate::{settings::Settings, ui};
-
-use super::app::GameError;
+use crate::settings::Settings;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum GameViewMode {
@@ -70,31 +68,34 @@ impl GameState {
     }
 
     pub fn apply_move(&mut self, wall: CellWall, fast: bool) {
-        if self.view_mode == GameViewMode::Spectator {
-            let cam_off = wall.reverse_wall().to_coord() + self.camera_offset;
+        match self.view_mode {
+            GameViewMode::Spectator => {
+                let cam_off = wall.reverse_wall().to_coord() + self.camera_offset;
 
-            self.camera_offset = Dims3D(
-                cam_off.0,
-                cam_off.1,
-                (-self.game.get_player_pos().2).max(
-                    (self.game.get_maze().size().2 - self.game.get_player_pos().2 - 1)
-                        .min(cam_off.2),
-                ),
-            )
-        } else {
-            self.game
-                .move_player(
-                    wall,
-                    if self.settings.get_slow() {
-                        MoveMode::Slow
-                    } else if fast {
-                        MoveMode::Fast
-                    } else {
-                        MoveMode::Normal
-                    },
-                    !self.settings.get_disable_tower_auto_up(),
+                self.camera_offset = Dims3D(
+                    cam_off.0,
+                    cam_off.1,
+                    (-self.game.get_player_pos().2).max(
+                        (self.game.get_maze().size().2 - self.game.get_player_pos().2 - 1)
+                            .min(cam_off.2),
+                    ),
                 )
-                .unwrap();
+            }
+            GameViewMode::Adventure => {
+                self.game
+                    .move_player(
+                        wall,
+                        if self.settings.get_slow() {
+                            MoveMode::Slow
+                        } else if fast {
+                            MoveMode::Fast
+                        } else {
+                            MoveMode::Normal
+                        },
+                        !self.settings.get_disable_tower_auto_up(),
+                    )
+                    .unwrap();
+            }
         }
     }
 }
