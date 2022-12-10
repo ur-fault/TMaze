@@ -279,18 +279,13 @@ impl App {
                         size.1 / 2 - last_player_real_pos.1,
                     ),
                     CameraMode::EdgeFollow(margin_x, margin_y) => {
-                        let player_real_pos =
-                            self.last_edge_follow_offset + last_player_real_pos;
+                        let player_real_pos = self.last_edge_follow_offset + last_player_real_pos;
 
-                        if player_real_pos.0 < margin_x
-                            || player_real_pos.0 > size.0 - margin_x
-                        {
+                        if player_real_pos.0 < margin_x || player_real_pos.0 > size.0 - margin_x {
                             self.last_edge_follow_offset.0 = size.0 / 2 - last_player_real_pos.0;
                         }
 
-                        if player_real_pos.1 < margin_y
-                            || player_real_pos.1 > size.1 - margin_y
-                        {
+                        if player_real_pos.1 < margin_y || player_real_pos.1 > size.1 - margin_y {
                             self.last_edge_follow_offset.1 = size.1 / 2 - last_player_real_pos.1;
                         }
                         self.last_edge_follow_offset
@@ -486,8 +481,8 @@ impl App {
             }
         }
 
-        let moves = game.get_moves();
         // Drawing visited places (moves)
+        let moves = game.get_moves();
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
                 let real_pos = helpers::from_maze_to_real(*move_pos);
@@ -495,7 +490,7 @@ impl App {
             }
         }
 
-        // Drawing maze itself
+        // Drawing insides of the maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
             let ypos = iy as i32 * 2 + 1 + maze_pos.1;
             if ypos >= size.1 - 2 {
