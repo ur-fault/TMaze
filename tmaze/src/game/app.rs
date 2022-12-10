@@ -156,7 +156,7 @@ impl App {
                                 "Supports 3D mazes",
                                 "",
                                 "Created by:",
-                                "    - morsee",
+                                &format!("    - {}", env!("CARGO_PKG_AUTHORS")),
                                 "",
                                 "Version:",
                                 &format!("    {}", env!("CARGO_PKG_VERSION")),
