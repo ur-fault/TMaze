@@ -271,27 +271,27 @@ impl App {
 
         let maze_pos = {
             let pos = if is_around_player {
-                let player_real_maze_pos = helpers::from_maze_to_real(player_pos);
+                let last_player_real_pos = helpers::from_maze_to_real(player_pos);
 
                 match camera_mode {
                     CameraMode::CloseFollow => Dims(
-                        size.0 / 2 - player_real_maze_pos.0,
-                        size.1 / 2 - player_real_maze_pos.1,
+                        size.0 / 2 - last_player_real_pos.0,
+                        size.1 / 2 - last_player_real_pos.1,
                     ),
                     CameraMode::EdgeFollow(margin_x, margin_y) => {
-                        let current_player_real_pos =
-                            self.last_edge_follow_offset + player_real_maze_pos;
+                        let player_real_pos =
+                            self.last_edge_follow_offset + last_player_real_pos;
 
-                        if current_player_real_pos.0 < margin_x
-                            || current_player_real_pos.0 > size.0 - margin_x
+                        if player_real_pos.0 < margin_x
+                            || player_real_pos.0 > size.0 - margin_x
                         {
-                            self.last_edge_follow_offset.0 = size.0 / 2 - player_real_maze_pos.0;
+                            self.last_edge_follow_offset.0 = size.0 / 2 - last_player_real_pos.0;
                         }
 
-                        if current_player_real_pos.1 < margin_y
-                            || current_player_real_pos.1 > size.1 - margin_y
+                        if player_real_pos.1 < margin_y
+                            || player_real_pos.1 > size.1 - margin_y
                         {
-                            self.last_edge_follow_offset.1 = size.1 / 2 - player_real_maze_pos.1;
+                            self.last_edge_follow_offset.1 = size.1 / 2 - last_player_real_pos.1;
                         }
                         self.last_edge_follow_offset
                     }
