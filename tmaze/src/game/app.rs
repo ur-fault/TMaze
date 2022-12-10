@@ -561,7 +561,7 @@ impl App {
                 &mut normal_context,
                 &mut player_context,
                 &mut goal_context,
-                &maze.get_cells()[floor as usize][player_pos.1 as usize][player_pos.0 as usize],
+                &maze.get_cell(player_pos).unwrap(),
                 (player_pos.0, player_pos.1),
                 maze_pos,
                 floor,
