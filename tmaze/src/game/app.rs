@@ -309,18 +309,22 @@ impl App {
         let mut normal_context = DrawContext {
             renderer: &renderer_cell,
             style: normal_style,
+            frame: None,
         };
         let mut text_context = DrawContext {
             renderer: &renderer_cell,
             style: text_style,
+            frame: None,
         };
         let mut player_context = DrawContext {
             renderer: &renderer_cell,
             style: player_style,
+            frame: None,
         };
         let mut goal_context = DrawContext {
             renderer: &renderer_cell,
             style: goal_style,
+            frame: None,
         };
 
         let floor = player_pos.2 + camera_offset.2;

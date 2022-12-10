@@ -160,6 +160,7 @@ pub fn render_menu(
         let mut context = DrawContext {
             renderer: &RefCell::new(renderer),
             style: box_style,
+            frame: None,
         };
 
         context.draw_box(pos, menu_size);
