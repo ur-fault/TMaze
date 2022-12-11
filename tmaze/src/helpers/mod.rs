@@ -16,7 +16,7 @@ pub fn box_center(container_start: Dims, container_end: Dims, box_dims: Dims) ->
 
 pub fn maze_render_size(maze: &Maze) -> Dims {
     let msize = maze.size();
-    Dims((msize.0 * 2 + 1) as i32, (msize.1 * 2 + 1) as i32)
+    Dims(msize.0, msize.1) * 2 + Dims(1, 1)
 }
 
 pub fn value_if<T: Default>(cond: bool, fun: impl FnOnce() -> T) -> T {
