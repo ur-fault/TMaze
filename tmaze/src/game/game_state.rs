@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use cmaze::{
     game::{Game, MoveMode},
     maze::{CellWall, Dims3D},
@@ -11,6 +13,15 @@ use crate::settings::Settings;
 pub enum GameViewMode {
     Adventure,
     Spectator,
+}
+
+impl Display for GameViewMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GameViewMode::Adventure => write!(f, "Adventure"),
+            GameViewMode::Spectator => write!(f, "Spectator"),
+        }
+    }
 }
 
 pub struct ShowMenu;

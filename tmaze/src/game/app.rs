@@ -10,7 +10,7 @@ use crossterm::{
 };
 use masof::Renderer;
 
-use crate::helpers::{constants, LineDir};
+use crate::helpers::{constants, value_if_else, LineDir};
 use crate::maze::CellWall;
 use crate::maze::{algorithms::*, Cell};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
@@ -434,29 +434,25 @@ impl App {
             draw_line_double(
                 &mut normal_context,
                 (maze_pos.0, ypos + 1),
-                if maze
-                    .get_cell(Dims3D(0, y, floor))
-                    .unwrap()
-                    .get_wall(CellWall::Bottom)
-                {
-                    LineDir::ClosedLeft
-                } else {
-                    LineDir::Vertical
-                },
+                value_if_else(
+                    maze.get_cell(Dims3D(0, y, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Bottom),
+                    || LineDir::ClosedLeft,
+                    || LineDir::Vertical,
+                ),
             );
 
             draw_line_double(
                 &mut normal_context,
                 (maze_pos.0 + maze_render_size.0 - 1, ypos + 1),
-                if maze
-                    .get_cell(Dims3D(maze.size().0 - 1, y, floor))
-                    .unwrap()
-                    .get_wall(CellWall::Bottom)
-                {
-                    LineDir::ClosedRight
-                } else {
-                    LineDir::Vertical
-                },
+                value_if_else(
+                    maze.get_cell(Dims3D(maze.size().0 - 1, y, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Bottom),
+                    || LineDir::ClosedRight,
+                    || LineDir::Vertical,
+                ),
             );
 
             draw_line_double(&mut normal_context, (maze_pos.0, ypos), LineDir::Vertical);
@@ -567,12 +563,11 @@ impl App {
         };
 
         let from_start = game.get_elapsed().unwrap();
+        let view_mode = game_state.view_mode.to_string();
+
         let texts = (
             &pos_text,
-            match game_state.view_mode {
-                GameViewMode::Adventure => "Adventure",
-                GameViewMode::Spectator => "Spectator",
-            },
+            view_mode.as_str(),
             &format!("{} moves", game_state.game.get_move_count()),
             &ui::format_duration(from_start),
         );

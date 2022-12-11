@@ -27,6 +27,14 @@ pub fn value_if<T: Default>(cond: bool, fun: impl FnOnce() -> T) -> T {
     }
 }
 
+pub fn value_if_else<T>(cond: bool, fun: impl FnOnce() -> T, else_fun: impl FnOnce() -> T) -> T {
+    if cond {
+        fun()
+    } else {
+        else_fun()
+    }
+}
+
 pub enum LineDir {
     Empty,
     Cross,
