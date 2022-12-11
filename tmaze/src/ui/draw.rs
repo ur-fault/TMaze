@@ -74,6 +74,7 @@ pub fn draw_char<'a>(
     renderer.draw_char(x as u16, y as u16, text, style);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Frame {
     start: Dims,
     end: Dims,

@@ -14,7 +14,7 @@ use crate::helpers::{constants, LineDir};
 use crate::maze::CellWall;
 use crate::maze::{algorithms::*, Cell};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
-use crate::ui::{DrawContext, MenuError};
+use crate::ui::{box_center_screen, DrawContext, Frame, MenuError};
 use crate::{helpers, ui, ui::CrosstermError};
 use cmaze::core::*;
 use dirs::preference_dir;
@@ -306,10 +306,12 @@ impl App {
         self.renderer.begin()?;
         let renderer_cell = RefCell::new(&mut self.renderer);
 
+        let frame = Frame::new_sized(box_center_screen(maze_render_size)?, maze_render_size);
+
         let mut normal_context = DrawContext {
             renderer: &renderer_cell,
             style: normal_style,
-            frame: None,
+            frame: frame.into(),
         };
         let mut text_context = DrawContext {
             renderer: &renderer_cell,
@@ -319,12 +321,12 @@ impl App {
         let mut player_context = DrawContext {
             renderer: &renderer_cell,
             style: player_style,
-            frame: None,
+            frame: frame.into(),
         };
         let mut goal_context = DrawContext {
             renderer: &renderer_cell,
             style: goal_style,
-            frame: None,
+            frame: frame.into(),
         };
 
         let floor = player_pos.2 + camera_offset.2;
@@ -341,93 +343,81 @@ impl App {
             context.draw_str(pos.into(), l.double_line())
         };
 
-        // corners
-        if maze_pos.1 > 0 {
-            draw_line_double_duo(
-                &mut normal_context,
-                maze_pos,
-                LineDir::BottomRight,
-                LineDir::Horizontal,
-            );
-            draw_line_double_duo(
-                &mut normal_context,
-                (maze_pos.0 + maze_render_size.0 - 2, maze_pos.1),
-                LineDir::Horizontal,
-                LineDir::BottomLeft,
-            );
-        }
+        draw_line_double_duo(
+            &mut normal_context,
+            maze_pos,
+            LineDir::BottomRight,
+            LineDir::Horizontal,
+        );
+        draw_line_double_duo(
+            &mut normal_context,
+            (maze_pos.0 + maze_render_size.0 - 2, maze_pos.1),
+            LineDir::Horizontal,
+            LineDir::BottomLeft,
+        );
 
-        if maze_pos.1 + maze_render_size.1 - 2 < size.1 - 3 {
-            draw_line_double(
+        draw_line_double(
+            &mut normal_context,
+            (maze_pos.0, maze_pos.1 + maze_render_size.1 - 2),
+            LineDir::Vertical,
+        );
+        draw_line_double(
+            &mut normal_context,
+            (
+                maze_pos.0 + maze_render_size.0 - 1,
+                maze_pos.1 + maze_render_size.1 - 2,
+            ),
+            LineDir::Vertical,
+        );
+
+        draw_line_double(
+            &mut normal_context,
+            (maze_pos.0, maze_pos.1 + maze_render_size.1 - 1),
+            LineDir::TopRight,
+        );
+        draw_line_double_duo(
+            &mut normal_context,
+            (
+                maze_pos.0 + maze_render_size.0 - 2,
+                maze_pos.1 + maze_render_size.1 - 1,
+            ),
+            LineDir::Horizontal,
+            LineDir::TopLeft,
+        );
+
+        for x in 0..maze.size().0 - 1 {
+            draw_line_double_duo(
                 &mut normal_context,
-                (maze_pos.0, maze_pos.1 + maze_render_size.1 - 2),
-                LineDir::Vertical,
+                (x as i32 * 2 + maze_pos.0 + 1, maze_pos.1),
+                LineDir::Horizontal,
+                if maze
+                    .get_cell(Dims3D(x, 0, floor))
+                    .unwrap()
+                    .get_wall(CellWall::Right)
+                {
+                    LineDir::ClosedTop
+                } else {
+                    LineDir::Horizontal
+                },
             );
-            draw_line_double(
+
+            draw_line_double_duo(
                 &mut normal_context,
                 (
-                    maze_pos.0 + maze_render_size.0 - 1,
-                    maze_pos.1 + maze_render_size.1 - 2,
-                ),
-                LineDir::Vertical,
-            );
-        }
-
-        if maze_pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
-            draw_line_double(
-                &mut normal_context,
-                (maze_pos.0, maze_pos.1 + maze_render_size.1 - 1),
-                LineDir::TopRight,
-            );
-            draw_line_double_duo(
-                &mut normal_context,
-                (
-                    maze_pos.0 + maze_render_size.0 - 2,
+                    x as i32 * 2 + maze_pos.0 + 1,
                     maze_pos.1 + maze_render_size.1 - 1,
                 ),
                 LineDir::Horizontal,
-                LineDir::TopLeft,
+                if maze
+                    .get_cell(Dims3D(x, maze.size().1 - 1, floor))
+                    .unwrap()
+                    .get_wall(CellWall::Right)
+                {
+                    LineDir::ClosedBottom
+                } else {
+                    LineDir::Horizontal
+                },
             );
-        }
-
-        // Horizontal edge lines
-        for x in 0..maze.size().0 - 1 {
-            if maze_pos.1 > 0 {
-                draw_line_double_duo(
-                    &mut normal_context,
-                    (x as i32 * 2 + maze_pos.0 + 1, maze_pos.1),
-                    LineDir::Horizontal,
-                    if maze
-                        .get_cell(Dims3D(x, 0, floor))
-                        .unwrap()
-                        .get_wall(CellWall::Right)
-                    {
-                        LineDir::ClosedTop
-                    } else {
-                        LineDir::Horizontal
-                    },
-                );
-            }
-
-            if maze_pos.1 + maze_render_size.1 - 1 < size.1 - 2 {
-                draw_line_double_duo(
-                    &mut normal_context,
-                    (
-                        x as i32 * 2 + maze_pos.0 + 1,
-                        maze_pos.1 + maze_render_size.1 - 1,
-                    ),
-                    LineDir::Horizontal,
-                    if maze
-                        .get_cell(Dims3D(x, maze.size().1 - 1, floor))
-                        .unwrap()
-                        .get_wall(CellWall::Right)
-                    {
-                        LineDir::ClosedBottom
-                    } else {
-                        LineDir::Horizontal
-                    },
-                );
-            }
         }
 
         // Vertical edge lines
@@ -441,48 +431,44 @@ impl App {
                 continue;
             }
 
-            if ypos + 3 < size.1 {
-                draw_line_double(
-                    &mut normal_context,
-                    (maze_pos.0, ypos + 1),
-                    if maze
-                        .get_cell(Dims3D(0, y, floor))
-                        .unwrap()
-                        .get_wall(CellWall::Bottom)
-                    {
-                        LineDir::ClosedLeft
-                    } else {
-                        LineDir::Vertical
-                    },
-                );
+            draw_line_double(
+                &mut normal_context,
+                (maze_pos.0, ypos + 1),
+                if maze
+                    .get_cell(Dims3D(0, y, floor))
+                    .unwrap()
+                    .get_wall(CellWall::Bottom)
+                {
+                    LineDir::ClosedLeft
+                } else {
+                    LineDir::Vertical
+                },
+            );
 
-                draw_line_double(
-                    &mut normal_context,
-                    (maze_pos.0 + maze_render_size.0 - 1, ypos + 1),
-                    if maze
-                        .get_cell(Dims3D(maze.size().0 - 1, y, floor))
-                        .unwrap()
-                        .get_wall(CellWall::Bottom)
-                    {
-                        LineDir::ClosedRight
-                    } else {
-                        LineDir::Vertical
-                    },
-                );
-            }
+            draw_line_double(
+                &mut normal_context,
+                (maze_pos.0 + maze_render_size.0 - 1, ypos + 1),
+                if maze
+                    .get_cell(Dims3D(maze.size().0 - 1, y, floor))
+                    .unwrap()
+                    .get_wall(CellWall::Bottom)
+                {
+                    LineDir::ClosedRight
+                } else {
+                    LineDir::Vertical
+                },
+            );
 
-            if ypos + 1 < size.1 {
-                draw_line_double(&mut normal_context, (maze_pos.0, ypos), LineDir::Vertical);
+            draw_line_double(&mut normal_context, (maze_pos.0, ypos), LineDir::Vertical);
 
-                draw_line_double(
-                    &mut normal_context,
-                    (
-                        maze_pos.0 + maze_render_size.0 - 1,
-                        y as i32 * 2 + maze_pos.1 + 1,
-                    ),
-                    LineDir::Vertical,
-                );
-            }
+            draw_line_double(
+                &mut normal_context,
+                (
+                    maze_pos.0 + maze_render_size.0 - 1,
+                    y as i32 * 2 + maze_pos.1 + 1,
+                ),
+                LineDir::Vertical,
+            );
         }
 
         // Drawing visited places (moves)
@@ -497,15 +483,13 @@ impl App {
         // Drawing insides of the maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
             let ypos = iy as i32 * 2 + 1 + maze_pos.1;
-            if ypos >= size.1 - 2 {
-                break;
-            }
 
             for (ix, cell) in row.iter().enumerate() {
                 let xpos = ix as i32 * 2 + 1 + maze_pos.0;
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
                     draw_line_double(&mut normal_context, (xpos + 1, ypos), LineDir::Vertical);
                 }
+
                 if ypos + 1 < size.1 as i32 - 2
                     && ypos > 0
                     && cell.get_wall(CellWall::Bottom)
@@ -526,24 +510,21 @@ impl App {
                     ups_as_goal,
                 );
 
-                if iy == maze.size().1 as usize - 1 || ix == maze.size().0 as usize - 1 {
-                    continue;
-                }
+                let cell2 = match maze.get_cell(Dims3D(ix as i32 + 1, iy as i32 + 1, floor)) {
+                    Some(cell) => cell,
+                    None => continue,
+                };
 
-                let cell2 = &maze.get_cells()[floor as usize][iy + 1][ix + 1];
-
-                if ypos < size.1 as i32 - 3 && ypos > 0 {
-                    draw_line_double(
-                        &mut normal_context,
-                        (xpos + 1, ypos + 1),
-                        LineDir::double_line_bools(
-                            cell.get_wall(CellWall::Bottom),
-                            cell.get_wall(CellWall::Right),
-                            cell2.get_wall(CellWall::Top),
-                            cell2.get_wall(CellWall::Left),
-                        ),
-                    );
-                }
+                draw_line_double(
+                    &mut normal_context,
+                    (xpos + 1, ypos + 1),
+                    LineDir::double_line_bools(
+                        cell.get_wall(CellWall::Bottom),
+                        cell.get_wall(CellWall::Right),
+                        cell2.get_wall(CellWall::Top),
+                        cell2.get_wall(CellWall::Left),
+                    ),
+                );
             }
         }
 
