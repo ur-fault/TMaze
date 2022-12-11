@@ -9,20 +9,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 colored = "^2"
-crossterm = {version = "^0.24.0", features = ["serde"]}
-masof = {git = "https://github.com/MineFuf/masof.git"}
+crossterm = { version = "^0.24.0", features = ["serde"] }
+masof = { git = "https://github.com/MineFuf/masof.git" }
 substring = "^1.4.5"
-serde = {version = "^1.0.136", features = ["derive"]}
+serde = { version = "^1.0.136", features = ["derive"] }
 pausable_clock = "^1.0.1"
 dirs = "^4.0.0"
 ron = "0.8.0"
-clap = { version = "4.0.29", features = ["derive"], optional = true }
-cmaze = { path = "../cmaze"}
+clap = { version = "4.0.29", features = ["derive"] }
+cmaze = { path = "../cmaze" }
 pad = "0.1.6"
 rand = "^0.8.1"
-wasm-bindgen = { version = "0.2.83", optional = true}
-
-[features]
-default = ["cli"]
-wasm = ["dep:wasm-bindgen"]
-cli = ["dep:clap"]
