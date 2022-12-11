@@ -4,7 +4,8 @@ version = "1.9.0"
 edition = "2021"
 authors = ["ur-fault"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 colored = "^2"
@@ -15,7 +16,13 @@ serde = {version = "^1.0.136", features = ["derive"]}
 pausable_clock = "^1.0.1"
 dirs = "^4.0.0"
 ron = "0.8.0"
-clap = { version = "4.0.29", features = ["derive"] }
+clap = { version = "4.0.29", features = ["derive"], optional = true }
 cmaze = { path = "../cmaze"}
 pad = "0.1.6"
 rand = "^0.8.1"
+wasm-bindgen = { version = "0.2.83", optional = true}
+
+[features]
+default = ["cli"]
+wasm = ["dep:wasm-bindgen"]
+cli = ["dep:clap"]
