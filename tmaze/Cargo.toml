@@ -4,9 +4,6 @@ version = "1.9.0"
 edition = "2021"
 authors = ["ur-fault"]
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 [dependencies]
 colored = "^2"
 crossterm = { version = "^0.24.0", features = ["serde"] }
