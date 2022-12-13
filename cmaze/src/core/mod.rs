@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign, Div, DivAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Dims(pub i32, pub i32);
@@ -54,6 +54,21 @@ impl MulAssign<i32> for Dims {
     fn mul_assign(&mut self, other: i32) {
         self.0 *= other;
         self.1 *= other;
+    }
+}
+
+impl Div<i32> for Dims {
+    type Output = Dims;
+
+    fn div(self, other: i32) -> Dims {
+        Dims(self.0 / other, self.1 / other)
+    }
+}
+
+impl DivAssign<i32> for Dims {
+    fn div_assign(&mut self, other: i32) {
+        self.0 /= other;
+        self.1 /= other;
     }
 }
 
@@ -123,6 +138,22 @@ impl MulAssign<i32> for Dims3D {
     }
 }
 
+impl Div<i32> for Dims3D {
+    type Output = Dims3D;
+
+    fn div(self, other: i32) -> Dims3D {
+        Dims3D(self.0 / other, self.1 / other, self.2 / other)
+    }
+}
+
+impl DivAssign<i32> for Dims3D {
+    fn div_assign(&mut self, other: i32) {
+        self.0 /= other;
+        self.1 /= other;
+        self.2 /= other;
+    }
+}
+
 impl From<(i32, i32, i32)> for Dims3D {
     fn from(tuple: (i32, i32, i32)) -> Self {
         Dims3D(tuple.0, tuple.1, tuple.2)
@@ -183,6 +214,21 @@ impl MulAssign<usize> for DimsU {
     fn mul_assign(&mut self, other: usize) {
         self.0 *= other;
         self.1 *= other;
+    }
+}
+
+impl Div<usize> for DimsU {
+    type Output = DimsU;
+
+    fn div(self, other: usize) -> DimsU {
+        DimsU(self.0 / other, self.1 / other)
+    }
+}
+
+impl DivAssign<usize> for DimsU {
+    fn div_assign(&mut self, other: usize) {
+        self.0 /= other;
+        self.1 /= other;
     }
 }
 

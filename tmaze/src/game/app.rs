@@ -14,7 +14,7 @@ use crate::helpers::{constants, value_if_else, LineDir};
 use crate::maze::CellWall;
 use crate::maze::{algorithms::*, Cell};
 use crate::settings::{CameraMode, MazeGenAlgo, Settings};
-use crate::ui::{box_center_screen, DrawContext, Frame, MenuError};
+use crate::ui::{box_center_screen, draw_box, DrawContext, Frame, MenuError};
 use crate::{helpers, ui, ui::CrosstermError};
 use cmaze::core::*;
 use dirs::preference_dir;
@@ -263,39 +263,42 @@ impl App {
         let maze_render_size = helpers::maze_render_size(maze);
         let size = {
             let size = size()?;
-            (size.0 as i32, size.1 as i32)
+            Dims(size.0 as i32, size.1 as i32)
         };
 
-        let is_around_player =
-            maze_render_size.0 > size.0 as i32 || maze_render_size.1 + 3 > size.1 as i32;
+        let maze_margin = Dims(10, 3);
+
+        let is_around_player = maze_render_size.0 + maze_margin.0 + 2 > size.0 as i32
+            || maze_render_size.1 + 3 + maze_margin.1 + 4 > size.1 as i32;
 
         let maze_pos = {
             let pos = if is_around_player {
                 let last_player_real_pos = helpers::from_maze_to_real(player_pos);
 
                 match camera_mode {
-                    CameraMode::CloseFollow => Dims(
-                        size.0 / 2 - last_player_real_pos.0,
-                        size.1 / 2 - last_player_real_pos.1,
-                    ),
+                    CameraMode::CloseFollow => size / 2 - last_player_real_pos,
                     CameraMode::EdgeFollow(margin_x, margin_y) => {
                         let player_real_pos = self.last_edge_follow_offset + last_player_real_pos;
 
-                        if player_real_pos.0 < margin_x || player_real_pos.0 > size.0 - margin_x {
+                        if player_real_pos.0 + maze_margin.0 + 1 < margin_x
+                            || player_real_pos.0 - maze_margin.1 - 1 > size.0 - margin_x
+                        {
                             self.last_edge_follow_offset.0 = size.0 / 2 - last_player_real_pos.0;
                         }
 
-                        if player_real_pos.1 < margin_y || player_real_pos.1 > size.1 - margin_y {
+                        if player_real_pos.1 + maze_margin.1 + 1 < margin_y
+                            || player_real_pos.1 - maze_margin.1 - 1 > size.1 - margin_y
+                        {
                             self.last_edge_follow_offset.1 = size.1 / 2 - last_player_real_pos.1;
                         }
                         self.last_edge_follow_offset
                     }
                 }
             } else {
-                ui::box_center_screen(Dims(maze_render_size.0 as i32, maze_render_size.1 as i32))?
+                ui::box_center_screen(maze_render_size)?
             };
 
-            (pos.0 + camera_offset.0 * 2, pos.1 + camera_offset.1 * 2)
+            pos + Dims::from(*camera_offset) * 2
         };
 
         let normal_style = self.settings.get_color_scheme().normals();
@@ -306,7 +309,12 @@ impl App {
         self.renderer.begin()?;
         let renderer_cell = RefCell::new(&mut self.renderer);
 
-        let frame = Frame::new_sized(box_center_screen(maze_render_size)?, maze_render_size);
+        let text_frame = if is_around_player {
+            Frame::new_sized(Dims(0, 0), size.into()).with_margin(maze_margin)
+        } else {
+            Frame::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
+        };
+        let frame = text_frame.with_margin(Dims(1, 2));
 
         let mut normal_context = DrawContext {
             renderer: &renderer_cell,
@@ -316,7 +324,7 @@ impl App {
         let mut text_context = DrawContext {
             renderer: &renderer_cell,
             style: text_style,
-            frame: None,
+            frame: text_frame.into(),
         };
         let mut player_context = DrawContext {
             renderer: &renderer_cell,
@@ -328,6 +336,9 @@ impl App {
             style: goal_style,
             frame: frame.into(),
         };
+
+        let box_frame = text_frame.with_margin(Dims(0, 1));
+        normal_context.draw_box(box_frame.start, box_frame.size());
 
         let floor = player_pos.2 + camera_offset.2;
 
@@ -345,7 +356,7 @@ impl App {
 
         draw_line_double_duo(
             &mut normal_context,
-            maze_pos,
+            maze_pos.into(),
             LineDir::BottomRight,
             LineDir::Horizontal,
         );
@@ -500,7 +511,7 @@ impl App {
                     &mut goal_context,
                     cell,
                     (ix as i32, iy as i32),
-                    maze_pos,
+                    maze_pos.into(),
                     floor,
                     player_pos,
                     ups_as_goal,
@@ -544,7 +555,7 @@ impl App {
                 &mut goal_context,
                 &maze.get_cell(player_pos).unwrap(),
                 (player_pos.0, player_pos.1),
-                maze_pos,
+                maze_pos.into(),
                 floor,
                 player_pos,
                 ups_as_goal,
@@ -573,10 +584,19 @@ impl App {
         );
 
         // Print texts
-        let str_pos_tl = Dims(text_horizontal_margin, 0);
-        let str_pos_tr = Dims(size.0 - text_horizontal_margin - texts.1.len() as i32, 0);
-        let str_pos_bl = Dims(text_horizontal_margin, size.1 - 2);
-        let str_pos_br = Dims::from(size) - Dims(text_horizontal_margin + texts.3.len() as i32, 2);
+        let str_pos_tl = Dims(
+            text_horizontal_margin + text_frame.start.0,
+            text_frame.start.1,
+        );
+        let str_pos_tr = Dims(
+            text_frame.end.0 - text_horizontal_margin - texts.1.len() as i32,
+            text_frame.start.1,
+        );
+        let str_pos_bl = Dims(
+            text_horizontal_margin + text_frame.start.0,
+            text_frame.end.1,
+        );
+        let str_pos_br = text_frame.end - Dims(text_horizontal_margin + texts.3.len() as i32, 0);
 
         text_context.draw_str(str_pos_tl, texts.0);
         text_context.draw_str(str_pos_tr, texts.1);

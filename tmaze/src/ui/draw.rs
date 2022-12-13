@@ -76,8 +76,8 @@ pub fn draw_char<'a>(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Frame {
-    start: Dims,
-    end: Dims,
+    pub start: Dims,
+    pub end: Dims,
 }
 
 impl Frame {
@@ -93,7 +93,7 @@ impl Frame {
     }
 
     pub fn size(&self) -> Dims {
-        Dims(self.end.0 - self.start.0, self.end.1 - self.start.1)
+        Dims(self.end.0 - self.start.0, self.end.1 - self.start.1) + Dims(1, 1)
     }
 
     pub fn contains(&self, pos: Dims) -> bool {
@@ -104,13 +104,17 @@ impl Frame {
         let mut text = text.as_ref();
         let size = self.size();
 
+        if pos.1 < self.start.1 || pos.1 > self.end.1 {
+            return ("", pos);
+        }
+
         if pos.0 < self.start.0 {
             let offset = self.start.0 - pos.0;
-            text = text.substring(offset as usize, text.len());
+            text = text.substring(offset as usize, text.chars().count());
             pos = Dims(self.start.0, pos.1);
         }
 
-        if text.len() as i32 + self.start.0 > self.end.0 {
+        if text.chars().count() as i32 + pos.0 > self.end.0 {
             let x = size.0 - (pos.0 - self.start.0);
             let x = x.max(0) as usize;
             text = text.substring(0, x);
@@ -122,6 +126,13 @@ impl Frame {
     pub fn trim_relative<'a>(&'a self, text: &'a impl AsRef<str>, pos: Dims) -> (&str, Dims) {
         let (text, pos) = self.trim_absolute(text, pos + self.start);
         (text, pos - self.start)
+    }
+
+    pub fn with_margin(&self, margin: Dims) -> Self {
+        Self {
+            start: self.start + margin,
+            end: self.end - margin,
+        }
     }
 }
 
