@@ -225,8 +225,8 @@ impl Settings {
         let default_settings_string = include_str!("./default_settings.ron");
 
         let settings_string = fs::read_to_string(&path);
+        let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
         if let Ok(settings_string) = settings_string {
-            let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
             match options.from_str(&settings_string) {
                 Ok(settings) => settings,
                 Err(err) => {
@@ -236,7 +236,7 @@ impl Settings {
         } else {
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(&path, default_settings_string).unwrap();
-            ron::from_str(default_settings_string).unwrap()
+            options.from_str(default_settings_string).unwrap()
         }
     }
 }
