@@ -1,4 +1,4 @@
-use std::{io::stdout, cell::RefCell};
+use std::{cell::RefCell, io::stdout};
 
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},

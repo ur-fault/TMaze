@@ -7,8 +7,8 @@ pub use crossterm::{
 pub use masof::{Color, ContentStyle, Renderer};
 pub use substring::Substring;
 
-use crate::helpers;
 use crate::core::*;
+use crate::helpers;
 
 pub mod draw;
 pub mod menu;
@@ -26,9 +26,7 @@ pub struct CrosstermError(pub crossterm::ErrorKind);
 impl From<masof::renderer::Error> for CrosstermError {
     fn from(error: masof::renderer::Error) -> Self {
         match error {
-            masof::renderer::Error::CrossTermError(e) => {
-                Self(e)
-            }
+            masof::renderer::Error::CrossTermError(e) => Self(e),
             _ => panic!("Unexpected error: {}", error),
         }
     }

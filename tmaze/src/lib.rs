@@ -1,6 +1,6 @@
-pub mod ui;
+pub mod game;
 pub mod helpers;
 pub mod settings;
-pub mod game;
+pub mod ui;
 
 use cmaze::{core, maze};

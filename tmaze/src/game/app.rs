@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::io::{stdout, Stdout};
-use std::path::PathBuf;
 use std::time::Duration;
 
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
@@ -13,11 +12,10 @@ use masof::Renderer;
 use crate::helpers::{constants, value_if_else, LineDir};
 use crate::maze::CellWall;
 use crate::maze::{algorithms::*, Cell};
-use crate::settings::{CameraMode, MazeGenAlgo, Settings};
-use crate::ui::{box_center_screen, draw_box, DrawContext, Frame, MenuError};
+use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
+use crate::ui::{DrawContext, Frame, MenuError};
 use crate::{helpers, ui, ui::CrosstermError};
 use cmaze::core::*;
-use dirs::preference_dir;
 
 use super::{GameError, GameState, GameViewMode};
 
@@ -26,18 +24,16 @@ pub struct App {
     stdout: Stdout,
     settings: Settings,
     last_edge_follow_offset: Dims,
-    settings_file_path: PathBuf,
 }
 
 impl App {
     pub fn new() -> Self {
-        let settings_path = preference_dir().unwrap().join("tmaze").join("settings.ron");
+        let settings_path = Settings::default_path();
         App {
             renderer: Renderer::default(),
             stdout: stdout(),
             settings: Settings::load(settings_path.clone()),
             last_edge_follow_offset: Dims(0, 0),
-            settings_file_path: settings_path,
         }
     }
 
@@ -77,7 +73,7 @@ impl App {
                     },
 
                     1 => {
-                        self.show_settings_popup()?;
+                        self.show_settings_screen()?;
                     }
                     2 => {
                         self.show_controls_popup()?;
@@ -97,18 +93,13 @@ impl App {
         Ok(())
     }
 
-    fn show_settings_popup(&mut self) -> Result<(), GameError> {
-        ui::popup(
+    fn show_settings_screen(&mut self) -> Result<(), GameError> {
+        let mut settings = self.settings.clone();
+        settings.edit(
             &mut self.renderer,
-            self.settings.get_color_scheme().normals(),
-            self.settings.get_color_scheme().texts(),
-            "Settings",
-            &[
-                "Settings file is located at:",
-                &format!(" {}", self.settings_file_path.to_str().unwrap()),
-            ],
+            self.settings.color_scheme.clone().unwrap(),
         )?;
-
+        self.settings = settings;
         Ok(())
     }
 
