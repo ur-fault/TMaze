@@ -259,11 +259,13 @@ impl App {
 
         let maze_margin = Dims(10, 3);
 
-        let is_around_player = maze_render_size.0 + maze_margin.0 + 2 > size.0 as i32
-            || maze_render_size.1 + 3 + maze_margin.1 + 4 > size.1 as i32;
+        let fits_on_screen = maze_render_size.0 + maze_margin.0 + 2 <= size.0 as i32
+            && maze_render_size.1 + 3 + maze_margin.1 + 4 <= size.1 as i32;
 
         let maze_pos = {
-            let pos = if is_around_player {
+            let pos = if fits_on_screen {
+                ui::box_center_screen(maze_render_size)?
+            } else {
                 let last_player_real_pos = helpers::from_maze_to_real(player_pos);
 
                 match camera_mode {
@@ -285,8 +287,6 @@ impl App {
                         self.last_edge_follow_offset
                     }
                 }
-            } else {
-                ui::box_center_screen(maze_render_size)?
             };
 
             pos + Dims::from(*camera_offset) * 2
@@ -300,10 +300,10 @@ impl App {
         self.renderer.begin()?;
         let renderer_cell = RefCell::new(&mut self.renderer);
 
-        let text_frame = if is_around_player {
-            Frame::new_sized(Dims(0, 0), size.into()).with_margin(maze_margin)
-        } else {
+        let text_frame = if fits_on_screen {
             Frame::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
+        } else {
+            Frame::new_sized(Dims(0, 0), size.into()).with_margin(maze_margin)
         };
         let frame = text_frame.with_margin(Dims(1, 2));
 
