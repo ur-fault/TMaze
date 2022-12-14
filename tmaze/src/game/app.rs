@@ -566,6 +566,22 @@ impl App {
 
         let from_start = game.get_elapsed().unwrap();
         let view_mode = game_state.view_mode.to_string();
+        let (view_mode, pos_text) =
+            if view_mode.len() as i32 + text_horizontal_margin * 2 + pos_text.len() as i32 + 1
+                > text_frame.size().0
+            {
+                (
+                    format!("{}", view_mode.chars().nth(0).unwrap()),
+                    format!(
+                        "x:{} y:{} f:{}",
+                        player_pos.0 + 1,
+                        player_pos.1 + 1,
+                        player_pos.2 + 1
+                    ),
+                )
+            } else {
+                (view_mode, pos_text)
+            };
 
         let texts = (
             &pos_text,
@@ -580,14 +596,15 @@ impl App {
             text_frame.start.1,
         );
         let str_pos_tr = Dims(
-            text_frame.end.0 - text_horizontal_margin - texts.1.len() as i32,
+            text_frame.end.0 - text_horizontal_margin - texts.1.len() as i32 + 1,
             text_frame.start.1,
         );
         let str_pos_bl = Dims(
             text_horizontal_margin + text_frame.start.0,
             text_frame.end.1,
         );
-        let str_pos_br = text_frame.end - Dims(text_horizontal_margin + texts.3.len() as i32, 0);
+        let str_pos_br =
+            text_frame.end - Dims(text_horizontal_margin + texts.3.len() as i32 - 1, 0);
 
         text_context.draw_str(str_pos_tl, texts.0);
         text_context.draw_str(str_pos_tr, texts.1);
