@@ -86,10 +86,7 @@ impl Frame {
     }
 
     pub fn new_sized(start: Dims, size: Dims) -> Self {
-        Self {
-            start,
-            end: Dims(start.0 + size.0, start.1 + size.1),
-        }
+        Self::new(start, Dims(start.0 + size.0, start.1 + size.1))
     }
 
     pub fn size(&self) -> Dims {
@@ -123,6 +120,7 @@ impl Frame {
         (text, pos)
     }
 
+    #[allow(dead_code)]
     pub fn trim_relative<'a>(&'a self, text: &'a impl AsRef<str>, pos: Dims) -> (&str, Dims) {
         let (text, pos) = self.trim_absolute(text, pos + self.start);
         (text, pos - self.start)
