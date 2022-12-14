@@ -271,18 +271,18 @@ impl App {
                     CameraMode::EdgeFollow(margin_x, margin_y) => {
                         let player_real_pos = self.last_edge_follow_offset + last_player_real_pos;
 
-                        if player_real_pos.0 + maze_margin.0 + 1 < margin_x
-                            || player_real_pos.0 - maze_margin.1 - 1 > size.0 - margin_x
+                        if player_real_pos.0 - maze_margin.0 + 1 < margin_x
+                            || player_real_pos.0 + maze_margin.1 - 1 > size.0 - margin_x
                         {
                             self.last_edge_follow_offset.0 = size.0 / 2 - last_player_real_pos.0;
                         }
 
-                        if player_real_pos.1 + maze_margin.1 + 1 < margin_y
-                            || player_real_pos.1 - maze_margin.1 - 1 > size.1 - margin_y
+                        if player_real_pos.1 - maze_margin.1 + 1 < margin_y
+                            || player_real_pos.1 + maze_margin.1 - 1 > size.1 - margin_y
                         {
                             self.last_edge_follow_offset.1 = size.1 / 2 - last_player_real_pos.1;
                         }
-                        self.last_edge_follow_offset + last_player_real_pos
+                        self.last_edge_follow_offset
                     }
                 }
             } else {
