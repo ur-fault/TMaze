@@ -282,7 +282,7 @@ impl App {
                         {
                             self.last_edge_follow_offset.1 = size.1 / 2 - last_player_real_pos.1;
                         }
-                        self.last_edge_follow_offset
+                        self.last_edge_follow_offset + last_player_real_pos
                     }
                 }
             } else {
