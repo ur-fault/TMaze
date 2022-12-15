@@ -9,7 +9,7 @@ use crossbeam::{
 };
 pub use depth_first_search::DepthFirstSearch;
 use rand::{thread_rng, Rng};
-use rayon;
+use rayon::prelude::*;
 pub use rnd_kruskals::RndKruskals;
 use std::{
     any::Any,
@@ -75,7 +75,7 @@ pub trait MazeAlgorithm {
     fn generate(
         size: Dims3D,
         floored: bool,
-        multithreaded_floored: bool,
+        parallel_floor_generation: bool,
     ) -> Result<MazeGeneratorComunication, GenerationErrorInstant> {
         if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
             return Err(GenerationErrorInstant::InvalidSize(size));
@@ -92,7 +92,12 @@ pub trait MazeAlgorithm {
                 let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
                 let cells = if floored && d > 1 {
-                    let mut cells = Self::generate_floors(size, s_progress, stop_flag)?;
+                    let mut cells = Self::generate_floors(
+                        size,
+                        s_progress,
+                        stop_flag,
+                        parallel_floor_generation,
+                    )?;
 
                     for floor in 0..du - 1 {
                         let (x, y) = (thread_rng().gen_range(0..wu), thread_rng().gen_range(0..hu));
@@ -121,43 +126,53 @@ pub trait MazeAlgorithm {
         size: Dims3D,
         progres_sender: Sender<Progress>,
         stop_flag: StopGenerationFlag,
+        parallel_floor_generation: bool,
     ) -> Result<Vec<Vec<Vec<Cell>>>, GenerationErrorThreaded> {
         let Dims3D(w, h, d) = size;
         let (.., du) = (w as usize, h as usize, d as usize);
         let s_progress = progres_sender;
 
-        let cells: Vec<Vec<Vec<Cell>>> = (0..du)
-            .map(|maze_i| {
-                let (s, r) = unbounded();
+        let generate_floor = |maze_i: usize| {
+            let (s, r) = unbounded();
 
-                let s_progress = s_progress.clone();
-                let stop_flag = stop_flag.clone();
-                match scope(|scope| {
-                    scope.spawn(move |_| {
-                        for Progress { done, from } in r.iter() {
-                            s_progress
-                                .send(Progress {
-                                    done: done + maze_i * from,
-                                    from: from * du,
-                                })
-                                .unwrap();
-                        }
-                    });
-
-                    if stop_flag.is_stopped() {
-                        return Err(GenerationErrorThreaded::AbortGeneration);
+            let s_progress = s_progress.clone();
+            let stop_flag = stop_flag.clone();
+            match scope(|scope| {
+                scope.spawn(move |_| {
+                    for Progress { done, from } in r.iter() {
+                        s_progress
+                            .send(Progress {
+                                done: done + maze_i * from,
+                                from: from * du,
+                            })
+                            .unwrap();
                     }
+                });
 
-                    Self::generate_individual(Dims3D(w, h, 1), stop_flag, s)
-                })
-                .map(|res| Ok(res?.cells.remove(0)))
-                {
-                    Ok(Ok(maze)) => Ok(maze),
-                    Err(e) => Err(GenerationErrorThreaded::UnknownError(e)),
-                    Ok(Err(e)) => Err(e),
+                if stop_flag.is_stopped() {
+                    return Err(GenerationErrorThreaded::AbortGeneration);
                 }
+
+                Self::generate_individual(Dims3D(w, h, 1), stop_flag, s)
             })
-            .collect::<Result<Vec<_>, GenerationErrorThreaded>>()?;
+            .map(|res| Ok(res?.cells.remove(0)))
+            {
+                Ok(Ok(maze)) => Ok(maze),
+                Err(e) => Err(GenerationErrorThreaded::UnknownError(e)),
+                Ok(Err(e)) => Err(e),
+            }
+        };
+
+        let cells: Vec<Vec<Vec<Cell>>> = if parallel_floor_generation {
+            (0..du)
+                .into_par_iter()
+                .map(generate_floor)
+                .collect::<Result<Vec<_>, GenerationErrorThreaded>>()?
+        } else {
+            (0..du)
+                .map(generate_floor)
+                .collect::<Result<Vec<_>, GenerationErrorThreaded>>()?
+        };
 
         Ok(cells)
     }

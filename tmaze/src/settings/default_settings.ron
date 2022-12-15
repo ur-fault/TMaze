@@ -18,7 +18,7 @@ Settings (
     //  - white
     //  - grey
     color_scheme: ColorScheme (
-        normal: "black",
+        normal: "dark_grey",
         player: "red",
         goal: "yellow",
         text: "grey",
@@ -61,40 +61,40 @@ Settings (
         // - depth - depth of the maze
         // - tower - if true, maze will be a tower (only if depth is >1)
         // - default - first maze with "default: true", will be used as default in the menu
-        Maze (
+        MazePreset (
             title: "10x5",
             width: 10,
             height: 5,
             default: true,
-        ), Maze (
+        ), MazePreset (
             title: "30x10",
             width: 30,
             height: 10,
-        ), Maze (
+        ), MazePreset (
             title: "60x20",
             width: 60,
             height: 20,
-        ), Maze (
+        ), MazePreset (
             title: "300x100",
             width: 300,
             height: 100,
-        ), Maze (
+        ), MazePreset (
             title: "5x5x5",
             width: 5,
             height: 5,
             depth: 5,
-        ), Maze (
+        ), MazePreset (
             title: "10x10x10",
             width: 10,
             height: 10,
             depth: 10,
-        ), Maze (
+        ), MazePreset (
             title: "10x10x5 Tower",
             width: 10,
             height: 10,
             depth: 5,
             tower: true,
-        ), Maze (
+        ), MazePreset (
             title: "40x15x10 Tower",
             width: 40,
             height: 15,

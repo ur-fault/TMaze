@@ -55,6 +55,7 @@ pub fn render_popup(
         let mut context = DrawContext {
             renderer: &RefCell::new(renderer),
             style: box_style,
+            frame: None,
         };
 
         context.draw_box(pos, box_size);

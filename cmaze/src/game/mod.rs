@@ -70,7 +70,7 @@ impl Game {
         let player_pos = Dims3D(0, 0, 0);
         let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
 
-        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower, false)?;
+        let (maze_handle, stop_flag, progress) = generation_func(msize, is_tower, true)?;
 
         Ok((
             thread::spawn(move || {

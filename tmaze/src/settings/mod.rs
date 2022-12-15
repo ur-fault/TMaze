@@ -1,7 +1,13 @@
+pub mod editable;
+
+use derivative::Derivative;
+use dirs::preference_dir;
 use masof::{Color, ContentStyle};
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
+
+use self::editable::EditableField;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CameraMode {
@@ -16,7 +22,7 @@ impl Default for CameraMode {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Maze {
+pub struct MazePreset {
     pub title: String,
     pub width: u16,
     pub height: u16,
@@ -30,6 +36,12 @@ pub struct Maze {
 
 fn default_depth() -> u16 {
     1
+}
+
+impl EditableField for MazePreset {
+    fn print(&self) -> String {
+        format!("{}", self.title,)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,6 +122,12 @@ impl Default for ColorScheme {
     }
 }
 
+impl EditableField for ColorScheme {
+    fn print(&self) -> String {
+        todo!();
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum MazeGenAlgo {
     RandomKruskals,
@@ -122,7 +140,17 @@ impl Default for MazeGenAlgo {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+impl EditableField for MazeGenAlgo {
+    fn print(&self) -> String {
+        match self {
+            MazeGenAlgo::RandomKruskals => "Random Kruskals".to_string(),
+            MazeGenAlgo::DepthFirstSearch => "Depth First Search".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Derivative, Clone, Serialize, Deserialize)]
+#[derivative(Default)]
 pub struct Settings {
     #[serde(default)]
     pub color_scheme: Option<ColorScheme>,
@@ -137,25 +165,44 @@ pub struct Settings {
     #[serde(default)]
     pub dont_ask_for_maze_algo: Option<bool>,
     #[serde(default)]
-    pub mazes: Option<Vec<Maze>>,
+    pub mazes: Option<Vec<MazePreset>>,
+    #[serde(skip)]
+    #[derivative(Default(value = "Settings::default_path()"))]
+    pub path: PathBuf,
+}
+
+impl EditableField for Settings {
+    fn print(&self) -> String {
+        String::from("Settings")
+    }
+
+    fn edit(
+        &mut self,
+        renderer: &mut masof::Renderer,
+        color_scheme: ColorScheme,
+    ) -> Result<bool, crate::ui::CrosstermError> {
+        crate::ui::popup(
+            renderer,
+            color_scheme.normals(),
+            color_scheme.texts(),
+            &format!("Edit settings"),
+            &[
+                "Path to the current settings",
+                &format!(" {}", self.path.display()),
+            ],
+        )
+        .map(|_| false)
+    }
 }
 
 #[allow(dead_code)]
 impl Settings {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn default_path() -> PathBuf {
+        preference_dir().unwrap().join("tmaze").join("settings.ron")
     }
 
-    pub fn populate(mut self) -> Self {
-        self.color_scheme = Some(self.color_scheme.unwrap_or_default());
-        self.slow = Some(self.slow.unwrap_or_default());
-        self.disable_tower_auto_up = Some(self.disable_tower_auto_up.unwrap_or_default());
-        self.camera_mode = Some(self.camera_mode.unwrap_or_default());
-        self.default_maze_gen_algo = Some(self.default_maze_gen_algo.unwrap_or_default());
-        self.dont_ask_for_maze_algo = Some(self.dont_ask_for_maze_algo.unwrap_or_default());
-        self.mazes = Some(self.mazes.unwrap_or_default());
-
-        self
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn set_color_scheme(mut self, value: ColorScheme) -> Self {
@@ -212,12 +259,12 @@ impl Settings {
         self.dont_ask_for_maze_algo.unwrap_or_default()
     }
 
-    pub fn set_mazes(mut self, value: Vec<Maze>) -> Self {
+    pub fn set_mazes(mut self, value: Vec<MazePreset>) -> Self {
         self.mazes = Some(value);
         self
     }
 
-    pub fn get_mazes(&self) -> Vec<Maze> {
+    pub fn get_mazes(&self) -> Vec<MazePreset> {
         self.mazes.clone().unwrap_or_default()
     }
 
@@ -225,8 +272,8 @@ impl Settings {
         let default_settings_string = include_str!("./default_settings.ron");
 
         let settings_string = fs::read_to_string(&path);
-        if let Ok(settings_string) = settings_string {
-            let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
+        let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
+        let mut settings: Self = if let Ok(settings_string) = settings_string {
             match options.from_str(&settings_string) {
                 Ok(settings) => settings,
                 Err(err) => {
@@ -236,7 +283,11 @@ impl Settings {
         } else {
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(&path, default_settings_string).unwrap();
-            ron::from_str(default_settings_string).unwrap()
-        }
+            options.from_str(default_settings_string).unwrap()
+        };
+
+        settings.path = path;
+
+        settings
     }
 }
