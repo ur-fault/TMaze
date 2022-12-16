@@ -290,4 +290,18 @@ impl Settings {
 
         settings
     }
+
+    pub fn reset(&mut self) {
+        let default_settings_string = include_str!("./default_settings.ron");
+        let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
+        *self = options.from_str(default_settings_string).unwrap();
+        self.path = Settings::default_path();
+
+        fs::write(&self.path, default_settings_string).unwrap();
+    }
+
+    pub fn reset_config(path: PathBuf) {
+        let default_settings_string = include_str!("./default_settings.ron");
+        fs::write(&path, default_settings_string).unwrap();
+    }
 }
