@@ -3,6 +3,7 @@ name = "tmaze"
 version = "1.10.0"
 edition = "2021"
 authors = ["ur-fault"]
+description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
 
 [dependencies]
 colored = "^2"
