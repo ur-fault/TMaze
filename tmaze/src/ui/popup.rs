@@ -1,12 +1,14 @@
+use crossterm::{event::KeyEventKind, style::ContentStyle};
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use masof::{Color, ContentStyle, Renderer};
-use std::{cell::RefCell, io::stdout};
+
+use std::cell::RefCell;
 
 use super::draw::*;
 use super::*;
+use crate::renderer::Renderer;
 
 pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
     match texts.iter().map(|text| text.len()).max() {
@@ -29,11 +31,13 @@ pub fn popup(
 
     loop {
         let event = read()?;
-        if let Event::Key(KeyEvent { code, modifiers: _ }) = event {
-            break Ok(code);
+        if let Event::Key(KeyEvent { code, kind, .. }) = event {
+            if kind != KeyEventKind::Release {
+                break Ok(code);
+            }
         }
 
-        renderer.event(&event);
+        renderer.on_event(&event)?;
 
         render_popup(renderer, box_style, text_style, title, texts)?;
     }
@@ -50,7 +54,6 @@ pub fn render_popup(
     let title_pos = box_center_screen(Dims(title.len() as i32 + 2, 1))?.0;
     let pos = box_center_screen(box_size)?;
 
-    renderer.begin()?;
     {
         let mut context = DrawContext {
             renderer: &RefCell::new(renderer),
@@ -73,7 +76,7 @@ pub fn render_popup(
         }
     }
 
-    renderer.end(&mut stdout())?;
+    renderer.flip()?;
 
     Ok(())
 }

@@ -1,6 +1,5 @@
 pub mod app;
 pub mod game_state;
-// pub mod ui;
 pub use app::App;
 pub use game_state::{GameState, GameViewMode};
 
@@ -35,12 +34,6 @@ impl From<CrosstermError> for GameError {
 
 impl From<crossterm::ErrorKind> for GameError {
     fn from(error: crossterm::ErrorKind) -> Self {
-        Self::CrosstermError(CrosstermError::from(error))
-    }
-}
-
-impl From<masof::renderer::Error> for GameError {
-    fn from(error: masof::renderer::Error) -> Self {
         Self::CrosstermError(CrosstermError::from(error))
     }
 }

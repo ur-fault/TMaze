@@ -1,5 +1,7 @@
 pub mod constants;
 
+use crossterm::event::KeyEventKind;
+
 use crate::core::*;
 use crate::maze::Maze;
 
@@ -116,4 +118,8 @@ impl LineDir {
 
 pub fn from_maze_to_real(pos_on_maze: Dims3D) -> Dims {
     Dims(pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1)
+}
+
+pub fn is_release(k: KeyEventKind) -> bool {
+    k == KeyEventKind::Release
 }

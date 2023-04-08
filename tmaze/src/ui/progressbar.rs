@@ -1,13 +1,14 @@
-use std::{cell::RefCell, io::stdout};
+use std::cell::RefCell;
 
+use crossterm::style::ContentStyle;
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use masof::{Color, ContentStyle, Renderer};
 
 use super::draw::*;
 use super::*;
+use crate::renderer::Renderer;
 
 pub fn render_progress(
     renderer: &mut Renderer,
@@ -18,8 +19,6 @@ pub fn render_progress(
 ) -> Result<(), CrosstermError> {
     let progress_size = Dims(title.len() as i32 + 2, 4);
     let pos = box_center_screen(progress_size)?;
-
-    renderer.begin()?;
 
     {
         let mut context = DrawContext {
@@ -40,7 +39,7 @@ pub fn render_progress(
         }
     }
 
-    renderer.end(&mut stdout())?;
+    renderer.flip()?;
 
     Ok(())
 }

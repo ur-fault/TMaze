@@ -1,10 +1,6 @@
 pub use std::time::Duration;
 
-pub use crossterm::{
-    event::{poll, read, Event, KeyCode, KeyEvent},
-    terminal::size,
-};
-pub use masof::{Color, ContentStyle, Renderer};
+use crossterm::terminal::size;
 pub use substring::Substring;
 
 use crate::core::*;
@@ -22,15 +18,6 @@ pub use progressbar::*;
 
 #[derive(Debug)]
 pub struct CrosstermError(pub crossterm::ErrorKind);
-
-impl From<masof::renderer::Error> for CrosstermError {
-    fn from(error: masof::renderer::Error) -> Self {
-        match error {
-            masof::renderer::Error::CrossTermError(e) => Self(e),
-            _ => panic!("Unexpected error: {}", error),
-        }
-    }
-}
 
 impl From<crossterm::ErrorKind> for CrosstermError {
     fn from(error: crossterm::ErrorKind) -> Self {

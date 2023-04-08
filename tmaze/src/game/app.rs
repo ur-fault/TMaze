@@ -1,27 +1,26 @@
 use std::cell::RefCell;
-use std::io::{stdout, Stdout};
 use std::time::Duration;
 
+use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
 use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-use masof::Renderer;
 
 use crate::helpers::{constants, value_if_else, LineDir};
 use crate::maze::CellWall;
 use crate::maze::{algorithms::*, Cell};
+use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
 use crate::ui::{DrawContext, Frame, MenuError};
 use crate::{helpers, ui, ui::CrosstermError};
-use cmaze::core::*;
 
 use super::{GameError, GameState, GameViewMode};
 
 pub struct App {
     renderer: Renderer,
-    stdout: Stdout,
+    // stdout: Stdout,
     settings: Settings,
     last_edge_follow_offset: Dims,
 }
@@ -30,15 +29,13 @@ impl App {
     pub fn new() -> Self {
         let settings_path = Settings::default_path();
         App {
-            renderer: Renderer::default(),
-            stdout: stdout(),
+            renderer: Renderer::new().expect("Failed to initialize renderer"),
             settings: Settings::load(settings_path.clone()),
             last_edge_follow_offset: Dims(0, 0),
         }
     }
 
     pub fn run(mut self) -> Result<(), GameError> {
-        self.renderer.term_on(&mut self.stdout)?;
         let mut game_restart_reqested = false;
 
         loop {
@@ -89,7 +86,6 @@ impl App {
             };
         }
 
-        self.renderer.term_off(&mut self.stdout)?;
         Ok(())
     }
 
@@ -204,7 +200,7 @@ impl App {
                     _ => {}
                 }
 
-                self.renderer.event(&event.unwrap());
+                self.renderer.on_event(&event.unwrap())?;
             }
 
             self.render_game(&game_state, self.settings.get_camera_mode(), is_tower, 1)?;
@@ -297,7 +293,7 @@ impl App {
         let player_style = self.settings.get_color_scheme().players();
         let goal_style = self.settings.get_color_scheme().goals();
 
-        self.renderer.begin()?;
+        // self.renderer.begin()?;
         let renderer_cell = RefCell::new(&mut self.renderer);
 
         let text_frame = if fits_on_screen {
@@ -611,7 +607,7 @@ impl App {
         text_context.draw_str(str_pos_bl, texts.2);
         text_context.draw_str(str_pos_br, texts.3);
 
-        self.renderer.end(&mut self.stdout)?;
+        self.renderer.flip()?;
 
         Ok(())
     }
@@ -643,7 +639,7 @@ impl App {
             let current_progress = done as f64 / from as f64;
 
             if let Ok(true) = poll(Duration::from_nanos(1)) {
-                if let Ok(Event::Key(KeyEvent { code, modifiers: _ })) = read() {
+                if let Ok(Event::Key(KeyEvent { code, .. })) = read() {
                     match code {
                         KeyCode::Esc => {
                             stop_flag.stop();

@@ -4,10 +4,9 @@ use cmaze::{
     game::{Game, MoveMode},
     maze::{CellWall, Dims3D},
 };
-use crossterm::event::KeyModifiers;
-use masof::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::settings::Settings;
+use crate::{helpers::is_release, settings::Settings};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum GameViewMode {
@@ -37,7 +36,16 @@ pub struct GameState {
 
 impl GameState {
     pub fn handle_event(&mut self, event: KeyEvent) -> Result<(), ShowMenu> {
-        let KeyEvent { code, modifiers } = event;
+        let KeyEvent {
+            code,
+            modifiers,
+            kind,
+            ..
+        } = event;
+        if is_release(kind) {
+            return Ok(());
+        }
+
         let is_fast = modifiers.contains(KeyModifiers::SHIFT);
 
         match code {
