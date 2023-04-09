@@ -10,6 +10,18 @@ pub struct Maze {
 }
 
 impl Maze {
+    pub fn new(cells: Vec<Vec<Vec<Cell>>>) -> Self {
+        let width = cells[0][0].len();
+        let height = cells[0].len();
+        let depth = cells.len();
+        Maze {
+            cells,
+            width,
+            height,
+            depth,
+        }
+    }
+
     pub fn size(&self) -> Dims3D {
         Dims3D(self.width as i32, self.height as i32, self.depth as i32)
     }
