@@ -76,7 +76,7 @@ pub fn render_popup(
         }
     }
 
-    renderer.flip()?;
+    renderer.render()?;
 
     Ok(())
 }

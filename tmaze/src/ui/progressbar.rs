@@ -39,7 +39,7 @@ pub fn render_progress(
         }
     }
 
-    renderer.flip()?;
+    renderer.render()?;
 
     Ok(())
 }

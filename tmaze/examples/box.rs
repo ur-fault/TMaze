@@ -17,7 +17,7 @@ fn main() -> Result<(), CrosstermError> {
             Dims(10, 10),
             ContentStyle::default(),
         );
-        renderer.flip()?;
+        renderer.render()?;
 
         let event = crossterm::event::read()?;
         events.push(event.clone());

@@ -194,8 +194,8 @@ pub fn render_menu(
             );
         }
     }
-    
-    renderer.flip()?;
+
+    renderer.render()?;
 
     Ok(())
 }

@@ -79,7 +79,7 @@ impl Renderer {
         &mut self.hidden
     }
 
-    pub fn flip(&mut self) -> CRResult<()> {
+    pub fn render(&mut self) -> CRResult<()> {
         let mut tty = stdout();
 
         let mut style = ContentStyle::default();

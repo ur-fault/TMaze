@@ -607,7 +607,7 @@ impl App {
         text_context.draw_str(str_pos_bl, texts.2);
         text_context.draw_str(str_pos_br, texts.3);
 
-        self.renderer.flip()?;
+        self.renderer.render()?;
 
         Ok(())
     }
