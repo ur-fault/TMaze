@@ -11,10 +11,13 @@ thiserror = "1.0.31"
 pausable_clock = "^1.0.1"
 crossbeam = "^0.8.1"
 rayon = "^1.6.0"
+hashbrown = { version = "0.13.2", optional = true }
 
 [dev-dependencies]
 criterion = "0.4.0"
-hashbrown = "0.13.2"
+
+[features]
+hashbrown = ["dep:hashbrown"]
 
 [[bench]]
 name = "kruskals"

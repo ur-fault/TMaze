@@ -6,6 +6,7 @@ authors = ["ur-fault"]
 description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
 
 [dependencies]
+cmaze = { path = "../cmaze" }
 colored = "^2"
 crossterm = { version = "^0.26.0", features = ["serde"] }
 substring = "^1.4.5"
@@ -14,8 +15,11 @@ pausable_clock = "^1.0.1"
 dirs = "^4.0.0"
 ron = "0.8.0"
 clap = { version = "4.0.29", features = ["derive"] }
-cmaze = { path = "../cmaze" }
 pad = "0.1.6"
 rand = "^0.8.1"
 derivative = "2.2.0"
 unicode-width = "0.1.10"
+
+[features]
+default = ["hashbrown"]
+hashbrown = ["cmaze/hashbrown"]
