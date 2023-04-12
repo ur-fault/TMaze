@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["ur-fault"]
 description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
 license-file = "../LICENSE"
+readme = "../README.md"
 
 [dependencies]
 cmaze = { path = "../cmaze", version = "0.5.0" }

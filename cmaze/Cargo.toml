@@ -4,6 +4,7 @@ version = "0.5.0"
 edition = "2021"
 description = "Core of tmaze game"
 license-file = "../LICENSE"
+readme = "../README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
