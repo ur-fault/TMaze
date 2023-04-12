@@ -22,7 +22,7 @@ jobs:
                   command: build
                   args: --release
             - run: |
-                  $tmversion = ./target/release/tmaze.exe -v | Select-String -Pattern '^tmaze (v[0-9]+\.[0-9]+\.[0-9]+)$' | %{$_.Matches[0].Groups[1].Value}
+                  $tmversion = ./target/release/tmaze.exe --version | Select-String -Pattern '^tmaze ([0-9]+\.[0-9]+\.[0-9]+)$' | %{$_.Matches[0].Groups[1].Value}
                   $filepath = "./target/release/tmaze-${tmversion}-win-x86_64.exe"
                   echo "BIN_FILEPATH=$filepath" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
                   echo "TM_VERSION=$tmversion" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
@@ -46,7 +46,7 @@ jobs:
             - run: strip ./target/release/tmaze
             - run: ls -l ./target/release/
             - run: |
-                  versionregex="tmaze (v[0-9]+\.[0-9]+\.[0-9]+)"
+                  versionregex="tmaze ([0-9]+\.[0-9]+\.[0-9]+)"
                   if [[ $(./target/release/tmaze --version) =~ $versionregex ]]; then
                       version=${BASH_REMATCH[1]}
                       filepath="./target/release/tmaze-$version-linux-x86_64"
