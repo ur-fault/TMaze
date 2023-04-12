@@ -9,7 +9,7 @@ use cmaze::{core, maze};
 use game::{App, GameError};
 
 #[derive(Parser, Debug)]
-#[clap(version)]
+#[clap(version, author, about, name = "tmaze")]
 struct Args {
     #[clap(short, long, action, help = "Reset config to default and quit")]
     reset_config: bool,
