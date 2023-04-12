@@ -1,13 +1,14 @@
 pub mod editable;
 
+use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use dirs::preference_dir;
-use masof::{Color, ContentStyle};
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 use self::editable::EditableField;
+use crate::renderer::Renderer;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CameraMode {
@@ -178,7 +179,7 @@ impl EditableField for Settings {
 
     fn edit(
         &mut self,
-        renderer: &mut masof::Renderer,
+        renderer: &mut Renderer,
         color_scheme: ColorScheme,
     ) -> Result<bool, crate::ui::CrosstermError> {
         crate::ui::popup(

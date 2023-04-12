@@ -7,6 +7,10 @@ use super::{
 use crate::core::*;
 use crossbeam::channel::Sender;
 use rand::{seq::SliceRandom, thread_rng};
+
+#[cfg(feature = "hashbrown")]
+use hashbrown::HashSet;
+#[cfg(not(feature = "hashbrown"))]
 use std::collections::HashSet;
 
 pub struct RndKruskals {}

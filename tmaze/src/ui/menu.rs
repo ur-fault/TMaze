@@ -1,12 +1,14 @@
+use crossterm::style::{Color, ContentStyle};
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use masof::{Color, ContentStyle, Renderer};
-use pad::PadStr;
-use std::{cell::RefCell, io::stdout};
 
-use crate::helpers::value_if;
+use pad::PadStr;
+use std::cell::RefCell;
+
+use crate::helpers::{is_release, value_if};
+use crate::renderer::Renderer;
 
 use super::draw::*;
 use super::*;
@@ -86,7 +88,7 @@ pub fn menu(
         let event = read()?;
 
         match event {
-            Event::Key(KeyEvent { code, modifiers: _ }) => match code {
+            Event::Key(KeyEvent { code, kind, .. }) if !is_release(kind) => match code {
                 KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                     selected = if selected == 0 {
                         opt_count - 1
@@ -115,7 +117,7 @@ pub fn menu(
             _ => {}
         }
 
-        renderer.event(&event);
+        renderer.on_event(&event)?;
 
         render_menu(
             renderer, box_style, text_style, title, &options, selected, counted,
@@ -153,8 +155,6 @@ pub fn render_menu(
     let opt_count = options.len();
 
     let max_count = opt_count.to_string().len();
-
-    renderer.begin()?;
 
     {
         let mut context = DrawContext {
@@ -194,7 +194,8 @@ pub fn render_menu(
             );
         }
     }
-    renderer.end(&mut stdout())?;
+
+    renderer.render()?;
 
     Ok(())
 }

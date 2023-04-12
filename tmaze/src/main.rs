@@ -1,5 +1,6 @@
 mod game;
 mod helpers;
+mod renderer;
 mod settings;
 mod ui;
 

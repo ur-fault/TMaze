@@ -1,24 +1,23 @@
-use std::io::stdout;
-
-use masof::Renderer;
-use tmaze::ui::{menu, CrosstermError, MenuError};
+use crossterm::style::ContentStyle;
+use tmaze::{
+    renderer::Renderer,
+    ui::{menu, CrosstermError, MenuError},
+};
 
 fn main() -> Result<(), CrosstermError> {
-    let mut renderer = Renderer::default();
-
-    renderer.term_on(&mut stdout())?;
+    let mut renderer = Renderer::new()?;
 
     let res = menu::menu(
         &mut renderer,
-        menu::ContentStyle::default(),
-        menu::ContentStyle::default(),
+        ContentStyle::default(),
+        ContentStyle::default(),
         "Menu",
         &["Option 1", "Option 2", "Option 3"],
         Some(0),
         true,
     );
 
-    renderer.term_off(&mut stdout())?;
+    drop(renderer);
 
     match res {
         Ok(i) => println!("Selected option {}", i),

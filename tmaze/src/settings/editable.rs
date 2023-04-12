@@ -1,6 +1,7 @@
-use masof::Renderer;
-
-use crate::ui::{self, CrosstermError};
+use crate::{
+    renderer::Renderer,
+    ui::{self, CrosstermError},
+};
 
 use super::ColorScheme;
 

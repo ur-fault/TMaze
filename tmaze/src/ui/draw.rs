@@ -1,11 +1,13 @@
 use std::{cell::RefCell, ops::DerefMut};
 
 use crate::core::*;
+use crate::renderer::Renderer;
+
+use crossterm::style::ContentStyle;
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
-pub use masof::{Color, ContentStyle, Renderer};
 
 pub use substring::Substring;
 
@@ -57,7 +59,8 @@ pub fn draw_str<'a>(
         return;
     }
 
-    renderer.draw_str(x as u16, y as u16, text, style);
+    // renderer.draw_str(x as u16, y as u16, text, style);
+    renderer.frame().draw((x as u16, y as u16), (text, style));
 }
 
 pub fn draw_char<'a>(
@@ -71,7 +74,8 @@ pub fn draw_char<'a>(
         return;
     }
 
-    renderer.draw_char(x as u16, y as u16, text, style);
+    // renderer.draw_char(x as u16, y as u16, text, style);
+    renderer.frame().draw((x as u16, y as u16), (text, style));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
