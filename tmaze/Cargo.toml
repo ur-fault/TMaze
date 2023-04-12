@@ -7,7 +7,7 @@ description = "Simple multiplatform maze solving game for terminal written entir
 license-file = "../LICENSE"
 
 [dependencies]
-cmaze = { path = "../cmaze" }
+cmaze = { path = "../cmaze", version = "0.5.0" }
 colored = "^2"
 crossterm = { version = "^0.26.0", features = ["serde"] }
 substring = "^1.4.5"
