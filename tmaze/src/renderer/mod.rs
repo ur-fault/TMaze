@@ -192,7 +192,7 @@ impl Frame {
     pub fn new(size: Pos) -> Self {
         let mut buffer = Vec::new();
         for _ in 0..size.1 {
-            buffer.push(vec![Cell::default(); size.0 as usize]);
+            buffer.push(vec![Cell::new(' '); size.0 as usize]);
         }
         Frame { buffer, size }
     }
