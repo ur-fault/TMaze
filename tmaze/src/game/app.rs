@@ -30,7 +30,7 @@ impl App {
         let settings_path = Settings::default_path();
         App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
-            settings: Settings::load(settings_path.clone()),
+            settings: Settings::load(settings_path),
             last_edge_follow_offset: Dims(0, 0),
         }
     }
@@ -176,7 +176,7 @@ impl App {
 
                 match event {
                     Ok(Event::Key(key_event)) => {
-                        if let Err(_) = game_state.handle_event(key_event) {
+                        if game_state.handle_event(key_event).is_err() {
                             game_state.game.pause().unwrap();
                             match ui::menu(
                                 &mut self.renderer,
@@ -255,8 +255,8 @@ impl App {
 
         let maze_margin = Dims(10, 3);
 
-        let fits_on_screen = maze_render_size.0 + maze_margin.0 + 2 <= size.0 as i32
-            && maze_render_size.1 + 3 + maze_margin.1 + 4 <= size.1 as i32;
+        let fits_on_screen = maze_render_size.0 + maze_margin.0 + 2 <= size.0
+            && maze_render_size.1 + 3 + maze_margin.1 + 4 <= size.1;
 
         let maze_pos = {
             let pos = if fits_on_screen {
@@ -299,7 +299,7 @@ impl App {
         let text_frame = if fits_on_screen {
             Frame::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
         } else {
-            Frame::new_sized(Dims(0, 0), size.into()).with_margin(maze_margin)
+            Frame::new_sized(Dims(0, 0), size).with_margin(maze_margin)
         };
         let frame = text_frame.with_margin(Dims(1, 2));
 
@@ -386,7 +386,7 @@ impl App {
         for x in 0..maze.size().0 - 1 {
             draw_line_double_duo(
                 &mut normal_context,
-                (x as i32 * 2 + maze_pos.0 + 1, maze_pos.1),
+                (x * 2 + maze_pos.0 + 1, maze_pos.1),
                 LineDir::Horizontal,
                 if maze
                     .get_cell(Dims3D(x, 0, floor))
@@ -401,10 +401,7 @@ impl App {
 
             draw_line_double_duo(
                 &mut normal_context,
-                (
-                    x as i32 * 2 + maze_pos.0 + 1,
-                    maze_pos.1 + maze_render_size.1 - 1,
-                ),
+                (x * 2 + maze_pos.0 + 1, maze_pos.1 + maze_render_size.1 - 1),
                 LineDir::Horizontal,
                 if maze
                     .get_cell(Dims3D(x, maze.size().1 - 1, floor))
@@ -420,7 +417,7 @@ impl App {
 
         // Vertical edge lines
         for y in 0..maze.size().1 - 1 {
-            let ypos = y as i32 * 2 + maze_pos.1 + 1;
+            let ypos = y * 2 + maze_pos.1 + 1;
             if ypos >= size.1 - 2 {
                 break;
             }
@@ -457,10 +454,7 @@ impl App {
 
             draw_line_double(
                 &mut normal_context,
-                (
-                    maze_pos.0 + maze_render_size.0 - 1,
-                    y as i32 * 2 + maze_pos.1 + 1,
-                ),
+                (maze_pos.0 + maze_render_size.0 - 1, y * 2 + maze_pos.1 + 1),
                 LineDir::Vertical,
             );
         }
@@ -470,7 +464,7 @@ impl App {
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
                 let real_pos = helpers::from_maze_to_real(*move_pos);
-                normal_context.draw_char(Dims::from(maze_pos) + real_pos, '.');
+                normal_context.draw_char(maze_pos + real_pos, '.');
             }
         }
 
@@ -484,7 +478,7 @@ impl App {
                     draw_line_double(&mut normal_context, (xpos + 1, ypos), LineDir::Vertical);
                 }
 
-                if ypos + 1 < size.1 as i32 - 2
+                if ypos + 1 < size.1 - 2
                     && ypos > 0
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
@@ -525,14 +519,14 @@ impl App {
         let goal_pos = game.get_goal_pos();
         if floor == goal_pos.2 {
             goal_context.draw_char(
-                Dims::from(goal_pos) * 2 + maze_pos.into() + Dims(1, 1),
+                Dims::from(goal_pos) * 2 + maze_pos + Dims(1, 1),
                 constants::GOAL_CHAR,
             );
         }
 
         if floor == player_pos.2 {
             player_context.draw_char(
-                Dims::from(player_pos) * 2 + maze_pos.into() + Dims(1, 1),
+                Dims::from(player_pos) * 2 + maze_pos + Dims(1, 1),
                 *player_char,
             );
 
@@ -540,7 +534,7 @@ impl App {
                 &mut normal_context,
                 &mut player_context,
                 &mut goal_context,
-                &maze.get_cell(player_pos).unwrap(),
+                maze.get_cell(player_pos).unwrap(),
                 (player_pos.0, player_pos.1),
                 maze_pos.into(),
                 floor,
@@ -567,7 +561,7 @@ impl App {
                 > text_frame.size().0
             {
                 (
-                    format!("{}", view_mode.chars().nth(0).unwrap()),
+                    format!("{}", view_mode.chars().next().unwrap()),
                     format!(
                         "x:{} y:{} f:{}",
                         player_pos.0 + 1,
@@ -689,9 +683,9 @@ impl App {
                         &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                     ],
                 )?;
-                return Err(GameError::EmptyMaze);
+                Err(GameError::EmptyMaze)
             }
-            Err(GenerationErrorThreaded::AbortGeneration) => return Err(GameError::Back),
+            Err(GenerationErrorThreaded::AbortGeneration) => Err(GameError::Back),
             Err(GenerationErrorThreaded::UnknownError(err)) => panic!("{:?}", err),
         }
     }
