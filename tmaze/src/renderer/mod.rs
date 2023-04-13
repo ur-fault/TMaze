@@ -67,9 +67,8 @@ impl Renderer {
     }
 
     pub fn on_event(&mut self, event: &Event) -> CRResult<()> {
-        match event {
-            Event::Resize(x, y) => self.on_resize(Some((*x, *y)))?,
-            _ => {}
+        if let Event::Resize(x, y) = event {
+            self.on_resize(Some((*x, *y)))?
         }
 
         Ok(())
@@ -257,7 +256,7 @@ impl std::ops::Index<Pos> for Frame {
     }
 }
 
-impl<'a> std::ops::Index<u16> for Frame {
+impl std::ops::Index<u16> for Frame {
     type Output = [Cell];
 
     fn index(&self, index: u16) -> &Self::Output {

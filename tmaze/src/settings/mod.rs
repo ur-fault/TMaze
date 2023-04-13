@@ -135,12 +135,6 @@ pub enum MazeGenAlgo {
     DepthFirstSearch,
 }
 
-impl Default for MazeGenAlgo {
-    fn default() -> Self {
-        MazeGenAlgo::RandomKruskals
-    }
-}
-
 impl EditableField for MazeGenAlgo {
     fn print(&self) -> String {
         match self {
@@ -186,7 +180,7 @@ impl EditableField for Settings {
             renderer,
             color_scheme.normals(),
             color_scheme.texts(),
-            &format!("Edit settings"),
+            "Edit settings",
             &[
                 "Path to the current settings",
                 &format!(" {}", self.path.display()),
@@ -303,6 +297,6 @@ impl Settings {
 
     pub fn reset_config(path: PathBuf) {
         let default_settings_string = include_str!("./default_settings.ron");
-        fs::write(&path, default_settings_string).unwrap();
+        fs::write(path, default_settings_string).unwrap();
     }
 }
