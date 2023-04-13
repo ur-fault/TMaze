@@ -6,6 +6,7 @@ authors = ["ur-fault"]
 description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
 license-file = "../LICENSE"
 readme = "../README.md"
+repository = "https://github.com/ur-fault/tmaze"
 
 [dependencies]
 cmaze = { path = "../cmaze", version = "0.6.0" }
