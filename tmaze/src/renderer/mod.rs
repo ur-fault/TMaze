@@ -1,11 +1,12 @@
 pub mod drawable;
+pub mod helpers;
 
 use std::io::{stdout, Write};
 
 use crossterm::{event::Event, style::ContentStyle, QueueableCommand, Result as CRResult};
 use unicode_width::UnicodeWidthChar;
 
-use self::drawable::Drawable;
+use self::{drawable::Drawable, helpers::term_size};
 
 pub type Pos = (u16, u16);
 
@@ -18,7 +19,7 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new() -> CRResult<Self> {
-        let size = crossterm::terminal::size().unwrap();
+        let size = term_size();
         let hidden = Frame::new(size);
         let shown = Frame::new(size);
 
