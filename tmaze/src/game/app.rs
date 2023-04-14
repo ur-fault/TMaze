@@ -3,14 +3,12 @@ use std::time::Duration;
 
 use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
-use crossterm::{
-    event::{poll, read, Event, KeyCode, KeyEvent},
-    terminal::size,
-};
+use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
 
-use crate::helpers::{constants, value_if_else, LineDir};
 use crate::gameboard::CellWall;
 use crate::gameboard::{algorithms::*, Cell};
+use crate::helpers::{constants, value_if_else, LineDir};
+use crate::renderer::helpers::term_size;
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
 use crate::ui::{DrawContext, Frame, MenuError};
@@ -249,7 +247,7 @@ impl App {
 
         let maze_render_size = helpers::maze_render_size(maze);
         let size = {
-            let size = size()?;
+            let size = term_size();
             Dims(size.0 as i32, size.1 as i32)
         };
 
