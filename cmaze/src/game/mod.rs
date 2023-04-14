@@ -1,5 +1,5 @@
 use crate::core::*;
-use crate::maze::{
+use crate::gameboard::{
     CellWall, GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeGeneratorComunication,
     Progress, StopGenerationFlag,
 };

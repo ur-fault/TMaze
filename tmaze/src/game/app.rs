@@ -9,8 +9,8 @@ use crossterm::{
 };
 
 use crate::helpers::{constants, value_if_else, LineDir};
-use crate::maze::CellWall;
-use crate::maze::{algorithms::*, Cell};
+use crate::gameboard::CellWall;
+use crate::gameboard::{algorithms::*, Cell};
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
 use crate::ui::{DrawContext, Frame, MenuError};

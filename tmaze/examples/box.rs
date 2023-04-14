@@ -1,4 +1,4 @@
-use cmaze::maze::Dims;
+use cmaze::gameboard::Dims;
 use crossterm::style::ContentStyle;
 use tmaze::{
     renderer::Renderer,

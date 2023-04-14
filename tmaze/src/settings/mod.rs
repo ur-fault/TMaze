@@ -10,16 +10,11 @@ use std::{fs, path::PathBuf};
 use self::editable::EditableField;
 use crate::renderer::Renderer;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum CameraMode {
+    #[default]
     CloseFollow,
     EdgeFollow(i32, i32),
-}
-
-impl Default for CameraMode {
-    fn default() -> Self {
-        CameraMode::CloseFollow
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +36,7 @@ fn default_depth() -> u16 {
 
 impl EditableField for MazePreset {
     fn print(&self) -> String {
-        format!("{}", self.title,)
+        self.title.to_string()
     }
 }
 

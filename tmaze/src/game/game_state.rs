@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use cmaze::{
     game::{Game, MoveMode},
-    maze::{CellWall, Dims3D},
+    gameboard::{CellWall, Dims3D},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 

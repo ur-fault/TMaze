@@ -4,4 +4,4 @@ pub mod renderer;
 pub mod settings;
 pub mod ui;
 
-use cmaze::{core, maze};
+use cmaze::{core, gameboard};

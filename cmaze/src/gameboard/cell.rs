@@ -1,5 +1,5 @@
 use crate::core::*;
-use crate::maze::cell::CellWall::*;
+use crate::gameboard::cell::CellWall::*;
 
 #[derive(Clone)]
 pub struct Cell {
