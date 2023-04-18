@@ -1,6 +1,6 @@
 [package]
 name = "tmaze"
-version = "1.12.0"
+version = "1.12.1"
 edition = "2021"
 authors = ["ur-fault"]
 description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
@@ -9,7 +9,7 @@ readme = "../README.md"
 repository = "https://github.com/ur-fault/tmaze"
 
 [dependencies]
-cmaze = { path = "../cmaze", version = "0.6.0" }
+cmaze = { path = "../cmaze", version = "0.6.1" }
 colored = "^2"
 crossterm = { version = "^0.26.0", features = ["serde"] }
 substring = "^1.4.5"
