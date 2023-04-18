@@ -92,13 +92,19 @@ jobs:
             - uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
-            - uses: actions-rs/cargo@v1
+                  
+            - name: publish cmaze
+              uses: katyo/publish-crates@v2
               with:
-                  command: publish
-                  args: --token ${{ secrets.CRATES_IO }}
-                  working-directory: ./cmaze
-            - uses: actions-rs/cargo@v1
+                path: ./cmaze
+                registry-token: ${{ secrets.CRATES_IO }}
+                ignore-unpublished-changes: true
+                
+            - name: publish tmaze
+              uses: katyo/publish-crates@v2
               with:
-                  command: publish
-                  args: --token ${{ secrets.CRATES_IO }}
-                  working-directory: ./tmaze
+                # Path to Rust crate or workspace
+                path: ./tmaze
+                # Cargo registry token
+                registry-token: ${{ secrets.CRATES_IO }}
+                ignore-unpublished-changes: true
