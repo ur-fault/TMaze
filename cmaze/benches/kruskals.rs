@@ -1,6 +1,6 @@
 use std::sync::mpsc::channel;
 
-use cmaze::maze::{
+use cmaze::gameboard::{
     Cell, CellWall, Dims3D, Maze, MazeAlgorithm, Progress, RndKruskals, StopGenerationFlag,
 };
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -31,7 +31,7 @@ pub fn kruskals_floors(c: &mut Criterion) {
 }
 
 pub fn kruskals_hashmap(c: &mut Criterion) {
-    use cmaze::maze::{CellWall::*, GenerationErrorInstant, GenerationErrorThreaded};
+    use cmaze::gameboard::{CellWall::*, GenerationErrorInstant, GenerationErrorThreaded};
     let mut group = c.benchmark_group("kruskals_hashmap");
     for input in [
         (10, 10, 1),

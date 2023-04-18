@@ -107,7 +107,7 @@ pub trait MazeAlgorithm {
 
                     cells
                 } else {
-                    Self::generate_individual(Dims3D(w, h, d), stop_flag, s_progress.clone())?.cells
+                    Self::generate_individual(Dims3D(w, h, d), stop_flag, s_progress)?.cells
                 };
 
                 Ok(Maze {

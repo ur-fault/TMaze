@@ -8,18 +8,14 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 use self::editable::EditableField;
+pub use self::editable::EditableFieldError;
 use crate::renderer::Renderer;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum CameraMode {
+    #[default]
     CloseFollow,
     EdgeFollow(i32, i32),
-}
-
-impl Default for CameraMode {
-    fn default() -> Self {
-        CameraMode::CloseFollow
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,7 +37,7 @@ fn default_depth() -> u16 {
 
 impl EditableField for MazePreset {
     fn print(&self) -> String {
-        format!("{}", self.title,)
+        self.title.to_string()
     }
 }
 
@@ -129,16 +125,11 @@ impl EditableField for ColorScheme {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum MazeGenAlgo {
+    #[default]
     RandomKruskals,
     DepthFirstSearch,
-}
-
-impl Default for MazeGenAlgo {
-    fn default() -> Self {
-        MazeGenAlgo::RandomKruskals
-    }
 }
 
 impl EditableField for MazeGenAlgo {
@@ -181,18 +172,19 @@ impl EditableField for Settings {
         &mut self,
         renderer: &mut Renderer,
         color_scheme: ColorScheme,
-    ) -> Result<bool, crate::ui::CrosstermError> {
+    ) -> Result<bool, EditableFieldError> {
         crate::ui::popup(
             renderer,
             color_scheme.normals(),
             color_scheme.texts(),
-            &format!("Edit settings"),
+            "Edit settings",
             &[
                 "Path to the current settings",
                 &format!(" {}", self.path.display()),
             ],
         )
         .map(|_| false)
+        .map_err(|e| e.into())
     }
 }
 
@@ -303,6 +295,6 @@ impl Settings {
 
     pub fn reset_config(path: PathBuf) {
         let default_settings_string = include_str!("./default_settings.ron");
-        fs::write(&path, default_settings_string).unwrap();
+        fs::write(path, default_settings_string).unwrap();
     }
 }

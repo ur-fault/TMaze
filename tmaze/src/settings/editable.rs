@@ -12,7 +12,7 @@ pub trait EditableField {
         &mut self,
         renderer: &mut Renderer,
         color_scheme: ColorScheme,
-    ) -> Result<bool, CrosstermError> {
+    ) -> Result<bool, EditableFieldError> {
         ui::popup(
             renderer,
             color_scheme.normals(),
@@ -21,6 +21,7 @@ pub trait EditableField {
             &["Cannot edit this field"],
         )
         .map(|_| false)
+        .map_err(|e| e.into())
     }
 }
 
@@ -36,5 +37,18 @@ impl<T: EditableField> EditableField for Option<T> {
             Some(value) => value.print(),
             None => "None".to_string(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum EditableFieldError {
+    Back,
+    Quit,
+    Crossterm(CrosstermError),
+}
+
+impl From<CrosstermError> for EditableFieldError {
+    fn from(error: CrosstermError) -> Self {
+        Self::Crossterm(error)
     }
 }

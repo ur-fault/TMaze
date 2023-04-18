@@ -1,12 +1,11 @@
 [package]
 name = "cmaze"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "Core of tmaze game"
 license-file = "../LICENSE"
 readme = "../README.md"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository = "https://github.com/ur-fault/tmaze"
 
 [dependencies]
 rand = "^0.8.5"

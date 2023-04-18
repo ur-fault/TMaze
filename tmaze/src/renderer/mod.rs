@@ -1,11 +1,12 @@
 pub mod drawable;
+pub mod helpers;
 
 use std::io::{stdout, Write};
 
 use crossterm::{event::Event, style::ContentStyle, QueueableCommand, Result as CRResult};
 use unicode_width::UnicodeWidthChar;
 
-use self::drawable::Drawable;
+use self::{drawable::Drawable, helpers::term_size};
 
 pub type Pos = (u16, u16);
 
@@ -18,7 +19,7 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new() -> CRResult<Self> {
-        let size = crossterm::terminal::size().unwrap();
+        let size = term_size();
         let hidden = Frame::new(size);
         let shown = Frame::new(size);
 
@@ -67,9 +68,8 @@ impl Renderer {
     }
 
     pub fn on_event(&mut self, event: &Event) -> CRResult<()> {
-        match event {
-            Event::Resize(x, y) => self.on_resize(Some((*x, *y)))?,
-            _ => {}
+        if let Event::Resize(x, y) = event {
+            self.on_resize(Some((*x, *y)))?
         }
 
         Ok(())
@@ -257,7 +257,7 @@ impl std::ops::Index<Pos> for Frame {
     }
 }
 
-impl<'a> std::ops::Index<u16> for Frame {
+impl std::ops::Index<u16> for Frame {
     type Output = [Cell];
 
     fn index(&self, index: u16) -> &Self::Output {

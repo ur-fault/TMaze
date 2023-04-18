@@ -3,7 +3,10 @@ pub mod game_state;
 pub use app::App;
 pub use game_state::{GameState, GameViewMode};
 
-use crate::ui::{CrosstermError, MenuError};
+use crate::{
+    settings::EditableFieldError,
+    ui::{CrosstermError, MenuError},
+};
 
 #[derive(Debug)]
 pub enum GameError {
@@ -35,5 +38,15 @@ impl From<CrosstermError> for GameError {
 impl From<crossterm::ErrorKind> for GameError {
     fn from(error: crossterm::ErrorKind) -> Self {
         Self::CrosstermError(CrosstermError::from(error))
+    }
+}
+
+impl From<EditableFieldError> for GameError {
+    fn from(error: EditableFieldError) -> Self {
+        match error {
+            EditableFieldError::Back => Self::Back,
+            EditableFieldError::Quit => Self::FullQuit,
+            EditableFieldError::Crossterm(error) => Self::CrosstermError(error),
+        }
     }
 }

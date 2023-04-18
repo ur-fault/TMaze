@@ -1,3 +1,4 @@
 {
-	"editor.showUnused": false
+	"editor.showUnused": false,
+	"rust-analyzer.check.command": "clippy"
 }

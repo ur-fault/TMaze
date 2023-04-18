@@ -5,7 +5,7 @@ mod settings;
 mod ui;
 
 use clap::Parser;
-use cmaze::{core, maze};
+use cmaze::{core, gameboard};
 use game::{App, GameError};
 
 #[derive(Parser, Debug)]

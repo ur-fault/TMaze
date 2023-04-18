@@ -1,5 +1,5 @@
 use crate::core::*;
-use crate::maze::{
+use crate::gameboard::{
     CellWall, GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeGeneratorComunication,
     Progress, StopGenerationFlag,
 };
@@ -26,7 +26,8 @@ pub enum GameState {
 
 pub struct GameProperities {
     pub game_mode: GameMode,
-    pub generator: fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
+    pub generator:
+        fn(Dims3D, bool, bool) -> Result<MazeGeneratorComunication, GenerationErrorInstant>,
 }
 
 pub enum MoveMode {
