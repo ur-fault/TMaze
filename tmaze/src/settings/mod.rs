@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 use self::editable::EditableField;
+pub use self::editable::EditableFieldError;
 use crate::renderer::Renderer;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
@@ -171,7 +172,7 @@ impl EditableField for Settings {
         &mut self,
         renderer: &mut Renderer,
         color_scheme: ColorScheme,
-    ) -> Result<bool, crate::ui::CrosstermError> {
+    ) -> Result<bool, EditableFieldError> {
         crate::ui::popup(
             renderer,
             color_scheme.normals(),
@@ -183,6 +184,7 @@ impl EditableField for Settings {
             ],
         )
         .map(|_| false)
+        .map_err(|e| e.into())
     }
 }
 

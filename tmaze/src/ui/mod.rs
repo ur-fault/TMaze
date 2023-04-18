@@ -1,9 +1,11 @@
 pub use std::time::Duration;
 
+use crossterm::Result as CResult;
 pub use substring::Substring;
 
 use crate::core::*;
 use crate::helpers;
+use crate::helpers::is_release;
 use crate::renderer::helpers::term_size;
 
 pub mod draw;
@@ -40,4 +42,17 @@ pub fn format_duration(dur: Duration) -> String {
         dur.as_secs() / 60,
         (dur.as_secs() % 60) as f32 + dur.subsec_millis() as f32 / 1000f32,
     )
+}
+
+pub fn wait_for_key() -> CResult<KeyCode> {
+    let mut e = crossterm::event::read();
+    loop {
+        match e {
+            Ok(event) => match event {
+                Event::Key(KeyEvent { code, kind, .. }) if !is_release(kind) => return Ok(code),
+                _ => e = crossterm::event::read(),
+            },
+            Err(e) => return Err(e),
+        }
+    }
 }
