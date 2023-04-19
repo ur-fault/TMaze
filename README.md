@@ -11,18 +11,27 @@ Simple multiplatform maze solving game for terminal written entirely in  Rust
 
 ### Features
 - Responsive to terminal size
-- Variable maze sizes
+- Configurable maze sizes through config file
+- Configurable colors
 - Various maze generation algorithms: Randomized Kruskal's, Depth-First Search
 - Timer and move counter
 - Show visited places
-- Spectator mode, where you can fly and see the map
+- Spectator mode, where you can fly and see the gameboard
 - Floors and 3D mazes (that's what spectator mode is mainly for)
+
+
+### Rationale
+Since I'm a student, I've got to attend classes, but even when I'm listening I wanted to do something more than sit there. Also at the time this project came to life, I started to learn Rust, so it seemed to make sense to make some kind of game, but since my notebook is not the newest and I wanted to make it as lightweight as possible, I decided to make it for a terminal. It's also pretty cool.
+
+Another requirement was that it would be multiplatform so that I could play it anywhere. A bonus was that I could play it on the server.
+
+And it ended up as maze solving game because I just couldn't find any other.
 
 ### To do
 - Better settings UI
 - Render path (you will be able to disable this)
 - Maybe multiplayer
-- Saving and exporting game state, mazes and their generators
+- Saving and exporting and importing game state, mazes
 
 ## How to run
 - You can either download from GitHub releases,  they are built automatically now, using GitHub Actions ~~althought there are old builds, and I won't update them so frequently, maybe in the future~~
