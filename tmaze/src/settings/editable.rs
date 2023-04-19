@@ -1,6 +1,6 @@
 use crate::{
     renderer::Renderer,
-    ui::{self, CrosstermError, MenuError, GenericUIError},
+    ui::{self, GenericUIError},
 };
 
 use super::ColorScheme;

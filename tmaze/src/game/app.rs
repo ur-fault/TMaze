@@ -688,6 +688,7 @@ impl App {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn draw_stairs<'a>(
         normal_context: &'a mut DrawContext,
         player_context: &'a mut DrawContext,

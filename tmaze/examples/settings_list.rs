@@ -9,7 +9,7 @@ fn main() -> CResult<()> {
     let mut v = vec![1, 2, 3];
     v.edit(&mut renderer, settings::ColorScheme::default())
         .unwrap();
-    
+
     renderer.render()?;
     Ok(())
 }
