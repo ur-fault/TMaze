@@ -6,10 +6,10 @@ use tmaze::{
 
 fn main() -> CResult<()> {
     let mut renderer = Renderer::new()?;
-    let mut settings = settings::Settings::new();
-    settings
-        .edit(&mut renderer, settings::ColorScheme::default())
+    let mut v = vec![1, 2, 3];
+    v.edit(&mut renderer, settings::ColorScheme::default())
         .unwrap();
+    
     renderer.render()?;
     Ok(())
 }

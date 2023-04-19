@@ -1,6 +1,6 @@
 use crate::{
     renderer::Renderer,
-    ui::{self, CrosstermError},
+    ui::{self, CrosstermError, MenuError, GenericUIError},
 };
 
 use super::ColorScheme;
@@ -12,7 +12,7 @@ pub trait EditableField {
         &mut self,
         renderer: &mut Renderer,
         color_scheme: ColorScheme,
-    ) -> Result<bool, EditableFieldError> {
+    ) -> Result<bool, GenericUIError> {
         ui::popup(
             renderer,
             color_scheme.normals(),
@@ -37,18 +37,5 @@ impl<T: EditableField> EditableField for Option<T> {
             Some(value) => value.print(),
             None => "None".to_string(),
         }
-    }
-}
-
-#[derive(Debug)]
-pub enum EditableFieldError {
-    Back,
-    Quit,
-    Crossterm(CrosstermError),
-}
-
-impl From<CrosstermError> for EditableFieldError {
-    fn from(error: CrosstermError) -> Self {
-        Self::Crossterm(error)
     }
 }

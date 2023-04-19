@@ -9,11 +9,13 @@ use crate::helpers::is_release;
 use crate::renderer::helpers::term_size;
 
 pub mod draw;
+pub mod input;
 pub mod menu;
 pub mod popup;
 pub mod progressbar;
 
 pub use draw::*;
+pub use input::*;
 pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
@@ -24,6 +26,36 @@ pub struct CrosstermError(pub crossterm::ErrorKind);
 impl From<crossterm::ErrorKind> for CrosstermError {
     fn from(error: crossterm::ErrorKind) -> Self {
         Self(error)
+    }
+}
+
+#[derive(Debug)]
+pub enum GenericUIError {
+    Back,
+    Quit,
+    Crossterm(CrosstermError),
+}
+
+impl From<CrosstermError> for GenericUIError {
+    fn from(error: CrosstermError) -> Self {
+        Self::Crossterm(error)
+    }
+}
+
+impl From<MenuError> for GenericUIError {
+    fn from(error: MenuError) -> Self {
+        match error {
+            MenuError::CrosstermError(e) => Self::Crossterm(e),
+            MenuError::Exit => Self::Back,
+            MenuError::FullQuit => Self::Quit,
+            MenuError::EmptyMenu => panic!("Empty menu"),
+        }
+    }
+}
+
+impl From<crossterm::ErrorKind> for GenericUIError {
+    fn from(error: crossterm::ErrorKind) -> Self {
+        Self::Crossterm(error.into())
     }
 }
 

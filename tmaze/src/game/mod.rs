@@ -4,7 +4,7 @@ pub use app::App;
 pub use game_state::{GameState, GameViewMode};
 
 use crate::{
-    settings::EditableFieldError,
+    ui::GenericUIError,
     ui::{CrosstermError, MenuError},
 };
 
@@ -41,12 +41,12 @@ impl From<crossterm::ErrorKind> for GameError {
     }
 }
 
-impl From<EditableFieldError> for GameError {
-    fn from(error: EditableFieldError) -> Self {
+impl From<GenericUIError> for GameError {
+    fn from(error: GenericUIError) -> Self {
         match error {
-            EditableFieldError::Back => Self::Back,
-            EditableFieldError::Quit => Self::FullQuit,
-            EditableFieldError::Crossterm(error) => Self::CrosstermError(error),
+            GenericUIError::Back => Self::Back,
+            GenericUIError::Quit => Self::FullQuit,
+            GenericUIError::Crossterm(error) => Self::CrosstermError(error),
         }
     }
 }

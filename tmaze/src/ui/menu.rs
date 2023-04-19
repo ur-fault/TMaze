@@ -56,10 +56,10 @@ pub fn menu(
     box_style: ContentStyle,
     text_style: ContentStyle,
     title: &str,
-    options: &[&str],
+    options: &[impl AsRef<str>],
     default: Option<usize>,
     counted: bool,
-) -> Result<u16, MenuError> {
+) -> Result<usize, MenuError> {
     let mut selected = default.unwrap_or(0);
     let opt_count = options.len();
 
@@ -71,12 +71,18 @@ pub fn menu(
         options
             .iter()
             .enumerate()
-            .map(|(i, opt)| format!("{} {}", if i == default.unwrap() { "▪" } else { " " }, opt))
+            .map(|(i, opt)| {
+                format!(
+                    "{} {}",
+                    if i == default.unwrap() { "▪" } else { " " },
+                    opt.as_ref()
+                )
+            })
             .collect::<Vec<_>>()
     } else {
         options
             .iter()
-            .map(|opt| String::from(*opt))
+            .map(|opt| String::from(opt.as_ref()))
             .collect::<Vec<_>>()
     };
 
@@ -99,7 +105,7 @@ pub fn menu(
                 KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
                     selected = (selected + 1) % opt_count
                 }
-                KeyCode::Enter | KeyCode::Char(' ') => return Ok(selected as u16),
+                KeyCode::Enter | KeyCode::Char(' ') => return Ok(selected),
                 KeyCode::Char(ch) => {
                     if counted {
                         selected = match ch {
@@ -137,8 +143,8 @@ pub fn choice_menu<'a, T>(
     let _options: Vec<&str> = options.iter().map(|opt| opt.1).collect();
     Ok(&options[menu(
         renderer, box_style, text_style, title, &_options, default, counted,
-    )? as usize]
-        .0)
+    )?]
+    .0)
 }
 
 pub fn render_menu(
