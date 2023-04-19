@@ -204,7 +204,7 @@ checksum = "8a2dd5a6fe8c6e3502f568a6353e5273bbb15193ad9a89e457b9970798efbea1"
 
 [[package]]
 name = "cmaze"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "criterion",
  "crossbeam",
@@ -212,6 +212,7 @@ dependencies = [
  "pausable_clock",
  "rand",
  "rayon",
+ "serde",
  "thiserror",
 ]
 
@@ -1107,7 +1108,7 @@ dependencies = [
 
 [[package]]
 name = "tmaze"
-version = "1.12.0"
+version = "1.12.1"
 dependencies = [
  "clap 4.2.1",
  "cmaze",
