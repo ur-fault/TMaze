@@ -5,6 +5,8 @@ Simple multiplatform maze solving game for terminal written entirely in  Rust
 ![](https://img.shields.io/crates/d/tmaze)
 ![Crates.io](https://img.shields.io/crates/v/tmaze)
 
+![Screenshot of in-game](https://github.com/ur-fault/tmaze/blob/readme/screenshot_ingame.png?raw=true)
+
 ## What's this
 
 ### Features
