@@ -20,7 +20,6 @@ impl fmt::Display for SerializeError {
 
 #[derive(Serialize, Deserialize)]
 pub struct SerializableMaze {
-    pub format_version: u32,
     pub maze: Maze,
     #[serde(default)]
     pub title: String,
