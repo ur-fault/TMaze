@@ -83,6 +83,7 @@ jobs:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   commit: master
                   generateReleaseNotes: true
+                  skipIfReleaseExists: true
                   draft: true
                   tag: ${{ env.TM_VERSION }}
     publish-on-crates:
