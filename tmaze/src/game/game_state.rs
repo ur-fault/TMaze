@@ -5,6 +5,7 @@ use cmaze::{
     gameboard::{CellWall, Dims3D},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use tap::Tap;
 
 use crate::{helpers::is_release, settings::Settings};
 
@@ -90,7 +91,8 @@ impl GameState {
     pub fn apply_move(&mut self, wall: CellWall, fast: bool) {
         match self.view_mode {
             GameViewMode::Spectator => {
-                let cam_off = wall.reverse_wall().to_coord() + self.camera_offset;
+                let cam_off =
+                    wall.reverse_wall().to_coord().tap_mut(|c| c.2 *= -1) + self.camera_offset;
 
                 self.camera_offset = Dims3D(
                     cam_off.0,
