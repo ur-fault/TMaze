@@ -37,14 +37,25 @@ And it ended up as maze solving game because I just couldn't find any other.
 - You can either download from GitHub releases,  they are built automatically now, using GitHub Actions ~~althought there are old builds, and I won't update them so frequently, maybe in the future~~
 - or build from source, you need cargo installed on your system
 
+
+### Feature flags
+TMaze uses cargo features to enable/disable some features. In Github release binaries they are all enabled, but not all are enabled by default when building from source.
+
+- hashbrown - uses hashbrown instead of std hashmap, which is faster [enabled by default]
+- updates - enables checking for updates, which is done on startup, can be disabled (this **doesn't** install new version)
+
 ### How to build from source
+#### Enabling/disabling features
+After `cargo` command add `--features` to enabled features, such as `updates`. To disable default features, such as `hashbrown`, add `--no-default-features`. To enable all featueres add `--all-features`.
+
+#### From GitHub repository
 1. Make sure you have [cargo](https://crates.io/) installed
 1. Clone GitHub repository or download it as zip, then extract it
 1. Go to that folder
 1. Run command `cargo run --release` to run (or you can just build it with `cargo build --release` without runing it)
 1. You can find compiled executable in the folder `./target/release/`, which you can move or link somewhere else
 
-#### Other option is to just install it using cargo
+#### Other option is to just install it from crates.io index
 1. Make sure you have [cargo](https://crates.io/) installed
 1. Run `cargo install tmaze`
 1. If you want, make sure that `~/.cargo/bin` is in the PATH and enjoy
