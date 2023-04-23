@@ -3,6 +3,7 @@ mod helpers;
 mod renderer;
 mod settings;
 mod ui;
+mod updates;
 
 use clap::Parser;
 use cmaze::{core, gameboard};

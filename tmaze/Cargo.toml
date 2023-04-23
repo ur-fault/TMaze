@@ -23,6 +23,8 @@ rand = "^0.8.1"
 derivative = "2.2.0"
 unicode-width = "0.1.10"
 tap = "1.0.1"
+crates_io_api = "0.8.1"
+semver = "1.0.17"
 
 [features]
 default = ["hashbrown"]
