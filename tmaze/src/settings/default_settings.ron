@@ -52,6 +52,10 @@ Settings (
     dont_ask_for_maze_algo: true,
     // dont_ask_for_maze_algo: false,
 
+    // check for updates on startup
+    check_for_updates: true,
+    // check_for_updates: false,
+
     // lists of maze presets
     mazes: [
         // Maze:

@@ -38,7 +38,7 @@ impl App {
 
     pub fn run(mut self) -> Result<(), GameError> {
         #[cfg(feature = "updates")]
-        {
+        if self.settings.get_check_for_updates() {
             ui::popup::render_popup(
                 &mut self.renderer,
                 Default::default(),

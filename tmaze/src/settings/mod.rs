@@ -157,6 +157,8 @@ pub struct Settings {
     #[serde(default)]
     pub dont_ask_for_maze_algo: Option<bool>,
     #[serde(default)]
+    pub check_for_updates: Option<bool>,
+    #[serde(default)]
     pub mazes: Option<Vec<MazePreset>>,
     #[serde(skip)]
     #[derivative(Default(value = "Settings::default_path()"))]
@@ -250,6 +252,15 @@ impl Settings {
 
     pub fn get_dont_ask_for_maze_algo(&self) -> bool {
         self.dont_ask_for_maze_algo.unwrap_or_default()
+    }
+
+    pub fn set_check_for_updates(mut self, value: bool) -> Self {
+        self.check_for_updates = Some(value);
+        self
+    }
+
+    pub fn get_check_for_updates(&self) -> bool {
+        self.check_for_updates.unwrap_or(true)
     }
 
     pub fn set_mazes(mut self, value: Vec<MazePreset>) -> Self {
