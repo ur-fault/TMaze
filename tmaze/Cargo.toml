@@ -23,8 +23,8 @@ rand = "^0.8.1"
 derivative = "2.2.0"
 unicode-width = "0.1.10"
 tap = "1.0.1"
-crates_io_api = {version = "0.8.1", optional = true}
-semver = {version = "1.0.17", optional = true}
+crates_io_api = { version = "0.8.1", optional = true }
+semver = { version = "1.0.17", optional = true }
 
 [features]
 default = ["hashbrown"]
