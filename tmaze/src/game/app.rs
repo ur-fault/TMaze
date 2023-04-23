@@ -12,8 +12,10 @@ use crate::renderer::helpers::term_size;
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
 use crate::ui::{DrawContext, Frame, MenuError};
-use crate::updates;
 use crate::{helpers, ui, ui::CrosstermError};
+
+#[cfg(feature = "updates")]
+use crate::updates;
 
 use super::{GameError, GameState, GameViewMode};
 
@@ -35,21 +37,24 @@ impl App {
     }
 
     pub fn run(mut self) -> Result<(), GameError> {
-        ui::popup::render_popup(
-            &mut self.renderer,
-            Default::default(),
-            Default::default(),
-            "Checking for newer version",
-            &["Please wait..."],
-        )?;
-        if let Ok(Some(version)) = updates::get_newer() {
-            ui::popup(
+        #[cfg(feature = "updates")]
+        {
+            ui::popup::render_popup(
                 &mut self.renderer,
                 Default::default(),
                 Default::default(),
-                "New version available",
-                &[format!("New version {} is available", version).as_str()],
+                "Checking for newer version",
+                &["Please wait..."],
             )?;
+            if let Ok(Some(version)) = updates::get_newer() {
+                ui::popup(
+                    &mut self.renderer,
+                    Default::default(),
+                    Default::default(),
+                    "New version available",
+                    &[format!("New version {} is available", version).as_str()],
+                )?;
+            }
         }
 
         let mut game_restart_reqested = false;

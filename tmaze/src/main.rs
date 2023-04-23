@@ -3,6 +3,7 @@ mod helpers;
 mod renderer;
 mod settings;
 mod ui;
+#[cfg(feature = "updates")]
 mod updates;
 
 use clap::Parser;
