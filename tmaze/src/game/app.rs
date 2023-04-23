@@ -52,7 +52,10 @@ impl App {
                     Default::default(),
                     Default::default(),
                     "New version available",
-                    &[format!("New version {} is available", version).as_str()],
+                    &[
+                        format!("New version {} is available", version).as_str(),
+                        format!("Your version is {}", env!("CARGO_PKG_VERSION")).as_str(),
+                    ],
                 )?;
             }
         }
