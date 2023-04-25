@@ -2,6 +2,9 @@
 
 Simple multiplatform maze solving game for terminal written entirely in  Rust
 
+### Install with `cargo install tmaze` and run with `tmaze`
+---
+
 ![](https://img.shields.io/crates/d/tmaze)
 ![Crates.io](https://img.shields.io/crates/v/tmaze)
 
