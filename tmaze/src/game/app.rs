@@ -21,6 +21,7 @@ pub struct App {
     // stdout: Stdout,
     settings: Settings,
     last_edge_follow_offset: Dims,
+    last_selected_preset: Option<usize>,
 }
 
 impl App {
@@ -30,6 +31,7 @@ impl App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
             settings: Settings::load(settings_path),
             last_edge_follow_offset: Dims(0, 0),
+            last_selected_preset: None,
         }
     }
 
@@ -726,7 +728,7 @@ impl App {
     }
 
     fn get_game_properities(&mut self) -> Result<GameProperities, GameError> {
-        let mode = *ui::choice_menu(
+        let (i, &mode) = ui::choice_menu(
             &mut self.renderer,
             self.settings.get_color_scheme().normals(),
             self.settings.get_color_scheme().texts(),
@@ -745,12 +747,16 @@ impl App {
                     )
                 })
                 .collect::<Vec<_>>(),
-            self.settings
-                .get_mazes()
-                .iter()
-                .position(|maze| maze.default),
+            self.last_selected_preset.or_else(|| {
+                self.settings
+                    .get_mazes()
+                    .iter()
+                    .position(|maze| maze.default)
+            }),
             false,
         )?;
+
+        self.last_selected_preset = Some(i);
 
         let gen = if self.settings.get_dont_ask_for_maze_algo() {
             match self.settings.get_default_maze_gen_algo() {
