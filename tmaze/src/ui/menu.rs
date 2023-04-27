@@ -133,12 +133,13 @@ pub fn choice_menu<'a, T>(
     options: &'a [(T, &str)],
     default: Option<usize>,
     counted: bool,
-) -> Result<&'a T, MenuError> {
+) -> Result<(usize, &'a T), MenuError> {
     let _options: Vec<&str> = options.iter().map(|opt| opt.1).collect();
-    Ok(&options[menu(
+    let idx = menu(
         renderer, box_style, text_style, title, &_options, default, counted,
-    )? as usize]
-        .0)
+    )? as usize;
+
+    Ok((idx, &options[idx].0))
 }
 
 pub fn render_menu(
