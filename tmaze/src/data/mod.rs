@@ -36,7 +36,7 @@ impl SaveData {
     }
 
     pub fn load_or() -> Self {
-        Self::load().unwrap_or_else(|err| Self {
+        Self::load().unwrap_or_else(|_| Self {
             last_update_check: None,
             path: Self::default_path(),
         })
