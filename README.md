@@ -39,23 +39,24 @@ And it ended up as maze solving game because I just couldn't find any other.
 
 
 ### Feature flags
-TMaze uses cargo features to enable/disable some features. In Github release binaries they are all enabled, but not all are enabled by default when building from source.
+TMaze uses cargo features to enable/disable some features. In Github release binaries they are all enabled, but not all of them are enabled by default when building from source.
 
 - hashbrown - uses hashbrown instead of std hashmap, which is faster [enabled by default]
 - updates - enables checking for updates, which is done on startup, can be disabled (this **doesn't** install new version)
 
 ### How to build from source
 #### Enabling/disabling features
-After `cargo` command add `--features` to enabled features, such as `updates`. To disable default features, such as `hashbrown`, add `--no-default-features`. To enable all featueres add `--all-features`.
+After `cargo` command add `--features` to enable features, such as `updates`. To disable default features, such as `hashbrown`, add `--no-default-features`. To enable all featueres add `--all-features`.
 
-#### From GitHub repository
+#### Install it using cargo from crates.io
+1. Make sure you have [cargo](https://crates.io/) installed
+1. Run `cargo install tmaze`
+1. It's recommended that you have `~/.cargo/bin` in the PATH, so that you don't need full path to run it
+
+#### Or directly from Github
 1. Make sure you have [cargo](https://crates.io/) installed
 1. Clone GitHub repository or download it as zip, then extract it
 1. Go to that folder
 1. Run command `cargo run --release` to run (or you can just build it with `cargo build --release` without runing it)
-1. You can find compiled executable in the folder `./target/release/`, which you can move or link somewhere else
+1. You can find compiled executable in the directory `./target/release/` with name `tmaze` or `tmaze.exe` , which you can move or link somewhere else
 
-#### Other option is to just install it from crates.io index
-1. Make sure you have [cargo](https://crates.io/) installed
-1. Run `cargo install tmaze`
-1. If you want, make sure that `~/.cargo/bin` is in the PATH and enjoy
