@@ -44,6 +44,10 @@ pub fn format_duration(dur: Duration) -> String {
     )
 }
 
+pub fn format_days_duration(dur: Duration) -> String {
+    format!("{} days", dur.as_secs() / 86400)
+}
+
 pub fn wait_for_key() -> CResult<KeyCode> {
     let mut e = crossterm::event::read();
     loop {

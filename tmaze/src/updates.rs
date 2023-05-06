@@ -1,17 +1,20 @@
 use std::time::Duration;
 
-use crates_io_api::{Error as CratesError, SyncClient};
+use crates_io_api::{AsyncClient, Error as CratesError};
 use semver::{Comparator, Version, VersionReq};
 
-pub fn get_newer() -> Result<Option<Version>, CratesError> {
-    let client = SyncClient::new("tmaze", Duration::from_secs(1)).unwrap();
+pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
+    let client = AsyncClient::new("tmaze", Duration::from_secs(1)).unwrap();
 
+    // Load the latest version of this crate from crates.io
     let latest_version = client
-        .full_crate(env!("CARGO_PKG_NAME"), false)?
+        .full_crate(env!("CARGO_PKG_NAME"), false)
+        .await?
         .max_stable_version
         .unwrap();
     let latest_version = Version::parse(latest_version.as_str()).unwrap();
 
+    // Compare the latest version to the current version
     let current_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
     let version_req = VersionReq {
         comparators: vec![Comparator {

@@ -2,14 +2,13 @@ pub mod editable;
 
 use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
-use dirs::preference_dir;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 use self::editable::EditableField;
 pub use self::editable::EditableFieldError;
-use crate::renderer::Renderer;
+use crate::{constants::base_path, renderer::Renderer};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum CameraMode {
@@ -141,6 +140,17 @@ impl EditableField for MazeGenAlgo {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+pub enum UpdateCheckInterval {
+    Never,
+    #[default]
+    Daily,
+    Weekly,
+    Monthly,
+    Yearly,
+    Always,
+}
+
 #[derive(Debug, Derivative, Clone, Serialize, Deserialize)]
 #[derivative(Default)]
 pub struct Settings {
@@ -157,7 +167,7 @@ pub struct Settings {
     #[serde(default)]
     pub dont_ask_for_maze_algo: Option<bool>,
     #[serde(default)]
-    pub check_for_updates: Option<bool>,
+    pub update_check_interval: Option<UpdateCheckInterval>,
     #[serde(default)]
     pub mazes: Option<Vec<MazePreset>>,
     #[serde(skip)]
@@ -193,7 +203,7 @@ impl EditableField for Settings {
 #[allow(dead_code)]
 impl Settings {
     pub fn default_path() -> PathBuf {
-        preference_dir().unwrap().join("tmaze").join("settings.ron")
+        base_path().join("settings.ron")
     }
 
     pub fn new() -> Self {
@@ -254,13 +264,13 @@ impl Settings {
         self.dont_ask_for_maze_algo.unwrap_or_default()
     }
 
-    pub fn set_check_for_updates(mut self, value: bool) -> Self {
-        self.check_for_updates = Some(value);
+    pub fn set_check_interval(mut self, value: UpdateCheckInterval) -> Self {
+        self.update_check_interval = Some(value);
         self
     }
 
-    pub fn get_check_for_updates(&self) -> bool {
-        self.check_for_updates.unwrap_or(true)
+    pub fn get_check_interval(&self) -> UpdateCheckInterval {
+        self.update_check_interval.unwrap_or(UpdateCheckInterval::Daily)
     }
 
     pub fn set_mazes(mut self, value: Vec<MazePreset>) -> Self {

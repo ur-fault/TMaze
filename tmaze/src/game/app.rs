@@ -3,8 +3,9 @@ use std::time::Duration;
 
 use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
-use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
+use crossterm::event::{self, poll, read, Event, KeyCode, KeyEvent, KeyEventKind};
 
+use crate::data::SaveData;
 use crate::gameboard::CellWall;
 use crate::gameboard::{algorithms::*, Cell};
 use crate::helpers::{constants, value_if_else, LineDir};
@@ -21,8 +22,8 @@ use super::{GameError, GameState, GameViewMode};
 
 pub struct App {
     renderer: Renderer,
-    // stdout: Stdout,
     settings: Settings,
+    save_data: SaveData,
     last_edge_follow_offset: Dims,
 }
 
@@ -32,21 +33,58 @@ impl App {
         App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
             settings: Settings::load(settings_path),
+            save_data: SaveData::load_or(),
             last_edge_follow_offset: Dims(0, 0),
         }
     }
 
     pub fn run(mut self) -> Result<(), GameError> {
         #[cfg(feature = "updates")]
-        if self.settings.get_check_for_updates() {
+        if !self.save_data.is_update_checked(&self.settings) {
             ui::popup::render_popup(
                 &mut self.renderer,
                 Default::default(),
                 Default::default(),
                 "Checking for newer version",
-                &["Please wait..."],
+                &[
+                    "Please wait...",
+                    &format!(
+                        "Last check before: {}",
+                        self.save_data
+                            .last_update_check
+                            .map(|l| l.elapsed().unwrap())
+                            .map(ui::format_days_duration)
+                            .unwrap_or("never".to_owned())
+                    ),
+                    "Press 'q' to cancel or Esc to skip",
+                ],
             )?;
-            if let Ok(Some(version)) = updates::get_newer() {
+
+            let rt = tokio::runtime::Runtime::new().unwrap();
+
+            let handle = rt.spawn(updates::get_newer_async());
+            while !handle.is_finished() {
+                if let Ok(true) = event::poll(Duration::from_millis(15)) {
+                    match event::read() {
+                        Ok(Event::Key(KeyEvent {
+                            code: KeyCode::Char('q'),
+                            kind: KeyEventKind::Press | KeyEventKind::Repeat,
+                            ..
+                        })) => {
+                            handle.abort();
+                            return Ok(());
+                        }
+                        Ok(Event::Key(KeyEvent {
+                            code: KeyCode::Esc,
+                            kind: KeyEventKind::Press | KeyEventKind::Repeat,
+                            ..
+                        })) => handle.abort(),
+                        _ => (),
+                    }
+                }
+            }
+
+            if let Ok(Ok(Some(version))) = rt.block_on(handle) {
                 ui::popup(
                     &mut self.renderer,
                     Default::default(),
@@ -58,6 +96,10 @@ impl App {
                     ],
                 )?;
             }
+
+            self.save_data
+                .update_last_check()
+                .expect("Failed to save data");
         }
 
         let mut game_restart_reqested = false;
