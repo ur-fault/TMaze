@@ -31,6 +31,8 @@ jobs:
               with:
                   path: ${{env.BIN_FILEPATH}}
                   name: release
+            - uses: MinoruSekine/setup-scoop@v1
+            - run: powershell ~\scoop\apps\scoop\current\bin\checkver.ps1 -Dir . -Update
     build-linux-x64:
         runs-on: ubuntu-latest
         steps:
@@ -93,19 +95,19 @@ jobs:
             - uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
-                  
+
             - name: publish cmaze
               uses: katyo/publish-crates@v2
               with:
-                path: ./cmaze
-                registry-token: ${{ secrets.CRATES_IO }}
-                ignore-unpublished-changes: true
-                
+                  path: ./cmaze
+                  registry-token: ${{ secrets.CRATES_IO }}
+                  ignore-unpublished-changes: true
+
             - name: publish tmaze
               uses: katyo/publish-crates@v2
               with:
-                # Path to Rust crate or workspace
-                path: ./tmaze
-                # Cargo registry token
-                registry-token: ${{ secrets.CRATES_IO }}
-                ignore-unpublished-changes: true
+                  # Path to Rust crate or workspace
+                  path: ./tmaze
+                  # Cargo registry token
+                  registry-token: ${{ secrets.CRATES_IO }}
+                  ignore-unpublished-changes: true
