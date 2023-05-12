@@ -2,13 +2,23 @@
 
 Simple multiplatform maze solving game for terminal written entirely in  Rust
 
-### Install with `cargo install tmaze` and run with `tmaze`
+### [Installation below](#installation)
+
 ---
 
 ![](https://img.shields.io/crates/d/tmaze)
 ![Crates.io](https://img.shields.io/crates/v/tmaze)
 
 ![Screenshot of in-game](https://github.com/ur-fault/tmaze/blob/master/readme_assets/screenshot_ingame.png?raw=true)
+
+## Installation
+You can install TMaze several ways:
+
+### Cargo (Any OS)
+Install with `cargo install tmaze` and run with `tmaze`
+
+### Scoop (Windows)
+Install with `scoop install https://raw.githubusercontent.com/ur-fault/TMaze/master/tmaze.json` and run with `tmaze`
 
 ## What's this
 

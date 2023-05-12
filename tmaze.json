@@ -1,0 +1,6 @@
+{
+    "version": "1.12.3",
+    "url": "https://github.com/ur-fault/TMaze/releases/download/1.12.3/tmaze-1.12.3-win-x86_64.zip",
+    "extract_dir": "tmaze",
+    "bin": "tmaze.exe"
+}
