@@ -12,7 +12,7 @@ Simple multiplatform maze solving game for terminal written entirely in  Rust
 ![Screenshot of in-game](https://github.com/ur-fault/tmaze/blob/master/readme_assets/screenshot_ingame.png?raw=true)
 
 ## Installation
-You can install TMaze several ways:
+You can install TMaze in several ways:
 
 ### Cargo (Any OS)
 Install with `cargo install tmaze` and run with `tmaze`
