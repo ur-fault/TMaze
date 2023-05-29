@@ -1,0 +1,11 @@
+on:
+    schedule:
+        - cron: '0 0 * * *'
+
+jobs:
+    main:
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: MinoruSekine/setup-scoop@v1
+            - run: powershell ~\scoop\apps\scoop\current\bin\checkver.ps1 -Dir . -Update

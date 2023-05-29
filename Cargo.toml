@@ -1,3 +1,3 @@
 [workspace]
-members = ["tmaze", "cmaze"]
+members = ["tmaze", "cmaze", "editor", "editor2"]
 default-members = ["tmaze", "cmaze"]

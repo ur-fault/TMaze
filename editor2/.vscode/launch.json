@@ -1,0 +1,324 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'tmaze'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "tmaze",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'tmaze'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=tmaze",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "tmaze",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'tmaze'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=tmaze",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "tmaze",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'box'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=box",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "box",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'box'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=box",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "box",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'menu'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=menu",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "menu",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'menu'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=menu",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "menu",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'popup'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=popup",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "popup",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'popup'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=popup",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "popup",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'settings'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=settings",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "settings",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'settings'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=settings",
+                    "--package=tmaze"
+                ],
+                "filter": {
+                    "name": "settings",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'cmaze'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=cmaze"
+                ],
+                "filter": {
+                    "name": "cmaze",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'kruskals'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=kruskals",
+                    "--package=cmaze"
+                ],
+                "filter": {
+                    "name": "kruskals",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'editor'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=editor",
+                    "--package=editor"
+                ],
+                "filter": {
+                    "name": "editor",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'editor'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=editor",
+                    "--package=editor"
+                ],
+                "filter": {
+                    "name": "editor",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'editor2'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=editor2",
+                    "--package=editor2"
+                ],
+                "filter": {
+                    "name": "editor2",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'editor2'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=editor2",
+                    "--package=editor2"
+                ],
+                "filter": {
+                    "name": "editor2",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
