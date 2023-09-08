@@ -1,3 +1,4 @@
 [workspace]
 members = ["tmaze", "cmaze"]
 default-members = ["tmaze", "cmaze"]
+workspace.resolver = "2"
