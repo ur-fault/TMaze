@@ -1,8 +1,5 @@
+use crossterm::event::{read, Event, KeyCode, KeyEvent};
 use crossterm::style::ContentStyle;
-use crossterm::{
-    event::{poll, read, Event, KeyCode, KeyEvent},
-    terminal::size,
-};
 
 use std::cell::RefCell;
 

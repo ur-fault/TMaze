@@ -1,7 +1,7 @@
 pub mod drawable;
 pub mod helpers;
 
-use std::io::{stdout, Write, self};
+use std::io::{self, stdout, Write};
 
 use crossterm::{event::Event, style::ContentStyle, QueueableCommand};
 use unicode_width::UnicodeWidthChar;

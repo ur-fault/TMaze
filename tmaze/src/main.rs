@@ -1,3 +1,5 @@
+mod constants;
+mod data;
 mod game;
 mod helpers;
 mod renderer;
@@ -5,8 +7,6 @@ mod settings;
 mod ui;
 #[cfg(feature = "updates")]
 mod updates;
-mod constants;
-mod data;
 
 use clap::Parser;
 use cmaze::{core, gameboard};

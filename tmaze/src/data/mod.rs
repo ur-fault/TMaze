@@ -57,15 +57,15 @@ impl SaveData {
     pub fn is_update_checked(&self, settings: &Settings) -> bool {
         use UpdateCheckInterval::*;
 
-        let skip_check = |interval: Duration| {
-            if let Some(last_check) = self.last_update_check {
-                SystemTime::now()
-                    .duration_since(last_check)
-                    .map(|d| d < interval)
-                    .unwrap_or(false)
-            } else {
-                false
-            }
+        let skip_check = |interval| {
+            self.last_update_check
+                .map(|lc| {
+                    SystemTime::now()
+                        .duration_since(lc)
+                        .map(|d| d < interval)
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false)
         };
 
         match settings.get_check_interval() {

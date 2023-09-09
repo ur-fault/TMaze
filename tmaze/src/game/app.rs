@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
-use crossterm::event::{self, poll, read, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
 
 use crate::data::SaveData;
 use crate::gameboard::CellWall;
