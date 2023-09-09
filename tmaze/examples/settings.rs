@@ -1,11 +1,18 @@
-use cmaze::gameboard::Dims;
-use tmaze::{renderer::Renderer, ui::{wait_for_key, draw_box}, settings::{self, editable::EditableField}};
-use crossterm::{Result as CResult, style::ContentStyle};
+use std::io;
 
-fn main() -> CResult<()> {
+use tmaze::{
+    renderer::Renderer,
+    settings::{self, editable::EditableField},
+};
+
+fn main() -> io::Result<()> {
     let mut renderer = Renderer::new()?;
     let mut settings = settings::Settings::new();
-    settings.edit(&mut renderer, settings::ColorScheme::default()).unwrap();
+
+    settings
+        .edit(&mut renderer, settings::ColorScheme::default())
+        .unwrap();
     renderer.render()?;
+
     Ok(())
 }

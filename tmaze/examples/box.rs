@@ -1,11 +1,10 @@
+use std::io;
+
 use cmaze::gameboard::Dims;
 use crossterm::style::ContentStyle;
-use tmaze::{
-    renderer::Renderer,
-    ui::{draw, CrosstermError},
-};
+use tmaze::{renderer::Renderer, ui::draw};
 
-fn main() -> Result<(), CrosstermError> {
+fn main() -> io::Result<()> {
     let mut renderer = Renderer::new()?;
 
     let mut events = vec![];

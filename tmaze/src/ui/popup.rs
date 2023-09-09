@@ -1,4 +1,4 @@
-use crossterm::{event::KeyEventKind, style::ContentStyle};
+use crossterm::style::ContentStyle;
 pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
@@ -8,7 +8,7 @@ use std::cell::RefCell;
 
 use super::draw::*;
 use super::*;
-use crate::renderer::Renderer;
+use crate::{helpers::is_release, renderer::Renderer};
 
 pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
     match texts.iter().map(|text| text.len()).max() {
@@ -26,13 +26,13 @@ pub fn popup(
     text_style: ContentStyle,
     title: &str,
     texts: &[&str],
-) -> Result<KeyCode, CrosstermError> {
+) -> io::Result<KeyCode> {
     render_popup(renderer, box_style, text_style, title, texts)?;
 
     loop {
         let event = read()?;
         if let Event::Key(KeyEvent { code, kind, .. }) = event {
-            if kind != KeyEventKind::Release {
+            if !is_release(kind) {
                 break Ok(code);
             }
         }
@@ -49,7 +49,7 @@ pub fn render_popup(
     text_style: ContentStyle,
     title: &str,
     texts: &[&str],
-) -> Result<(), CrosstermError> {
+) -> io::Result<()> {
     let box_size = popup_size(title, texts);
     let title_pos = box_center_screen(Dims(title.len() as i32 + 2, 1))?.0;
     let pos = box_center_screen(box_size)?;
