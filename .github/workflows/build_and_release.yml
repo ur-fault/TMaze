@@ -19,7 +19,7 @@ jobs:
             - uses: actions-rs/cargo@v1
               with:
                   command: build
-                  args: --release
+                  args: --release --all-features
             - run: |
                   $tmversion = ./target/release/tmaze.exe --version | Select-String -Pattern '^tmaze ([0-9]+\.[0-9]+\.[0-9]+)$' | %{$_.Matches[0].Groups[1].Value}
                   $filepath = "./target/release/tmaze-${tmversion}-win-x86_64.exe"
@@ -42,7 +42,7 @@ jobs:
             - uses: actions-rs/cargo@v1
               with:
                   command: build
-                  args: --release
+                  args: --release --all-features
             - run: strip ./target/release/tmaze
             - run: ls -l ./target/release/
             - run: |
@@ -104,8 +104,6 @@ jobs:
             - name: publish tmaze
               uses: katyo/publish-crates@v2
               with:
-                # Path to Rust crate or workspace
                 path: ./tmaze
-                # Cargo registry token
                 registry-token: ${{ secrets.CRATES_IO }}
                 ignore-unpublished-changes: true

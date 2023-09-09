@@ -52,6 +52,16 @@ Settings (
     dont_ask_for_maze_algo: true,
     // dont_ask_for_maze_algo: false,
 
+    // update check interval
+    // - valid intervals:
+    //  - Never
+    //  - Daily
+    //  - Weekly
+    //  - Monthly
+    //  - Yearly
+    //  - Always
+    update_check_interval: Daily,
+
     // lists of maze presets
     mazes: [
         // Maze:

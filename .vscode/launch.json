@@ -12,7 +12,8 @@
                 "args": [
                     "build",
                     "--bin=tmaze",
-                    "--package=tmaze"
+                    "--package=tmaze",
+                    "--all-features"
                 ],
                 "filter": {
                     "name": "tmaze",
