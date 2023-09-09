@@ -1,9 +1,7 @@
-use cmaze::gameboard::Dims;
-use crossterm::style::ContentStyle;
 use tmaze::{
     renderer::Renderer,
     settings::{self, editable::EditableField},
-    ui::{draw_box, wait_for_key, CRResult},
+    ui::CRResult,
 };
 
 fn main() -> CRResult<()> {
