@@ -61,7 +61,7 @@ impl App {
                         self.save_data
                             .last_update_check
                             .map(|l| l.elapsed().unwrap())
-                            .map(ui::format_days_duration)
+                            .map(|d| humantime::format_duration(d).to_string())
                             .unwrap_or("never".to_owned())
                     ),
                     "Press 'q' to cancel or Esc to skip",
