@@ -7,4 +7,4 @@ WORKDIR /usr/src/tmaze
 
 RUN cargo build --release --all-features
 
-CMD ["cargo", "run", "--release"]
+CMD ["./target/release/tmaze"]
