@@ -51,3 +51,11 @@ And it ended up as maze solving game because I just couldn't find any other.
 1. Make sure you have [cargo](https://crates.io/) installed
 1. Run `cargo install tmaze`
 1. If you want, make sure that `~/.cargo/bin` is in the PATH and enjoy
+
+#### If you are Docker enjoyer, you may use it too
+1. Make sure you have [Docker](https://www.docker.com/) installed
+1. Build the image with `docker build -t tmaze . --tag tmaze` inside the repository folder, image is not published on Docker Hub yet
+1. Then you have multiple options of actually running it (and ofc more)
+    1. Run it one time only: `docker run --rm -it tmaze`
+    1. Run it with persistent storage for config and saved data: `docker run -it --rm -v tmaze_data:/root/.config/tmaze tmaze`
+        - In this case you can edit config using somthing like `docker run --rm -it -v tmaze_data:/root thinca/vim:latest`
