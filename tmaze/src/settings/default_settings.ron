@@ -33,7 +33,6 @@ Settings (
     disable_tower_auto_up: false,
     // disable_tower_auto_up: true,
 
-
     // when maze cannot fit on the screen
     // camera_mode:
     // - valid modes
@@ -61,6 +60,11 @@ Settings (
     //  - Yearly
     //  - Always
     update_check_interval: Daily,
+
+    // display update check errors,
+    // when false display on successfully found new version
+    display_update_check_errors: true,
+    // display_update_check_errors: false,
 
     // lists of maze presets
     mazes: [

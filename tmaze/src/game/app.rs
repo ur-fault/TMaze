@@ -92,17 +92,32 @@ impl App {
                 }
             }
 
-            if let Ok(Ok(Some(version))) = rt.block_on(handle) {
-                ui::popup(
-                    &mut self.renderer,
-                    Default::default(),
-                    Default::default(),
-                    "New version available",
-                    &[
-                        format!("New version {} is available", version).as_str(),
-                        format!("Your version is {}", env!("CARGO_PKG_VERSION")).as_str(),
-                    ],
-                )?;
+            match rt.block_on(handle).unwrap() {
+                Ok(Some(version)) => {
+                    ui::popup(
+                        &mut self.renderer,
+                        Default::default(),
+                        Default::default(),
+                        "New version available",
+                        &[
+                            format!("New version {} is available", version).as_str(),
+                            format!("Your version is {}", env!("CARGO_PKG_VERSION")).as_str(),
+                        ],
+                    )?;
+                }
+                Err(err) if self.settings.get_display_update_check_errors() => {
+                    ui::popup(
+                        &mut self.renderer,
+                        Default::default(),
+                        Default::default(),
+                        "Error while checking for updates",
+                        &[
+                            "There was an error while checking for updates",
+                            &format!("Error: {}", err),
+                        ],
+                    )?;
+                }
+                _ => {}
             }
 
             self.save_data

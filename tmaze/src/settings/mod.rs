@@ -169,6 +169,8 @@ pub struct Settings {
     #[serde(default)]
     pub update_check_interval: Option<UpdateCheckInterval>,
     #[serde(default)]
+    pub display_update_check_errors: Option<bool>,
+    #[serde(default)]
     pub mazes: Option<Vec<MazePreset>>,
     #[serde(skip)]
     #[derivative(Default(value = "Settings::default_path()"))]
@@ -270,7 +272,17 @@ impl Settings {
     }
 
     pub fn get_check_interval(&self) -> UpdateCheckInterval {
-        self.update_check_interval.unwrap_or(UpdateCheckInterval::Daily)
+        self.update_check_interval
+            .unwrap_or(UpdateCheckInterval::Daily)
+    }
+
+    pub fn get_display_update_check_errors(&self) -> bool {
+        self.display_update_check_errors.unwrap_or(true)
+    }
+
+    pub fn set_display_update_check_errors(mut self, value: bool) -> Self {
+        self.display_update_check_errors = Some(value);
+        self
     }
 
     pub fn set_mazes(mut self, value: Vec<MazePreset>) -> Self {

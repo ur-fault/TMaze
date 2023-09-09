@@ -1,5 +1,5 @@
 use crossterm::style::{Color, ContentStyle};
-pub use crossterm::{
+use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
