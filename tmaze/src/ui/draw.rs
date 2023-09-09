@@ -138,6 +138,7 @@ impl Frame {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct DrawContext<'a> {
     pub renderer: &'a RefCell<&'a mut Renderer>,
     pub style: ContentStyle,
