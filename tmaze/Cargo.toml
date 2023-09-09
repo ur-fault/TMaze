@@ -23,6 +23,7 @@ rand = "^0.8.1"
 derivative = "2.2.0"
 unicode-width = "0.1.10"
 tap = "1.0.1"
+thiserror = "1.0.48"
 
 [features]
 default = ["hashbrown"]

@@ -1,10 +1,12 @@
+use std::io;
+
 use crossterm::style::ContentStyle;
 use tmaze::{
     renderer::Renderer,
-    ui::{menu, CrosstermError, MenuError},
+    ui::{menu, MenuError},
 };
 
-fn main() -> Result<(), CrosstermError> {
+fn main() -> io::Result<()> {
     let mut renderer = Renderer::new()?;
 
     let res = menu::menu(

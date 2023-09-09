@@ -2,6 +2,7 @@ use std::io;
 pub use std::time::Duration;
 
 pub use substring::Substring;
+use thiserror::Error;
 
 use crate::core::*;
 use crate::helpers;
@@ -17,18 +18,7 @@ pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
 
-pub type CRResult<T> = Result<T, CrosstermError>;
-
-#[derive(Debug)]
-pub struct CrosstermError(pub io::Error);
-
-impl From<io::Error> for CrosstermError {
-    fn from(error: io::Error) -> Self {
-        Self(error)
-    }
-}
-
-pub fn box_center_screen(box_dims: Dims) -> Result<Dims, CrosstermError> {
+pub fn box_center_screen(box_dims: Dims) -> io::Result<Dims> {
     let size_u16 = term_size();
     Ok(helpers::box_center(
         Dims(0, 0),
