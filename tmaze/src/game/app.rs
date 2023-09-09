@@ -704,8 +704,8 @@ impl App {
         }
     }
 
-    fn draw_stairs<'a>(
-        contexts: GameDrawContexts<'a>,
+    fn draw_stairs(
+        contexts: GameDrawContexts,
         cell: &Cell,
         stairs_pos: (i32, i32),
         maze_pos: (i32, i32),
