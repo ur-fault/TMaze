@@ -205,7 +205,7 @@ checksum = "cd7cc57abe963c6d3b9d8be5b06ba7c8957a930305ca90304f24ef040aa6f961"
 
 [[package]]
 name = "cmaze"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "criterion",
  "crossbeam",
@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "tmaze"
-version = "1.12.3"
+version = "1.12.4"
 dependencies = [
  "clap",
  "cmaze",

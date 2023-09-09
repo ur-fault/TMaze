@@ -1,6 +1,6 @@
 [package]
 name = "cmaze"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 description = "Core of tmaze game"
 license-file = "../LICENSE"
