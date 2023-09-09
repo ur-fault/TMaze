@@ -12,7 +12,7 @@ use crate::renderer::helpers::term_size;
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
 use crate::ui::{DrawContext, Frame, MenuError};
-use crate::{helpers, ui, ui::CrosstermError};
+use crate::{helpers, ui};
 
 use super::{GameError, GameState, GameViewMode};
 
@@ -201,7 +201,7 @@ impl App {
                         }
                     }
                     Err(err) => {
-                        break Err(CrosstermError(err).into());
+                        break Err(err.into());
                     }
                     _ => {}
                 }
@@ -639,7 +639,7 @@ impl App {
                         &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                     ],
                 )?;
-                return Err(GameError::EmptyMaze);
+                return Err(GameError::EmptyMenu);
             }
         };
 
@@ -697,7 +697,7 @@ impl App {
                         &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                     ],
                 )?;
-                Err(GameError::EmptyMaze)
+                Err(GameError::EmptyMenu)
             }
             Err(GenerationErrorThreaded::AbortGeneration) => Err(GameError::Back),
             Err(GenerationErrorThreaded::UnknownError(err)) => panic!("{:?}", err),

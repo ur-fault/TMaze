@@ -1,21 +1,25 @@
 pub mod app;
 pub mod game_state;
+
 use std::io;
 
 pub use app::App;
 pub use game_state::{GameState, GameViewMode};
+use thiserror::Error;
 
-use crate::{
-    settings::EditableFieldError,
-    ui::{CrosstermError, MenuError},
-};
+use crate::{settings::EditableFieldError, ui::MenuError};
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum GameError {
-    CrosstermError(CrosstermError),
-    EmptyMaze,
+    #[error("Crossterm error: {0}")]
+    CrosstermError(#[from] io::Error),
+    #[error("Empty menu, nothing to select")]
+    EmptyMenu,
+    #[error("Back")]
     Back,
+    #[error("Full quit")]
     FullQuit,
+    #[error("New game")]
     NewGame,
 }
 
@@ -24,22 +28,10 @@ impl From<MenuError> for GameError {
         match error {
             MenuError::CrosstermError(error) => Self::CrosstermError(error),
             // TODO: this shouldn't be EmptyMaze or at least it doesn't make sense
-            MenuError::EmptyMenu => Self::EmptyMaze,
+            MenuError::EmptyMenu => Self::EmptyMenu,
             MenuError::Exit => Self::Back,
             MenuError::FullQuit => Self::FullQuit,
         }
-    }
-}
-
-impl From<CrosstermError> for GameError {
-    fn from(error: CrosstermError) -> Self {
-        Self::CrosstermError(error)
-    }
-}
-
-impl From<io::Error> for GameError {
-    fn from(error: io::Error) -> Self {
-        Self::CrosstermError(CrosstermError::from(error))
     }
 }
 

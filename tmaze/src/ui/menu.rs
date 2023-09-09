@@ -13,24 +13,16 @@ use crate::renderer::Renderer;
 use super::draw::*;
 use super::*;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum MenuError {
-    CrosstermError(CrosstermError),
+    #[error(transparent)]
+    CrosstermError(#[from] io::Error),
+    #[error("Empty menu, nothing to select")]
     EmptyMenu,
+    #[error("Exit")]
     Exit,
+    #[error("Full quit")]
     FullQuit,
-}
-
-impl From<CrosstermError> for MenuError {
-    fn from(error: CrosstermError) -> Self {
-        Self::CrosstermError(error)
-    }
-}
-
-impl From<io::Error> for MenuError {
-    fn from(error: io::Error) -> Self {
-        Self::CrosstermError(error.try_into().expect("Cannot convert crossterm error"))
-    }
 }
 
 pub fn menu_size(title: &str, options: &[String], counted: bool) -> Dims {
@@ -150,7 +142,7 @@ pub fn render_menu(
     options: &[String],
     selected: usize,
     counted: bool,
-) -> Result<(), CrosstermError> {
+) -> io::Result<()> {
     let menu_size = menu_size(title, options, counted);
     let pos = box_center_screen(menu_size)?;
     let opt_count = options.len();

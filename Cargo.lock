@@ -1102,6 +1102,7 @@ dependencies = [
  "serde",
  "substring",
  "tap",
+ "thiserror",
  "unicode-width",
 ]
 
