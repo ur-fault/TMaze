@@ -48,6 +48,8 @@ impl App {
 
     #[cfg(feature = "updates")]
     fn check_for_updates(&mut self) -> Result<(), GameError> {
+        use crossterm::event::{self, KeyEventKind};
+
         if !self.save_data.is_update_checked(&self.settings) {
             ui::popup::render_popup(
                 &mut self.renderer,
