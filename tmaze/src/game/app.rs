@@ -46,8 +46,8 @@ impl App {
         }
     }
 
-    pub fn run(mut self) -> Result<(), GameError> {
-        #[cfg(feature = "updates")]
+    #[cfg(feature = "updates")]
+    fn check_for_updates(&mut self) -> Result<(), GameError> {
         if !self.save_data.is_update_checked(&self.settings) {
             ui::popup::render_popup(
                 &mut self.renderer,
@@ -109,6 +109,13 @@ impl App {
                 .update_last_check()
                 .expect("Failed to save data");
         }
+
+        Ok(())
+    }
+
+    pub fn run(mut self) -> Result<(), GameError> {
+        #[cfg(feature = "updates")]
+        self.check_for_updates()?;
 
         let mut game_restart_reqested = false;
 
