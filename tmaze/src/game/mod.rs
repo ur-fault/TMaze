@@ -1,5 +1,7 @@
 pub mod app;
 pub mod game_state;
+use std::io;
+
 pub use app::App;
 pub use game_state::{GameState, GameViewMode};
 
@@ -35,8 +37,8 @@ impl From<CrosstermError> for GameError {
     }
 }
 
-impl From<crossterm::ErrorKind> for GameError {
-    fn from(error: crossterm::ErrorKind) -> Self {
+impl From<io::Error> for GameError {
+    fn from(error: io::Error) -> Self {
         Self::CrosstermError(CrosstermError::from(error))
     }
 }
