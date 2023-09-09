@@ -268,7 +268,7 @@ impl App {
             let pos = if fits_on_screen {
                 ui::box_center_screen(maze_render_size)?
             } else {
-                let last_player_real_pos = helpers::from_maze_to_real(player_pos);
+                let last_player_real_pos = helpers::maze_pos_to_real(player_pos);
 
                 match camera_mode {
                     CameraMode::CloseFollow => size / 2 - last_player_real_pos,
@@ -469,7 +469,7 @@ impl App {
         let moves = game.get_moves();
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
-                let real_pos = helpers::from_maze_to_real(*move_pos);
+                let real_pos = helpers::maze_pos_to_real(*move_pos);
                 normal_context.draw_char(maze_pos + real_pos, '.');
             }
         }
@@ -516,7 +516,7 @@ impl App {
                 draw_line_double(
                     normal_context,
                     (xpos + 1, ypos + 1),
-                    LineDir::double_line_bools(
+                    LineDir::from_bools(
                         cell.get_wall(CellWall::Bottom),
                         cell.get_wall(CellWall::Right),
                         cell2.get_wall(CellWall::Top),
@@ -713,7 +713,7 @@ impl App {
         player_pos: Dims3D,
         ups_as_goal: bool,
     ) {
-        let real_pos = helpers::from_maze_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
+        let real_pos = helpers::maze_pos_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
             + Dims::from(maze_pos);
 
         let GameDrawContexts {
