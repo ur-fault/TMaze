@@ -1,6 +1,6 @@
+use std::io;
 pub use std::time::Duration;
 
-use crossterm::Result as CResult;
 pub use substring::Substring;
 
 use crate::core::*;
@@ -18,11 +18,13 @@ pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
 
-#[derive(Debug)]
-pub struct CrosstermError(pub crossterm::ErrorKind);
+pub type CRResult<T> = Result<T, CrosstermError>;
 
-impl From<crossterm::ErrorKind> for CrosstermError {
-    fn from(error: crossterm::ErrorKind) -> Self {
+#[derive(Debug)]
+pub struct CrosstermError(pub io::Error);
+
+impl From<io::Error> for CrosstermError {
+    fn from(error: io::Error) -> Self {
         Self(error)
     }
 }
@@ -44,7 +46,7 @@ pub fn format_duration(dur: Duration) -> String {
     )
 }
 
-pub fn wait_for_key() -> CResult<KeyCode> {
+pub fn wait_for_key() -> CRResult<KeyCode> {
     let mut e = crossterm::event::read();
     loop {
         match e {
@@ -52,7 +54,7 @@ pub fn wait_for_key() -> CResult<KeyCode> {
                 Event::Key(KeyEvent { code, kind, .. }) if !is_release(kind) => return Ok(code),
                 _ => e = crossterm::event::read(),
             },
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         }
     }
 }

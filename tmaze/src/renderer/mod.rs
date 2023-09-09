@@ -3,8 +3,10 @@ pub mod helpers;
 
 use std::io::{stdout, Write};
 
-use crossterm::{event::Event, style::ContentStyle, QueueableCommand, Result as CRResult};
+use crossterm::{event::Event, style::ContentStyle, QueueableCommand};
 use unicode_width::UnicodeWidthChar;
+
+use crate::ui::CRResult;
 
 use self::{drawable::Drawable, helpers::term_size};
 

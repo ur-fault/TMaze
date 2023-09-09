@@ -27,8 +27,8 @@ impl From<CrosstermError> for MenuError {
     }
 }
 
-impl From<crossterm::ErrorKind> for MenuError {
-    fn from(error: crossterm::ErrorKind) -> Self {
+impl From<io::Error> for MenuError {
+    fn from(error: io::Error) -> Self {
         Self::CrosstermError(error.try_into().expect("Cannot convert crossterm error"))
     }
 }
