@@ -34,7 +34,3 @@ pub fn format_duration(dur: Duration) -> String {
         (dur.as_secs() % 60) as f32 + dur.subsec_millis() as f32 / 1000f32,
     )
 }
-
-pub fn format_days_duration(dur: Duration) -> String {
-    format!("{} days", dur.as_secs() / 86400)
-}
