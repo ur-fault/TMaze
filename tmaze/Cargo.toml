@@ -28,6 +28,7 @@ semver = { version = "1.0.17", optional = true }
 tokio = { version = "1.27.0", optional = true }
 thiserror = "1.0.48"
 humantime = "2.1.0"
+chrono = { version = "0.4.30", features = ["serde"] }
 
 [features]
 default = ["hashbrown"]

@@ -1,5 +1,7 @@
 pub mod constants;
 
+use core::fmt;
+
 use crossterm::event::KeyEventKind;
 
 use crate::core::*;
@@ -123,3 +125,11 @@ pub fn maze_pos_to_real(pos_on_maze: Dims3D) -> Dims {
 pub fn is_release(k: KeyEventKind) -> bool {
     k == KeyEventKind::Release
 }
+
+pub trait ToDebug: fmt::Debug {
+    fn to_debug(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+impl<T: fmt::Debug> ToDebug for T {}

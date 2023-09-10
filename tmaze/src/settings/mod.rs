@@ -272,8 +272,7 @@ impl Settings {
     }
 
     pub fn get_check_interval(&self) -> UpdateCheckInterval {
-        self.update_check_interval
-            .unwrap_or(UpdateCheckInterval::Daily)
+        self.update_check_interval.unwrap_or_default()
     }
 
     pub fn get_display_update_check_errors(&self) -> bool {

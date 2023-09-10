@@ -48,9 +48,25 @@ impl App {
 
     #[cfg(feature = "updates")]
     fn check_for_updates(&mut self) -> Result<(), GameError> {
+        use chrono::Local;
         use crossterm::event::{self, KeyEventKind};
 
+        use crate::helpers::ToDebug;
+
         if !self.save_data.is_update_checked(&self.settings) {
+            let last_check_before = self
+                .save_data
+                .last_update_check
+                .map(|l| Local::now().signed_duration_since(l))
+                .map(|d| d.to_std().expect("Failed to convert to std duration"))
+                .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)) // Remove subsec time
+                .map(humantime::format_duration);
+
+            let update_interval = format!(
+                "Currently checkes {} for updates",
+                self.settings.get_check_interval().to_debug().to_lowercase()
+            );
+
             ui::popup::render_popup(
                 &mut self.renderer,
                 Default::default(),
@@ -58,14 +74,10 @@ impl App {
                 "Checking for newer version",
                 &[
                     "Please wait...",
-                    &format!(
-                        "Last check before: {}",
-                        self.save_data
-                            .last_update_check
-                            .map(|l| l.elapsed().unwrap())
-                            .map(|d| humantime::format_duration(d).to_string())
-                            .unwrap_or("never".to_owned())
-                    ),
+                    &update_interval,
+                    &last_check_before
+                        .map(|lc| format!("Last check before: {}", lc))
+                        .unwrap_or("Never checked for updates".to_owned()),
                     "Press 'q' to cancel or Esc to skip",
                 ],
             )?;
