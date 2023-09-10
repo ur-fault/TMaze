@@ -63,3 +63,10 @@ After `cargo` command add `--features` to enable features, such as `updates`. To
 1. Run command `cargo run --release` to run (or you can just build it with `cargo build --release` without runing it)
 1. You can find compiled executable in the directory `./target/release/` with name `tmaze` or `tmaze.exe` , which you can move or link somewhere else
 
+#### If you are Docker enjoyer, you may use it too
+1. Make sure you have [Docker](https://www.docker.com/) installed
+1. Build the image with `docker build -t tmaze . --tag tmaze` inside the repository folder, image is not published on Docker Hub yet
+1. Then you have multiple options of actually running it (and ofc more)
+    1. Run it one time only: `docker run --rm -it tmaze`
+    1. Run it with persistent storage for config and saved data: `docker run -it --rm -v tmaze_data:/root/.config/tmaze tmaze`
+        - In this case you can edit config using somthing like `docker run --rm -it -v tmaze_data:/root thinca/vim:latest`
