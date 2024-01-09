@@ -5,10 +5,10 @@ pub use crossterm::{
     event::{poll, read, Event, KeyCode, KeyEvent},
     terminal::size,
 };
+use fyodor::renderer::Renderer;
 
 use super::draw::*;
 use super::*;
-use crate::renderer::Renderer;
 
 pub fn render_progress(
     renderer: &mut Renderer,
@@ -20,24 +20,24 @@ pub fn render_progress(
     let progress_size = Dims(title.len() as i32 + 2, 4);
     let pos = box_center_screen(progress_size)?;
 
-    {
-        let mut context = DrawContext {
-            renderer: &RefCell::new(renderer),
-            style: box_style,
-            frame: None,
-        };
-
-        context.draw_box(pos, progress_size);
-        if pos.1 + 1 >= 0 {
-            context.draw_str_styled(pos + Dims(1, 1), title, text_style);
-        }
-        if pos.1 + 2 >= 0 {
-            context.draw_str(
-                pos + Dims(1, 2),
-                &"█".repeat((title.len() as f64 * progress) as usize),
-            );
-        }
-    }
+    // {
+    //     let mut context = DrawContext {
+    //         renderer: &RefCell::new(renderer),
+    //         style: box_style,
+    //         frame: None,
+    //     };
+    //
+    //     context.draw_box(pos, progress_size);
+    //     if pos.1 + 1 >= 0 {
+    //         context.draw_str_styled(pos + Dims(1, 1), title, text_style);
+    //     }
+    //     if pos.1 + 2 >= 0 {
+    //         context.draw_str(
+    //             pos + Dims(1, 2),
+    //             &"█".repeat((title.len() as f64 * progress) as usize),
+    //         );
+    //     }
+    // }
 
     renderer.render()?;
 

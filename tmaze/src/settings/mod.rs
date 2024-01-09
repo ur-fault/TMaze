@@ -2,13 +2,14 @@ pub mod editable;
 
 use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
+use fyodor::renderer::Renderer;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 use self::editable::EditableField;
 pub use self::editable::EditableFieldError;
-use crate::{constants::base_path, renderer::Renderer};
+use crate::constants::base_path;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum CameraMode {

@@ -81,15 +81,15 @@ impl From<(i32, i32)> for Dims {
     }
 }
 
-impl From<Dims> for (i32, i32) {
-    fn from(val: Dims) -> Self {
-        (val.0, val.1)
-    }
-}
-
 impl From<Dims3D> for Dims {
     fn from(dims: Dims3D) -> Self {
         Dims(dims.0, dims.1)
+    }
+}
+
+impl From<Dims> for (i32, i32) {
+    fn from(val: Dims) -> Self {
+        (val.0, val.1)
     }
 }
 

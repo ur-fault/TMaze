@@ -3,9 +3,12 @@ pub mod constants;
 use core::fmt;
 
 use crossterm::event::KeyEventKind;
+use crossterm::style::{ContentStyle, Color};
+use fyodor::ui::menu::Menu;
 
 use crate::core::*;
 use crate::gameboard::Maze;
+use crate::settings::Settings;
 
 pub fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
     (container_end - container_start - item_width) / 2 + container_start
@@ -133,3 +136,28 @@ pub trait ToDebug: fmt::Debug {
 }
 
 impl<T: fmt::Debug> ToDebug for T {}
+
+pub fn dims2fyodor(dims: Dims) -> fyodor::Dims {
+    fyodor::Dims::new(dims.0, dims.1)
+}
+
+pub fn fyodor2dims(fyodor: fyodor::Dims) -> Dims {
+    Dims(fyodor.x, fyodor.y)
+}
+
+pub fn fg_style(color: Color) -> ContentStyle {
+    ContentStyle {
+        foreground_color: Some(color),
+        ..Default::default()
+    }
+}
+
+pub fn make_menu<T>(title: impl Into<String>, items: Vec<T>, settings: &Settings) -> Menu<T> {
+    let mut menu = Menu::new(title.into()).with_items(items);
+    let scheme = settings.get_color_scheme();
+    menu.box_style = fg_style(scheme.normal);
+    menu.text_style = fg_style(scheme.text);
+    menu.item_style = fg_style(scheme.text);
+
+    menu
+}

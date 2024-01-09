@@ -1,11 +1,9 @@
 use std::io;
 
+use fyodor::renderer::Renderer;
 use thiserror::Error;
 
-use crate::{
-    renderer::Renderer,
-    ui::{self},
-};
+use crate::ui::{self};
 
 use super::ColorScheme;
 

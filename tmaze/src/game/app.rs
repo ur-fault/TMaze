@@ -1,19 +1,37 @@
-use std::cell::RefCell;
 use std::time::Duration;
 
-use cmaze::core::*;
-use cmaze::game::{Game, GameProperities, GameState as GameStatus};
-use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
+use cmaze::{
+    core::*,
+    game::{Game, GameProperities, GameState as GameStatus},
+};
+use crossterm::{
+    event::{poll, read, Event, KeyCode, KeyEvent},
+    style::ContentStyle,
+};
+use fyodor::{
+    drawable::dbox::Dbox,
+    helpers::term_size,
+    layout::{
+        align::{Align, AlignedOnX},
+        Pos,
+    },
+    renderer::Renderer,
+    ui::{
+        fullscreen_menu::{FullscreenMenu, MenuResult},
+        menu::Menu,
+        Window,
+    },
+    CanvasLike, CanvasLikeExt, Drawable, Frame,
+};
+use unicode_width::UnicodeWidthStr;
 
-use crate::data::SaveData;
-use crate::gameboard::CellWall;
-use crate::gameboard::{algorithms::*, Cell};
-use crate::helpers::{constants, value_if_else, LineDir};
-use crate::renderer::helpers::term_size;
-use crate::renderer::Renderer;
-use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
-use crate::ui::{DrawContext, Frame, MenuError};
-use crate::{helpers, ui};
+use crate::{
+    data::SaveData,
+    gameboard::{algorithms::*, CellWall},
+    helpers::{self, constants, dims2fyodor, make_menu, value_if_else, LineDir},
+    settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings},
+    ui,
+};
 
 #[cfg(feature = "updates")]
 use crate::updates;
@@ -26,12 +44,6 @@ pub struct App {
     save_data: SaveData,
     last_edge_follow_offset: Dims,
     last_selected_preset: Option<usize>,
-}
-
-struct GameDrawContexts<'a> {
-    normal: DrawContext<'a>,
-    player: DrawContext<'a>,
-    goal: DrawContext<'a>,
 }
 
 impl App {
@@ -148,6 +160,9 @@ impl App {
 
         let mut game_restart_reqested = false;
 
+        let main_menu = Menu::new("TMaze".to_string())
+            .with_items(vec!["New Game", "Settings", "Controls", "About", "Quit"]);
+
         loop {
             if game_restart_reqested {
                 game_restart_reqested = false;
@@ -161,16 +176,33 @@ impl App {
                 continue;
             }
 
-            match ui::menu(
-                &mut self.renderer,
-                self.settings.get_color_scheme().normals(),
-                self.settings.get_color_scheme().texts(),
-                "TMaze",
-                &["New Game", "Settings", "Controls", "About", "Quit"],
-                None,
-                true,
-            ) {
-                Ok(res) => match res {
+            // match ui::menu(
+            //     &mut self.renderer,
+            //     self.settings.get_color_scheme().normals(),
+            //     self.settings.get_color_scheme().texts(),
+            //     "TMaze",
+            //     &["New Game", "Settings", "Controls", "About", "Quit"],
+            //     None,
+            //     true,
+            // ) {
+            let menu_res = FullscreenMenu::new(main_menu)
+                .run(&mut self.renderer)?
+                .unwrap();
+
+            match menu_res {
+                MenuResult {
+                    code: KeyCode::Char('q') | KeyCode::Esc | KeyCode::Backspace,
+                    ..
+                } => break,
+                MenuResult {
+                    code: KeyCode::Char('r'),
+                    ..
+                } => game_restart_reqested = true,
+                MenuResult {
+                    code: KeyCode::Char(' ') | KeyCode::Enter,
+                    index,
+                    data: _,
+                } => match index {
                     0 => match self.run_game() {
                         Ok(_) | Err(GameError::Back) => {}
                         Err(GameError::NewGame) => {
@@ -189,10 +221,8 @@ impl App {
                         self.show_about_popup()?;
                     }
                     4 => break,
-                    _ => break,
+                    _ => panic!("should not be possible, invalid main menu result index"),
                 },
-                Err(MenuError::Exit) => break,
-                Err(_) => break,
             };
         }
 
@@ -288,18 +318,29 @@ impl App {
                     Ok(Event::Key(key_event)) => {
                         if game_state.handle_event(key_event).is_err() {
                             game_state.game.pause().unwrap();
-                            match ui::menu(
-                                &mut self.renderer,
-                                self.settings.get_color_scheme().normals(),
-                                self.settings.get_color_scheme().texts(),
-                                "Paused",
-                                &["Resume", "Main Menu", "Quit"],
-                                None,
-                                false,
-                            )? {
+                            // match ui::menu(
+                            //     &mut self.renderer,
+                            //     self.settings.get_color_scheme().normals(),
+                            //     self.settings.get_color_scheme().texts(),
+                            //     "Paused",
+                            //     &["Resume", "Main Menu", "Quit"],
+                            //     None,
+                            //     false,
+                            // )? {
+                            let menu_res = FullscreenMenu::new(
+                                Menu::new("Paused".to_string()).with_items(vec![
+                                    "Resume",
+                                    "Main Menu",
+                                    "Quit",
+                                ]),
+                            )
+                            .run(&mut self.renderer)?
+                            .unwrap();
+
+                            match menu_res.index {
+                                0 => {}
                                 1 => return Err(GameError::Back),
                                 2 => return Err(GameError::FullQuit),
-                                _ => {}
                             }
                             game_state.game.resume().unwrap();
                         }
@@ -310,6 +351,7 @@ impl App {
                     _ => {}
                 }
 
+                // TODO: handle error better
                 self.renderer.on_event(&event.unwrap())?;
             }
 
@@ -360,7 +402,7 @@ impl App {
         let maze_render_size = helpers::maze_render_size(maze);
         let size = {
             let size = term_size();
-            Dims(size.0 as i32, size.1 as i32)
+            Dims(size.x, size.y)
         };
 
         let maze_margin = Dims(10, 3);
@@ -398,147 +440,146 @@ impl App {
             pos + Dims::from(*camera_offset) * 2
         };
 
-        let normal_style = self.settings.get_color_scheme().normals();
-        let text_style = self.settings.get_color_scheme().texts();
-        let player_style = self.settings.get_color_scheme().players();
-        let goal_style = self.settings.get_color_scheme().goals();
+        let fmaze_pos = (maze_pos.0, maze_pos.1);
+
+        let color_scheme = self.settings.get_color_scheme();
+        let normal_style = color_scheme.normals();
+        let text_style = color_scheme.texts();
+        let player_style = color_scheme.players();
+        let goal_style = color_scheme.goals();
 
         // self.renderer.begin()?;
-        let renderer_cell = RefCell::new(&mut self.renderer);
+        // let renderer_cell = RefCell::new(&mut self.renderer);
 
-        let text_frame = if fits_on_screen {
-            Frame::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
+        // let text_frame = if fits_on_screen {
+        //     Frame::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
+        // } else {
+        //     Frame::new_sized(Dims(0, 0), size).with_margin(maze_margin)
+        // };
+        // let frame = text_frame.with_margin(Dims(1, 2));
+
+        let mut text_frame = if fits_on_screen {
+            Frame::new(self.renderer.get_render_space())
+                .with_pos((maze_pos.0, maze_pos.1))
+                .with_size((maze_render_size.0, maze_render_size.1))
+                .mx(-1)
+                .my(-2)
         } else {
-            Frame::new_sized(Dims(0, 0), size).with_margin(maze_margin)
-        };
-        let frame = text_frame.with_margin(Dims(1, 2));
-
-        let mut normal_context = DrawContext {
-            renderer: &renderer_cell,
-            style: normal_style,
-            frame: frame.into(),
-        };
-        let mut text_context = DrawContext {
-            renderer: &renderer_cell,
-            style: text_style,
-            frame: text_frame.into(),
-        };
-        let mut player_context = DrawContext {
-            renderer: &renderer_cell,
-            style: player_style,
-            frame: frame.into(),
-        };
-        let mut goal_context = DrawContext {
-            renderer: &renderer_cell,
-            style: goal_style,
-            frame: frame.into(),
+            Frame::new(self.renderer.get_render_space()).mx(1).my(2)
         };
 
-        let box_frame = text_frame.with_margin(Dims(0, 1));
-        normal_context.draw_box(box_frame.start, box_frame.size());
+        // let mut normal_context = DrawContext {
+        //     renderer: &renderer_cell,
+        //     style: normal_style,
+        //     frame: frame.into(),
+        // };
+        // let mut text_context = DrawContext {
+        //     renderer: &renderer_cell,
+        //     style: text_style,
+        //     frame: text_frame.into(),
+        // };
+        // let mut player_context = DrawContext {
+        //     renderer: &renderer_cell,
+        //     style: player_style,
+        //     frame: frame.into(),
+        // };
+        // let mut goal_context = DrawContext {
+        //     renderer: &renderer_cell,
+        //     style: goal_style,
+        //     frame: frame.into(),
+        // };
+
+        // let box_frame = text_frame.with_margin(Dims(0, 1));
+        let mut box_frame = text_frame.clone().my(1);
+        let mut maze_frame = box_frame.clone().mx(1).my(1);
+
+        // normal_context.draw_box(box_frame.start, box_frame.size());
+        (normal_style, &Dbox::new(box_frame.size())).draw((0, 0), &mut box_frame);
 
         let floor = player_pos.2 + camera_offset.2;
 
-        let draw_line_double_duo =
-            |mut context: DrawContext, pos: (i32, i32), l1: LineDir, l2: LineDir| {
-                context.draw_str(
-                    pos.into(),
-                    &format!("{}{}", l1.double_line(), l2.double_line(),),
-                )
-            };
+        struct Double(LineDir, ContentStyle);
 
-        let draw_line_double = |mut context: DrawContext, pos: (i32, i32), l: LineDir| {
-            context.draw_str(pos.into(), l.double_line())
-        };
+        impl Drawable for Double {
+            type X = i32;
+            type Y = i32;
 
-        draw_line_double_duo(
-            normal_context,
-            maze_pos.into(),
-            LineDir::BottomRight,
-            LineDir::Horizontal,
-        );
-        draw_line_double_duo(
-            normal_context,
-            (maze_pos.0 + maze_render_size.0 - 2, maze_pos.1),
-            LineDir::Horizontal,
-            LineDir::BottomLeft,
-        );
+            fn draw(&self, pos: impl Into<fyodor::Dims>, frame: &mut impl CanvasLike) {
+                frame.show(pos, &self.0.double_line())
+            }
+        }
 
-        draw_line_double(
-            normal_context,
-            (maze_pos.0, maze_pos.1 + maze_render_size.1 - 2),
-            LineDir::Vertical,
-        );
-        draw_line_double(
-            normal_context,
-            (
-                maze_pos.0 + maze_render_size.0 - 1,
-                maze_pos.1 + maze_render_size.1 - 2,
-            ),
-            LineDir::Vertical,
+        struct DoubleDuo(LineDir, LineDir, ContentStyle);
+
+        impl Drawable for DoubleDuo {
+            type X = i32;
+            type Y = i32;
+
+            fn draw(&self, pos: impl Into<fyodor::Dims>, frame: &mut impl CanvasLike) {
+                frame.show(
+                    pos,
+                    &format!("{}{}", self.0.double_line(), self.1.double_line()),
+                );
+            }
+        }
+
+        DoubleDuo(LineDir::BottomRight, LineDir::Horizontal, normal_style)
+            .draw((0, 0), &mut maze_frame);
+        DoubleDuo(LineDir::Horizontal, LineDir::BottomLeft, normal_style)
+            .draw((maze_render_size.0 - 2, 0), &mut maze_frame);
+
+        Double(LineDir::TopRight, normal_style).draw((0, maze_render_size.1 - 1), &mut maze_frame);
+        DoubleDuo(LineDir::Horizontal, LineDir::TopLeft, normal_style).draw(
+            (maze_render_size.0 - 2, maze_render_size.1 - 1),
+            &mut maze_frame,
         );
 
-        draw_line_double(
-            normal_context,
-            (maze_pos.0, maze_pos.1 + maze_render_size.1 - 1),
-            LineDir::TopRight,
-        );
-        draw_line_double_duo(
-            normal_context,
-            (
-                maze_pos.0 + maze_render_size.0 - 2,
-                maze_pos.1 + maze_render_size.1 - 1,
-            ),
-            LineDir::Horizontal,
-            LineDir::TopLeft,
+        Double(LineDir::Vertical, normal_style).draw((0, maze_render_size.1 - 2), &mut maze_frame);
+        Double(LineDir::Vertical, normal_style).draw(
+            (maze_render_size.0 - 1, maze_render_size.1 - 2),
+            &mut maze_frame,
         );
 
         for x in 0..maze.size().0 - 1 {
-            draw_line_double_duo(
-                normal_context,
-                (x * 2 + maze_pos.0 + 1, maze_pos.1),
+            DoubleDuo(
                 LineDir::Horizontal,
-                if maze
-                    .get_cell(Dims3D(x, 0, floor))
-                    .unwrap()
-                    .get_wall(CellWall::Right)
-                {
-                    LineDir::ClosedTop
-                } else {
-                    LineDir::Horizontal
-                },
-            );
+                value_if_else(
+                    maze.get_cell(Dims3D(x, 0, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Right),
+                    || LineDir::ClosedTop,
+                    || LineDir::Horizontal,
+                ),
+                normal_style,
+            )
+            .draw((x * 2 + 1, 0), &mut maze_frame);
 
-            draw_line_double_duo(
-                normal_context,
-                (x * 2 + maze_pos.0 + 1, maze_pos.1 + maze_render_size.1 - 1),
+            DoubleDuo(
                 LineDir::Horizontal,
-                if maze
-                    .get_cell(Dims3D(x, maze.size().1 - 1, floor))
-                    .unwrap()
-                    .get_wall(CellWall::Right)
-                {
-                    LineDir::ClosedBottom
-                } else {
-                    LineDir::Horizontal
-                },
-            );
+                value_if_else(
+                    maze.get_cell(Dims3D(x, maze.size().1 - 1, floor))
+                        .unwrap()
+                        .get_wall(CellWall::Right),
+                    || LineDir::ClosedBottom,
+                    || LineDir::Horizontal,
+                ),
+                normal_style,
+            )
+            .draw((x * 2 + 1, maze_render_size.1 - 1), &mut maze_frame);
         }
 
         // Vertical edge lines
         for y in 0..maze.size().1 - 1 {
-            let ypos = y * 2 + maze_pos.1 + 1;
-            if ypos >= size.1 - 2 {
+            let ypos = y * 2 + 1;
+            if ypos + maze_pos.1 >= size.1 - 2 {
                 break;
             }
 
-            if ypos == -1 {
+            if ypos < 0 {
                 continue;
             }
 
-            draw_line_double(
-                normal_context,
-                (maze_pos.0, ypos + 1),
+            Double(
                 value_if_else(
                     maze.get_cell(Dims3D(0, y, floor))
                         .unwrap()
@@ -546,11 +587,11 @@ impl App {
                     || LineDir::ClosedLeft,
                     || LineDir::Vertical,
                 ),
-            );
+                normal_style,
+            )
+            .draw((0, ypos + 1), &mut maze_frame);
 
-            draw_line_double(
-                normal_context,
-                (maze_pos.0 + maze_render_size.0 - 1, ypos + 1),
+            Double(
                 value_if_else(
                     maze.get_cell(Dims3D(maze.size().0 - 1, y, floor))
                         .unwrap()
@@ -558,15 +599,14 @@ impl App {
                     || LineDir::ClosedRight,
                     || LineDir::Vertical,
                 ),
-            );
+                normal_style,
+            )
+            .draw((maze_render_size.0 - 1, ypos + 1), &mut maze_frame);
 
-            draw_line_double(normal_context, (maze_pos.0, ypos), LineDir::Vertical);
+            Double(LineDir::Vertical, normal_style).draw((0, ypos), &mut maze_frame);
 
-            draw_line_double(
-                normal_context,
-                (maze_pos.0 + maze_render_size.0 - 1, y * 2 + maze_pos.1 + 1),
-                LineDir::Vertical,
-            );
+            Double(LineDir::Vertical, normal_style)
+                .draw((maze_render_size.0 - 1, ypos), &mut maze_frame);
         }
 
         // Drawing visited places (moves)
@@ -574,91 +614,86 @@ impl App {
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
                 let real_pos = helpers::maze_pos_to_real(*move_pos);
-                normal_context.draw_char(maze_pos + real_pos, '.');
+                (normal_style, &'.').draw(dims2fyodor(real_pos), &mut maze_frame);
             }
         }
 
         // Drawing insides of the maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
-            let ypos = iy as i32 * 2 + 1 + maze_pos.1;
+            let ypos = iy as i32 * 2 + 1;
 
             for (ix, cell) in row.iter().enumerate() {
-                let xpos = ix as i32 * 2 + 1 + maze_pos.0;
+                let xpos = ix as i32 * 2 + 1;
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
-                    draw_line_double(normal_context, (xpos + 1, ypos), LineDir::Vertical);
+                    Double(LineDir::Vertical, normal_style).draw((xpos + 1, ypos), &mut maze_frame);
                 }
 
-                if ypos + 1 < size.1 - 2
-                    && ypos > 0
+                if ypos + 1 + maze_pos.1 < size.1 - 2
+                    && ypos + maze_pos.1 > 0
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
-                    draw_line_double(normal_context, (xpos, ypos + 1), LineDir::Horizontal);
+                    Double(LineDir::Horizontal, normal_style)
+                        .draw((xpos, ypos + 1), &mut maze_frame);
                 }
 
-                let contexts = GameDrawContexts {
-                    normal: normal_context,
-                    player: player_context,
-                    goal: goal_context,
-                };
-
-                Self::draw_stairs(
-                    contexts,
-                    cell,
-                    (ix as i32, iy as i32),
-                    maze_pos.into(),
-                    floor,
-                    player_pos,
-                    ups_as_goal,
-                );
+                // Self::draw_stairs(
+                //     contexts,
+                //     cell,
+                //     (ix as i32, iy as i32),
+                //     maze_pos.into(),
+                //     floor,
+                //     player_pos,
+                //     ups_as_goal,
+                // );
 
                 let cell2 = match maze.get_cell(Dims3D(ix as i32 + 1, iy as i32 + 1, floor)) {
                     Some(cell) => cell,
                     None => continue,
                 };
 
-                draw_line_double(
-                    normal_context,
-                    (xpos + 1, ypos + 1),
+                Double(
                     LineDir::from_bools(
                         cell.get_wall(CellWall::Bottom),
                         cell.get_wall(CellWall::Right),
                         cell2.get_wall(CellWall::Top),
                         cell2.get_wall(CellWall::Left),
                     ),
-                );
+                    normal_style,
+                )
+                .draw((xpos + 1, ypos + 1), &mut maze_frame);
             }
         }
 
         let goal_pos = game.get_goal_pos();
         if floor == goal_pos.2 {
-            goal_context.draw_char(
-                Dims::from(goal_pos) * 2 + maze_pos + Dims(1, 1),
-                constants::GOAL_CHAR,
+            (goal_style, &constants::GOAL_CHAR).draw(
+                dims2fyodor(helpers::maze_pos_to_real(goal_pos)),
+                &mut maze_frame,
             );
         }
 
         if floor == player_pos.2 {
-            player_context.draw_char(
-                Dims::from(player_pos) * 2 + maze_pos + Dims(1, 1),
-                *player_char,
+            (player_style, player_char).draw(
+                dims2fyodor(helpers::maze_pos_to_real(player_pos)),
+                &mut maze_frame,
             );
 
-            let contexts = GameDrawContexts {
-                normal: normal_context,
-                player: player_context,
-                goal: goal_context,
-            };
+            // let contexts = GameDrawContexts {
+            //     normal: normal_context,
+            //     player: player_context,
+            //     goal: goal_context,
+            // };
 
-            Self::draw_stairs(
-                contexts,
-                maze.get_cell(player_pos).unwrap(),
-                (player_pos.0, player_pos.1),
-                maze_pos.into(),
-                floor,
-                player_pos,
-                ups_as_goal,
-            );
+            // Self::draw_stairs(
+            //     contexts,
+            //     maze.get_cell(player_pos).unwrap(),
+            //     (player_pos.0, player_pos.1),
+            //     maze_pos.into(),
+            //     floor,
+            //     player_pos,
+            //     ups_as_goal,
+            // );
         }
 
         let pos_text = if maze.size().2 > 1 {
@@ -676,7 +711,7 @@ impl App {
         let view_mode = game_state.view_mode.to_string();
         let (view_mode, pos_text) =
             if view_mode.len() as i32 + text_horizontal_margin * 2 + pos_text.len() as i32 + 1
-                > text_frame.size().0
+                > text_frame.size().x
             {
                 (
                     format!("{}", view_mode.chars().next().unwrap()),
@@ -691,33 +726,43 @@ impl App {
                 (view_mode, pos_text)
             };
 
-        let texts = (
-            &pos_text,
-            view_mode.as_str(),
-            &format!("{} moves", game_state.game.get_move_count()),
-            &ui::format_duration(from_start),
+        AlignedOnX(pos_text.as_str()).draw(
+            (
+                Align::new(Anchor::Start, pos_text.width() as i32)
+                    .with_margin(text_horizontal_margin),
+                0,
+            ),
+            &mut text_frame,
         );
 
-        // Print texts
-        let str_pos_tl = Dims(
-            text_horizontal_margin + text_frame.start.0,
-            text_frame.start.1,
+        AlignedOnX(view_mode.as_str()).draw(
+            (
+                Align::new(Anchor::End, view_mode.width() as i32)
+                    .with_margin(text_horizontal_margin),
+                0,
+            ),
+            &mut text_frame,
         );
-        let str_pos_tr = Dims(
-            text_frame.end.0 - text_horizontal_margin - texts.1.len() as i32 + 1,
-            text_frame.start.1,
-        );
-        let str_pos_bl = Dims(
-            text_horizontal_margin + text_frame.start.0,
-            text_frame.end.1,
-        );
-        let str_pos_br =
-            text_frame.end - Dims(text_horizontal_margin + texts.3.len() as i32 - 1, 0);
 
-        text_context.draw_str(str_pos_tl, texts.0);
-        text_context.draw_str(str_pos_tr, texts.1);
-        text_context.draw_str(str_pos_bl, texts.2);
-        text_context.draw_str(str_pos_br, texts.3);
+        let moves_text = format!("{} moves", game_state.game.get_move_count());
+        AlignedOnX(moves_text.as_str()).draw(
+            (
+                Align::new(Anchor::Start, moves_text.width() as i32)
+                    .with_margin(text_horizontal_margin),
+                text_frame.size().y - 1,
+            ),
+            &mut text_frame,
+        );
+
+        let time_text = ui::format_duration(from_start);
+        AlignedOnX(time_text.as_str()).draw(
+            (
+                Align::new(Anchor::End, time_text.width() as i32)
+                    .with_margin(text_horizontal_margin),
+                text_frame.size().y - 1,
+            ),
+            &mut text_frame,
+        );
 
         self.renderer.render()?;
 
@@ -808,77 +853,124 @@ impl App {
         }
     }
 
-    fn draw_stairs(
-        contexts: GameDrawContexts,
-        cell: &Cell,
-        stairs_pos: (i32, i32),
-        maze_pos: (i32, i32),
-        floor: i32,
-        player_pos: Dims3D,
-        ups_as_goal: bool,
-    ) {
-        let real_pos = helpers::maze_pos_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
-            + Dims::from(maze_pos);
-
-        let GameDrawContexts {
-            normal: mut normal_context,
-            player: mut player_context,
-            goal: mut goal_context,
-        } = contexts;
-
-        if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-            if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos, '⥮');
-            } else {
-                normal_context.draw_char(real_pos, '⥮');
-            };
-        } else if !cell.get_wall(CellWall::Up) {
-            if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos, '↑');
-            } else if ups_as_goal {
-                goal_context.draw_char(real_pos, '↑');
-            } else {
-                normal_context.draw_char(real_pos, '↑');
-            }
-        } else if !cell.get_wall(CellWall::Down) {
-            if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos, '↓');
-            } else {
-                normal_context.draw_char(real_pos, '↓');
-            }
-        }
-    }
+    // fn draw_stairs(
+    //     contexts: GameDrawContexts,
+    //     cell: &Cell,
+    //     stairs_pos: (i32, i32),
+    //     maze_pos: (i32, i32),
+    //     floor: i32,
+    //     player_pos: Dims3D,
+    //     ups_as_goal: bool,
+    // ) {
+    //     let real_pos = helpers::maze_pos_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
+    //         + Dims::from(maze_pos);
+    //
+    //     let GameDrawContexts {
+    //         normal: mut normal_context,
+    //         player: mut player_context,
+    //         goal: mut goal_context,
+    //     } = contexts;
+    //
+    //     if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
+    //         if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
+    //             player_context.draw_char(real_pos, '⥮');
+    //         } else {
+    //             normal_context.draw_char(real_pos, '⥮');
+    //         };
+    //     } else if !cell.get_wall(CellWall::Up) {
+    //         if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
+    //             player_context.draw_char(real_pos, '↑');
+    //         } else if ups_as_goal {
+    //             goal_context.draw_char(real_pos, '↑');
+    //         } else {
+    //             normal_context.draw_char(real_pos, '↑');
+    //         }
+    //     } else if !cell.get_wall(CellWall::Down) {
+    //         if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
+    //             player_context.draw_char(real_pos, '↓');
+    //         } else {
+    //             normal_context.draw_char(real_pos, '↓');
+    //         }
+    //     }
+    // }
 
     fn get_game_properities(&mut self) -> Result<GameProperities, GameError> {
-        let (i, &mode) = ui::choice_menu(
-            &mut self.renderer,
-            self.settings.get_color_scheme().normals(),
-            self.settings.get_color_scheme().texts(),
+        // let (i, &mode) = ui::choice_menu(
+        //     &mut self.renderer,
+        //     self.settings.get_color_scheme().normals(),
+        //     self.settings.get_color_scheme().texts(),
+        //     "Maze size",
+        //     &self
+        //         .settings
+        //         .get_mazes()
+        //         .iter()
+        //         .map(|maze| {
+        //             (
+        //                 GameMode {
+        //                     size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
+        //                     is_tower: maze.tower,
+        //                 },
+        //                 maze.title.as_str(),
+        //             )
+        //         })
+        //         .collect::<Vec<_>>(),
+        //     self.last_selected_preset.or_else(|| {
+        //         self.settings
+        //             .get_mazes()
+        //             .iter()
+        //             .position(|maze| maze.default)
+        //     }),
+        //     false,
+        // )?;
+
+        struct GameModeMenuItem {
+            mode: GameMode,
+            title: String,
+            default: bool,
+        }
+
+        impl Drawable for GameModeMenuItem {
+            type X = i32;
+            type Y = i32;
+
+            fn draw(&self, pos: impl Into<Pos<i32, i32>>, frame: &mut impl CanvasLike) {
+                frame.show(pos.into(), &self.title);
+            }
+        }
+
+        impl Drawable for (ContentStyle, &GameModeMenuItem) {
+            type X = i32;
+            type Y = i32;
+
+            fn draw(&self, pos: impl Into<Pos<i32, i32>>, frame: &mut impl CanvasLike) {
+                frame.show(pos.into(), (self.0, &self.1.title))
+            }
+        }
+
+        let mode_res = make_menu(
             "Maze size",
-            &self
-                .settings
+            self.settings
                 .get_mazes()
                 .iter()
                 .map(|maze| {
-                    (
-                        GameMode {
+                    GameModeMenuItem {
+                        mode: GameMode {
                             size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
                             is_tower: maze.tower,
                         },
-                        maze.title.as_str(),
-                    )
+                        title: maze.title.clone(),
+                        default: maze.default,
+                    }
                 })
                 .collect::<Vec<_>>(),
-            self.last_selected_preset.or_else(|| {
-                self.settings
-                    .get_mazes()
-                    .iter()
-                    .position(|maze| maze.default)
-            }),
-            false,
-        )?;
+            &self.settings,
+        );
 
-        self.last_selected_preset = Some(i);
+        if self.last_selected_preset.is_some() {
+            mode_res.select(self.last_selected_preset.unwrap());
+        }
+
+        let mode_res = FullscreenMenu::new(mode_res).run(&mut self.renderer);
 
         let gen = if self.settings.get_dont_ask_for_maze_algo() {
             match self.settings.get_default_maze_gen_algo() {
@@ -886,26 +978,44 @@ impl App {
                 MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
             }
         } else {
-            match ui::menu(
-                &mut self.renderer,
-                self.settings.get_color_scheme().normals(),
-                self.settings.get_color_scheme().texts(),
+            let gen_menu = make_menu(
                 "Maze generation algorithm",
-                &["Randomized Kruskal's", "Depth-first search"],
-                match self.settings.get_default_maze_gen_algo() {
-                    MazeGenAlgo::RandomKruskals => Some(0),
-                    MazeGenAlgo::DepthFirstSearch => Some(1),
-                },
-                true,
-            )? {
+                vec!["Randomized Kruskal's", "Depth-first search"],
+                &self.settings,
+            );
+
+            gen_menu.select(match self.settings.get_default_maze_gen_algo() {
+                MazeGenAlgo::RandomKruskals => 0,
+                MazeGenAlgo::DepthFirstSearch => 1,
+            });
+
+            let menu_res = FullscreenMenu::new(gen_menu).run(&mut self.renderer);
+
+            match menu_res {
                 0 => RndKruskals::generate,
                 1 => DepthFirstSearch::generate,
                 _ => panic!(),
             }
+            // match ui::menu(
+            //     &mut self.renderer,
+            //     self.settings.get_color_scheme().normals(),
+            //     self.settings.get_color_scheme().texts(),
+            //     "Maze generation algorithm",
+            //     &["Randomized Kruskal's", "Depth-first search"],
+            //     match self.settings.get_default_maze_gen_algo() {
+            //         MazeGenAlgo::RandomKruskals => Some(0),
+            //         MazeGenAlgo::DepthFirstSearch => Some(1),
+            //     },
+            //     true,
+            // )? {
+            //     0 => RndKruskals::generate,
+            //     1 => DepthFirstSearch::generate,
+            //     _ => panic!(),
+            // }
         };
 
         Ok(GameProperities {
-            game_mode: mode,
+            game_mode: mode_res,
             generator: gen,
         })
     }

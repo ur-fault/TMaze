@@ -1,11 +1,13 @@
 use crossterm::event::{read, Event, KeyCode, KeyEvent};
 use crossterm::style::ContentStyle;
+use fyodor::renderer::Renderer;
 
 use std::cell::RefCell;
 
+use crate::helpers::is_release;
+
 use super::draw::*;
 use super::*;
-use crate::{helpers::is_release, renderer::Renderer};
 
 pub fn popup_size(title: &str, texts: &[&str]) -> Dims {
     match texts.iter().map(|text| text.len()).max() {
@@ -51,27 +53,27 @@ pub fn render_popup(
     let title_pos = box_center_screen(Dims(title.len() as i32 + 2, 1))?.0;
     let pos = box_center_screen(box_size)?;
 
-    {
-        let mut context = DrawContext {
-            renderer: &RefCell::new(renderer),
-            style: box_style,
-            frame: None,
-        };
-
-        context.draw_box(pos, box_size);
-        context.draw_str_styled(
-            Dims(title_pos, pos.1 + 1),
-            &format!(" {} ", title),
-            text_style,
-        );
-
-        if !texts.is_empty() {
-            context.draw_str(pos + Dims(1, 2), &"─".repeat(box_size.0 as usize - 2));
-            for (i, text) in texts.iter().enumerate() {
-                context.draw_str_styled(pos + Dims(2, i as i32 + 3), text, text_style);
-            }
-        }
-    }
+    // {
+    //     let mut context = DrawContext {
+    //         renderer: &RefCell::new(renderer),
+    //         style: box_style,
+    //         frame: None,
+    //     };
+    //
+    //     context.draw_box(pos, box_size);
+    //     context.draw_str_styled(
+    //         Dims(title_pos, pos.1 + 1),
+    //         &format!(" {} ", title),
+    //         text_style,
+    //     );
+    //
+    //     if !texts.is_empty() {
+    //         context.draw_str(pos + Dims(1, 2), &"─".repeat(box_size.0 as usize - 2));
+    //         for (i, text) in texts.iter().enumerate() {
+    //             context.draw_str_styled(pos + Dims(2, i as i32 + 3), text, text_style);
+    //         }
+    //     }
+    // }
 
     renderer.render()?;
 
