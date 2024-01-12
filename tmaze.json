@@ -1,5 +1,5 @@
 {
-	"version": "1.12.3",
+	"version": "1.13.0",
 	"description": "Simple multiplatform maze solving game for terminal written entirely in Rust",
 	"extract_dir": "tmaze",
 	"bin": "tmaze.exe",
@@ -7,7 +7,7 @@
 	"checkver": "github",
 	"architecture": {
 		"64bit": {
-			"url": "https://github.com/ur-fault/TMaze/releases/download/1.12.3/tmaze-1.12.3-win-x86_64.exe"
+			"url": "https://github.com/ur-fault/TMaze/releases/download/1.13.0/tmaze-1.13.0-win-x86_64.exe"
 		}
 	},
 	"autoupdate": {
