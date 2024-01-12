@@ -41,9 +41,11 @@ jobs:
 
             - uses: actions/upload-artifact@v3
               with:
-                  path: |
-                      ${{env.BIN_FILEPATH}}
-                      ./release/tmaze.json
+                  path: ${{env.BIN_FILEPATH}}
+                  name: release
+            - uses: actions/upload-artifact@v3
+              with:
+                  path: ./release/tmaze.json
                   name: release
 
     build-linux-x64:
