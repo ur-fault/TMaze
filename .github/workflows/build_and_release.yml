@@ -106,6 +106,7 @@ jobs:
                   commit: master
                   generateReleaseNotes: true
                   skipIfReleaseExists: true
+                  allowUpdates: true
                   draft: true
                   tag: ${{ env.TM_VERSION }}
 
