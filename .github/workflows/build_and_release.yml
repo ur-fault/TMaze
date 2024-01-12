@@ -3,6 +3,7 @@ name: Build and Release
 on:
     push:
         branches: ["master"]
+    workflow_dispatch:
 
 env:
     CARGO_TERM_COLOR: always
@@ -121,13 +122,14 @@ jobs:
             - name: publish cmaze
               uses: katyo/publish-crates@v2
               with:
-                path: ./cmaze
-                registry-token: ${{ secrets.CRATES_IO }}
-                ignore-unpublished-changes: true
+                  path: ./cmaze
+                  registry-token: ${{ secrets.CRATES_IO }}
+                  ignore-unpublished-changes: true
 
             - name: publish tmaze
               uses: katyo/publish-crates@v2
               with:
-                path: ./tmaze
-                registry-token: ${{ secrets.CRATES_IO }}
-                ignore-unpublished-changes: true
+                  path: ./tmaze
+                  registry-token: ${{ secrets.CRATES_IO }}
+                  ignore-unpublished-changes: true
+
