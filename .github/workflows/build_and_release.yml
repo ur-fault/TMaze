@@ -27,9 +27,6 @@ jobs:
                   command: build
                   args: --release --all-features
 
-            - name: Creating scoop manifest
-              working-directory: ./release
-              run: python make_scoop_manifest.py > tmaze.json
             - name: Get version and rename file to version specific
               run: |
                   $tmversion = ./target/release/tmaze.exe --version | Select-String -Pattern '^tmaze ([0-9]+\.[0-9]+\.[0-9]+)$' | %{$_.Matches[0].Groups[1].Value}
@@ -42,10 +39,6 @@ jobs:
             - uses: actions/upload-artifact@v3
               with:
                   path: ${{env.BIN_FILEPATH}}
-                  name: release
-            - uses: actions/upload-artifact@v3
-              with:
-                  path: ./release/tmaze.json
                   name: release
 
     build-linux-x64:
