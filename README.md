@@ -36,6 +36,14 @@ And it ended up as maze solving game because I just couldn't find any other.
 - Maybe multiplayer
 - Saving and exporting and importing game state, mazes
 
+### Credis
+- Music and OST - [step](https://github.com/PhntD)
+- Marketing - [PhntD](https://github.com/PhntD)
+- Marketing - Inženýr
+- Random stuff - [filip2cz](https://github.com/filip2cz/)
+- Playtest - everyone
+- Everything else - [me, ie. ur-fault](https://github.com/ur-fault)
+
 ## How to run
 - You can either download from GitHub releases,  they are built automatically now, using GitHub Actions ~~althought there are old builds, and I won't update them so frequently, maybe in the future~~
 - or build from source, you need cargo installed on your system
