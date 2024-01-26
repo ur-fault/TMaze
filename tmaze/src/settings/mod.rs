@@ -4,7 +4,8 @@ use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+
+use std::{fs, path::PathBuf, sync::mpsc::Receiver};
 
 use self::editable::EditableField;
 pub use self::editable::EditableFieldError;
@@ -292,7 +293,9 @@ impl Settings {
     pub fn get_mazes(&self) -> Vec<MazePreset> {
         self.mazes.clone().unwrap_or_default()
     }
+}
 
+impl Settings {
     pub fn load(path: PathBuf) -> Self {
         let default_settings_string = include_str!("./default_settings.ron");
 
@@ -328,5 +331,25 @@ impl Settings {
     pub fn reset_config(path: PathBuf) {
         let default_settings_string = include_str!("./default_settings.ron");
         fs::write(path, default_settings_string).unwrap();
+    }
+
+    pub fn reload(&mut self, reloader: &mut SettingsReloader) {
+        if let Some(settings) = reloader.reload() {
+            *self = settings;
+        }
+    }
+}
+
+pub struct SettingsReloader {
+    receiver: Receiver<Settings>,
+}
+
+impl SettingsReloader {
+    pub fn new(receiver: Receiver<Settings>) -> Self {
+        Self { receiver }
+    }
+
+    pub fn reload(&mut self) -> Option<Settings> {
+        self.receiver.try_recv().ok()
     }
 }
