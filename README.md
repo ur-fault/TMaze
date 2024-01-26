@@ -56,9 +56,11 @@ And it ended up as maze solving game because I just couldn't find any other.
 3. And finally install tmaze with `scoop install henshouse/tmaze`
 
 ### Feature flags
-TMaze uses cargo features to enable/disable some features. In Github release binaries they are all enabled, but not all of them are enabled by default when building from source.
+TMaze uses cargo features to enable/disable some features. In Github release binaries they are all enabled, ~~but not all of them are enabled by default when building from source.~~ From version 1.14.0 all features are enabled by default and should be disabled manually. To disable them, use `--no-default-features` flag. After disabling them, enable specific ones you want with `--features <feature1>,<feature2>,...` flag.
 
-- hashbrown - uses hashbrown instead of std hashmap, which is faster [enabled by default]
+The features are:
+
+- hashbrown - uses hashbrown instead of std hashmap, which is faster
 - updates - enables checking for updates, which is done on startup, can be disabled (this **doesn't** install new version)
 
 ### How to build from source
