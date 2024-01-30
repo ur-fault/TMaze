@@ -154,24 +154,35 @@ pub enum UpdateCheckInterval {
 #[derive(Debug, Derivative, Clone, Serialize, Deserialize)]
 #[derivative(Default)]
 pub struct Settings {
+    // general
     #[serde(default)]
     pub color_scheme: Option<ColorScheme>,
     #[serde(default)]
+
+    // motion
     pub slow: Option<bool>,
     #[serde(default)]
     pub disable_tower_auto_up: Option<bool>,
     #[serde(default)]
     pub camera_mode: Option<CameraMode>,
+
+    // game config
     #[serde(default)]
     pub default_maze_gen_algo: Option<MazeGenAlgo>,
     #[serde(default)]
     pub dont_ask_for_maze_algo: Option<bool>,
     #[serde(default)]
+
+    // update check
     pub update_check_interval: Option<UpdateCheckInterval>,
     #[serde(default)]
     pub display_update_check_errors: Option<bool>,
     #[serde(default)]
+
+    // mazes
     pub mazes: Option<Vec<MazePreset>>,
+
+    // other
     #[serde(skip)]
     #[derivative(Default(value = "Settings::default_path()"))]
     pub path: PathBuf,
