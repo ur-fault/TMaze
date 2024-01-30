@@ -19,6 +19,8 @@ struct Args {
     reset_config: bool,
     #[clap(short, long, action, help = "Show config path and quit")]
     show_config_path: bool,
+    #[clap(long, help = "Show config in debug format and quit")]
+    debug_config: bool,
 }
 
 fn main() -> Result<(), GameError> {
@@ -35,6 +37,11 @@ fn main() -> Result<(), GameError> {
         } else {
             println!("{:?}", settings::Settings::default_path());
         }
+        return Ok(());
+    }
+
+    if _args.debug_config {
+        println!("{:#?}", settings::Settings::load(settings::Settings::default_path()));
         return Ok(());
     }
 
