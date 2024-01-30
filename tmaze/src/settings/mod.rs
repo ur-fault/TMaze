@@ -158,7 +158,6 @@ pub struct Settings {
     #[serde(default)]
     pub color_scheme: Option<ColorScheme>,
     #[serde(default)]
-
     // motion
     pub slow: Option<bool>,
     #[serde(default)]
@@ -172,14 +171,23 @@ pub struct Settings {
     #[serde(default)]
     pub dont_ask_for_maze_algo: Option<bool>,
     #[serde(default)]
-
     // update check
     pub update_check_interval: Option<UpdateCheckInterval>,
     #[serde(default)]
     pub display_update_check_errors: Option<bool>,
+
+    // audio
     #[serde(default)]
+    pub enable_audio: Option<bool>,
+    #[serde(default)]
+    pub audio_volume: Option<f32>,
+    #[serde(default)]
+    pub enable_music: Option<bool>,
+    #[serde(default)]
+    pub music_volume: Option<f32>,
 
     // mazes
+    #[serde(default)]
     pub mazes: Option<Vec<MazePreset>>,
 
     // other
@@ -292,6 +300,42 @@ impl Settings {
 
     pub fn set_display_update_check_errors(mut self, value: bool) -> Self {
         self.display_update_check_errors = Some(value);
+        self
+    }
+
+    pub fn get_enable_audio(&self) -> bool {
+        self.enable_audio.unwrap_or_default()
+    }
+
+    pub fn set_enable_audio(mut self, value: bool) -> Self {
+        self.enable_audio = Some(value);
+        self
+    }
+
+    pub fn get_audio_volume(&self) -> f32 {
+        self.audio_volume.unwrap_or_default().clamp(0., 1.)
+    }
+
+    pub fn set_audio_volume(mut self, value: f32) -> Self {
+        self.audio_volume = Some(value.clamp(0., 1.));
+        self
+    }
+
+    pub fn get_enable_music(&self) -> bool {
+        self.enable_music.unwrap_or_default()
+    }
+
+    pub fn set_enable_music(mut self, value: bool) -> Self {
+        self.enable_music = Some(value);
+        self
+    }
+
+    pub fn get_music_volume(&self) -> f32 {
+        self.music_volume.unwrap_or_default().clamp(0., 1.)
+    }
+
+    pub fn set_music_volume(mut self, value: f32) -> Self {
+        self.music_volume = Some(value.clamp(0., 1.));
         self
     }
 

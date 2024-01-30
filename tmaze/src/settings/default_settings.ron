@@ -66,6 +66,20 @@ Settings (
     display_update_check_errors: true,
     // display_update_check_errors: false,
 
+    // enable audio, if false, no audio will be played
+    enable_audio: false,
+    // enable_audio: true,
+
+    // audio volume, 0.0 - 1.0, value is clamped, must not be NaN
+    audio_volume: 0.5,
+
+    // enable music, needs to have audio enabled
+    enable_music: true,
+    // enable_music: false,
+
+    // music volume, 0.0 - 1.0, value is clamped, must not be NaN
+    music_volume: 0.5,
+
     // lists of maze presets
     mazes: [
         // Maze:
