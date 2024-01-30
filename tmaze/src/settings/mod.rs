@@ -194,6 +194,8 @@ pub struct Settings {
     #[serde(skip)]
     #[derivative(Default(value = "Settings::default_path()"))]
     pub path: PathBuf,
+    // TODO: it's not possible in RON to have a HashMap with flattened keys,
+    // since it would require this `struct` to become a `map` in RON.
 }
 
 impl EditableField for Settings {
