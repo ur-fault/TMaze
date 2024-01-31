@@ -10,6 +10,7 @@ use crate::{
 use super::ColorScheme;
 
 pub trait EditableField {
+    // TODO: return &str
     fn print(&self) -> String;
 
     fn edit(
