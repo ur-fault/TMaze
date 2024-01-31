@@ -195,7 +195,10 @@ pub struct Settings {
     #[derivative(Default(value = "Settings::default_path()"))]
     pub path: PathBuf,
     // TODO: it's not possible in RON to have a HashMap with flattened keys,
-    // since it would require this `struct` to become a `map` in RON.
+    // so we will support it in different way formats
+    // once we support them - this would mean dropping RON support
+    // https://github.com/ron-rs/ron/issues/115
+    // pub unknown_fields: HashMap<String, Value>,
 }
 
 impl EditableField for Settings {
