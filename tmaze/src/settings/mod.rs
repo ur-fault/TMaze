@@ -10,6 +10,8 @@ use self::editable::EditableField;
 pub use self::editable::EditableFieldError;
 use crate::{constants::base_path, renderer::Renderer};
 
+const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum CameraMode {
     #[default]
@@ -352,9 +354,11 @@ impl Settings {
     pub fn get_mazes(&self) -> Vec<MazePreset> {
         self.mazes.clone().unwrap_or_default()
     }
+}
 
+impl Settings {
     pub fn load(path: PathBuf) -> Self {
-        let default_settings_string = include_str!("./default_settings.ron");
+        let default_settings_string = DEFAULT_SETTINGS;
 
         let settings_string = fs::read_to_string(&path);
         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
@@ -377,7 +381,7 @@ impl Settings {
     }
 
     pub fn reset(&mut self) {
-        let default_settings_string = include_str!("./default_settings.ron");
+        let default_settings_string = DEFAULT_SETTINGS;
         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
         *self = options.from_str(default_settings_string).unwrap();
         self.path = Settings::default_path();
@@ -386,7 +390,7 @@ impl Settings {
     }
 
     pub fn reset_config(path: PathBuf) {
-        let default_settings_string = include_str!("./default_settings.ron");
+        let default_settings_string = DEFAULT_SETTINGS;
         fs::write(path, default_settings_string).unwrap();
     }
 }
