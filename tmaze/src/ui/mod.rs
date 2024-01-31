@@ -1,7 +1,7 @@
 use std::io;
 pub use std::time::Duration;
 
-pub use substring::Substring;
+
 use thiserror::Error;
 
 use crate::core::*;

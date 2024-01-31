@@ -4,10 +4,7 @@ use crate::core::*;
 use crate::renderer::Renderer;
 
 use crossterm::style::ContentStyle;
-pub use crossterm::{
-    event::{poll, read, Event, KeyCode, KeyEvent},
-    terminal::size,
-};
+
 
 pub use substring::Substring;
 
