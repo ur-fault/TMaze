@@ -1,9 +1,12 @@
 pub mod drawable;
 pub mod helpers;
 
-use std::io::{self, stdout, Write};
+use std::{
+    io::{self, stdout, Write},
+    panic, thread,
+};
 
-use crossterm::{event::Event, style::ContentStyle, QueueableCommand};
+use crossterm::{event::Event, execute, style::ContentStyle, QueueableCommand};
 use unicode_width::UnicodeWidthChar;
 
 use self::{drawable::Drawable, helpers::term_size};
@@ -36,6 +39,8 @@ impl Renderer {
     }
 
     fn turn_on(&mut self) -> io::Result<()> {
+        self.register_panic_hook();
+
         crossterm::terminal::enable_raw_mode()?;
         crossterm::execute!(
             stdout(),
@@ -49,6 +54,8 @@ impl Renderer {
     }
 
     fn turn_off(&mut self) -> io::Result<()> {
+        self.unregiser_panic_hook();
+
         crossterm::execute!(
             stdout(),
             crossterm::cursor::Show,
@@ -56,6 +63,30 @@ impl Renderer {
         )?;
         crossterm::terminal::disable_raw_mode()?;
         Ok(())
+    }
+
+    fn register_panic_hook(&self) {
+        let prev = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            let mut stdout = stdout();
+
+            execute!(
+                stdout,
+                crossterm::terminal::LeaveAlternateScreen,
+                crossterm::cursor::Show
+            )
+            .unwrap();
+
+            crossterm::terminal::disable_raw_mode().unwrap();
+
+            prev(info)
+        }));
+    }
+
+    fn unregiser_panic_hook(&self) {
+        if !thread::panicking() {
+            let _ = panic::take_hook();
+        }
     }
 
     fn on_resize(&mut self, size: Option<Pos>) -> io::Result<()> {
