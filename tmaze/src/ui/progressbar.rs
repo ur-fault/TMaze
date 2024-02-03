@@ -2,7 +2,6 @@ use std::cell::RefCell;
 
 use crossterm::style::ContentStyle;
 
-
 use super::draw::*;
 use super::*;
 use crate::renderer::Renderer;

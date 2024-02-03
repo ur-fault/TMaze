@@ -5,7 +5,6 @@ use crate::renderer::Renderer;
 
 use crossterm::style::ContentStyle;
 
-
 pub use substring::Substring;
 
 pub fn draw_box<'a>(

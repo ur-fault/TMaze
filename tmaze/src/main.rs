@@ -4,6 +4,8 @@ mod game;
 mod helpers;
 mod renderer;
 mod settings;
+#[cfg(feature = "sound")]
+mod sound;
 mod ui;
 #[cfg(feature = "updates")]
 mod updates;
@@ -21,6 +23,10 @@ struct Args {
     show_config_path: bool,
     #[clap(long, help = "Show config in debug format and quit")]
     debug_config: bool,
+
+    // TODO: remove this
+    #[clap(long, help = "Just run sounds (for testing)")]
+    sounds: bool,
 }
 
 fn main() -> Result<(), GameError> {
@@ -41,7 +47,20 @@ fn main() -> Result<(), GameError> {
     }
 
     if _args.debug_config {
-        println!("{:#?}", settings::Settings::load(settings::Settings::default_path()));
+        println!(
+            "{:#?}",
+            settings::Settings::load(settings::Settings::default_path())
+        );
+        return Ok(());
+    }
+
+    if _args.sounds {
+        let player = sound::SoundPlayer::new();
+        let track = sound::track::MusicTracks::Menu.get_track();
+        player.add_track(track);
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        player.replace_track(sound::track::MusicTracks::Easy.get_track());
+        player.wait();
         return Ok(());
     }
 

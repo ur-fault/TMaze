@@ -4,10 +4,10 @@ pub mod game;
 pub mod helpers;
 pub mod renderer;
 pub mod settings;
+#[cfg(feature = "sound")]
+pub mod sound;
 pub mod ui;
 #[cfg(feature = "updates")]
 pub mod updates;
-#[cfg(feature = "sound")]
-pub mod sound;
 
 use cmaze::{core, gameboard};
