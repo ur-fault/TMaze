@@ -3,7 +3,6 @@ use std::io;
 use cmaze::gameboard::Maze;
 
 use rand::{seq::SliceRandom, thread_rng};
-use rodio::{Decoder, Source};
 
 mod assets_sounds {
     pub const MUSIC_EASY: &[u8] = include_bytes!("./assets/music_easy-level.wav");
@@ -12,36 +11,7 @@ mod assets_sounds {
     pub const MUSIC_MENU: &[u8] = include_bytes!("./assets/music_menu.wav");
 }
 
-pub struct Track {
-    looped: bool,
-    source: Box<dyn rodio::Source<Item = i16> + Send>,
-}
-
-impl Track {
-    pub fn new(data: &'static [u8]) -> Self {
-        let cursor = io::Cursor::new(data);
-        let source = Decoder::new(cursor).unwrap();
-        Self {
-            source: Box::new(source),
-            looped: false,
-        }
-    }
-
-    pub fn source(self) -> Box<dyn rodio::Source<Item = i16> + Send> {
-        self.source
-    }
-
-    pub fn looped(self) -> Self {
-        if self.looped {
-            return self;
-        }
-
-        Self {
-            source: Box::new(self.source.repeat_infinite()),
-            looped: true,
-        }
-    }
-}
+pub type Track = Box<dyn rodio::Source<Item = i16> + Send>;
 
 // TODO: maan, i know this is not the best
 // BUT, for now it's gonna be enough
@@ -68,7 +38,10 @@ impl MusicTracks {
     pub fn get_track(&self) -> Track {
         let data = Self::get_data(self);
 
-        Track::new(data)
+        let cursor = io::Cursor::new(data);
+        let source = rodio::Decoder::new(cursor).unwrap();
+        // Track(Box::new(source))
+        Box::new(source)
     }
 
     /// Choose a random track for the Maze
