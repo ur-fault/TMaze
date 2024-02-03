@@ -5,10 +5,10 @@ use cmaze::gameboard::Maze;
 use rand::{seq::SliceRandom, thread_rng};
 
 mod assets_sounds {
-    pub const MUSIC_EASY: &[u8] = include_bytes!("./assets/music_easy-level.wav");
-    pub const MUSIC_MEDIUM: &[u8] = include_bytes!("./assets/music_medium-level.wav");
-    pub const MUSIC_HARD: &[u8] = include_bytes!("./assets/music_hard-level.wav");
-    pub const MUSIC_MENU: &[u8] = include_bytes!("./assets/music_menu.wav");
+    pub const MUSIC_EASY: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/audio/", "music_easy-level.", env!("AUDIO_EXT")));
+    pub const MUSIC_MEDIUM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/audio/", "music_medium-level.", env!("AUDIO_EXT")));
+    pub const MUSIC_HARD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/audio/", "music_hard-level.", env!("AUDIO_EXT")));
+    pub const MUSIC_MENU: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/audio/", "music_menu.", env!("AUDIO_EXT")));
 }
 
 pub type Track = Box<dyn rodio::Source<Item = i16> + Send>;

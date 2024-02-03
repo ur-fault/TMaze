@@ -1,46 +1,63 @@
-use std::{
-    fs::File,
-    io::Write,
-    path::{Component, Path, PathBuf},
-};
+use std::{fs::File, io::Write, path::Path};
 
 use dunce::canonicalize;
-use flacenc::component::BitRepr;
 use walkdir::WalkDir;
 
 fn main() {
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir).canonicalize().unwrap();
 
-    // audio
-    let audio_dir = Path::new("src/sound/assets");
-    println!("cargo:rerun-if-changed={}", audio_dir.display());
+    {
+        // audio
+        let audio_dir = Path::new("src/sound/assets");
+        println!("cargo:rerun-if-changed={}", audio_dir.display());
 
-    let audio_dir = canonicalize(audio_dir).unwrap();
-    let audio_out_dir = out_dir.join("audio");
-    std::fs::create_dir_all(&audio_out_dir).unwrap();
-    for item in WalkDir::new(&audio_dir) {
-        let item = item.unwrap();
+        let audio_dir = canonicalize(audio_dir).unwrap();
+        let audio_out_dir = out_dir.join("audio");
+        std::fs::create_dir_all(&audio_out_dir).unwrap();
 
-        if item.file_type().is_file() {
-            let item_path = item.path();
-            let item_path = canonicalize(item_path).unwrap();
+        enum AudioFormat {
+            Flac,
+            Mp3,
+        }
 
-            let item_rel = item_path.strip_prefix(&audio_dir).unwrap();
+        let format = AudioFormat::Mp3;
 
-            let item_out_path = audio_out_dir.join(item_rel);
-            let item_out_path = item_out_path.with_extension("flac");
+        println!(
+            "cargo:rustc-env=AUDIO_EXT={}",
+            match format {
+                AudioFormat::Flac => "flac",
+                AudioFormat::Mp3 => "mp3",
+            }
+        );
 
-            let item_dir = item_out_path.parent().unwrap();
+        for item in WalkDir::new(&audio_dir) {
+            let item = item.unwrap();
 
-            std::fs::create_dir_all(&item_dir).unwrap();
+            if item.file_type().is_file() {
+                let item_path = item.path();
+                let item_path = canonicalize(item_path).unwrap();
 
-            let (header, samples) = read_wav(&item_path);
-            save_flac(&item_out_path, header, samples);
+                let item_rel = item_path.strip_prefix(&audio_dir).unwrap();
+
+                let item_out_path = audio_out_dir.join(item_rel);
+
+                let item_dir = item_out_path.parent().unwrap();
+
+                std::fs::create_dir_all(&item_dir).unwrap();
+
+                eprintln!("{} -> {}", item_path.display(), item_out_path.display());
+
+                let (header, samples) = read_wav(&item_path);
+                match format {
+                    AudioFormat::Flac => save_flac(&item_out_path, header, samples),
+                    AudioFormat::Mp3 => save_mp3(&item_out_path, header, samples),
+                }
+            }
         }
     }
 
-    panic!();
+    // panic!();
 }
 
 struct Header {
@@ -66,6 +83,10 @@ fn read_wav(path: &Path) -> (Header, Vec<i16>) {
 }
 
 fn save_flac(path: &Path, header: Header, samples: Vec<i16>) {
+    use flacenc::component::BitRepr;
+
+    let path = path.with_extension("flac");
+
     let samples = samples.into_iter().map(|s| s as i32).collect::<Vec<_>>();
 
     let config = flacenc::config::Encoder::default();
@@ -81,4 +102,37 @@ fn save_flac(path: &Path, header: Header, samples: Vec<i16>) {
 
     let mut file = File::create(path).expect("Failed to create file.");
     file.write_all(sink.as_slice()).unwrap();
+}
+
+fn save_mp3(path: &Path, header: Header, samples: Vec<i16>) {
+    let path = path.with_extension("mp3");
+
+    use mp3lame_encoder::{Builder, FlushNoGap, InterleavedPcm, Quality};
+
+    let mut encoder = Builder::new().unwrap();
+    encoder
+        .set_num_channels(header.channels as u8)
+        .expect("Failed to set num channels.");
+    encoder.set_sample_rate(header.sample_rate as u32).unwrap();
+    encoder.set_quality(Quality::Decent).unwrap();
+    let mut encoder = encoder.build().unwrap();
+
+    let data = InterleavedPcm(&samples);
+
+    let mut mp3 = Vec::with_capacity(mp3lame_encoder::max_required_buffer_size(samples.len()));
+    let encoded_size = encoder.encode(data, mp3.spare_capacity_mut()).unwrap();
+
+    unsafe {
+        mp3.set_len(mp3.len().wrapping_add(encoded_size));
+    }
+
+    let encoded_size = encoder
+        .flush::<FlushNoGap>(mp3.spare_capacity_mut())
+        .unwrap();
+    unsafe {
+        mp3.set_len(mp3.len().wrapping_add(encoded_size));
+    }
+
+    let mut file = File::create(path).expect("Failed to create file.");
+    file.write_all(&mp3).unwrap();
 }
