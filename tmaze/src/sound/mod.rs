@@ -6,7 +6,7 @@ use self::track::Track;
 
 pub struct SoundPlayer {
     _stream: OutputStream,
-    _handle: OutputStreamHandle,
+    handle: OutputStreamHandle,
     sink: Sink,
 }
 
@@ -19,11 +19,12 @@ impl SoundPlayer {
 
         Self {
             _stream: stream,
-            _handle: handle,
+            handle,
             sink,
         }
     }
 
+    #[allow(dead_code)]
     pub fn enqueue(&self, track: Track) {
         self.sink.append(track);
         self.sink.play();
@@ -35,7 +36,20 @@ impl SoundPlayer {
         self.sink.play();
     }
 
+    #[allow(dead_code)]
+    pub fn play_sound(&self, track: Track) {
+        let sink = Sink::try_new(&self.handle).expect("Failed to create sink");
+        sink.append(track);
+        sink.play();
+        sink.detach();
+    }
+
+    #[allow(dead_code)]
     pub fn wait(&self) {
         self.sink.sleep_until_end();
+    }
+
+    pub fn sink(&self) -> &Sink {
+        &self.sink
     }
 }
