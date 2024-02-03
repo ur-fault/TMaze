@@ -291,6 +291,8 @@ impl App {
 
         let game = self.generate_maze(game_props)?;
 
+        self.play_bgm(MusicTracks::choose_for_maze(&game.get_maze()));
+
         let mut game_state = GameState {
             game,
             camera_offset: Dims3D(0, 0, 0),
