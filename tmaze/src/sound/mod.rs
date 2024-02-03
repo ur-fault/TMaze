@@ -5,8 +5,8 @@ use rodio::{OutputStream, OutputStreamHandle, Sink};
 use self::track::Track;
 
 pub struct SoundPlayer {
-    stream: OutputStream,
-    handle: OutputStreamHandle,
+    _stream: OutputStream,
+    _handle: OutputStreamHandle,
     sink: Sink,
 }
 
@@ -18,8 +18,8 @@ impl SoundPlayer {
         let sink = Sink::try_new(&handle).expect("Failed to create sink");
 
         Self {
-            stream,
-            handle,
+            _stream: stream,
+            _handle: handle,
             sink,
         }
     }

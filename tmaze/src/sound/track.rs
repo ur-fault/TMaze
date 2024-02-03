@@ -17,7 +17,7 @@ pub type Track = Box<dyn rodio::Source<Item = i16> + Send>;
 // BUT, for now it's gonna be enough
 // PS: once there are mods (copium),
 // this gonna need to be reworked from the ground up
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MusicTracks {
     Easy,
     Medium,
@@ -40,7 +40,7 @@ impl MusicTracks {
 
         let cursor = io::Cursor::new(data);
         let source = rodio::Decoder::new(cursor).unwrap();
-        // Track(Box::new(source))
+
         Box::new(source)
     }
 

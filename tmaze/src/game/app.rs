@@ -3,7 +3,9 @@ use std::time::Duration;
 
 use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
+
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
+use rodio::Source;
 
 use crate::data::SaveData;
 use crate::gameboard::CellWall;
@@ -12,6 +14,8 @@ use crate::helpers::{constants, value_if_else, LineDir};
 use crate::renderer::helpers::term_size;
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
+use crate::sound::track::MusicTracks;
+use crate::sound::SoundPlayer;
 use crate::ui::{DrawContext, Frame, MenuError};
 use crate::{helpers, ui};
 
@@ -22,10 +26,12 @@ use super::{GameError, GameState, GameViewMode};
 
 pub struct App {
     renderer: Renderer,
+    sound_player: SoundPlayer,
     settings: Settings,
     save_data: SaveData,
     last_edge_follow_offset: Dims,
     last_selected_preset: Option<usize>,
+    bgm_track: Option<MusicTracks>,
 }
 
 struct GameDrawContexts<'a> {
@@ -39,11 +45,25 @@ impl App {
         let settings_path = Settings::default_path();
         App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
+            sound_player: SoundPlayer::new(),
             settings: Settings::load(settings_path),
             save_data: SaveData::load_or(),
             last_edge_follow_offset: Dims(0, 0),
             last_selected_preset: None,
+            bgm_track: None,
         }
+    }
+
+    #[cfg(feature = "sound")]
+    fn play_bgm(&mut self, track: MusicTracks) {
+        if let Some(prev_track) = self.bgm_track {
+            if prev_track == track {
+                return;
+            }
+        }
+
+        self.bgm_track = Some(track);
+        self.sound_player.play_track(Box::new(track.get_track().repeat_infinite()));
     }
 
     #[cfg(feature = "updates")]
@@ -160,6 +180,8 @@ impl App {
                 }
                 continue;
             }
+
+            self.play_bgm(MusicTracks::Menu);
 
             match ui::menu(
                 &mut self.renderer,
