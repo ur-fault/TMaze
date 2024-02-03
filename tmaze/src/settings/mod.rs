@@ -213,7 +213,7 @@ pub struct Settings(Arc<RwLock<SettingsInner>>);
 
 impl Default for Settings {
     fn default() -> Self {
-        let mut settings = SettingsInner::default();
+        let settings = SettingsInner::default();
         Self(Arc::new(RwLock::new(settings)))
     }
 }

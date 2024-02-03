@@ -52,7 +52,7 @@ impl MusicTracks {
     ///
     /// # Notes
     /// * We do *NOT* have yet a for determining the difficulty of the maze, so we just choose a random track
-    pub fn choose_from_maze(_maze: &Maze) -> Self {
+    pub fn choose_for_maze(_maze: &Maze) -> Self {
         use MusicTracks::*;
         *[Easy, Medium, Hard].choose(&mut thread_rng()).unwrap()
     }
