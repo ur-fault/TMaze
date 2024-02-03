@@ -203,7 +203,7 @@ impl App {
         let mut settings = self.settings.clone();
         settings.edit(
             &mut self.renderer,
-            self.settings.color_scheme.clone().unwrap(),
+            self.settings.read().color_scheme.clone().unwrap(),
         )?;
         self.settings = settings;
         Ok(())
