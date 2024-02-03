@@ -67,8 +67,8 @@ Settings (
     // display_update_check_errors: false,
 
     // enable audio, if false, no audio will be played
-    enable_audio: false,
-    // enable_audio: true,
+    enable_audio: true,
+    // enable_audio: false,
 
     // audio volume, 0.0 - 1.0, value is clamped, must not be NaN
     audio_volume: 0.5,
