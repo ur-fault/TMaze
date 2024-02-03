@@ -53,8 +53,8 @@ And it ended up as maze solving game because I just couldn't find any other.
 ### Using package managers
 #### Scoop
 1. Make sure you have the latest version of Scoop installed
-2. Add [Henshouse bucket](https://github.com/henshouse/henshouse-scoop) using `scoop bucket add henshouse https://github.com/henshouse/henshouse-scoop`
-3. And finally install tmaze with `scoop install henshouse/tmaze`
+2. Add games bucket using `scoop bucket add games` if you did not before
+3. And finally install tmaze with `scoop install tmaze`
 
 ### Feature flags
 TMaze uses cargo features to enable/disable some features. In Github release binaries they are all enabled, ~~but not all of them are enabled by default when building from source.~~ From version 1.14.0 all features are enabled by default and should be disabled manually. To disable them, use `--no-default-features` flag. After disabling them, enable specific ones you want with `--features <feature1>,<feature2>,...` flag.
