@@ -4,7 +4,11 @@ use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{Arc, RwLock},
+};
 
 use self::editable::EditableField;
 pub use self::editable::EditableFieldError;
@@ -155,7 +159,7 @@ pub enum UpdateCheckInterval {
 
 #[derive(Debug, Derivative, Clone, Serialize, Deserialize)]
 #[derivative(Default)]
-pub struct Settings {
+pub struct SettingsInner {
     // general
     #[serde(default)]
     pub color_scheme: Option<ColorScheme>,
@@ -203,6 +207,16 @@ pub struct Settings {
     // pub unknown_fields: HashMap<String, Value>,
 }
 
+#[derive(Debug, Clone)]
+pub struct Settings(Arc<RwLock<SettingsInner>>);
+
+impl Default for Settings {
+    fn default() -> Self {
+        let mut settings = SettingsInner::default();
+        Self(Arc::new(RwLock::new(settings)))
+    }
+}
+
 impl EditableField for Settings {
     fn print(&self) -> String {
         String::from("Settings")
@@ -220,7 +234,7 @@ impl EditableField for Settings {
             "Edit settings",
             &[
                 "Path to the current settings",
-                &format!(" {}", self.path.display()),
+                &format!(" {}", self.read().path.display()),
             ],
         )
         .map(|_| false)
@@ -238,121 +252,129 @@ impl Settings {
         Self::default()
     }
 
-    pub fn set_color_scheme(mut self, value: ColorScheme) -> Self {
-        self.color_scheme = Some(value);
-        self
+    pub fn read(&self) -> std::sync::RwLockReadGuard<SettingsInner> {
+        self.0.read().unwrap()
+    }
+
+    pub fn write(&mut self) -> std::sync::RwLockWriteGuard<SettingsInner> {
+        self.0.write().unwrap()
     }
 
     pub fn get_color_scheme(&self) -> ColorScheme {
-        self.color_scheme.clone().unwrap_or_default()
+        self.read().color_scheme.clone().unwrap_or_default()
+    }
+
+    pub fn set_color_scheme(mut self, value: ColorScheme) -> Self {
+        self.write().color_scheme = Some(value);
+        self
     }
 
     pub fn set_slow(mut self, value: bool) -> Self {
-        self.slow = Some(value);
+        self.write().slow = Some(value);
         self
     }
 
     pub fn get_slow(&self) -> bool {
-        self.slow.unwrap_or_default()
+        self.read().slow.unwrap_or_default()
     }
 
     pub fn set_disable_tower_auto_up(mut self, value: bool) -> Self {
-        self.disable_tower_auto_up = Some(value);
+        self.write().disable_tower_auto_up = Some(value);
         self
     }
 
     pub fn get_disable_tower_auto_up(&self) -> bool {
-        self.disable_tower_auto_up.unwrap_or_default()
+        self.read().disable_tower_auto_up.unwrap_or_default()
     }
 
     pub fn set_camera_mode(mut self, value: CameraMode) -> Self {
-        self.camera_mode = Some(value);
+        self.write().camera_mode = Some(value);
         self
     }
 
     pub fn get_camera_mode(&self) -> CameraMode {
-        self.camera_mode.unwrap_or_default()
+        self.read().camera_mode.unwrap_or_default()
     }
 
     pub fn set_default_maze_gen_algo(mut self, value: MazeGenAlgo) -> Self {
-        self.default_maze_gen_algo = Some(value);
+        self.write().default_maze_gen_algo = Some(value);
         self
     }
 
     pub fn get_default_maze_gen_algo(&self) -> MazeGenAlgo {
-        self.default_maze_gen_algo.unwrap_or_default()
+        self.read().default_maze_gen_algo.unwrap_or_default()
     }
 
     pub fn set_dont_ask_for_maze_algo(mut self, value: bool) -> Self {
-        self.dont_ask_for_maze_algo = Some(value);
+        self.write().dont_ask_for_maze_algo = Some(value);
         self
     }
 
     pub fn get_dont_ask_for_maze_algo(&self) -> bool {
-        self.dont_ask_for_maze_algo.unwrap_or_default()
+        self.read().dont_ask_for_maze_algo.unwrap_or_default()
     }
 
     pub fn set_check_interval(mut self, value: UpdateCheckInterval) -> Self {
-        self.update_check_interval = Some(value);
+        self.write().update_check_interval = Some(value);
         self
     }
 
     pub fn get_check_interval(&self) -> UpdateCheckInterval {
-        self.update_check_interval.unwrap_or_default()
+        self.read().update_check_interval.unwrap_or_default()
     }
 
     pub fn get_display_update_check_errors(&self) -> bool {
-        self.display_update_check_errors.unwrap_or(true)
+        self.read().display_update_check_errors.unwrap_or(true)
     }
 
     pub fn set_display_update_check_errors(mut self, value: bool) -> Self {
-        self.display_update_check_errors = Some(value);
+        self.write().display_update_check_errors = Some(value);
         self
     }
 
     pub fn get_enable_audio(&self) -> bool {
-        self.enable_audio.unwrap_or_default()
+        self.read().enable_audio.unwrap_or_default()
     }
 
     pub fn set_enable_audio(mut self, value: bool) -> Self {
-        self.enable_audio = Some(value);
+        self.write().enable_audio = Some(value);
         self
     }
 
     pub fn get_audio_volume(&self) -> f32 {
-        self.audio_volume.unwrap_or_default().clamp(0., 1.)
+        self.read().audio_volume.unwrap_or_default().clamp(0., 1.)
     }
 
     pub fn set_audio_volume(mut self, value: f32) -> Self {
-        self.audio_volume = Some(value.clamp(0., 1.));
+        self.write().audio_volume = Some(value.clamp(0., 1.));
         self
     }
 
     pub fn get_enable_music(&self) -> bool {
-        self.enable_music.unwrap_or_default()
+        self.read().enable_music.unwrap_or_default()
     }
 
     pub fn set_enable_music(mut self, value: bool) -> Self {
-        self.enable_music = Some(value);
+        self.write().enable_music = Some(value);
         self
     }
 
     pub fn get_music_volume(&self) -> f32 {
-        self.music_volume.unwrap_or_default().clamp(0., 1.)
+        self.read().music_volume.unwrap_or_default().clamp(0., 1.)
     }
 
     pub fn set_music_volume(mut self, value: f32) -> Self {
-        self.music_volume = Some(value.clamp(0., 1.));
+        self.write().music_volume = Some(value.clamp(0., 1.));
         self
     }
 
     pub fn set_mazes(mut self, value: Vec<MazePreset>) -> Self {
-        self.mazes = Some(value);
+        self.write().mazes = Some(value);
         self
     }
 
     pub fn get_mazes(&self) -> Vec<MazePreset> {
-        self.mazes.clone().unwrap_or_default()
+        self.read().mazes.clone().unwrap_or_default()
     }
 }
 
@@ -362,7 +384,7 @@ impl Settings {
 
         let settings_string = fs::read_to_string(&path);
         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
-        let mut settings: Self = if let Ok(settings_string) = settings_string {
+        let mut settings: SettingsInner = if let Ok(settings_string) = settings_string {
             match options.from_str(&settings_string) {
                 Ok(settings) => settings,
                 Err(err) => {
@@ -377,16 +399,18 @@ impl Settings {
 
         settings.path = path;
 
-        settings
+        Self(Arc::new(RwLock::new(settings)))
     }
 
     pub fn reset(&mut self) {
         let default_settings_string = DEFAULT_SETTINGS;
         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
-        *self = options.from_str(default_settings_string).unwrap();
-        self.path = Settings::default_path();
+        *self.write() = options.from_str(default_settings_string).unwrap();
 
-        fs::write(&self.path, default_settings_string).unwrap();
+        let path = Settings::default_path();
+        fs::write(&path, default_settings_string).unwrap();
+
+        self.write().path = path;
     }
 
     pub fn reset_config(path: PathBuf) {
