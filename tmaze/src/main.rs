@@ -54,25 +54,5 @@ fn main() -> Result<(), GameError> {
         return Ok(());
     }
 
-    if _args.sounds {
-        use rodio::Source;
-
-        let player = sound::SoundPlayer::new();
-        let track = sound::track::MusicTracks::Menu.get_track();
-        player.enqueue(track);
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        let track = sound::track::MusicTracks::Easy.get_track();
-
-        let track = Box::new(
-            track
-                .take_duration(std::time::Duration::from_secs(4))
-                .repeat_infinite(),
-        );
-
-        player.play_track(track);
-        player.wait();
-        return Ok(());
-    }
-
     App::new().run()
 }
