@@ -159,6 +159,7 @@ pub enum UpdateCheckInterval {
 
 #[derive(Debug, Derivative, Clone, Serialize, Deserialize)]
 #[derivative(Default)]
+#[serde(rename = "Settings")]
 pub struct SettingsInner {
     // general
     #[serde(default)]
