@@ -33,6 +33,12 @@ semver = { version = "1.0.17", optional = true }
 tokio = { version = "1.27.0", optional = true }
 rodio = { version = "0.17.3", optional = true, default-features = false, features = ["wav"] }
 
+[build-dependencies]
+flacenc = "0.3.1"
+wav = "1.0.0"
+walkdir = "2.4.0"
+dunce = "1.0.4"
+
 [features]
 default = ["hashbrown", "updates", "sound"]
 hashbrown = ["cmaze/hashbrown"]
