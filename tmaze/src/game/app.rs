@@ -5,6 +5,7 @@ use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
 
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
+#[cfg(feature = "sound")]
 use rodio::Source;
 
 use crate::data::SaveData;
@@ -14,23 +15,26 @@ use crate::helpers::{constants, value_if_else, LineDir};
 use crate::renderer::helpers::term_size;
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
-use crate::sound::track::MusicTracks;
-use crate::sound::SoundPlayer;
 use crate::ui::{DrawContext, Frame, MenuError};
 use crate::{helpers, ui};
 
 #[cfg(feature = "updates")]
 use crate::updates;
 
+#[cfg(feature = "sound")]
+use crate::sound::{track::MusicTracks, SoundPlayer};
+
 use super::{GameError, GameState, GameViewMode};
 
 pub struct App {
     renderer: Renderer,
+    #[cfg(feature = "sound")]
     sound_player: SoundPlayer,
     settings: Settings,
     save_data: SaveData,
     last_edge_follow_offset: Dims,
     last_selected_preset: Option<usize>,
+    #[cfg(feature = "sound")]
     bgm_track: Option<MusicTracks>,
 }
 
@@ -45,11 +49,13 @@ impl App {
         let settings_path = Settings::default_path();
         App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
+            #[cfg(feature = "sound")]
             sound_player: SoundPlayer::new(),
             settings: Settings::load(settings_path),
             save_data: SaveData::load_or(),
             last_edge_follow_offset: Dims(0, 0),
             last_selected_preset: None,
+            #[cfg(feature = "sound")]
             bgm_track: None,
         }
     }
@@ -62,8 +68,16 @@ impl App {
             }
         }
 
+        if !self.settings.get_enable_audio() || !self.settings.get_enable_music() {
+            return;
+        }
+
+        let volume = self.settings.get_audio_volume() * self.settings.get_music_volume();
+        self.sound_player.sink().set_volume(volume);
+
         self.bgm_track = Some(track);
-        self.sound_player.play_track(Box::new(track.get_track().repeat_infinite()));
+        self.sound_player
+            .play_track(Box::new(track.get_track().repeat_infinite()));
     }
 
     #[cfg(feature = "updates")]
@@ -181,6 +195,7 @@ impl App {
                 continue;
             }
 
+            #[cfg(feature = "sound")]
             self.play_bgm(MusicTracks::Menu);
 
             match ui::menu(
@@ -291,6 +306,7 @@ impl App {
 
         let game = self.generate_maze(game_props)?;
 
+        #[cfg(feature = "sound")]
         self.play_bgm(MusicTracks::choose_for_maze(&game.get_maze()));
 
         let mut game_state = GameState {
