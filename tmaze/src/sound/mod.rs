@@ -16,6 +16,7 @@ impl SoundPlayer {
             rodio::OutputStream::try_default().expect("Failed to create output stream");
 
         let sink = Sink::try_new(&handle).expect("Failed to create sink");
+
         Self {
             stream,
             handle,
@@ -23,14 +24,14 @@ impl SoundPlayer {
         }
     }
 
-    pub fn add_track(&self, track: Track) {
-        self.sink.append(track.source());
+    pub fn enqueue(&self, track: Track) {
+        self.sink.append(track);
         self.sink.play();
     }
 
-    pub fn replace_track(&self, track: Track) {
+    pub fn play_track(&self, track: Track) {
         self.sink.stop();
-        self.sink.append(track.source());
+        self.sink.append(track);
         self.sink.play();
     }
 
