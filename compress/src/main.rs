@@ -119,13 +119,14 @@ fn main() -> Result<()> {
                 .file_name()
                 .ok_or(anyhow::anyhow!("No file name"))?,
         );
-
-        let (ext, action): (_, fn(_, _) -> Result<()>) = match path
+        let ext = path
             .extension()
             .ok_or(anyhow::anyhow!("No extension"))?
             .to_str()
             .ok_or(anyhow::anyhow!("Invalid extension"))?
-        {
+            .to_lowercase();
+
+        let (ext, action): (_, fn(_, _) -> Result<()>) = match &ext[..] {
             "wav" => ("mp3", |src, dest| {
                 let (header, samples) = audio::read_wav(src)?;
                 audio::save_mp3(dest, header, samples)
