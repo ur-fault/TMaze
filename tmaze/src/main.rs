@@ -23,10 +23,6 @@ struct Args {
     show_config_path: bool,
     #[clap(long, help = "Show config in debug format and quit")]
     debug_config: bool,
-
-    // TODO: remove this
-    #[clap(long, help = "Just run sounds (for testing)")]
-    sounds: bool,
 }
 
 fn main() -> Result<(), GameError> {
