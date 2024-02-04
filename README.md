@@ -14,6 +14,7 @@ Simple multiplatform maze solving game for terminal written entirely in  Rust
 
 ### Features
 - Responsive to terminal size
+- Fire banger OST from [step](https://github.com/StepGamesOfficial)
 - Configurable maze sizes through config file
 - Configurable colors
 - Various maze generation algorithms: Randomized Kruskal's, Depth-First Search
@@ -37,7 +38,7 @@ And it ended up as maze solving game because I just couldn't find any other.
 - Saving and exporting and importing game state, mazes
 
 ### Credits and thanks
-- Music and OST - [step](https://github.com/PhntD)
+- Music and OST - [step](https://github.com/StepGamesOfficial)
 - Marketing - [PhntD](https://github.com/PhntD)
 - Marketing - Inženýr
 - Random stuff - [filip2cz](https://github.com/filip2cz/)
