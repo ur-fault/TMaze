@@ -51,6 +51,8 @@ jobs:
                   toolchain: stable
             - uses: Swatinem/rust-cache@v2
 
+            - run: apt install libasound2-dev
+
             - uses: actions-rs/cargo@v1
               with:
                   command: build
