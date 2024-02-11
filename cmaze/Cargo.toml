@@ -14,6 +14,8 @@ pausable_clock = "^1.0.1"
 crossbeam = "^0.8.1"
 rayon = "^1.6.0"
 hashbrown = { version = "0.14", optional = true }
+paste = "1.0.14"
+num-traits = "0.2.18"
 
 [dev-dependencies]
 criterion = "0.5"

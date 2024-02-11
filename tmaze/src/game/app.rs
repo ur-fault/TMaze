@@ -1,17 +1,22 @@
+use std::borrow::BorrowMut;
 use std::cell::RefCell;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
+use cmaze::gameboard::cell::Way;
 
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
+use crossterm::style::{Color, ContentStyle};
 #[cfg(feature = "sound")]
 use rodio::Source;
 
+use super::{GameError, GameState, GameViewMode};
+
 use crate::data::SaveData;
-use crate::gameboard::CellWall;
 use crate::gameboard::{algorithms::*, Cell};
 use crate::helpers::{constants, value_if_else, LineDir};
+use crate::renderer::drawable::Drawable;
 use crate::renderer::helpers::term_size;
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
@@ -24,16 +29,18 @@ use crate::updates;
 #[cfg(feature = "sound")]
 use crate::sound::{track::MusicTracks, SoundPlayer};
 
-use super::{GameError, GameState, GameViewMode};
-
 pub struct App {
     renderer: Renderer,
     #[cfg(feature = "sound")]
     sound_player: SoundPlayer,
+
     settings: Settings,
     save_data: SaveData,
+
     last_edge_follow_offset: Dims,
     last_selected_preset: Option<usize>,
+
+    start_time: Instant,
     #[cfg(feature = "sound")]
     bgm_track: Option<MusicTracks>,
 }
@@ -51,10 +58,14 @@ impl App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
             #[cfg(feature = "sound")]
             sound_player: SoundPlayer::new(),
+
             settings: Settings::load(settings_path),
             save_data: SaveData::load_or(),
+
             last_edge_follow_offset: Dims(0, 0),
             last_selected_preset: None,
+
+            start_time: Instant::now(),
             #[cfg(feature = "sound")]
             bgm_track: None,
         }
@@ -541,7 +552,7 @@ impl App {
                 if maze
                     .get_cell(Dims3D(x, 0, floor))
                     .unwrap()
-                    .get_wall(CellWall::Right)
+                    .is_closed(Way::Right)
                 {
                     LineDir::ClosedTop
                 } else {
@@ -556,7 +567,7 @@ impl App {
                 if maze
                     .get_cell(Dims3D(x, maze.size().1 - 1, floor))
                     .unwrap()
-                    .get_wall(CellWall::Right)
+                    .is_closed(Way::Right)
                 {
                     LineDir::ClosedBottom
                 } else {
@@ -582,7 +593,7 @@ impl App {
                 value_if_else(
                     maze.get_cell(Dims3D(0, y, floor))
                         .unwrap()
-                        .get_wall(CellWall::Bottom),
+                        .is_closed(Way::Bottom),
                     || LineDir::ClosedLeft,
                     || LineDir::Vertical,
                 ),
@@ -594,7 +605,7 @@ impl App {
                 value_if_else(
                     maze.get_cell(Dims3D(maze.size().0 - 1, y, floor))
                         .unwrap()
-                        .get_wall(CellWall::Bottom),
+                        .is_closed(Way::Bottom),
                     || LineDir::ClosedRight,
                     || LineDir::Vertical,
                 ),
@@ -618,19 +629,28 @@ impl App {
             }
         }
 
+        if floor == player_pos.2 {
+            player_context.draw_char(
+                Dims::from(player_pos) * 2 + maze_pos + Dims(1, 1),
+                *player_char,
+            );
+        }
+
         // Drawing insides of the maze itself
         for (iy, row) in maze.get_cells()[floor as usize].iter().enumerate() {
             let ypos = iy as i32 * 2 + 1 + maze_pos.1;
 
             for (ix, cell) in row.iter().enumerate() {
+                let pos_in_maze = Dims3D(ix as i32, iy as i32, floor);
+
                 let xpos = ix as i32 * 2 + 1 + maze_pos.0;
-                if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
+                if cell.is_closed(Way::Right) && ix != maze.size().0 as usize - 1 {
                     draw_line_double(normal_context, (xpos + 1, ypos), LineDir::Vertical);
                 }
 
                 if ypos + 1 < size.1 - 2
                     && ypos > 0
-                    && cell.get_wall(CellWall::Bottom)
+                    && cell.is_closed(Way::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
                     draw_line_double(normal_context, (xpos, ypos + 1), LineDir::Horizontal);
@@ -642,29 +662,57 @@ impl App {
                     goal: goal_context,
                 };
 
-                Self::draw_stairs(
-                    contexts,
-                    cell,
-                    (ix as i32, iy as i32),
-                    maze_pos.into(),
-                    floor,
-                    player_pos,
-                    ups_as_goal,
-                );
+                fn stair_tui_cell_for_pos(
+                    contexts: GameDrawContexts<'_>,
+                    state: &GameState,
+                    pos: Dims3D,
+                ) -> Option<(char, ContentStyle)> {
+                    let cell = state.game.get_maze().get_cell(pos).unwrap();
+                    let mut chr = ' ';
+                    let mut color = contexts.normal.style;
 
-                let cell2 = match maze.get_cell(Dims3D(ix as i32 + 1, iy as i32 + 1, floor)) {
-                    Some(cell) => cell,
-                    None => continue,
+                    if cell.is_open(Way::Up) && cell.is_open(Way::Down) {
+                        chr = '⥮';
+                    } else if !cell.is_closed(Way::Up) {
+                        chr = '↑';
+                    } else if !cell.is_closed(Way::Down) {
+                        chr = '↓';
+                    }
+
+                    if chr == ' ' {
+                        return None;
+                    }
+
+                    if pos == state.game.get_player_pos() {
+                        color = contexts.player.style;
+                    } else if pos == state.game.get_goal_pos() {
+                        color = contexts.goal.style;
+                    }
+
+                    Some((chr, color))
+                }
+
+                if let Some((chr, style)) =
+                    stair_tui_cell_for_pos(contexts, game_state, pos_in_maze)
+                {
+                    (chr, style).draw(
+                        (xpos as u16, ypos as u16),
+                        renderer_cell.borrow_mut().frame(),
+                    );
+                }
+
+                let Some(cell2) = maze.get_cell(Dims3D(ix as i32 + 1, iy as i32, floor)) else {
+                    continue;
                 };
 
                 draw_line_double(
                     normal_context,
                     (xpos + 1, ypos + 1),
                     LineDir::from_bools(
-                        cell.get_wall(CellWall::Bottom),
-                        cell.get_wall(CellWall::Right),
-                        cell2.get_wall(CellWall::Top),
-                        cell2.get_wall(CellWall::Left),
+                        cell.is_closed(Way::Bottom),
+                        cell.is_closed(Way::Right),
+                        cell2.is_closed(Way::Top),
+                        cell2.is_closed(Way::Left),
                     ),
                 );
             }
@@ -675,29 +723,6 @@ impl App {
             goal_context.draw_char(
                 Dims::from(goal_pos) * 2 + maze_pos + Dims(1, 1),
                 constants::GOAL_CHAR,
-            );
-        }
-
-        if floor == player_pos.2 {
-            player_context.draw_char(
-                Dims::from(player_pos) * 2 + maze_pos + Dims(1, 1),
-                *player_char,
-            );
-
-            let contexts = GameDrawContexts {
-                normal: normal_context,
-                player: player_context,
-                goal: goal_context,
-            };
-
-            Self::draw_stairs(
-                contexts,
-                maze.get_cell(player_pos).unwrap(),
-                (player_pos.0, player_pos.1),
-                maze_pos.into(),
-                floor,
-                player_pos,
-                ups_as_goal,
             );
         }
 
@@ -848,46 +873,34 @@ impl App {
         }
     }
 
-    fn draw_stairs(
-        contexts: GameDrawContexts,
-        cell: &Cell,
-        stairs_pos: (i32, i32),
-        maze_pos: (i32, i32),
-        floor: i32,
-        player_pos: Dims3D,
-        ups_as_goal: bool,
-    ) {
-        let real_pos = helpers::maze_pos_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
-            + Dims::from(maze_pos);
-
-        let GameDrawContexts {
-            normal: mut normal_context,
-            player: mut player_context,
-            goal: mut goal_context,
-        } = contexts;
-
-        if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-            if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos, '⥮');
-            } else {
-                normal_context.draw_char(real_pos, '⥮');
-            };
-        } else if !cell.get_wall(CellWall::Up) {
-            if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos, '↑');
-            } else if ups_as_goal {
-                goal_context.draw_char(real_pos, '↑');
-            } else {
-                normal_context.draw_char(real_pos, '↑');
-            }
-        } else if !cell.get_wall(CellWall::Down) {
-            if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-                player_context.draw_char(real_pos, '↓');
-            } else {
-                normal_context.draw_char(real_pos, '↓');
-            }
-        }
-    }
+    // fn draw_stairs(
+    //     contexts: GameDrawContexts,
+    //     cell: &Cell,
+    //     stairs_pos: (i32, i32),
+    //     maze_pos: (i32, i32),
+    //     floor: i32,
+    //     player_pos: Dims3D,
+    //     ups_as_goal: bool,
+    // ) {
+    //     let real_pos = helpers::maze_pos_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
+    //         + Dims::from(maze_pos);
+    //
+    //     let mut context = if player_pos.2 == floor {
+    //         contexts.player
+    //     } else if ups_as_goal {
+    //         contexts.goal
+    //     } else {
+    //         contexts.normal
+    //     };
+    //
+    //     if cell.is_open(Way::Up) && cell.is_open(Way::Down) {
+    //         context.draw_char(real_pos, '⥮');
+    //     } else if !cell.is_closed(Way::Up) {
+    //         context.draw_char(real_pos, '↑');
+    //     } else if !cell.is_closed(Way::Down) {
+    //         context.draw_char(real_pos, '↓');
+    //     }
+    // }
 
     fn get_game_properities(&mut self) -> Result<GameProperities, GameError> {
         let (i, &mode) = ui::choice_menu(
@@ -948,6 +961,12 @@ impl App {
             game_mode: mode,
             generator: gen,
         })
+    }
+
+    fn get_blink_item<'a, T>(&'_ self, items: &'a [T]) -> &'a T {
+        let time = self.start_time.elapsed().as_secs_f64();
+        let index = (time / self.settings.get_blink_duration()) as usize % items.len();
+        &items[index]
     }
 }
 

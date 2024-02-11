@@ -1,7 +1,7 @@
 mod depth_first_search;
 mod rnd_kruskals;
 
-use super::{Cell, CellWall, Maze};
+use super::{Cell, Passage, Maze};
 pub use crate::core::*;
 use crossbeam::{
     channel::{unbounded, Receiver, Sender},
@@ -101,8 +101,8 @@ pub trait MazeAlgorithm {
 
                     for floor in 0..du - 1 {
                         let (x, y) = (thread_rng().gen_range(0..wu), thread_rng().gen_range(0..hu));
-                        cells[floor][y][x].remove_wall(CellWall::Up);
-                        cells[floor + 1][y][x].remove_wall(CellWall::Down);
+                        cells[floor][y][x].make_passage(Passage::Up);
+                        cells[floor + 1][y][x].make_passage(Passage::Down);
                     }
 
                     cells

@@ -1,7 +1,8 @@
-use self::CellWall::*;
+use self::Passage::*;
 use crate::core::*;
-use crate::gameboard::cell::{Cell, CellWall};
+use crate::gameboard::cell::{Cell, Passage};
 
+#[derive(Debug, Clone)]
 pub struct Maze {
     pub(crate) cells: Vec<Vec<Vec<Cell>>>,
     pub(crate) width: usize,
@@ -36,23 +37,24 @@ impl Maze {
     }
 
     pub fn is_valid_neighbor(&self, cell: Dims3D, off: Dims3D) -> bool {
-        (off.0 == -1 || off.0 == 1 || off.0 == 0)
-            && (off.1 == -1 || off.1 == 1 || off.1 == 0)
-            && (off.2 == -1 || off.2 == 1 || off.2 == 0)
-            && ((off.0 == 1 || off.0 == -1) as u8
-                + (off.1 == 1 || off.1 == -1) as u8
-                + (off.2 == 1 || off.2 == -1) as u8)
-                == 1
+        off.abs_sum() == 1
             && self.is_in_bounds(cell)
             && self.is_in_bounds(Dims3D(cell.0 + off.0, cell.1 + off.1, cell.2 + off.2))
     }
 
-    pub fn is_valid_wall(&self, cell: Dims3D, wall: CellWall) -> bool {
-        let neighbor_offset = wall.to_coord();
-        self.is_valid_neighbor(cell, neighbor_offset)
+    pub fn is_valid_passage(&self, cell: Dims3D, passage: Passage) -> bool {
+        match passage {
+            Portal(p) => self.is_in_bounds(p.other),
+            _ => self.is_valid_neighbor(cell, passage.offset().unwrap()),
+        }
     }
 
-    pub fn which_wall_between(cell: Dims3D, cell2: Dims3D) -> Option<CellWall> {
+    /// Returns the wall between two cells, if it exists
+    /// If the cells are not adjacent, returns None
+    ///
+    /// *Note*: This function doesn't use portal and
+    /// and will *NOT* return a wall if the cells are connected by a portal
+    pub fn which_wall_between(cell: Dims3D, cell2: Dims3D) -> Option<Passage> {
         match (cell.0 - cell2.0, cell.1 - cell2.1, cell.2 - cell2.2) {
             (-1, 0, 0) => Some(Right),
             (1, 0, 0) => Some(Left),
@@ -64,6 +66,7 @@ impl Maze {
         }
     }
 
+    // TODO: Maybe use `smallvec` for this function, who knows
     pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
         let offsets = [
             Dims3D(-1, 0, 0),
@@ -83,18 +86,29 @@ impl Maze {
             .collect()
     }
 
-    pub fn remove_wall(&mut self, cell: Dims3D, wall: CellWall) {
-        if !self.is_valid_wall(cell, wall) {
+    pub fn add_passage(&mut self, cell: Dims3D, passage: Passage) {
+        if !self.is_valid_passage(cell, passage) {
             return;
         }
 
-        self.cells[cell.2 as usize][cell.1 as usize][cell.0 as usize].remove_wall(wall);
-        let neighbor_offset = wall.to_coord();
-        {
+        self.cells[cell.2 as usize][cell.1 as usize][cell.0 as usize].make_passage(passage);
+        // let neighbor_offset = passage.offset();
+        // {
+        //     let x2 = (cell.0 + neighbor_offset.0) as usize;
+        //     let y2 = (cell.1 + neighbor_offset.1) as usize;
+        //     let z2 = (cell.2 + neighbor_offset.2) as usize;
+        //     self.cells[z2][y2][x2].make_passage(passage.reverse_passage());
+        // }
+        if let Some(neighbor_offset) = passage.offset() {
             let x2 = (cell.0 + neighbor_offset.0) as usize;
             let y2 = (cell.1 + neighbor_offset.1) as usize;
             let z2 = (cell.2 + neighbor_offset.2) as usize;
-            self.cells[z2][y2][x2].remove_wall(wall.reverse_wall());
+            self.cells[z2][y2][x2].make_passage(passage.reverse_passage().unwrap());
+        } else {
+            let pos = passage.portal_end().unwrap();
+            self.get_cell_mut(pos)
+                .unwrap()
+                .make_passage(passage.reverse_passage().unwrap());
         }
     }
 

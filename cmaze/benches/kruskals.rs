@@ -1,7 +1,7 @@
 use std::sync::mpsc::channel;
 
 use cmaze::gameboard::{
-    Cell, CellWall, Dims3D, Maze, MazeAlgorithm, Progress, RndKruskals, StopGenerationFlag,
+    Cell, Dims3D, Maze, MazeAlgorithm, Passage, Progress, RndKruskals, StopGenerationFlag,
 };
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{seq::SliceRandom, thread_rng};
@@ -31,7 +31,7 @@ pub fn kruskals_floors(c: &mut Criterion) {
 }
 
 pub fn kruskals_hashmap(c: &mut Criterion) {
-    use cmaze::gameboard::{CellWall::*, GenerationErrorInstant, GenerationErrorThreaded};
+    use cmaze::gameboard::{GenerationErrorInstant, GenerationErrorThreaded, Passage::*};
     let mut group = c.benchmark_group("kruskals_hashmap");
     for input in [
         (10, 10, 1),
@@ -76,7 +76,7 @@ pub fn kruskals_hashmap(c: &mut Criterion) {
                     }
 
                     let wall_count = (hu * (wu - 1) + wu * (hu - 1)) * du + wu * hu * (du - 1);
-                    let mut walls: Vec<(Dims3D, CellWall)> = Vec::with_capacity(wall_count);
+                    let mut walls: Vec<(Dims3D, Passage)> = Vec::with_capacity(wall_count);
 
                     for (iz, floor) in cells.iter().enumerate() {
                         for (iy, row) in floor.iter().enumerate() {
@@ -113,7 +113,7 @@ pub fn kruskals_hashmap(c: &mut Criterion) {
 
                     walls.shuffle(&mut thread_rng());
                     while let Some((pos0, wall)) = walls.pop() {
-                        let pos1 = pos0 + wall.to_coord();
+                        let pos1 = pos0 + wall.offset();
 
                         let set0_i = sets.iter().position(|set| set.contains(&pos0)).unwrap();
 
@@ -123,10 +123,10 @@ pub fn kruskals_hashmap(c: &mut Criterion) {
 
                         let set1_i = sets.iter().position(|set| set.contains(&pos1)).unwrap();
 
-                        maze.get_cell_mut(pos0).unwrap().remove_wall(wall);
+                        maze.get_cell_mut(pos0).unwrap().make_passage(wall);
                         maze.get_cell_mut(pos1)
                             .unwrap()
-                            .remove_wall(wall.reverse_wall());
+                            .make_passage(wall.reverse_passage());
                         let set0 = sets.swap_remove(set0_i);
 
                         let set1_i = if set1_i == sets.len() - 1 {
@@ -185,7 +185,7 @@ pub fn kruskals_hashmap(c: &mut Criterion) {
                     }
 
                     let wall_count = (hu * (wu - 1) + wu * (hu - 1)) * du + wu * hu * (du - 1);
-                    let mut walls: Vec<(Dims3D, CellWall)> = Vec::with_capacity(wall_count);
+                    let mut walls: Vec<(Dims3D, Passage)> = Vec::with_capacity(wall_count);
 
                     for (iz, floor) in cells.iter().enumerate() {
                         for (iy, row) in floor.iter().enumerate() {
@@ -222,7 +222,7 @@ pub fn kruskals_hashmap(c: &mut Criterion) {
 
                     walls.shuffle(&mut thread_rng());
                     while let Some((pos0, wall)) = walls.pop() {
-                        let pos1 = pos0 + wall.to_coord();
+                        let pos1 = pos0 + wall.offset();
 
                         let set0_i = sets.iter().position(|set| set.contains(&pos0)).unwrap();
 
@@ -232,10 +232,10 @@ pub fn kruskals_hashmap(c: &mut Criterion) {
 
                         let set1_i = sets.iter().position(|set| set.contains(&pos1)).unwrap();
 
-                        maze.get_cell_mut(pos0).unwrap().remove_wall(wall);
+                        maze.get_cell_mut(pos0).unwrap().make_passage(wall);
                         maze.get_cell_mut(pos1)
                             .unwrap()
-                            .remove_wall(wall.reverse_wall());
+                            .make_passage(wall.reverse_passage());
                         let set0 = sets.swap_remove(set0_i);
 
                         let set1_i = if set1_i == sets.len() - 1 {

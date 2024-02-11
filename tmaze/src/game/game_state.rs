@@ -2,10 +2,9 @@ use std::fmt::Display;
 
 use cmaze::{
     game::{Game, MoveMode},
-    gameboard::{CellWall, Dims3D},
+    gameboard::{Passage, Dims3D, cell::Way},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tap::Tap;
 
 use crate::{helpers::is_release, settings::Settings};
 
@@ -51,22 +50,22 @@ impl GameState {
 
         match code {
             KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                self.apply_move(CellWall::Top, is_fast);
+                self.apply_move(Way::Top, is_fast);
             }
             KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                self.apply_move(CellWall::Bottom, is_fast);
+                self.apply_move(Way::Bottom, is_fast);
             }
             KeyCode::Left | KeyCode::Char('a' | 'A') => {
-                self.apply_move(CellWall::Left, is_fast);
+                self.apply_move(Way::Left, is_fast);
             }
             KeyCode::Right | KeyCode::Char('d' | 'D') => {
-                self.apply_move(CellWall::Right, is_fast);
+                self.apply_move(Way::Right, is_fast);
             }
             KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
-                self.apply_move(CellWall::Down, is_fast);
+                self.apply_move(Way::Down, is_fast);
             }
             KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
-                self.apply_move(CellWall::Up, is_fast);
+                self.apply_move(Way::Up, is_fast);
             }
             KeyCode::Char(' ') => {
                 if self.view_mode == GameViewMode::Spectator {
@@ -88,11 +87,14 @@ impl GameState {
         Ok(())
     }
 
-    pub fn apply_move(&mut self, wall: CellWall, fast: bool) {
+    pub fn apply_move(&mut self, way: Way, fast: bool) {
         match self.view_mode {
             GameViewMode::Spectator => {
-                let cam_off =
-                    wall.reverse_wall().to_coord().tap_mut(|c| c.2 *= -1) + self.camera_offset;
+                let Some(rev_passage) = way.reverse() else {
+                    return;
+                };
+
+                let cam_off = rev_passage.offset().unwrap() + self.camera_offset;
 
                 self.camera_offset = Dims3D(
                     cam_off.0,
@@ -106,7 +108,7 @@ impl GameState {
             GameViewMode::Adventure => {
                 self.game
                     .move_player(
-                        wall,
+                        way,
                         if self.settings.get_slow() {
                             MoveMode::Slow
                         } else if fast {

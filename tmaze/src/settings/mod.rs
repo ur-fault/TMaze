@@ -165,12 +165,16 @@ pub struct SettingsInner {
     #[serde(default)]
     pub color_scheme: Option<ColorScheme>,
     #[serde(default)]
+
     // motion
     pub slow: Option<bool>,
     #[serde(default)]
+    // TODO: rename to disable_tower_auto_advance
     pub disable_tower_auto_up: Option<bool>,
     #[serde(default)]
     pub camera_mode: Option<CameraMode>,
+    #[serde(default)]
+    pub blink_duration: Option<f64>,
 
     // game config
     #[serde(default)]
@@ -295,6 +299,15 @@ impl Settings {
 
     pub fn get_camera_mode(&self) -> CameraMode {
         self.read().camera_mode.unwrap_or_default()
+    }
+
+    pub fn get_blink_duration(&self) -> f64 {
+        self.read().blink_duration.unwrap_or(0.5)
+    }
+
+    pub fn set_blink_duration(mut self, value: f64) -> Self {
+        self.write().blink_duration = Some(value);
+        self
     }
 
     pub fn set_default_maze_gen_algo(mut self, value: MazeGenAlgo) -> Self {
