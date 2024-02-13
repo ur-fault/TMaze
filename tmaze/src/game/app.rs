@@ -701,17 +701,16 @@ impl App {
                 if pos_in_maze == game_state.game.get_player_pos() {
                     chars.push(Some((*player_char, contexts.player.style)));
                 };
-                if let Some(Portal { id, .. }) = cell.get_portal() {
-                    const PORTAL_CHARS: &str =
-                        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                    const PORTAL_PLACEHOLDER: char = '⊛';
+                if let Some(Portal { other, .. }) = cell.get_portal() {
+                    const PORTAL_CHAR: char = '⊛';
 
-                    let portal_char = PORTAL_CHARS
-                        .as_bytes()
-                        .get(id)
-                        .map(|&b| b as char)
-                        .unwrap_or(PORTAL_PLACEHOLDER);
-                    chars.push(Some((portal_char as char, contexts.normal.style)));
+                    if game_state.game.get_player_pos() == pos_in_maze
+                        || game_state.game.get_player_pos() == other
+                    {
+                        chars.push(Some((PORTAL_CHAR, contexts.player.style)));
+                    } else {
+                        chars.push(Some((PORTAL_CHAR, contexts.normal.style)));
+                    };
                 }
 
                 if let Some((chr, style)) = Self::get_optional_blink_item(
