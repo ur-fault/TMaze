@@ -62,6 +62,10 @@ impl Cell {
         }
     }
 
+    pub fn get_portal(&self) -> Option<Portal> {
+        self.portal
+    }
+
     pub fn end_of_way(&self, way: Way) -> Option<Dims3D> {
         self.is_open(way).then(|| match way {
             Way::Portal => self.portal.unwrap().other,

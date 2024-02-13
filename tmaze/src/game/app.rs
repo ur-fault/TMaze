@@ -1,20 +1,20 @@
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
 use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
-use cmaze::gameboard::cell::Way;
+use cmaze::gameboard::cell::{Portal, Way};
 
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 #[cfg(feature = "sound")]
 use rodio::Source;
+use smallvec::{smallvec, SmallVec};
 
 use super::{GameError, GameState, GameViewMode};
 
 use crate::data::SaveData;
-use crate::gameboard::{algorithms::*, Cell};
+use crate::gameboard::algorithms::*;
 use crate::helpers::{constants, value_if_else, LineDir};
 use crate::renderer::drawable::Drawable;
 use crate::renderer::helpers::term_size;
@@ -416,6 +416,8 @@ impl App {
 
         let maze_margin = Dims(10, 3);
 
+        let app_time = (Instant::now() - self.start_time).as_secs_f64();
+
         let fits_on_screen = maze_render_size.0 + maze_margin.0 + 2 <= size.0
             && maze_render_size.1 + 3 + maze_margin.1 + 4 <= size.1;
 
@@ -544,6 +546,7 @@ impl App {
             LineDir::TopLeft,
         );
 
+        // Horizontal edge lines
         for x in 0..maze.size().0 - 1 {
             draw_line_double_duo(
                 normal_context,
@@ -663,7 +666,7 @@ impl App {
                 };
 
                 fn stair_tui_cell_for_pos(
-                    contexts: GameDrawContexts<'_>,
+                    contexts: &GameDrawContexts<'_>,
                     state: &GameState,
                     pos: Dims3D,
                 ) -> Option<(char, ContentStyle)> {
@@ -692,16 +695,37 @@ impl App {
                     Some((chr, color))
                 }
 
-                if let Some((chr, style)) =
-                    stair_tui_cell_for_pos(contexts, game_state, pos_in_maze)
-                {
-                    (chr, style).draw(
+                let mut chars: SmallVec<[_; 4]> = SmallVec::new();
+
+                chars.push(stair_tui_cell_for_pos(&contexts, game_state, pos_in_maze));
+                if pos_in_maze == game_state.game.get_player_pos() {
+                    chars.push(Some((*player_char, contexts.player.style)));
+                };
+                if let Some(Portal { id, .. }) = cell.get_portal() {
+                    const PORTAL_CHARS: &str =
+                        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                    const PORTAL_PLACEHOLDER: char = '⊛';
+
+                    let portal_char = PORTAL_CHARS
+                        .as_bytes()
+                        .get(id)
+                        .map(|&b| b as char)
+                        .unwrap_or(PORTAL_PLACEHOLDER);
+                    chars.push(Some((portal_char as char, contexts.normal.style)));
+                }
+
+                if let Some((chr, style)) = Self::get_optional_blink_item(
+                    app_time,
+                    self.settings.get_blink_duration(),
+                    &chars,
+                ) {
+                    (*chr, *style).draw(
                         (xpos as u16, ypos as u16),
                         renderer_cell.borrow_mut().frame(),
                     );
                 }
 
-                let Some(cell2) = maze.get_cell(Dims3D(ix as i32 + 1, iy as i32, floor)) else {
+                let Some(cell2) = maze.get_cell(Dims3D(ix as i32 + 1, iy as i32 + 1, floor)) else {
                     continue;
                 };
 
@@ -963,10 +987,33 @@ impl App {
         })
     }
 
-    fn get_blink_item<'a, T>(&'_ self, items: &'a [T]) -> &'a T {
-        let time = self.start_time.elapsed().as_secs_f64();
-        let index = (time / self.settings.get_blink_duration()) as usize % items.len();
+    fn get_blink_item<'a, T>(time: f64, dur: f64, items: &'a [T]) -> &'a T {
+        if items.is_empty() {
+            panic!("No items to blink");
+        }
+
+        let index = (time / dur) as usize % items.len();
         &items[index]
+    }
+
+    fn get_optional_blink_item<'a, T>(
+        time: f64,
+        dur: f64,
+        items: &'a [Option<T>],
+    ) -> Option<&'a T> {
+        const MAX_STACK_ITEMS: usize = 4;
+
+        let opts = items
+            .iter()
+            .filter_map(|x| x.as_ref())
+            .collect::<SmallVec<[_; MAX_STACK_ITEMS]>>();
+
+        if opts.is_empty() {
+            return None;
+        }
+
+        let index = (time / dur) as usize % opts.len();
+        opts.get(index).copied() // the ref, not the value
     }
 }
 
