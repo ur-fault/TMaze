@@ -697,16 +697,16 @@ impl App {
 
                 let mut chars: SmallVec<[_; 4]> = SmallVec::new();
 
-                chars.push(stair_tui_cell_for_pos(&contexts, game_state, pos_in_maze));
-                if pos_in_maze == game_state.game.get_player_pos() {
+                if let stairs @ Some(_) = stair_tui_cell_for_pos(&contexts, game_state, pos_in_maze)
+                {
+                    chars.push(stairs);
+                } else if pos_in_maze == player_pos {
                     chars.push(Some((*player_char, contexts.player.style)));
-                };
+                }
                 if let Some(Portal { other, .. }) = cell.get_portal() {
                     const PORTAL_CHAR: char = '⊛';
 
-                    if game_state.game.get_player_pos() == pos_in_maze
-                        || game_state.game.get_player_pos() == other
-                    {
+                    if player_pos == pos_in_maze || player_pos == other {
                         chars.push(Some((PORTAL_CHAR, contexts.player.style)));
                     } else {
                         chars.push(Some((PORTAL_CHAR, contexts.normal.style)));

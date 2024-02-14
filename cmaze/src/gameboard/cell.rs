@@ -15,7 +15,7 @@ pub struct Cell {
     up: bool,
     down: bool,
     portal: Option<Portal>,
-    coord: Dims3D,
+    pub(crate) coord: Dims3D,
 }
 
 impl Cell {
@@ -207,7 +207,7 @@ impl Way {
     /// Returns the walls that are perpendicular to the current wall
     ///
     /// *Note*: Portal is perpendicular to everything else, but nothing is perpendicular to Portal
-    pub fn perpendicular_walls(&self) -> Option<[Way; 5]> {
+    pub fn perpendicular_ways(&self) -> Option<[Way; 5]> {
         use Way::*;
 
         match self {

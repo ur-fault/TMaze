@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use cmaze::{
     game::{Game, MoveMode},
-    gameboard::{Passage, Dims3D, cell::Way},
+    gameboard::{cell::Way, Dims3D, Passage},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -67,6 +67,9 @@ impl GameState {
             KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
                 self.apply_move(Way::Up, is_fast);
             }
+            KeyCode::Char('z' | 'Z' | 'o' | 'O') => {
+                self.apply_move(Way::Portal, is_fast);
+            }
             KeyCode::Char(' ') => {
                 if self.view_mode == GameViewMode::Spectator {
                     self.camera_offset = Dims3D(0, 0, 0);
@@ -106,18 +109,14 @@ impl GameState {
                 )
             }
             GameViewMode::Adventure => {
+                let mode = match (self.settings.get_slow(), fast) {
+                    (true, _) => MoveMode::Slow,
+                    (false, true) => MoveMode::Fast,
+                    (false, false) => MoveMode::Normal,
+                };
+
                 self.game
-                    .move_player(
-                        way,
-                        if self.settings.get_slow() {
-                            MoveMode::Slow
-                        } else if fast {
-                            MoveMode::Fast
-                        } else {
-                            MoveMode::Normal
-                        },
-                        !self.settings.get_disable_tower_auto_up(),
-                    )
+                    .move_player(way, mode, !self.settings.get_disable_tower_auto_up())
                     .unwrap();
             }
         }

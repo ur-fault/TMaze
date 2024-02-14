@@ -163,7 +163,7 @@ pub trait MazeAlgorithm {
             }
         };
 
-        let cells: Vec<Vec<Vec<Cell>>> = if parallel_floor_generation {
+        let mut cells: Vec<Vec<Vec<Cell>>> = if parallel_floor_generation {
             (0..du)
                 .into_par_iter()
                 .map(generate_floor)
@@ -173,6 +173,14 @@ pub trait MazeAlgorithm {
                 .map(generate_floor)
                 .collect::<Result<Vec<_>, GenerationErrorThreaded>>()?
         };
+
+        for (i, floor) in cells.iter_mut().enumerate() {
+            for row in floor.iter_mut() {
+                for cell in row {
+                    cell.coord.2 = i as i32;
+                }
+            }
+        }
 
         Ok(cells)
     }

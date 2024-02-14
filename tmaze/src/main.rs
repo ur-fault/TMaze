@@ -26,6 +26,14 @@ struct Args {
 }
 
 fn main() -> Result<(), GameError> {
+    #[cfg(any(all(feature = "debuglog", debug_assertions), feature = "releaselog"))]
+    simplelog::WriteLogger::init(
+        simplelog::LevelFilter::Info,
+        simplelog::Config::default(),
+        std::fs::File::create("tmaze.log").unwrap(),
+    )
+    .unwrap();
+
     let _args = Args::parse();
 
     if _args.reset_config {

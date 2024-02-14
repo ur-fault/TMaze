@@ -16,6 +16,7 @@ rayon = "^1.6.0"
 hashbrown = { version = "0.14", optional = true }
 paste = "1.0.14"
 num-traits = "0.2.18"
+log = "0.4.20"
 
 [dev-dependencies]
 criterion = "0.5"

@@ -9,6 +9,8 @@ use pausable_clock::{PausableClock, PausableInstant};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use log::info;
+
 #[derive(Debug)]
 pub struct GameAlreadyRunningError {}
 #[derive(Debug)]
@@ -173,9 +175,9 @@ impl Game {
             }
 
             MoveMode::Normal => loop {
-                let mut cell = self.player_cell();
+                let cell = self.player_cell();
 
-                if !cell.is_open(way) {
+                if cell.is_closed(way) {
                     break;
                 }
 
@@ -184,22 +186,26 @@ impl Game {
                 self.moves.push((self.player_pos, way));
                 self.player_pos = self.player_cell().end_of_way(way).unwrap();
 
-                cell = self.maze.get_cell(self.player_pos).unwrap();
+                info!("Player pos: {:?}", self.player_pos);
 
-                let Some(perps) = way.perpendicular_walls() else {
+                let cell = self.player_cell();
+
+                let Some(perps) = way.perpendicular_ways() else {
                     break;
                 };
 
-                if perps.iter().any(|p| !cell.get_way(*p).is_some()) {
+                if perps.iter().any(|w| cell.is_open(*w)) {
                     break;
                 }
             },
         }
 
-        if tower_auto_up && self.game_mode.is_tower && !self.player_cell().is_open(Way::Up) {
-            self.moves.push((self.player_pos, Way::Up));
-            self.player_pos = self.player_cell().end_of_way(Way::Up).unwrap();
-            count += 1;
+        if tower_auto_up && self.game_mode.is_tower {
+            while let Some(pos) = self.player_cell().end_of_way(Way::Up) {
+                self.moves.push((pos, Way::Up));
+                self.player_pos = pos;
+                count += 1;
+            }
         }
 
         if self.player_pos == self.goal_pos {
@@ -211,9 +217,17 @@ impl Game {
     }
 
     pub fn player_cell(&self) -> &Cell {
-        self.maze
-            .get_cell(self.player_pos)
-            .expect("Player out of bounds")
+        let cell_opt = self.maze.get_cell(self.player_pos);
+
+        #[cfg(debug_assertions)]
+        {
+            cell_opt.expect(&format!("Player out of bounds: {:?}", self.player_pos))
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            cell_opt.unwrap()
+        }
     }
 
     pub fn check_running(&self) -> Result<(), GameNotRunningError> {
