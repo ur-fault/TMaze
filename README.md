@@ -8,9 +8,9 @@ Simple multiplatform maze solving game for terminal written entirely in  Rust
 ![](https://img.shields.io/crates/d/tmaze)
 ![Crates.io](https://img.shields.io/crates/v/tmaze)
 
-![Screenshot of in-game](https://github.com/ur-fault/tmaze/blob/master/readme_assets/screenshot_ingame.png?raw=true)
-
 [![Packaging status](https://repology.org/badge/vertical-allrepos/tmaze.svg)](https://repology.org/project/tmaze/versions)
+
+![Screenshot of in-game](https://github.com/ur-fault/tmaze/blob/master/readme_assets/screenshot_ingame.png?raw=true)
 
 ## What's this
 
