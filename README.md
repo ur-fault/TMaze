@@ -10,6 +10,8 @@ Simple multiplatform maze solving game for terminal written entirely in  Rust
 
 ![Screenshot of in-game](https://github.com/ur-fault/tmaze/blob/master/readme_assets/screenshot_ingame.png?raw=true)
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/tmaze.svg)](https://repology.org/project/tmaze/versions)
+
 ## What's this
 
 ### Features
