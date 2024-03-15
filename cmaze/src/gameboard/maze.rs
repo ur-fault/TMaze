@@ -80,8 +80,8 @@ impl Maze {
             .into_iter()
             .filter(|off| self.is_valid_neighbor(cell, *off))
             .map(|off| {
-                &self.cells[(cell.2 + off.2) as usize][(cell.1 + off.1) as usize]
-                    [(cell.0 + off.0) as usize]
+                let pos = cell + off;
+                &self.cells[pos.2 as usize][pos.1 as usize][pos.0 as usize]
             })
             .collect()
     }
