@@ -27,3 +27,14 @@ tap = "1.0.1"
 [features]
 default = ["hashbrown"]
 hashbrown = ["cmaze/hashbrown"]
+
+[[bench]]
+name = "extism_bench"
+path = "benches/extism/benchmark.rs"
+harness = false
+
+[dev-dependencies]
+extism = "1.2.0"
+extism-manifest = "1.2.0"
+criterion = "0.3"
+
