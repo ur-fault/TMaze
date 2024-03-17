@@ -3,6 +3,7 @@ name: Build and Release
 on:
     push:
         branches: ["master"]
+    workflow_dispatch:
 
 env:
     CARGO_TERM_COLOR: always
@@ -12,37 +13,51 @@ jobs:
         runs-on: windows-latest
         steps:
             - uses: actions/checkout@v3
+              
             - uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
+            - uses: actions/setup-python@v5
+              with:
+                python-version: '3.10'
+
             - uses: Swatinem/rust-cache@v2
             - uses: actions-rs/cargo@v1
               with:
                   command: build
-                  args: --release
-            - run: |
+                  args: --release --all-features
+
+            - name: Get version and rename file to version specific
+              run: |
                   $tmversion = ./target/release/tmaze.exe --version | Select-String -Pattern '^tmaze ([0-9]+\.[0-9]+\.[0-9]+)$' | %{$_.Matches[0].Groups[1].Value}
                   $filepath = "./target/release/tmaze-${tmversion}-win-x86_64.exe"
                   echo "BIN_FILEPATH=$filepath" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
                   echo "TM_VERSION=$tmversion" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf-8 -Append
                   mv ./target/release/tmaze.exe ${filepath}
             - run: echo "$Env:GITHUB_CONTEXT"
+
             - uses: actions/upload-artifact@v3
               with:
                   path: ${{env.BIN_FILEPATH}}
                   name: release
+
     build-linux-x64:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v3
+
             - uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
             - uses: Swatinem/rust-cache@v2
+
+            - run: sudo apt install libasound2-dev
+
             - uses: actions-rs/cargo@v1
               with:
                   command: build
-                  args: --release
+                  args: --release --all-features
+
             - run: strip ./target/release/tmaze
             - run: ls -l ./target/release/
             - run: |
@@ -57,12 +72,14 @@ jobs:
                   else
                       echo "FAIL"
                   fi
+
             - uses: actions/upload-artifact@v3
               with:
                   path: |
                       ${{env.BIN_FILEPATH}}
                       ./target/release/version
                   name: release
+
     draft-release:
         needs: ["build-win-x64", "build-linux-x64"]
         runs-on: ubuntu-latest
@@ -71,12 +88,15 @@ jobs:
               with:
                   path: release-files/
                   name: release
+
             - run: find ./release-files/ -type f -name "linux" -exec chmod +x ./release-files/{} \;
             - run: ls ./release-files/
-            - run: |
+            - name: Save version to env
+              run: |
                   version=$(<./release-files/version)
-                  rm ./release-files/version
                   echo "TM_VERSION=$version" >> $GITHUB_ENV
+            - name: Remove version file
+              run: rm ./release-files/version
             - uses: ncipollo/release-action@v1
               with:
                   artifacts: "./release-files/*"
@@ -84,8 +104,10 @@ jobs:
                   commit: master
                   generateReleaseNotes: true
                   skipIfReleaseExists: true
+                  allowUpdates: true
                   draft: true
                   tag: ${{ env.TM_VERSION }}
+
     publish-on-crates:
         runs-on: ubuntu-latest
         steps:
@@ -93,19 +115,20 @@ jobs:
             - uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
-                  
+
+            - run: sudo apt install libasound2-dev
+
             - name: publish cmaze
               uses: katyo/publish-crates@v2
               with:
-                path: ./cmaze
-                registry-token: ${{ secrets.CRATES_IO }}
-                ignore-unpublished-changes: true
-                
+                  path: ./cmaze
+                  registry-token: ${{ secrets.CRATES_IO }}
+                  ignore-unpublished-changes: true
+
             - name: publish tmaze
               uses: katyo/publish-crates@v2
               with:
-                # Path to Rust crate or workspace
-                path: ./tmaze
-                # Cargo registry token
-                registry-token: ${{ secrets.CRATES_IO }}
-                ignore-unpublished-changes: true
+                  path: ./tmaze
+                  registry-token: ${{ secrets.CRATES_IO }}
+                  ignore-unpublished-changes: true
+

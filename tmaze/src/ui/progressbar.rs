@@ -1,10 +1,6 @@
 use std::cell::RefCell;
 
 use crossterm::style::ContentStyle;
-pub use crossterm::{
-    event::{poll, read, Event, KeyCode, KeyEvent},
-    terminal::size,
-};
 
 use super::draw::*;
 use super::*;
@@ -16,7 +12,7 @@ pub fn render_progress(
     text_style: ContentStyle,
     title: &str,
     progress: f64,
-) -> Result<(), CrosstermError> {
+) -> io::Result<()> {
     let progress_size = Dims(title.len() as i32 + 2, 4);
     let pos = box_center_screen(progress_size)?;
 

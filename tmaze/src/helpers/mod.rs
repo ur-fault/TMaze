@@ -1,5 +1,7 @@
 pub mod constants;
 
+use core::fmt;
+
 use crossterm::event::KeyEventKind;
 
 use crate::core::*;
@@ -75,7 +77,7 @@ impl LineDir {
         }
     }
 
-    pub fn double_line_bools(left: bool, top: bool, right: bool, bottom: bool) -> Self {
+    pub fn from_bools(left: bool, top: bool, right: bool, bottom: bool) -> Self {
         match (left, top, right, bottom) {
             (false, false, false, false) => Self::Empty,
             (true, true, true, true) => Self::Cross,
@@ -116,10 +118,18 @@ impl LineDir {
     }
 }
 
-pub fn from_maze_to_real(pos_on_maze: Dims3D) -> Dims {
+pub fn maze_pos_to_real(pos_on_maze: Dims3D) -> Dims {
     Dims(pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1)
 }
 
 pub fn is_release(k: KeyEventKind) -> bool {
     k == KeyEventKind::Release
 }
+
+pub trait ToDebug: fmt::Debug {
+    fn to_debug(&self) -> String {
+        format!("{:?}", self)
+    }
+}
+
+impl<T: fmt::Debug> ToDebug for T {}

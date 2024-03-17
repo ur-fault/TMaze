@@ -2,10 +2,13 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Dims(pub i32, pub i32);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Dims3D(pub i32, pub i32, pub i32);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DimsU(pub usize, pub usize);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct GameMode {
     pub size: Dims3D,

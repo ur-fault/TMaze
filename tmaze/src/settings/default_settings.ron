@@ -33,7 +33,6 @@ Settings (
     disable_tower_auto_up: false,
     // disable_tower_auto_up: true,
 
-
     // when maze cannot fit on the screen
     // camera_mode:
     // - valid modes
@@ -51,6 +50,35 @@ Settings (
     // skip prompt for maze generation algorithm
     dont_ask_for_maze_algo: true,
     // dont_ask_for_maze_algo: false,
+
+    // update check interval
+    // - valid intervals:
+    //  - Never
+    //  - Daily
+    //  - Weekly
+    //  - Monthly
+    //  - Yearly
+    //  - Always
+    update_check_interval: Daily,
+
+    // display update check errors,
+    // when false display on successfully found new version
+    display_update_check_errors: true,
+    // display_update_check_errors: false,
+
+    // enable audio, if false, no audio will be played
+    enable_audio: true,
+    // enable_audio: false,
+
+    // audio volume, 0.0 - 1.0, value is clamped, must not be NaN
+    audio_volume: 0.5,
+
+    // enable music, needs to have audio enabled
+    enable_music: true,
+    // enable_music: false,
+
+    // music volume, 0.0 - 1.0, value is clamped, must not be NaN
+    music_volume: 0.5,
 
     // lists of maze presets
     mazes: [

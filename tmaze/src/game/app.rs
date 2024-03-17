@@ -3,8 +3,12 @@ use std::time::Duration;
 
 use cmaze::core::*;
 use cmaze::game::{Game, GameProperities, GameState as GameStatus};
-use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
 
+use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
+#[cfg(feature = "sound")]
+use rodio::Source;
+
+use crate::data::SaveData;
 use crate::gameboard::CellWall;
 use crate::gameboard::{algorithms::*, Cell};
 use crate::helpers::{constants, value_if_else, LineDir};
@@ -12,16 +16,32 @@ use crate::renderer::helpers::term_size;
 use crate::renderer::Renderer;
 use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
 use crate::ui::{DrawContext, Frame, MenuError};
-use crate::{helpers, ui, ui::CrosstermError};
+use crate::{helpers, ui};
+
+#[cfg(feature = "updates")]
+use crate::updates;
+
+#[cfg(feature = "sound")]
+use crate::sound::{track::MusicTracks, SoundPlayer};
 
 use super::{GameError, GameState, GameViewMode};
 
 pub struct App {
     renderer: Renderer,
-    // stdout: Stdout,
+    #[cfg(feature = "sound")]
+    sound_player: SoundPlayer,
     settings: Settings,
+    save_data: SaveData,
     last_edge_follow_offset: Dims,
     last_selected_preset: Option<usize>,
+    #[cfg(feature = "sound")]
+    bgm_track: Option<MusicTracks>,
+}
+
+struct GameDrawContexts<'a> {
+    normal: DrawContext<'a>,
+    player: DrawContext<'a>,
+    goal: DrawContext<'a>,
 }
 
 impl App {
@@ -29,13 +49,137 @@ impl App {
         let settings_path = Settings::default_path();
         App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
+            #[cfg(feature = "sound")]
+            sound_player: SoundPlayer::new(),
             settings: Settings::load(settings_path),
+            save_data: SaveData::load_or(),
             last_edge_follow_offset: Dims(0, 0),
             last_selected_preset: None,
+            #[cfg(feature = "sound")]
+            bgm_track: None,
         }
     }
 
+    #[cfg(feature = "sound")]
+    fn play_bgm(&mut self, track: MusicTracks) {
+        if let Some(prev_track) = self.bgm_track {
+            if prev_track == track {
+                return;
+            }
+        }
+
+        if !self.settings.get_enable_audio() || !self.settings.get_enable_music() {
+            return;
+        }
+
+        let volume = self.settings.get_audio_volume() * self.settings.get_music_volume();
+        self.sound_player.sink().set_volume(volume);
+
+        self.bgm_track = Some(track);
+        self.sound_player
+            .play_track(Box::new(track.get_track().repeat_infinite()));
+    }
+
+    #[cfg(feature = "updates")]
+    fn check_for_updates(&mut self) -> Result<(), GameError> {
+        use chrono::Local;
+        use crossterm::event::{self, KeyEventKind};
+
+        use crate::helpers::ToDebug;
+
+        if !self.save_data.is_update_checked(&self.settings) {
+            let last_check_before = self
+                .save_data
+                .last_update_check
+                .map(|l| Local::now().signed_duration_since(l))
+                .map(|d| d.to_std().expect("Failed to convert to std duration"))
+                .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)) // Remove subsec time
+                .map(humantime::format_duration);
+
+            let update_interval = format!(
+                "Currently checkes {} for updates",
+                self.settings.get_check_interval().to_debug().to_lowercase()
+            );
+
+            ui::popup::render_popup(
+                &mut self.renderer,
+                Default::default(),
+                Default::default(),
+                "Checking for newer version",
+                &[
+                    "Please wait...",
+                    &update_interval,
+                    &last_check_before
+                        .map(|lc| format!("Last check before: {}", lc))
+                        .unwrap_or("Never checked for updates".to_owned()),
+                    "Press 'q' to cancel or Esc to skip",
+                ],
+            )?;
+
+            let rt = tokio::runtime::Runtime::new().unwrap();
+
+            let handle = rt.spawn(updates::get_newer_async());
+            while !handle.is_finished() {
+                if let Ok(true) = event::poll(Duration::from_millis(15)) {
+                    match event::read() {
+                        Ok(Event::Key(KeyEvent {
+                            code: KeyCode::Char('q'),
+                            kind: KeyEventKind::Press | KeyEventKind::Repeat,
+                            ..
+                        })) => {
+                            handle.abort();
+                            return Ok(());
+                        }
+                        Ok(Event::Key(KeyEvent {
+                            code: KeyCode::Esc,
+                            kind: KeyEventKind::Press | KeyEventKind::Repeat,
+                            ..
+                        })) => handle.abort(),
+                        _ => (),
+                    }
+                }
+            }
+
+            match rt.block_on(handle).unwrap() {
+                Ok(Some(version)) => {
+                    ui::popup(
+                        &mut self.renderer,
+                        Default::default(),
+                        Default::default(),
+                        "New version available",
+                        &[
+                            format!("New version {} is available", version).as_str(),
+                            format!("Your version is {}", env!("CARGO_PKG_VERSION")).as_str(),
+                        ],
+                    )?;
+                }
+                Err(err) if self.settings.get_display_update_check_errors() => {
+                    ui::popup(
+                        &mut self.renderer,
+                        Default::default(),
+                        Default::default(),
+                        "Error while checking for updates",
+                        &[
+                            "There was an error while checking for updates",
+                            &format!("Error: {}", err),
+                        ],
+                    )?;
+                }
+                _ => {}
+            }
+
+            self.save_data
+                .update_last_check()
+                .expect("Failed to save data");
+        }
+
+        Ok(())
+    }
+
     pub fn run(mut self) -> Result<(), GameError> {
+        #[cfg(feature = "updates")]
+        self.check_for_updates()?;
+
         let mut game_restart_reqested = false;
 
         loop {
@@ -50,6 +194,9 @@ impl App {
                 }
                 continue;
             }
+
+            #[cfg(feature = "sound")]
+            self.play_bgm(MusicTracks::Menu);
 
             match ui::menu(
                 &mut self.renderer,
@@ -93,7 +240,7 @@ impl App {
         let mut settings = self.settings.clone();
         settings.edit(
             &mut self.renderer,
-            self.settings.color_scheme.clone().unwrap(),
+            self.settings.read().color_scheme.clone().unwrap(),
         )?;
         self.settings = settings;
         Ok(())
@@ -159,6 +306,9 @@ impl App {
 
         let game = self.generate_maze(game_props)?;
 
+        #[cfg(feature = "sound")]
+        self.play_bgm(MusicTracks::choose_for_maze(&game.get_maze()));
+
         let mut game_state = GameState {
             game,
             camera_offset: Dims3D(0, 0, 0),
@@ -195,7 +345,7 @@ impl App {
                         }
                     }
                     Err(err) => {
-                        break Err(CrosstermError(err).into());
+                        break Err(err.into());
                     }
                     _ => {}
                 }
@@ -262,7 +412,7 @@ impl App {
             let pos = if fits_on_screen {
                 ui::box_center_screen(maze_render_size)?
             } else {
-                let last_player_real_pos = helpers::from_maze_to_real(player_pos);
+                let last_player_real_pos = helpers::maze_pos_to_real(player_pos);
 
                 match camera_mode {
                     CameraMode::CloseFollow => size / 2 - last_player_real_pos,
@@ -330,37 +480,37 @@ impl App {
         let floor = player_pos.2 + camera_offset.2;
 
         let draw_line_double_duo =
-            |context: &mut DrawContext, pos: (i32, i32), l1: LineDir, l2: LineDir| {
+            |mut context: DrawContext, pos: (i32, i32), l1: LineDir, l2: LineDir| {
                 context.draw_str(
                     pos.into(),
                     &format!("{}{}", l1.double_line(), l2.double_line(),),
                 )
             };
 
-        let draw_line_double = |context: &mut DrawContext, pos: (i32, i32), l: LineDir| {
+        let draw_line_double = |mut context: DrawContext, pos: (i32, i32), l: LineDir| {
             context.draw_str(pos.into(), l.double_line())
         };
 
         draw_line_double_duo(
-            &mut normal_context,
+            normal_context,
             maze_pos.into(),
             LineDir::BottomRight,
             LineDir::Horizontal,
         );
         draw_line_double_duo(
-            &mut normal_context,
+            normal_context,
             (maze_pos.0 + maze_render_size.0 - 2, maze_pos.1),
             LineDir::Horizontal,
             LineDir::BottomLeft,
         );
 
         draw_line_double(
-            &mut normal_context,
+            normal_context,
             (maze_pos.0, maze_pos.1 + maze_render_size.1 - 2),
             LineDir::Vertical,
         );
         draw_line_double(
-            &mut normal_context,
+            normal_context,
             (
                 maze_pos.0 + maze_render_size.0 - 1,
                 maze_pos.1 + maze_render_size.1 - 2,
@@ -369,12 +519,12 @@ impl App {
         );
 
         draw_line_double(
-            &mut normal_context,
+            normal_context,
             (maze_pos.0, maze_pos.1 + maze_render_size.1 - 1),
             LineDir::TopRight,
         );
         draw_line_double_duo(
-            &mut normal_context,
+            normal_context,
             (
                 maze_pos.0 + maze_render_size.0 - 2,
                 maze_pos.1 + maze_render_size.1 - 1,
@@ -385,7 +535,7 @@ impl App {
 
         for x in 0..maze.size().0 - 1 {
             draw_line_double_duo(
-                &mut normal_context,
+                normal_context,
                 (x * 2 + maze_pos.0 + 1, maze_pos.1),
                 LineDir::Horizontal,
                 if maze
@@ -400,7 +550,7 @@ impl App {
             );
 
             draw_line_double_duo(
-                &mut normal_context,
+                normal_context,
                 (x * 2 + maze_pos.0 + 1, maze_pos.1 + maze_render_size.1 - 1),
                 LineDir::Horizontal,
                 if maze
@@ -427,7 +577,7 @@ impl App {
             }
 
             draw_line_double(
-                &mut normal_context,
+                normal_context,
                 (maze_pos.0, ypos + 1),
                 value_if_else(
                     maze.get_cell(Dims3D(0, y, floor))
@@ -439,7 +589,7 @@ impl App {
             );
 
             draw_line_double(
-                &mut normal_context,
+                normal_context,
                 (maze_pos.0 + maze_render_size.0 - 1, ypos + 1),
                 value_if_else(
                     maze.get_cell(Dims3D(maze.size().0 - 1, y, floor))
@@ -450,10 +600,10 @@ impl App {
                 ),
             );
 
-            draw_line_double(&mut normal_context, (maze_pos.0, ypos), LineDir::Vertical);
+            draw_line_double(normal_context, (maze_pos.0, ypos), LineDir::Vertical);
 
             draw_line_double(
-                &mut normal_context,
+                normal_context,
                 (maze_pos.0 + maze_render_size.0 - 1, y * 2 + maze_pos.1 + 1),
                 LineDir::Vertical,
             );
@@ -463,7 +613,7 @@ impl App {
         let moves = game.get_moves();
         for (move_pos, _) in moves {
             if move_pos.2 == floor {
-                let real_pos = helpers::from_maze_to_real(*move_pos);
+                let real_pos = helpers::maze_pos_to_real(*move_pos);
                 normal_context.draw_char(maze_pos + real_pos, '.');
             }
         }
@@ -475,7 +625,7 @@ impl App {
             for (ix, cell) in row.iter().enumerate() {
                 let xpos = ix as i32 * 2 + 1 + maze_pos.0;
                 if cell.get_wall(CellWall::Right) && ix != maze.size().0 as usize - 1 {
-                    draw_line_double(&mut normal_context, (xpos + 1, ypos), LineDir::Vertical);
+                    draw_line_double(normal_context, (xpos + 1, ypos), LineDir::Vertical);
                 }
 
                 if ypos + 1 < size.1 - 2
@@ -483,13 +633,17 @@ impl App {
                     && cell.get_wall(CellWall::Bottom)
                     && iy != maze.size().1 as usize - 1
                 {
-                    draw_line_double(&mut normal_context, (xpos, ypos + 1), LineDir::Horizontal);
+                    draw_line_double(normal_context, (xpos, ypos + 1), LineDir::Horizontal);
                 }
 
+                let contexts = GameDrawContexts {
+                    normal: normal_context,
+                    player: player_context,
+                    goal: goal_context,
+                };
+
                 Self::draw_stairs(
-                    &mut normal_context,
-                    &mut player_context,
-                    &mut goal_context,
+                    contexts,
                     cell,
                     (ix as i32, iy as i32),
                     maze_pos.into(),
@@ -504,9 +658,9 @@ impl App {
                 };
 
                 draw_line_double(
-                    &mut normal_context,
+                    normal_context,
                     (xpos + 1, ypos + 1),
-                    LineDir::double_line_bools(
+                    LineDir::from_bools(
                         cell.get_wall(CellWall::Bottom),
                         cell.get_wall(CellWall::Right),
                         cell2.get_wall(CellWall::Top),
@@ -530,10 +684,14 @@ impl App {
                 *player_char,
             );
 
+            let contexts = GameDrawContexts {
+                normal: normal_context,
+                player: player_context,
+                goal: goal_context,
+            };
+
             Self::draw_stairs(
-                &mut normal_context,
-                &mut player_context,
-                &mut goal_context,
+                contexts,
                 maze.get_cell(player_pos).unwrap(),
                 (player_pos.0, player_pos.1),
                 maze_pos.into(),
@@ -625,7 +783,7 @@ impl App {
                         &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                     ],
                 )?;
-                return Err(GameError::EmptyMaze);
+                return Err(GameError::EmptyMenu);
             }
         };
 
@@ -683,17 +841,15 @@ impl App {
                         &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                     ],
                 )?;
-                Err(GameError::EmptyMaze)
+                Err(GameError::EmptyMenu)
             }
             Err(GenerationErrorThreaded::AbortGeneration) => Err(GameError::Back),
             Err(GenerationErrorThreaded::UnknownError(err)) => panic!("{:?}", err),
         }
     }
 
-    fn draw_stairs<'a>(
-        normal_context: &'a mut DrawContext,
-        player_context: &'a mut DrawContext,
-        goal_context: &'a mut DrawContext,
+    fn draw_stairs(
+        contexts: GameDrawContexts,
         cell: &Cell,
         stairs_pos: (i32, i32),
         maze_pos: (i32, i32),
@@ -701,8 +857,14 @@ impl App {
         player_pos: Dims3D,
         ups_as_goal: bool,
     ) {
-        let real_pos = helpers::from_maze_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
+        let real_pos = helpers::maze_pos_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
             + Dims::from(maze_pos);
+
+        let GameDrawContexts {
+            normal: mut normal_context,
+            player: mut player_context,
+            goal: mut goal_context,
+        } = contexts;
 
         if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
             if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {

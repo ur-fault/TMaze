@@ -1,11 +1,16 @@
+use std::io;
+
+use thiserror::Error;
+
 use crate::{
     renderer::Renderer,
-    ui::{self, CrosstermError},
+    ui::{self},
 };
 
 use super::ColorScheme;
 
 pub trait EditableField {
+    // TODO: return &str
     fn print(&self) -> String;
 
     fn edit(
@@ -40,15 +45,12 @@ impl<T: EditableField> EditableField for Option<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum EditableFieldError {
+    #[error("Back")]
     Back,
+    #[error("Quit")]
     Quit,
-    Crossterm(CrosstermError),
-}
-
-impl From<CrosstermError> for EditableFieldError {
-    fn from(error: CrosstermError) -> Self {
-        Self::Crossterm(error)
-    }
+    #[error(transparent)]
+    Crossterm(#[from] io::Error),
 }

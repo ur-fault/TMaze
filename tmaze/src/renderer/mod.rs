@@ -1,9 +1,12 @@
 pub mod drawable;
 pub mod helpers;
 
-use std::io::{stdout, Write};
+use std::{
+    io::{self, stdout, Write},
+    panic, thread,
+};
 
-use crossterm::{event::Event, style::ContentStyle, QueueableCommand, Result as CRResult};
+use crossterm::{event::Event, execute, style::ContentStyle, QueueableCommand};
 use unicode_width::UnicodeWidthChar;
 
 use self::{drawable::Drawable, helpers::term_size};
@@ -18,7 +21,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new() -> CRResult<Self> {
+    pub fn new() -> io::Result<Self> {
         let size = term_size();
         let hidden = Frame::new(size);
         let shown = Frame::new(size);
@@ -35,7 +38,9 @@ impl Renderer {
         Ok(ren)
     }
 
-    fn turn_on(&mut self) -> CRResult<()> {
+    fn turn_on(&mut self) -> io::Result<()> {
+        self.register_panic_hook();
+
         crossterm::terminal::enable_raw_mode()?;
         crossterm::execute!(
             stdout(),
@@ -48,7 +53,9 @@ impl Renderer {
         Ok(())
     }
 
-    fn turn_off(&mut self) -> CRResult<()> {
+    fn turn_off(&mut self) -> io::Result<()> {
+        self.unregiser_panic_hook();
+
         crossterm::execute!(
             stdout(),
             crossterm::cursor::Show,
@@ -58,7 +65,31 @@ impl Renderer {
         Ok(())
     }
 
-    fn on_resize(&mut self, size: Option<Pos>) -> CRResult<()> {
+    fn register_panic_hook(&self) {
+        let prev = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            let mut stdout = stdout();
+
+            execute!(
+                stdout,
+                crossterm::terminal::LeaveAlternateScreen,
+                crossterm::cursor::Show
+            )
+            .unwrap();
+
+            crossterm::terminal::disable_raw_mode().unwrap();
+
+            prev(info)
+        }));
+    }
+
+    fn unregiser_panic_hook(&self) {
+        if !thread::panicking() {
+            let _ = panic::take_hook();
+        }
+    }
+
+    fn on_resize(&mut self, size: Option<Pos>) -> io::Result<()> {
         self.size = size.unwrap_or_else(|| crossterm::terminal::size().unwrap());
         self.shown.resize(self.size);
         self.hidden.resize(self.size);
@@ -67,7 +98,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn on_event(&mut self, event: &Event) -> CRResult<()> {
+    pub fn on_event(&mut self, event: &Event) -> io::Result<()> {
         if let Event::Resize(x, y) = event {
             self.on_resize(Some((*x, *y)))?
         }
@@ -79,7 +110,7 @@ impl Renderer {
         &mut self.hidden
     }
 
-    pub fn render(&mut self) -> CRResult<()> {
+    pub fn render(&mut self) -> io::Result<()> {
         let mut tty = stdout();
 
         let mut style = ContentStyle::default();

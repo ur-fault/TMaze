@@ -1,13 +1,12 @@
+use std::io;
+
 use crossterm::style::ContentStyle;
 use tmaze::{
     renderer::Renderer,
-    ui::{
-        popup::{self},
-        CrosstermError,
-    },
+    ui::popup::{self},
 };
 
-fn main() -> Result<(), CrosstermError> {
+fn main() -> io::Result<()> {
     let mut renderer = Renderer::new()?;
 
     // renderer.term_on(&mut stdout())?;

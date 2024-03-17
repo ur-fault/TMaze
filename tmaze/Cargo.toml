@@ -1,17 +1,20 @@
 [package]
 name = "tmaze"
-version = "1.12.3"
+version = "1.14.2"
 edition = "2021"
 authors = ["ur-fault"]
 description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
 license-file = "../LICENSE"
 readme = "../README.md"
 repository = "https://github.com/ur-fault/tmaze"
+exclude = [
+    "assets/raw",
+]
 
 [dependencies]
 cmaze = { path = "../cmaze", version = "0.6.1" }
 colored = "^2"
-crossterm = { version = "^0.26.0", features = ["serde"] }
+crossterm = { version = "^0.27.0", features = ["serde"] }
 substring = "^1.4.5"
 serde = { version = "^1.0.136", features = ["derive"] }
 pausable_clock = "^1.0.1"
@@ -23,10 +26,28 @@ rand = "^0.8.1"
 derivative = "2.2.0"
 unicode-width = "0.1.10"
 tap = "1.0.1"
+thiserror = "1.0.48"
+humantime = "2.1.0"
+chrono = { version = "0.4.30", features = ["serde"] }
+
+# optional 
+crates_io_api = { version = "0.8.1", optional = true }
+semver = { version = "1.0.17", optional = true }
+tokio = { version = "1.27.0", optional = true }
+rodio = { version = "0.17.3", optional = true, default-features = false, features = ["wav", "mp3"] }
+
+[build-dependencies]
+flacenc = "0.3.1"
+wav = "1.0.0"
+walkdir = "2.4.0"
+dunce = "1.0.4"
+mp3lame-encoder = "0.1.4"
 
 [features]
-default = ["hashbrown"]
+default = ["hashbrown", "updates", "sound"]
 hashbrown = ["cmaze/hashbrown"]
+updates = ["dep:crates_io_api", "dep:semver", "dep:tokio"]
+sound = ["dep:rodio"]
 
 [[bench]]
 name = "extism_bench"
@@ -37,4 +58,3 @@ harness = false
 extism = "1.2.0"
 extism-manifest = "1.2.0"
 criterion = "0.3"
-
