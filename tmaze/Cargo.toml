@@ -33,7 +33,7 @@ chrono = { version = "0.4.30", features = ["serde"] }
 # optional 
 crates_io_api = { version = "0.8.1", optional = true }
 semver = { version = "1.0.17", optional = true }
-tokio = { version = "1.27.0", optional = true }
+tokio = { version = "1.27.0", optional = true, features = ["rt", "rt-multi-thread"] }
 rodio = { version = "0.17.3", optional = true, default-features = false, features = ["wav", "mp3"] }
 
 [build-dependencies]
@@ -49,3 +49,12 @@ hashbrown = ["cmaze/hashbrown"]
 updates = ["dep:crates_io_api", "dep:semver", "dep:tokio"]
 sound = ["dep:rodio"]
 
+[[bench]]
+name = "extism_bench"
+path = "benches/extism/benchmark.rs"
+harness = false
+
+[dev-dependencies]
+extism = "1.2.0"
+extism-manifest = "1.2.0"
+criterion = "0.3"
