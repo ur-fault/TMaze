@@ -49,12 +49,3 @@ hashbrown = ["cmaze/hashbrown"]
 updates = ["dep:crates_io_api", "dep:semver", "dep:tokio"]
 sound = ["dep:rodio"]
 
-[[bench]]
-name = "extism_bench"
-path = "benches/extism/benchmark.rs"
-harness = false
-
-[dev-dependencies]
-extism = "1.2.0"
-extism-manifest = "1.2.0"
-criterion = "0.3"
