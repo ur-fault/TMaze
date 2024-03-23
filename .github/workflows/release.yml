@@ -309,10 +309,8 @@ jobs:
     - name: Install packages (Ubuntu)
       shell: bash
       run: |
-        shell: bash
-        run: |
-          sudo apt update
-          sudo apt install libasound2-dev libssl-dev
+        sudo apt update
+        sudo apt install libasound2-dev libssl-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
