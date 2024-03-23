@@ -251,7 +251,7 @@ jobs:
     - name: Build release binary
       shell: bash
       run: |
-        cargo deb -p tmaze --profile deb --target ${{ env.TARGET }}
+        cargo deb -p tmaze --profile release --target ${{ env.TARGET }}
         version="${{ needs.create-release.outputs.version }}"
         echo "DEB_DIR=target/${{ env.TARGET }}/debian" >> $GITHUB_ENV
         echo "DEB_NAME=tmaze_$version-1_amd64.deb" >> $GITHUB_ENV
