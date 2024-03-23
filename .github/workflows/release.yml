@@ -196,95 +196,12 @@ jobs:
     - name: Rename binary according to target
       shell: bash
       run: |
-        # if [ "${{ matrix.os }}" = "windows-latest" ]; then
-        # #   cp "$BIN" "target/release/tmaze_${{ matrix.name }}.exe"
-        #   echo 
-        # else
-        #   cp "$BIN" "target/release/tmaze_${{ matrix.name }}"
-        # fi 
-        if [ "${{ matrix.os}}" == "windows-latest"]; then
+        if [ "${{ matrix.os}}" = "windows-latest" ]; then
           cp "$BIN" "${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}.exe"
         else
           cp "$BIN" "${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}"
         fi
         echo "NEW_BIN=${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}" >> $GITHUB_ENV
-
-    # - name: Determine archive name
-    #   shell: bash
-    #   run: |
-    #     version="${{ needs.create-release.outputs.version }}"
-    #     echo "ARCHIVE=ripgrep-$version-${{ matrix.target }}" >> $GITHUB_ENV
-
-    # - name: Creating directory for archive
-    #   shell: bash
-    #   run: |
-    #     mkdir -p "$ARCHIVE"/{complete,doc}
-    #     cp "$BIN" "$ARCHIVE"/
-    #     cp {README.md,COPYING,UNLICENSE,LICENSE-MIT} "$ARCHIVE"/
-    #     cp {CHANGELOG.md,FAQ.md,GUIDE.md} "$ARCHIVE"/doc/
-
-    # - name: Generate man page and completions (no emulation)
-    #   if: matrix.qemu == ''
-    #   shell: bash
-    #   run: |
-    #     "$BIN" --version
-    #     "$BIN" --generate complete-bash > "$ARCHIVE/complete/rg.bash"
-    #     "$BIN" --generate complete-fish > "$ARCHIVE/complete/rg.fish"
-    #     "$BIN" --generate complete-powershell > "$ARCHIVE/complete/_rg.ps1"
-    #     "$BIN" --generate complete-zsh > "$ARCHIVE/complete/_rg"
-    #     "$BIN" --generate man > "$ARCHIVE/doc/rg.1"
-
-    # - name: Generate man page and completions (emulation)
-    #   if: matrix.qemu != ''
-    #   shell: bash
-    #   run: |
-    #     docker run --rm -v \
-    #       "$PWD/target:/target:Z" \
-    #       "ghcr.io/cross-rs/${{ matrix.target }}:main" \
-    #       "${{ matrix.qemu }}" "/$BIN" --version
-    #     docker run --rm -v \
-    #       "$PWD/target:/target:Z" \
-    #       "ghcr.io/cross-rs/${{ matrix.target }}:main" \
-    #       "${{ matrix.qemu }}" "/$BIN" \
-    #         --generate complete-bash > "$ARCHIVE/complete/rg.bash"
-    #     docker run --rm -v \
-    #       "$PWD/target:/target:Z" \
-    #       "ghcr.io/cross-rs/${{ matrix.target }}:main" \
-    #       "${{ matrix.qemu }}" "/$BIN" \
-    #         --generate complete-fish > "$ARCHIVE/complete/rg.fish"
-    #     docker run --rm -v \
-    #       "$PWD/target:/target:Z" \
-    #       "ghcr.io/cross-rs/${{ matrix.target }}:main" \
-    #       "${{ matrix.qemu }}" "/$BIN" \
-    #         --generate complete-powershell > "$ARCHIVE/complete/_rg.ps1"
-    #     docker run --rm -v \
-    #       "$PWD/target:/target:Z" \
-    #       "ghcr.io/cross-rs/${{ matrix.target }}:main" \
-    #       "${{ matrix.qemu }}" "/$BIN" \
-    #         --generate complete-zsh > "$ARCHIVE/complete/_rg"
-    #     docker run --rm -v \
-    #       "$PWD/target:/target:Z" \
-    #       "ghcr.io/cross-rs/${{ matrix.target }}:main" \
-    #       "${{ matrix.qemu }}" "/$BIN" \
-    #         --generate man > "$ARCHIVE/doc/rg.1"
-
-    # - name: Build archive (Windows)
-    #   shell: bash
-    #   if: matrix.os == 'windows-latest'
-    #   run: |
-    #     7z a "$ARCHIVE.zip" "$ARCHIVE"
-    #     certutil -hashfile "$ARCHIVE.zip" SHA256 > "$ARCHIVE.zip.sha256"
-    #     echo "ASSET=$ARCHIVE.zip" >> $GITHUB_ENV
-    #     echo "ASSET_SUM=$ARCHIVE.zip.sha256" >> $GITHUB_ENV
-
-    # - name: Build archive (Unix)
-    #   shell: bash
-    #   if: matrix.os != 'windows-latest'
-    #   run: |
-    #     tar czf "$ARCHIVE.tar.gz" "$ARCHIVE"
-    #     shasum -a 256 "$ARCHIVE.tar.gz" > "$ARCHIVE.tar.gz.sha256"
-    #     echo "ASSET=$ARCHIVE.tar.gz" >> $GITHUB_ENV
-    #     echo "ASSET_SUM=$ARCHIVE.tar.gz.sha256" >> $GITHUB_ENV
 
     - name: Upload release archive
       env:
@@ -324,36 +241,12 @@ jobs:
       run: |
         cargo install cargo-deb
 
-    # # 'cargo deb' does not seem to provide a way to specify an asset that is
-    # # created at build time, such as ripgrep's man page. To work around this,
-    # # we force a debug build, copy out the man page (and shell completions)
-    # # produced from that build, put it into a predictable location and then
-    # # build the deb, which knows where to look.
-    # - name: Build debug binary to create release assets
-    #   shell: bash
-    #   run: |
-    #     cargo build --target ${{ env.TARGET }}
-    #     bin="target/${{ env.TARGET }}/debug/rg"
-    #     echo "BIN=$bin" >> $GITHUB_ENV
-
     - name: Create deployment directory
       shell: bash
       run: |
         dir=deployment/deb
         mkdir -p "$dir"
         echo "DEPLOY_DIR=$dir" >> $GITHUB_ENV
-
-    # - name: Generate man page
-    #   shell: bash
-    #   run: |
-    #     "$BIN" --generate man > "$DEPLOY_DIR/rg.1"
-
-    # - name: Generate shell completions
-    #   shell: bash
-    #   run: |
-    #     "$BIN" --generate complete-bash > "$DEPLOY_DIR/rg.bash"
-    #     "$BIN" --generate complete-fish > "$DEPLOY_DIR/rg.fish"
-    #     "$BIN" --generate complete-zsh > "$DEPLOY_DIR/_rg"
 
     - name: Build release binary
       shell: bash
@@ -362,14 +255,6 @@ jobs:
         version="${{ needs.create-release.outputs.version }}"
         echo "DEB_DIR=target/${{ env.TARGET }}/debian" >> $GITHUB_ENV
         echo "DEB_NAME=tmaze_$version-1_amd64.deb" >> $GITHUB_ENV
-
-    # - name: Create sha256 sum of deb file
-    #   shell: bash
-    #   run: |
-    #     cd "$DEB_DIR"
-    #     sum="$DEB_NAME.sha256"
-    #     shasum -a 256 "$DEB_NAME" > "$sum"
-    #     echo "SUM=$sum" >> $GITHUB_ENV
 
     - name: Upload release archive
       env:
