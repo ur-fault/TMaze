@@ -197,11 +197,11 @@ jobs:
       shell: bash
       run: |
         if [ "${{ matrix.os}}" = "windows-latest" ]; then
-          cp "$BIN" "${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}.exe"
+          echo "NEW_BIN=${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}.exe" >> $GITHUB_ENV
         else
-          cp "$BIN" "${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}"
+          echo "NEW_BIN=${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}_"${{ needs.create-release.outputs.version }}"" >> $GITHUB_ENV
         fi
-        echo "NEW_BIN=${{ env.TARGET_DIR}}/tmaze_${{ matrix.name }}" >> $GITHUB_ENV
+        cp "$BIN" "${{ env.NEW_BIN }}
 
     - name: Upload release archive
       env:
@@ -251,7 +251,7 @@ jobs:
     - name: Build release binary
       shell: bash
       run: |
-        cargo deb --profile deb --target ${{ env.TARGET }}
+        cargo deb -p tmaze --profile deb --target ${{ env.TARGET }}
         version="${{ needs.create-release.outputs.version }}"
         echo "DEB_DIR=target/${{ env.TARGET }}/debian" >> $GITHUB_ENV
         echo "DEB_NAME=tmaze_$version-1_amd64.deb" >> $GITHUB_ENV
