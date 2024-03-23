@@ -33,13 +33,25 @@ jobs:
     name: create-release
     runs-on: ubuntu-latest
     steps:
+      - name: Inputs from workflow dispatch
+        shell: bash
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          echo "DRY_RUN=${{ github.event.inputs.dry-run }}" >> $GITHUB_ENV
+          echo "VERSION: ${{ github.event.inputs.version }}"
+          echo "DRY_RUN: ${{ github.event.inputs.dry-run }}"
+
       - uses: actions/checkout@v4
+
       - name: Get the release version from the tag
         if: env.VERSION == ''
         run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+
       - name: Show the version
         run: |
           echo "version is: $VERSION"
+
       - name: Check that tag version and Cargo.toml version are the same
         shell: bash
         run: |
@@ -47,6 +59,7 @@ jobs:
             echo "version does not match Cargo.toml" >&2
             exit 1
           fi
+
       - name: Create GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
