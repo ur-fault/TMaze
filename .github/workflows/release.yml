@@ -202,7 +202,7 @@ jobs:
           NEW_BIN="${{ env.TARGET_DIR }}/tmaze_${{ matrix.name }}_${{ needs.create-release.outputs.version }}"
         fi
         echo "NEW_BIN=$NEW_BIN" >> $GITHUB_ENV
-        cp "$BIN" "${{ env.NEW_BIN }}"
+        cp "$BIN" "$NEW_BIN"
 
     - name: Upload release archive
       env:
@@ -229,7 +229,7 @@ jobs:
       shell: bash
       run: |
         sudo apt update
-        sudo apt install libasound2-dev libssl-dev
+        sudo apt install libasound2-dev libssl-dev musl-tools
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
