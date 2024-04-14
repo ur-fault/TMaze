@@ -1,14 +1,4 @@
-mod constants;
-mod data;
-mod game;
-mod helpers;
-mod renderer;
-mod settings;
-#[cfg(feature = "sound")]
-mod sound;
-mod ui;
-#[cfg(feature = "updates")]
-mod updates;
+use tmaze::*;
 
 use clap::Parser;
 use cmaze::{core, gameboard};
