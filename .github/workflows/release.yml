@@ -59,7 +59,7 @@ jobs:
           fi
 
       - name: Create GitHub release
-        if: ${{ env.DRY_RUN == 'no' }}
+        if: ${{ env.DRY_RUN == 'no' && github.event_name == "workflow_dispatch" }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create $VERSION --draft --verify-tag --title $VERSION
