@@ -131,7 +131,6 @@ jobs:
       shell: bash
       run: |
         sudo apt update
-        sudo apt install libasound2-dev libssl-dev musl-tools
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
@@ -230,7 +229,6 @@ jobs:
       shell: bash
       run: |
         sudo apt update
-        sudo apt install libasound2-dev libssl-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
