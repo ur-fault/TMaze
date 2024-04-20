@@ -87,7 +87,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build: [linux, macos, macos-arm, win-msvc, win32-msvc]
+        build: [linux, linux-arm, macos, macos-arm, win-msvc, win32-msvc]
         include:
         - build: linux
           os: ubuntu-latest
@@ -205,6 +205,7 @@ jobs:
         cp "$BIN" "$NEW_BIN"
 
     - name: Upload release archive
+      if: ${{ env.DRY_RUN == 'no' && github.event_name == 'workflow_dispatch' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
