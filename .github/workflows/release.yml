@@ -37,6 +37,7 @@ jobs:
         run: |
           echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
           echo "DRY_RUN=${{ github.event.inputs.dry-run }}" >> $GITHUB_ENV
+          echo "DO_SMT=${{ github.event.inputs.dry-run != 'yes' }}" >> $GITHUB_ENV
           echo "VERSION: ${{ github.event.inputs.version }}"
           echo "DRY_RUN: ${{ github.event.inputs.dry-run }}"
 
@@ -59,12 +60,13 @@ jobs:
           fi
 
       - name: Create GitHub release
-        if: ${{ env.DRY_RUN == 'no' && github.event_name == 'workflow_dispatch' }}
+        if: ${{ env.DO_SMT }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create $VERSION --draft --verify-tag --title $VERSION
     outputs:
       version: ${{ env.VERSION }}
+      do_smt: ${{ env.DO_SMT }}
 
   build-release:
     name: build-release
@@ -204,7 +206,7 @@ jobs:
         cp "$BIN" "$NEW_BIN"
 
     - name: Upload release archive
-      if: ${{ env.DRY_RUN == 'no' && github.event_name == 'workflow_dispatch' }}
+      if: ${{ needs.create-release.outputs.do_smt }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -257,7 +259,7 @@ jobs:
         echo "DEB_NAME=tmaze_$version-1_amd64.deb" >> $GITHUB_ENV
 
     - name: Upload release archive
-      if: ${{ env.DRY_RUN == 'no' && github.event_name == 'workflow_dispatch' }}
+      if: ${{ needs.create-release.outputs.do_smt }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
