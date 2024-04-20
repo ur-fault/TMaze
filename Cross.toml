@@ -3,9 +3,8 @@ pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
     """apt-get update && \
         apt-get install --assume-yes \
-        pkg-config:$CROSS_DEB_ARCH \
+        pkg-config \
         libasound2-dev:$CROSS_DEB_ARCH \
-        build-essential:$CROSS_DEB_ARCH \
     """,
 ]
 
@@ -13,7 +12,7 @@ pre-build = [
 pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
     """apt-get update && apt-get install --assume-yes \
-        pkg-config:$CROSS_DEB_ARCH \
+        pkg-config \
         libasound2-dev:$CROSS_DEB_ARCH \
     """
 ]
