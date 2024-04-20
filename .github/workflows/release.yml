@@ -218,7 +218,7 @@ jobs:
     needs: ['create-release']
     runs-on: ubuntu-latest
     env:
-      TARGET: x86_64-unknown-linux-musl
+      TARGET: x86_64-unknown-linux-gnu
       # Emit backtraces on panics.
       RUST_BACKTRACE: 1
 
@@ -230,7 +230,7 @@ jobs:
       shell: bash
       run: |
         sudo apt update
-        sudo apt install libasound2-dev libssl-dev musl-tools
+        sudo apt install libasound2-dev libssl-dev
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
