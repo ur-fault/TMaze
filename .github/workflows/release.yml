@@ -265,7 +265,7 @@ jobs:
         version="${{ needs.create-release.outputs.version }}"
         DEB_NAME="tmaze_${{ env.TARGET_NAME }}_$version".deb
         echo "DEB_NAME=$DEB_NAME" >> $GITHUB_ENV
-        mv $DEB_BUILD_DIR/$DEB_BUILD_NAME $DEB_NAME
+        mv $DEB_DIR/$DEB_BUILD_NAME $DEB_NAME
 
     - name: Upload release archive
       if: ${{ needs.create-release.outputs.do_smt }}
