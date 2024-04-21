@@ -279,7 +279,7 @@ jobs:
           with:
               toolchain: stable
 
-        - run: sudo apt install libasound2-dev
+        - run: sudo apt update && sudo apt install libasound2-dev
 
         - name: publish cmaze
           uses: katyo/publish-crates@v2
