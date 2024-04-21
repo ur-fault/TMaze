@@ -133,6 +133,7 @@ jobs:
       with:
         path: target
         key: bin-${{ matrix.target }}--cargo-${{ hashFiles('**/Cargo.lock') }}
+        save-always: true
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
@@ -206,7 +207,7 @@ jobs:
         cp "$BIN" "$NEW_BIN"
 
     - name: Upload release archive
-      if: ${{ needs.create-release.outputs.do_smt }}
+      if: ${{ needs.create-release.outputs.do_smt == true }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -233,6 +234,7 @@ jobs:
       with:
         path: target
         key: deb-${{ runner.os }}--cargo-${{ hashFiles('**/Cargo.lock') }}
+        save-always: true
 
     - name: Install packages (Ubuntu)
       shell: bash
@@ -274,7 +276,7 @@ jobs:
         mv $DEB_DIR/$DEB_BUILD_NAME $DEB_NAME
 
     - name: Upload release archive
-      if: ${{ needs.create-release.outputs.do_smt }}
+      if: ${{ needs.create-release.outputs.do_smt == true }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -284,6 +286,7 @@ jobs:
 
   publish-on-crates-io:
     runs-on: ubuntu-latest
+    needs: ['create-release']
     steps:
         - uses: actions/checkout@v4
 
@@ -292,6 +295,7 @@ jobs:
           with:
             path: target
             key: cratesio-${{ runner.os }}--cargo-${{ hashFiles('**/Cargo.lock') }}
+            save-always: true
 
         - name: Install 
           uses: actions-rs/toolchain@v1
@@ -301,6 +305,7 @@ jobs:
         - run: sudo apt update && sudo apt install libasound2-dev
 
         - name: publish cmaze
+          if: ${{ needs.create-release.outputs.do_smt == true }}
           uses: katyo/publish-crates@v2
           with:
               path: ./cmaze
@@ -308,6 +313,7 @@ jobs:
               ignore-unpublished-changes: true
 
         - name: publish tmaze
+          if: ${{ needs.create-release.outputs.do_smt == true }}
           uses: katyo/publish-crates@v2
           with:
               path: ./tmaze
