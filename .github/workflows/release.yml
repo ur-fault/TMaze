@@ -220,6 +220,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARGET: x86_64-unknown-linux-gnu
+      TARGET_NAME: x64_64
       # Emit backtraces on panics.
       RUST_BACKTRACE: 1
 
@@ -256,7 +257,7 @@ jobs:
         cargo deb -p tmaze --profile release --target ${{ env.TARGET }}
         version="${{ needs.create-release.outputs.version }}"
         echo "DEB_DIR=target/${{ env.TARGET }}/debian" >> $GITHUB_ENV
-        echo "DEB_NAME=tmaze_$version-1_amd64.deb" >> $GITHUB_ENV
+        echo "DEB_NAME=tmaze_${{ env.TARGET_NAME }}_$version.deb" >> $GITHUB_ENV
 
     - name: Upload release archive
       if: ${{ needs.create-release.outputs.do_smt }}
@@ -266,4 +267,30 @@ jobs:
       run: |
         cd "$DEB_DIR"
         version="${{ needs.create-release.outputs.version }}"
-        gh release upload "$version" "$DEB_NAME" "$SUM"
+        gh release upload "$version" "$DEB_NAME"
+
+  publish-on-crates-io:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v4
+
+        - name: Install 
+          uses: actions-rs/toolchain@v1
+          with:
+              toolchain: stable
+
+        - run: sudo apt install libasound2-dev
+
+        - name: publish cmaze
+          uses: katyo/publish-crates@v2
+          with:
+              path: ./cmaze
+              registry-token: ${{ secrets.CRATES_IO }}
+              ignore-unpublished-changes: true
+
+        - name: publish tmaze
+          uses: katyo/publish-crates@v2
+          with:
+              path: ./tmaze
+              registry-token: ${{ secrets.CRATES_IO }}
+              ignore-unpublished-changes: true
