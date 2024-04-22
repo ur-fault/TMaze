@@ -1,7 +1,6 @@
 use tmaze::*;
 
 use clap::Parser;
-use cmaze::{core, gameboard};
 use game::{App, GameError};
 
 #[derive(Parser, Debug)]
