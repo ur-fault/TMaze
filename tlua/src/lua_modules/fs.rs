@@ -64,7 +64,7 @@ impl File {
         let mut buf = Vec::new();
         loop {
             let res = self.inner.read_u8().await;
-            let byte = check_eof!(res, res, Some(res), None);
+            let byte = check_eof!(res, res => Some(res), eof None);
 
             match byte {
                 Some(b'\n') => {

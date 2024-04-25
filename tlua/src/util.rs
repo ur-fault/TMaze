@@ -44,59 +44,77 @@ pub mod streams {
     //! But we can encode the type `T` in the return type, so that the caller
     //! can use it to parse the type `T` if needed. Pretty neat, huh?
 
-    use std::{fmt::Debug, future::Future, marker::PhantomData, str::FromStr};
-
-    use tokio::io::{self, AsyncRead, AsyncReadExt};
+    use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 
     use crate::check_eof;
-
-    pub(crate) async fn parsed<R, P, F>(
-        func: fn(&mut Vec<u8>, R) -> F,
-        reader: R,
-    ) -> io::Result<Option<P>>
-    where
-        F: Future<Output = io::Result<Option<PhantomData<P>>>>,
-        P: FromStr,
-        <P as FromStr>::Err: Debug,
-    {
-        let mut buf = Vec::new();
-        let res = func(&mut buf, reader).await;
-
-        // should be safe to unwrap here,
-        // provided the function `func` is implemented correctly.
-        // That's why it's pub(crate).
-        let string = String::from_utf8(buf).unwrap();
-
-        match res {
-            // also should be safe to expect correct format
-            Ok(Some(_)) => Ok(Some(string.parse().unwrap())),
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
-        }
-    }
 
     // advance past float
     // look for [+-]{0,1}[0-9]+ // int
     // then optional .[0-9]+
-    // then optional e[+-]{0,1}[0-9]+
-    pub async fn read_float(
+    // then optional e[+-]{0,1}[0-9]+ // `e` followed by int
+    pub async fn read_dec_float(
         buf: &mut Vec<u8>,
-        reader: impl AsyncRead + Unpin,
-    ) -> io::Result<Option<PhantomData<f64>>> {
-        // let next = reader.read_u8().await?;
+        mut reader: impl AsyncRead + Unpin + AsyncSeek,
+    ) -> io::Result<Option<()>> {
+        if let None = read_dec_int(buf, &mut reader).await? {
+            return Ok(None);
+        }
+        correct_buf(buf, &mut reader).await?;
 
-        todo!()
+        // .
+        // return `Some` on eof, since it's not mandatory
+        let dot = check_eof!(reader.read_u8().await, eof return Ok(Some(())));
+        if dot == b'.' {
+            buf.push(dot);
+
+            // [0-9]+
+            if let None = read_dec_int(buf, &mut reader).await? {
+                println!("no number after dot");
+                return Ok(None);
+            }
+        }
+
+        correct_buf(buf, &mut reader).await?;
+
+        // e
+        // return `Some` on eof, since it's not mandatory
+        let e = check_eof!(reader.read_u8().await, eof return Ok(Some(())));
+        if e != b'e' {
+            println!("no `e`, got {:?}", e as char);
+            return Ok(Some(()));
+        }
+        buf.push(e);
+
+        // [+-]?
+        let plus_minus = check_eof!(reader.read_u8().await);
+        let was_number = if plus_minus == b'+' || plus_minus == b'-' || plus_minus.is_ascii_digit()
+        {
+            buf.push(plus_minus);
+            plus_minus.is_ascii_digit()
+        } else {
+            // read `e` but no number after it
+            return Ok(None);
+        };
+
+        // [0-9]+
+        if !was_number {
+            if let None = read_dec_int(buf, &mut reader).await? {
+                return Ok(None);
+            }
+        } else {
+            // ignore if there was not a number after previous number
+            read_dec_int(buf, &mut reader).await?;
+        }
+
+        Ok(Some(()))
     }
 
     // advance past int
     // look for [+-]{0,1}[0-9]+
-    pub async fn read_dec_int<R>(
+    pub async fn read_dec_int(
         buf: &mut Vec<u8>,
-        mut reader: R,
-    ) -> io::Result<Option<PhantomData<i64>>>
-    where
-        R: AsyncRead + Unpin,
-    {
+        mut reader: impl AsyncRead + Unpin,
+    ) -> io::Result<Option<()>> {
         let next = check_eof!(reader.read_u8().await);
 
         // [+-]?
@@ -118,17 +136,24 @@ pub mod streams {
             buf.push(next);
             next = check_eof!(
                 reader.read_u8().await,
-                res,
-                res,
-                return if buf.len() > 0 {
-                    Ok(Some(PhantomData))
+                res => res,
+                eof return if buf.len() > 0 {
+                    Ok(Some(()))
                 } else {
                     Ok(None)
                 }
             );
         }
 
-        Ok(Some(PhantomData))
+        Ok(Some(()))
+    }
+
+    async fn correct_buf(buf: &mut Vec<u8>, mut reader: impl AsyncSeek + Unpin) -> io::Result<()> {
+        // read_dec_int (and potentionally others) leaves the reader at the next char,
+        // even if it's not parsed correctly, so we seek to the position in the buffer
+        // we read so far, so we have consistent behavior
+        reader.seek(io::SeekFrom::Start(buf.len() as u64)).await?;
+        Ok(())
     }
 
     #[cfg(test)]
@@ -140,6 +165,7 @@ pub mod streams {
         #[tokio::test]
         async fn test_read_dec_int() {
             async fn test(input: &str, expected: Option<i64>) {
+                println!("Testing input: {} for {:?}", input, expected);
                 let mut reader = Cursor::new(input);
                 let mut buf = Vec::new();
                 let result = read_dec_int(&mut buf, &mut reader).await.unwrap();
@@ -158,26 +184,66 @@ pub mod streams {
             test("a123", None).await;
             test("", None).await;
         }
+
+        #[tokio::test]
+        async fn test_read_dec_float() {
+            async fn test(input: &str, expected: Option<f64>) {
+                println!("Testing input: {} for {:?}", input, expected);
+                let mut reader = Cursor::new(input);
+                let mut buf = Vec::new();
+                let result = read_dec_float(&mut buf, &mut reader).await.unwrap();
+                if result.is_none() {
+                    println!("Resulted string: `None`");
+                    assert_eq!(None, expected);
+                } else {
+                    let string = String::from_utf8(buf).unwrap();
+                    println!("Resulted string: {}", string);
+                    assert_eq!(
+                        result.map(|_| string
+                            .parse()
+                            .expect("read function returned invalid buffer")),
+                        expected
+                    );
+                }
+            }
+
+            test("123", Some(123.0)).await;
+            test("+123", Some(123.0)).await;
+            test("-123", Some(-123.0)).await;
+            test("123.5", Some(123.5)).await;
+            test("123.e", None).await;
+            test("123.0e+1", Some(1230.0)).await;
+            test("123.0e-1", Some(12.3)).await;
+            test("123.0e1", Some(1230.0)).await;
+            test("123.0e", None).await;
+            test("123.0e+", None).await;
+            test("123.0e-", None).await;
+            test("123.0e+abs", None).await;
+            test("123.0e-abs", None).await;
+            test("123.0eabs", None).await;
+            test("123.0e+2", Some(12300.0)).await;
+            test("abc", None).await;
+            test("123.0e+1e", Some(1230.0)).await;
+            test("123.0e-1e", Some(12.3)).await;
+        }
     }
 }
 
 pub mod macros {
     #[macro_export]
     macro_rules! check_eof {
-        ($res:expr, $ok_from:ident, $ok_to:expr, $eof:expr) => {{
+        ($res:expr, $ok_from:ident => $ok_to:expr, eof $eof:expr) => {{
             match $res {
                 Ok($ok_from) => $ok_to,
-                Err(err) => {
-                    if matches!(err.kind(), std::io::ErrorKind::UnexpectedEof) {
-                        $eof
-                    } else {
-                        return Err(err.into());
-                    }
-                }
+                Err(err) if matches!(err.kind(), std::io::ErrorKind::UnexpectedEof) => $eof,
+                Err(err) => return Err(err.into()),
             }
         }};
         ($res:expr) => {
-            check_eof!($res, res, res, return Ok(None))
+            check_eof!($res, res => res, eof return Ok(None))
+        };
+        ($res:expr, eof $eof:expr) => {
+            check_eof!($res, res => res, eof $eof)
         };
     }
 }
