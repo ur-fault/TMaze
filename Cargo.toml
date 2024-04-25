@@ -1,4 +1,4 @@
 [workspace]
-members = ["tmaze", "cmaze", "compress"]
+members = ["tmaze", "cmaze", "compress", "tlua"]
 default-members = ["tmaze", "cmaze"]
 resolver = "2"
