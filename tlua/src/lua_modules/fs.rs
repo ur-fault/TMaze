@@ -30,6 +30,19 @@ impl LuaFile {
         todo!()
     }
 
+    pub async fn read_by_format(
+        &mut self,
+        format: FileReadFormat,
+    ) -> LuaResult<Option<FileReadResult>> {
+        let res = match format {
+            FileReadFormat::Line => self.read_line().await?.map(FileReadResult::Text),
+            FileReadFormat::Number => self.read_number().await?.map(FileReadResult::Number),
+            _ => todo!(),
+        };
+
+        Ok(res)
+    }
+
     async fn read_number(&mut self) -> LuaResult<Option<f64>> {
         let mut buf = Vec::new();
         let res = util::streams::read_dec_float(&mut buf, &mut self.file).await;
@@ -86,23 +99,23 @@ impl LuaModule for FsModule {
 }
 
 enum FileReadFormat {
-    Count,
+    Number,
     Line,
     All,
-    Number(usize),
+    Count(usize),
 }
 
 impl FromLua<'_> for FileReadFormat {
     fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
         match value {
             // s is a LuaString, potentionally not u UTF8 string
-            LuaValue::String(s) => match s.to_str()? {
-                "*n" => Ok(Self::Count),
-                "*l" => Ok(Self::Line),
-                "*a" => Ok(Self::All),
+            LuaValue::String(s) => match s.as_bytes() {
+                b"*n" => Ok(Self::Number),
+                b"*l" => Ok(Self::Line),
+                b"*a" => Ok(Self::All),
                 _ => Err(mlua::Error::external("invalid format")),
             },
-            LuaValue::Integer(n) => Ok(Self::Number(n as usize)),
+            LuaValue::Integer(n) => Ok(Self::Count(n as usize)),
             _ => Err(mlua::Error::external("invalid format")),
         }
     }
@@ -111,51 +124,43 @@ impl FromLua<'_> for FileReadFormat {
 enum FileReadResult {
     Text(Vec<u8>),
     Number(f64),
-    Nil,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        runtime::Runtime,
-        util::{self, block_on},
-    };
+    use crate::runtime::Runtime;
 
-    #[test]
     #[ignore = "global io file functions are deprecated, alas removed"]
-    fn test_fs_module() {
-        util::block_on(async {
-            let rt = Runtime::new("tlua");
-            rt.load_rs_module(FsModule).unwrap();
+    #[tokio::test]
+    async fn test_fs_module() {
+        let rt = Runtime::new("tlua");
+        rt.load_rs_module(FsModule).unwrap();
 
-            let code = "return coroutine.create(tlua.fs.read_to_string)";
-            let func = rt.load(code).unwrap();
-            let thread: LuaThread = func.call(()).expect("failed to call function");
-            let result: String = thread
-                .into_async("Cargo.toml")
-                .await
-                .expect("failed to block on coroutine");
-            assert!(result.contains("[package]"));
-        });
+        let code = "return coroutine.create(tlua.fs.read_to_string)";
+        let func = rt.load(code).unwrap();
+        let thread: LuaThread = func.call(()).expect("failed to call function");
+        let result: String = thread
+            .into_async("Cargo.toml")
+            .await
+            .expect("failed to block on coroutine");
+        assert!(result.contains("[package]"));
     }
 
-    #[test]
-    fn test_file_userdata() {
-        util::block_on(async {
-            let rt = Runtime::new("tlua");
-            rt.load_rs_module(FsModule).unwrap();
+    #[tokio::test]
+    async fn test_file_userdata() {
+        let rt = Runtime::new("tlua");
+        rt.load_rs_module(FsModule).unwrap();
 
-            let code = r#"
+        let code = r#"
 return coroutine.create(function()
     local handle = tlua.fs.open('Cargo.toml')
     return handle:read()
 end)"#;
-            let thread: LuaAsyncThread<String> = rt.eval::<LuaThread>(code).unwrap().into_async(());
-            let content = thread.await;
-            dbg!(&content);
-            assert!(content.is_ok());
-            assert!(content.unwrap().contains("[package]"));
-        });
+        let thread: LuaAsyncThread<String> = rt.eval::<LuaThread>(code).unwrap().into_async(());
+        let content = thread.await;
+        dbg!(&content);
+        assert!(content.is_ok());
+        assert!(content.unwrap().contains("[package]"));
     }
 }
