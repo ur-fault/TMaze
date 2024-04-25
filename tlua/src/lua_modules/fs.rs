@@ -1,60 +1,37 @@
-use std::{collections::HashMap, hash::Hash};
-
+use bstr::BString;
 use mlua::{prelude::*, Variadic};
-use tokio::{
-    io::AsyncReadExt,
-    sync::{Mutex, MutexGuard},
-};
+use tokio::{fs::File as TkFile, io::AsyncReadExt};
 
 use crate::check_eof;
-use crate::util::ResultExt;
 
 use super::LuaModule;
 
-struct FsData {
-    handles: HashMap<FileHandle, File>,
-    new_handle_id: usize,
-    reuse_ids: Vec<usize>,
+pub struct OwnedFileHandle {
+    file: TkFile,
 }
 
-impl FsData {
-    fn new() -> Self {
-        Self {
-            handles: HashMap::new(),
-            new_handle_id: 0,
-            reuse_ids: Vec::new(),
-        }
+impl LuaUserData for OwnedFileHandle {
+    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_async_method_mut("read", |_, this: &mut Self, ()| async move {
+            let mut buf = Vec::new();
+            this.file.read_to_end(&mut buf).await?;
+
+            // Reminder so that I don't forget:
+            // lua doesn't need null-terminated strings,
+            // so we can just return the Vec<u8> directly.
+            // https://www.lua.org/manual/5.1/manual.html#lua_pushlstring
+            Ok(BString::new(buf))
+        });
     }
 }
 
-impl FsData {
-    async fn new_id(&mut self) -> Result<usize, mlua::Error> {
-        if let Some(id) = self.reuse_ids.pop() {
-            return Ok(id);
-        }
-
-        let id = self.new_handle_id;
-        self.new_handle_id += 1;
-        Ok(id)
-    }
-
-    async fn free_id(&mut self, id: usize) -> Result<(), mlua::Error> {
-        self.reuse_ids.push(id);
-        Ok(())
-    }
-}
-
-pub struct File {
-    inner: tokio::fs::File,
-}
-
-impl File {
+impl OwnedFileHandle {
     pub async fn read(&mut self, format: Variadic<FileReadFormat>) -> LuaResult<FileReadResult> {
         todo!()
     }
 
     async fn read_number(&mut self) -> LuaResult<Option<f64>> {
-        let res = self.inner.read_f64().await;
+        let res = self.file.read_f64().await;
         let res = check_eof!(res);
 
         Ok(Some(res))
@@ -63,7 +40,7 @@ impl File {
     async fn read_line(&mut self) -> LuaResult<Option<Vec<u8>>> {
         let mut buf = Vec::new();
         loop {
-            let res = self.inner.read_u8().await;
+            let res = self.file.read_u8().await;
             let byte = check_eof!(res, res => Some(res), eof None);
 
             match byte {
@@ -81,91 +58,7 @@ impl File {
     }
 }
 
-#[derive(Clone)]
-pub struct FileHandle {
-    id: usize,
-    module: &'static FsModule,
-}
-
-impl std::fmt::Debug for FileHandle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FileHandle").field("id", &self.id).finish()
-    }
-}
-
-impl PartialEq for FileHandle {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Eq for FileHandle {}
-
-impl Hash for FileHandle {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
-impl<'lua> FromLua<'lua> for FileHandle {
-    fn from_lua(value: LuaValue<'lua>, _: &'lua Lua) -> LuaResult<Self> {
-        let Some(data) = value.as_userdata() else {
-            return Err(mlua::Error::external("not a handle"));
-        };
-
-        data.borrow().map(|data| FileHandle::clone(&data))
-    }
-}
-
-impl LuaUserData for FileHandle {
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_async_method("read", |_, this: &Self, ()| async move {
-            let mut buf = String::new();
-            this.module
-                .fs
-                .lock()
-                .await
-                .handles
-                .get_mut(&this)
-                .ok_or(|| ())
-                .map_text_err("invalid handle")?
-                .inner
-                .read_to_string(&mut buf)
-                .await?;
-            Ok(buf)
-            // Ok(())
-        });
-
-        // methods.add_async_method("")
-    }
-}
-
-impl Drop for FileHandle {
-    fn drop(&mut self) {
-        let self2 = self.clone();
-        tokio::spawn(async move {
-            let mut fs = self2.module.lock_fs().await;
-            fs.handles.remove(&self2);
-            fs.free_id(self2.id).await.unwrap();
-        });
-    }
-}
-
-pub struct FsModule {
-    fs: Mutex<FsData>,
-}
-
-impl FsModule {
-    pub fn new() -> Self {
-        Self {
-            fs: Mutex::new(FsData::new()),
-        }
-    }
-
-    async fn lock_fs(&self) -> MutexGuard<FsData> {
-        self.fs.lock().await
-    }
-}
+pub struct FsModule;
 
 impl LuaModule for FsModule {
     fn name(&self) -> &'static str {
@@ -179,16 +72,8 @@ impl LuaModule for FsModule {
         Ok(vec![(
             "open",
             lua.create_async_function(move |_, path: String| async move {
-                let file = tokio::fs::File::open(path).await?;
-                let mut fs = self.lock_fs().await;
-
-                let id = fs.new_id().await?;
-                fs.handles
-                    .insert(FileHandle { id, module: self }, File { inner: file });
-                Ok(FileHandle {
-                    id: 0,
-                    module: self,
-                })
+                let file = TkFile::open(path).await?;
+                Ok(OwnedFileHandle { file })
             })?,
         )])
     }
@@ -236,7 +121,7 @@ mod tests {
     fn test_fs_module() {
         util::block_on(async {
             let rt = Runtime::new("tlua");
-            rt.load_rs_module(FsModule::new()).unwrap();
+            rt.load_rs_module(FsModule).unwrap();
 
             let code = "return coroutine.create(tlua.fs.read_to_string)";
             let func = rt.load(code).unwrap();
@@ -253,7 +138,7 @@ mod tests {
     fn test_file_userdata() {
         util::block_on(async {
             let rt = Runtime::new("tlua");
-            rt.load_rs_module(FsModule::new()).unwrap();
+            rt.load_rs_module(FsModule).unwrap();
 
             let code = r#"
 return coroutine.create(function()
@@ -265,23 +150,6 @@ end)"#;
             dbg!(&content);
             assert!(content.is_ok());
             assert!(content.unwrap().contains("[package]"));
-        });
-    }
-
-    #[test]
-    fn test_ids() {
-        block_on(async {
-            let mut fs = FsData::new();
-
-            let id1 = fs.new_id().await.unwrap();
-            assert_eq!(id1, 0);
-            assert_eq!(fs.new_id().await.unwrap(), 1);
-            fs.free_id(id1).await.unwrap();
-            assert_eq!(fs.new_id().await.unwrap(), 0);
-            assert_eq!(fs.new_id().await.unwrap(), 2);
-            assert_eq!(fs.new_id().await.unwrap(), 3);
-            fs.free_id(2).await.unwrap();
-            assert_eq!(fs.new_id().await.unwrap(), 2);
         });
     }
 }

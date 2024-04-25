@@ -39,7 +39,7 @@ pub mod streams {
     //! - `Ok(None)` means that the value was not found. We catch for `EOF`.
     //! - `Err(err)` means that an error occurred, except `EOF`.
     //!
-    //! You can also notice that some functiond have a `PhantomData<T>` in a return
+    //! You can also notice that some functions have a `PhantomData<T>` in a return
     //! type. This is to ensure that the type `T` is not actually constructed.
     //! But we can encode the type `T` in the return type, so that the caller
     //! can use it to parse the type `T` if needed. Pretty neat, huh?
@@ -69,7 +69,6 @@ pub mod streams {
 
             // [0-9]+
             if let None = read_dec_int(buf, &mut reader).await? {
-                println!("no number after dot");
                 return Ok(None);
             }
         }

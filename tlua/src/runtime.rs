@@ -200,7 +200,7 @@ mod tests {
 
     #[test]
     #[cfg(target_os = "windows")]
-    // #[ignore = "is blocking, was just an experiment"]
+    #[ignore = "is blocking, was just an experiment"]
     fn test_ffi_module() {
         let rt = unsafe { Runtime::new_with_options(RuntimeOption::new().ffi(true)) };
 

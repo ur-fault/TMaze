@@ -84,7 +84,7 @@ mod tests {
             let code = "return coroutine.create(tlua.util.sleep)";
             let func = rt.load(code).unwrap();
             let thread: LuaThread = func.call(()).expect("failed to call function");
-            thread.into_async::<_, ()>(3).await.unwrap();
+            thread.into_async::<_, ()>(0.5).await.unwrap();
         });
     }
 }
