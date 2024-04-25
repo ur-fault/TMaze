@@ -56,10 +56,10 @@ pub mod streams {
         buf: &mut Vec<u8>,
         mut reader: impl AsyncRead + Unpin + AsyncSeek,
     ) -> io::Result<Option<()>> {
-        if let None = read_dec_int(buf, &mut reader).await? {
-            return Ok(None);
-        }
-        correct_buf(buf, &mut reader).await?;
+        if let None = read_dec_int(buf, &mut reader).await? { // -|
+            return Ok(None);                                  //  |
+        }                                                     //  |
+        correct_buf(buf, &mut reader).await?;                 // -|
 
         // .
         // return `Some` on eof, since it's not mandatory
@@ -68,12 +68,12 @@ pub mod streams {
             buf.push(dot);
 
             // [0-9]+
-            if let None = read_dec_int(buf, &mut reader).await? {
-                return Ok(None);
-            }
-        }
-
-        correct_buf(buf, &mut reader).await?;
+            if let None = read_dec_int(buf, &mut reader).await? { // -|
+                return Ok(None);                                  //  |
+            }                                                     //  |
+        }                                                         //  |
+                                                                  //  |
+        correct_buf(buf, &mut reader).await?;                     // -|
 
         // e
         // return `Some` on eof, since it's not mandatory
@@ -97,11 +97,13 @@ pub mod streams {
 
         // [0-9]+
         if !was_number {
+            // safe to not correct, since it's last
             if let None = read_dec_int(buf, &mut reader).await? {
                 return Ok(None);
             }
         } else {
             // ignore if there was not a number after previous number
+            // also safe to not correct, since it's last
             read_dec_int(buf, &mut reader).await?;
         }
 
