@@ -2,7 +2,7 @@ use bstr::BString;
 use mlua::{prelude::*, Variadic};
 use tokio::{fs::File as TkFile, io::AsyncReadExt};
 
-use crate::check_eof;
+use crate::{check_eof, util};
 
 use super::LuaModule;
 
@@ -31,10 +31,16 @@ impl LuaFile {
     }
 
     async fn read_number(&mut self) -> LuaResult<Option<f64>> {
-        let res = self.file.read_f64().await;
-        let res = check_eof!(res);
+        let mut buf = Vec::new();
+        let res = util::streams::read_dec_float(&mut buf, &mut self.file).await;
+        check_eof!(res);
 
-        Ok(Some(res))
+        Ok(Some(
+            String::from_utf8(buf)
+                .into_lua_err()?
+                .parse()
+                .into_lua_err()?,
+        ))
     }
 
     async fn read_line(&mut self) -> LuaResult<Option<Vec<u8>>> {
