@@ -191,19 +191,9 @@ pub mod streams {
                 let mut reader = Cursor::new(input);
                 let mut buf = Vec::new();
                 let result = read_dec_float(&mut buf, &mut reader).await.unwrap();
-                if result.is_none() {
-                    println!("Resulted string: `None`");
-                    assert_eq!(None, expected);
-                } else {
-                    let string = String::from_utf8(buf).unwrap();
-                    println!("Resulted string: {}", string);
-                    assert_eq!(
-                        result.map(|_| string
-                            .parse()
-                            .expect("read function returned invalid buffer")),
-                        expected
-                    );
-                }
+                let string = String::from_utf8(buf).unwrap();
+                println!("Resulted string: {}", string);
+                assert_eq!(result.map(|_| string.parse().unwrap()), expected);
             }
 
             test("123", Some(123.0)).await;
