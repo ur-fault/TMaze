@@ -62,6 +62,8 @@ impl RuntimeOption {
 }
 
 pub struct Runtime<'l> {
+    // TODO: try to use Rc or Arc for Lua for better ergonomics in lifetimes.
+    // This is bad, since most things then need to be static too
     lua: &'static Lua,
     mt_queue: Vec<LuaFunction<'l>>,
     rs_obj: LuaTable<'l>,
@@ -73,10 +75,6 @@ impl<'l> Runtime<'l> {
     }
 
     /// Create a new runtime with options
-    ///
-    /// # Arguments
-    ///
-    /// * `options` - The options to create the runtime with
     ///
     /// # Example
     ///

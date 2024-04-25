@@ -6,11 +6,11 @@ use crate::check_eof;
 
 use super::LuaModule;
 
-pub struct OwnedFileHandle {
+pub struct LuaFile {
     file: TkFile,
 }
 
-impl LuaUserData for OwnedFileHandle {
+impl LuaUserData for LuaFile {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
         methods.add_async_method_mut("read", |_, this: &mut Self, ()| async move {
             let mut buf = Vec::new();
@@ -25,7 +25,7 @@ impl LuaUserData for OwnedFileHandle {
     }
 }
 
-impl OwnedFileHandle {
+impl LuaFile {
     pub async fn read(&mut self, format: Variadic<FileReadFormat>) -> LuaResult<FileReadResult> {
         todo!()
     }
@@ -73,7 +73,7 @@ impl LuaModule for FsModule {
             "open",
             lua.create_async_function(move |_, path: String| async move {
                 let file = TkFile::open(path).await?;
-                Ok(OwnedFileHandle { file })
+                Ok(LuaFile { file })
             })?,
         )])
     }
