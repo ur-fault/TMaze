@@ -2,7 +2,7 @@ use bstr::BString;
 use mlua::{prelude::*, Variadic};
 use tokio::{
     fs::File as TkFile,
-    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufStream},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufStream},
 };
 
 use crate::{check_eof, util};
@@ -15,6 +15,7 @@ pub struct LuaFile {
 
 impl LuaUserData for LuaFile {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        // TODO: mby implement these with macro
         methods.add_async_method_mut("read", |_, this, formats| async {
             this.read(formats).await
         });
@@ -43,11 +44,26 @@ impl LuaUserData for LuaFile {
                     }
                 }
                 on_line.call(line)?;
-                // println!("{}", line);
             }
 
             Ok(())
         });
+
+        methods.add_async_method_mut(
+            "seek",
+            |_, this, (whence, offset): (Option<BString>, Option<usize>)| async move {
+                let offset = offset.unwrap_or(0);
+                let whence = whence.map(|v| v.to_vec()).unwrap_or(b"cur".to_vec());
+                let seek_off = match whence.as_slice() {
+                    b"set" => tokio::io::SeekFrom::Start(offset as u64),
+                    b"cur" => tokio::io::SeekFrom::Current(offset as i64),
+                    b"end" => tokio::io::SeekFrom::End(offset as i64),
+                    _ => return Err(mlua::Error::external("invalid whence")),
+                };
+                this.file.seek(seek_off).await?;
+                Ok(())
+            },
+        );
     }
 }
 
