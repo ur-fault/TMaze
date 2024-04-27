@@ -12,6 +12,7 @@ pub struct LuaFile {
 
 impl LuaUserData for LuaFile {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
+        // TODO: comform to the Lua's io.open signature
         methods.add_async_method_mut("read", |_, this: &mut Self, ()| async move {
             let mut buf = Vec::new();
             this.file.read_to_end(&mut buf).await?;
@@ -26,8 +27,22 @@ impl LuaUserData for LuaFile {
 }
 
 impl LuaFile {
-    pub async fn read(&mut self, format: Variadic<FileReadFormat>) -> LuaResult<FileReadResult> {
-        todo!()
+    pub async fn read(
+        &mut self,
+        formats: Variadic<FileReadFormat>,
+    ) -> LuaResult<Variadic<FileReadResult>> {
+        let mut results = Variadic::new();
+
+        for format in formats {
+            let result = self.read_by_format(format).await?;
+            if let Some(result) = result {
+                results.push(result);
+            } else {
+                break;
+            }
+        }
+
+        Ok(results)
     }
 
     pub async fn read_by_format(
@@ -37,7 +52,9 @@ impl LuaFile {
         let res = match format {
             FileReadFormat::Line => self.read_line().await?.map(FileReadResult::Text),
             FileReadFormat::Number => self.read_number().await?.map(FileReadResult::Number),
-            _ => todo!(),
+            FileReadFormat::Count(count) => self.read_count(count).await?.map(FileReadResult::Text),
+            // all cannot return `None`
+            FileReadFormat::All => Some(self.read_all().await?).map(FileReadResult::Text),
         };
 
         Ok(res)
@@ -75,6 +92,18 @@ impl LuaFile {
 
         Ok(Some(buf))
     }
+
+    async fn read_all(&mut self) -> LuaResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.file.read_to_end(&mut buf).await?;
+        Ok(buf)
+    }
+
+    async fn read_count(&mut self, count: usize) -> LuaResult<Option<Vec<u8>>> {
+        let mut buf = vec![0; count];
+        check_eof!(self.file.read_exact(&mut buf).await);
+        Ok(Some(buf))
+    }
 }
 
 pub struct FsModule;
@@ -90,6 +119,7 @@ impl LuaModule for FsModule {
     ) -> LuaResult<Vec<(&'static str, LuaFunction<'static>)>> {
         Ok(vec![(
             "open",
+            // TODO: comform to the Lua's io.open signature
             lua.create_async_function(move |_, path: String| async move {
                 let file = TkFile::open(path).await?;
                 Ok(LuaFile { file })
@@ -106,7 +136,7 @@ enum FileReadFormat {
 }
 
 impl FromLua<'_> for FileReadFormat {
-    fn from_lua(value: LuaValue, lua: &Lua) -> LuaResult<Self> {
+    fn from_lua(value: LuaValue, _: &Lua) -> LuaResult<Self> {
         match value {
             // s is a LuaString, potentionally not u UTF8 string
             LuaValue::String(s) => match s.as_bytes() {
