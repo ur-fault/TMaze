@@ -2,7 +2,7 @@ use bstr::BString;
 use mlua::{prelude::*, Variadic};
 use tokio::{
     fs::File as TkFile,
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufStream},
 };
 
 use crate::{check_eof, util};
@@ -10,7 +10,7 @@ use crate::{check_eof, util};
 use super::LuaModule;
 
 pub struct LuaFile {
-    file: TkFile,
+    file: BufStream<TkFile>,
 }
 
 impl LuaUserData for LuaFile {
@@ -49,9 +49,8 @@ impl LuaFile {
         }
 
         for format in formats {
-            let result = self.read_by_format(format).await?;
             // `Option::is_some` basically, but funnier
-            if let result @ Some(..) = result {
+            if let result @ Some(..) = self.read_by_format(format).await? {
                 results.push(result);
             } else {
                 break;
@@ -89,35 +88,26 @@ impl LuaFile {
         ))
     }
 
-    async fn read_line(&mut self) -> LuaResult<Option<Vec<u8>>> {
+    async fn read_line(&mut self) -> LuaResult<Option<BString>> {
         let mut buf = Vec::new();
-        loop {
-            let res = self.file.read_u8().await;
-            let byte = check_eof!(res, res => Some(res), eof None);
-
-            // dbg!(&byte);
-
-            match byte {
-                Some(b'\n') => break,
-                Some(byte) => buf.push(byte),
-                None if buf.is_empty() => return Ok(None),
-                None => break,
-            }
+        let read = self.file.read_until('\n' as u8, &mut buf).await?;
+        if read == 0 {
+            return Ok(None);
+        } else {
+            Ok(Some(BString::new(buf)))
         }
-
-        Ok(Some(buf))
     }
 
-    async fn read_all(&mut self) -> LuaResult<Vec<u8>> {
+    async fn read_all(&mut self) -> LuaResult<BString> {
         let mut buf = Vec::new();
         self.file.read_to_end(&mut buf).await?;
-        Ok(buf)
+        Ok(BString::new(buf))
     }
 
-    async fn read_count(&mut self, count: usize) -> LuaResult<Option<Vec<u8>>> {
+    async fn read_count(&mut self, count: usize) -> LuaResult<Option<BString>> {
         let mut buf = vec![0; count];
         check_eof!(self.file.read_exact(&mut buf).await);
-        Ok(Some(buf))
+        Ok(Some(BString::new(buf)))
     }
 }
 
@@ -132,7 +122,7 @@ impl LuaModule for FsModule {
         table.set(
             "open",
             lua.create_async_function(|_, path: String| async move {
-                let file = TkFile::open(path).await?;
+                let file = BufStream::new(TkFile::open(path).await?);
                 Ok(LuaFile { file })
             })?,
         )?;
@@ -164,14 +154,14 @@ impl FromLua<'_> for FileReadFormat {
 }
 
 pub enum FileReadResult {
-    Text(Vec<u8>),
+    Text(BString),
     Number(f64),
 }
 
 impl IntoLua<'_> for FileReadResult {
     fn into_lua(self, lua: &'_ Lua) -> LuaResult<LuaValue<'_>> {
         match self {
-            Self::Text(text) => Ok(BString::new(text).into_lua(lua)?),
+            Self::Text(text) => Ok(text.into_lua(lua)?),
             Self::Number(n) => Ok(n.into_lua(lua)?),
         }
     }
@@ -182,7 +172,7 @@ mod tests {
     use super::*;
     use crate::runtime::Runtime;
 
-    #[ignore = "global io file functions are deprecated, alas removed"]
+    #[ignore = "global io file functions are removed"]
     #[tokio::test]
     async fn test_fs_module() {
         let rt = Runtime::new("tlua");

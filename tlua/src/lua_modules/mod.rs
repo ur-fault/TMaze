@@ -1,6 +1,6 @@
 mod fs;
-mod util;
 mod task;
+mod util;
 
 use mlua::prelude::*;
 

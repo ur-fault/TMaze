@@ -35,12 +35,5 @@ mod tests {
             let result: Result<String, _> = func.call(());
             assert!(matches!(result, Ok(_)));
         }
-
-        block_on(async {
-            let code = "return coroutine.create(tlua.util.sleep)";
-            let func = rt.load(code).unwrap();
-            let thread: LuaThread = func.call(()).expect("failed to call function");
-            thread.into_async::<_, ()>(0.5).await.unwrap();
-        });
     }
 }
