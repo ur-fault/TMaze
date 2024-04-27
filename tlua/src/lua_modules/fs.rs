@@ -1,6 +1,9 @@
 use bstr::BString;
 use mlua::{prelude::*, Variadic};
-use tokio::{fs::File as TkFile, io::AsyncReadExt};
+use tokio::{
+    fs::File as TkFile,
+    io::{AsyncReadExt, AsyncWriteExt},
+};
 
 use crate::{check_eof, util};
 
@@ -12,16 +15,23 @@ pub struct LuaFile {
 
 impl LuaUserData for LuaFile {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
-        // TODO: comform to the Lua's io.open signature
-        methods.add_async_method_mut("read", |_, this: &mut Self, ()| async move {
-            let mut buf = Vec::new();
-            this.file.read_to_end(&mut buf).await?;
+        methods.add_async_method_mut("read", |_, this, formats| async {
+            this.read(formats).await
+        });
 
-            // Reminder so that I don't forget:
-            // lua doesn't need null-terminated strings,
-            // so we can just return the Vec<u8> directly.
-            // https://www.lua.org/manual/5.1/manual.html#lua_pushlstring
-            Ok(BString::new(buf))
+        methods.add_async_method_mut("close", |_, this, ()| async {
+            this.file.shutdown().await?;
+            Ok(())
+        });
+
+        methods.add_async_method_mut("flush", |_, this, ()| async {
+            this.file.flush().await?;
+            Ok(())
+        });
+
+        methods.add_async_method_mut("write", |_, this, data: BString| async move {
+            this.file.write_all(&data).await?;
+            Ok(())
         });
     }
 }
@@ -30,12 +40,18 @@ impl LuaFile {
     pub async fn read(
         &mut self,
         formats: Variadic<FileReadFormat>,
-    ) -> LuaResult<Variadic<FileReadResult>> {
+    ) -> LuaResult<Variadic<Option<FileReadResult>>> {
         let mut results = Variadic::new();
+
+        if formats.is_empty() {
+            results.push(self.read_line().await?.map(FileReadResult::Text));
+            return Ok(results);
+        }
 
         for format in formats {
             let result = self.read_by_format(format).await?;
-            if let Some(result) = result {
+            // `Option::is_some` basically, but funnier
+            if let result @ Some(..) = result {
                 results.push(result);
             } else {
                 break;
@@ -79,11 +95,10 @@ impl LuaFile {
             let res = self.file.read_u8().await;
             let byte = check_eof!(res, res => Some(res), eof None);
 
+            // dbg!(&byte);
+
             match byte {
-                Some(b'\n') => {
-                    buf.push(b'\n');
-                    break;
-                }
+                Some(b'\n') => break,
                 Some(byte) => buf.push(byte),
                 None if buf.is_empty() => return Ok(None),
                 None => break,
@@ -113,22 +128,19 @@ impl LuaModule for FsModule {
         "fs"
     }
 
-    fn functions(
-        &'static self,
-        lua: &'static Lua,
-    ) -> LuaResult<Vec<(&'static str, LuaFunction<'static>)>> {
-        Ok(vec![(
+    fn init<'l>(&self, lua: &'l Lua, table: LuaTable<'l>) -> LuaResult<()> {
+        table.set(
             "open",
-            // TODO: comform to the Lua's io.open signature
-            lua.create_async_function(move |_, path: String| async move {
+            lua.create_async_function(|_, path: String| async move {
                 let file = TkFile::open(path).await?;
                 Ok(LuaFile { file })
             })?,
-        )])
+        )?;
+        Ok(())
     }
 }
 
-enum FileReadFormat {
+pub enum FileReadFormat {
     Number,
     Line,
     All,
@@ -151,9 +163,18 @@ impl FromLua<'_> for FileReadFormat {
     }
 }
 
-enum FileReadResult {
+pub enum FileReadResult {
     Text(Vec<u8>),
     Number(f64),
+}
+
+impl IntoLua<'_> for FileReadResult {
+    fn into_lua(self, lua: &'_ Lua) -> LuaResult<LuaValue<'_>> {
+        match self {
+            Self::Text(text) => Ok(BString::new(text).into_lua(lua)?),
+            Self::Number(n) => Ok(n.into_lua(lua)?),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -189,8 +210,7 @@ return coroutine.create(function()
 end)"#;
         let thread: LuaAsyncThread<String> = rt.eval::<LuaThread>(code).unwrap().into_async(());
         let content = thread.await;
-        dbg!(&content);
         assert!(content.is_ok());
-        assert!(content.unwrap().contains("[package]"));
+        assert!(dbg!(content).unwrap().contains("[package]"));
     }
 }

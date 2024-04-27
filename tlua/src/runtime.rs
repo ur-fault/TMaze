@@ -144,9 +144,7 @@ impl<'l> Runtime<'l> {
         let module = static_ref(module);
 
         let dict = self.lua.create_table()?;
-        for (name, func) in module.functions(self.lua)? {
-            dict.set(name, func)?;
-        }
+        module.init(self.lua, dict.clone())?; // only the ref
         self.rs_obj.set(module.name(), dict)?;
         Ok(())
     }
