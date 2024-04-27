@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 use tokio::task::JoinHandle;
 
-use crate::{lua_modules::LuaModule, util::static_ref};
+use crate::{lua_modules::LuaModule, task::LuaTask, util::static_ref};
 
 /// The runtime options for the Lua runtime
 ///
@@ -62,10 +62,9 @@ impl RuntimeOption {
 }
 
 pub struct Runtime<'l> {
-    // TODO: try to use Rc or Arc for Lua for better ergonomics in lifetimes.
-    // This is bad, since most things then need to be static too
     lua: &'static Lua,
-    mt_queue: Vec<LuaFunction<'l>>,
+    callback_queue: Vec<LuaFunction<'l>>,
+    join_handles: Vec<LuaTask<'l>>,
     rs_obj: LuaTable<'l>,
 }
 
@@ -97,7 +96,8 @@ impl<'l> Runtime<'l> {
 
         Self {
             lua,
-            mt_queue: Vec::new(),
+            callback_queue: Vec::new(),
+            join_handles: Vec::new(),
             rs_obj,
         }
     }
@@ -109,7 +109,8 @@ impl<'l> Runtime<'l> {
 
         Self {
             lua,
-            mt_queue: Vec::new(),
+            callback_queue: Vec::new(),
+            join_handles: Vec::new(),
             rs_obj,
         }
     }
@@ -149,7 +150,15 @@ impl<'l> Runtime<'l> {
         Ok(())
     }
 
-    pub fn spawn<T: FromLua<'l> + Send + 'static>(
+    // pub fn add_handle(&mut self, handle: JoinHandle<LuaValue<'l>>) {
+    //     self.join_handles.push(LuaTask::new(handle));
+    // }
+
+    pub fn add_callback(&mut self, callback: LuaFunction<'l>) {
+        self.callback_queue.push(callback);
+    }
+
+    pub fn spawn_lua_fn<T: FromLuaMulti<'l> + Send + 'static>(
         &self,
         fn_: LuaFunction<'static>,
     ) -> LuaResult<JoinHandle<T>> {
@@ -160,12 +169,12 @@ impl<'l> Runtime<'l> {
 
     pub fn run_frame(&mut self, max_tasks: Option<usize>) {
         if let Some(n) = max_tasks {
-            for mt in self.mt_queue.drain(..n) {
-                mt.call::<(), ()>(()).unwrap();
+            for mt in self.callback_queue.drain(..n) {
+                mt.call::<(), ()>(()).expect("error running task");
             }
         } else {
-            for mt in self.mt_queue.drain(..) {
-                mt.call::<(), ()>(()).unwrap();
+            for mt in self.callback_queue.drain(..) {
+                mt.call::<(), ()>(()).expect("error running task");
             }
         }
     }
