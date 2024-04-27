@@ -33,6 +33,21 @@ impl LuaUserData for LuaFile {
             this.file.write_all(&data).await?;
             Ok(())
         });
+
+        methods.add_async_method_mut("lines", |_, this, on_line: LuaFunction<'lua>| async move {
+            while let Some(mut line) = this.read_line().await? {
+                if line.last() == Some(&b'\n') {
+                    line.pop();
+                    if line.last() == Some(&b'\r') {
+                        line.pop();
+                    }
+                }
+                on_line.call(line)?;
+                // println!("{}", line);
+            }
+
+            Ok(())
+        });
     }
 }
 
@@ -170,7 +185,7 @@ impl IntoLua<'_> for FileReadResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::Runtime;
+    use crate::{lua_modules::util::UtilModule, runtime::Runtime};
 
     #[ignore = "global io file functions are removed"]
     #[tokio::test]
@@ -186,6 +201,35 @@ mod tests {
             .await
             .expect("failed to block on coroutine");
         assert!(result.contains("[package]"));
+    }
+
+    #[tokio::test]
+    async fn test_file_lines() {
+        let rt = Runtime::new("tlua");
+        rt.load_rs_module(FsModule).unwrap();
+        rt.load_rs_module(UtilModule).unwrap();
+
+        let code = r#"
+return coroutine.create(function()
+    local ahandle = tlua.fs.open('Cargo.toml')
+    local alines = {}
+    ahandle:lines(function(line)
+        table.insert(alines, line)
+    end)
+
+    local shandle = io.open('Cargo.toml')
+    local slines = {}
+    for line in shandle:lines() do
+        table.insert(slines, line)
+    end
+
+    return table.concat(alines, '\n'), table.concat(slines, '\n')
+end)"#;
+        let thread: LuaAsyncThread<(BString, BString)> =
+            rt.eval::<LuaThread>(code).unwrap().into_async(());
+        let (at, st) = thread.await.unwrap();
+        assert_eq!(at.len(), st.len());
+        assert_eq!(at, st);
     }
 
     #[tokio::test]
