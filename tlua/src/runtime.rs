@@ -14,6 +14,8 @@ use crate::{
 /// Both of these options are unsafe because they can be used to load unsafe
 /// modules into the Lua runtime. FFI module is enabled by default.
 /// Same cannot be said for the debug module, which is disabled by default.
+///
+/// TODO: fix these docs
 pub struct RuntimeOption {
     pub debug: bool,
     pub ffi: bool,
@@ -40,26 +42,33 @@ impl RuntimeOption {
         Self::default()
     }
 
+    /// Enable or disable the debug module, `unsafe`.
+    /// Enable with caution. Disabled by default.
     pub fn debug(mut self, debug: bool) -> Self {
         self.debug = debug;
         self
     }
 
+    /// Enable or disable the FFI module, `unsafe`.
+    /// Enable with caution. Enabled by default.
     pub fn ffi(mut self, ffi: bool) -> Self {
         self.ffi = ffi;
         self
     }
 
+    /// Set the name of the runtime. Default is `tlua`.
     pub fn rt_name(mut self, rt_name: &'static str) -> Self {
         self.rt_name = rt_name;
         self
     }
 
+    /// Enable or disable the default modules. Enabled by default.
     pub fn with_default_mods(mut self, with_default_mods: bool) -> Self {
         self.default_mods = with_default_mods;
         self
     }
 
+    /// Convert the runtime options to the standard library options
     pub fn to_stdlib(&self) -> LuaStdLib {
         let mut lib = LuaStdLib::ALL_SAFE;
         if self.debug {
@@ -72,35 +81,47 @@ impl RuntimeOption {
     }
 }
 
+/// The TLua runtime
+///
+/// This is the main struct that holds the Lua state and the queue of tasks.
+/// You use this as the main entry point to interact with Lua. Internally,
+/// it's `Rc` so that it can be cloned and passed around easily. It's not
+/// [`Send`] nor [`Sync`] because [`mlua::Lua`] is not neither.
+///
+/// World would be so beautiful if it was, but it's not. :(
+/// - ur-fault, 2024
+///
+/// It has it's own queue of tasks that are executed in the order they are
+/// added. It's not a priority queue, so if you add a task that takes a long
+/// time to execute, it will block the other tasks from executing.
+///
+/// None of the tasks are executed in parallel. They are executed in the order
+/// they are added. You should, at all costs, avoid adding tasks that take a
+/// long time to execute.
+///
+/// TODO: events and handlers
 #[derive(Clone)]
 pub struct Runtime {
     inner: Rc<RefCell<RuntimeInner<'static>>>,
 }
 
-pub struct RuntimeInner<'l> {
+struct RuntimeInner<'l> {
     lua: &'static Lua,
     queue: Vec<Callable<'l>>,
     rs_obj: LuaTable<'l>,
+    rt_name: String,
 }
 
 impl Runtime {
     // ** Creating a new instances of the runtime.
     // ** Althought, there should be only single instance,
     // ** since we leak the Lua state, to make it 'static.
+    //
+    /// Create a new runtime with the name of the app module.
     pub fn new(rs_mod_name: &str) -> Self {
         Self::from_lua(Lua::new(), rs_mod_name)
             .with_default_mods()
             .unwrap()
-    }
-
-    pub fn with_default_mods(self) -> LuaResult<Self> {
-        use crate::lua_modules::prelude::*;
-        self.load_rs_module(FsModule)?;
-        self.load_rs_module(UtilModule)?;
-        self.load_rs_module(TaskModule::new(self.clone()))?;
-        self.load_g_module(GlobalModule)?;
-
-        Ok(self)
     }
 
     /// Create a new runtime with options
@@ -124,15 +145,43 @@ impl Runtime {
         let rs_obj = lua.create_table().unwrap();
         lua.globals().set(options.rt_name, rs_obj.clone()).unwrap();
 
-        Self {
+        let new = Self {
             inner: Rc::new(RefCell::new(RuntimeInner {
                 lua,
                 queue: Vec::new(),
                 rs_obj,
+                rt_name: options.rt_name.to_string(),
             })),
-        }
+        };
+
+        // for clarity
+        return if options.default_mods {
+            new.with_default_mods().unwrap()
+        } else {
+            new
+        };
     }
 
+    /// Enable default rust modules for that App. These modules are:
+    /// - [`crate::lua_modules::fs::FsModule`] module
+    /// - [`crate::lua_modules::util::UtilModule`] module
+    /// - [`crate::lua_modules::task::TaskModule`] module
+    ///
+    /// - And the global module [`GlobalModule`]
+    ///
+    /// All of these modules are in the `self.rt_name` namespace
+    pub fn with_default_mods(self) -> LuaResult<Self> {
+        use crate::lua_modules::prelude::*;
+        self.load_rs_module(FsModule)?;
+        self.load_rs_module(UtilModule)?;
+        self.load_rs_module(TaskModule::new(self.clone()))?;
+        self.load_g_module(GlobalModule)?;
+
+        Ok(self)
+    }
+
+    /// Create a new runtime from an existing Lua state.
+    /// Not a reccoemnded way to create a new runtime.
     pub fn from_lua(lua: Lua, rs_mod_name: &str) -> Self {
         let lua = static_ref(lua);
         let rs_obj = lua.create_table().unwrap();
@@ -143,42 +192,43 @@ impl Runtime {
                 lua,
                 queue: Vec::new(),
                 rs_obj,
+                rt_name: rs_mod_name.to_string(),
             })),
         }
     }
 
     // ** Utils
 
+    /// Returns the inner Lua state. It's a static reference.
     pub fn lua(&self) -> &'static Lua {
         self.inner.borrow().lua
     }
 
     // ** Loading and executing Lua code
 
+    /// Load a Lua code and return it as a function, when called, it will
+    /// execute the code.
     pub(crate) fn load(&self, code: &str) -> LuaResult<LuaFunction> {
         self.lua().load(code).into_function()
     }
 
+    /// Evaluate a Lua code and return the result.
     pub fn eval<T: FromLuaMulti<'static>>(&self, code: &str) -> LuaResult<T> {
         self.lua().load(code).eval()
     }
 
+    /// Execute a Lua code and return nothings. Same as [`Runtime::eval`] but
+    /// returns `()`.
     pub fn exec(&self, code: &str) -> LuaResult<()> {
         self.lua().load(code).exec()
     }
 
     // ** Loading Rust modules
 
-    pub fn load_modules(
-        &self,
-        modules: impl IntoIterator<Item = impl LuaModule + 'static>,
-    ) -> LuaResult<()> {
-        for module in modules {
-            self.load_rs_module(module)?;
-        }
-        Ok(())
-    }
-
+    /// Loads a Rust module into the Lua runtime. The module must implement
+    /// the [`LuaModule`] trait. This function is similar to the [`Self::load_rs_module`],
+    /// but it loads the module as a global module, meaning it's items are accessible
+    /// from the `self.rt_name` namespace.
     pub fn load_g_module(&self, module: impl LuaModule + 'static) -> LuaResult<()> {
         let module = static_ref(module);
 
@@ -186,6 +236,10 @@ impl Runtime {
         Ok(())
     }
 
+    /// Loads a Rust module into the Lua runtime. The module must implement
+    /// the [`LuaModule`] trait. This function is similar to the [`Self::load_g_module`],
+    /// but it loads the module as a regular module, meaning it's items are accessible
+    /// from the `self.rt_name`. `[LuaModule::name]` namespace.
     pub fn load_rs_module(&self, module: impl LuaModule + 'static) -> LuaResult<()> {
         let module = static_ref(module);
 
@@ -197,15 +251,21 @@ impl Runtime {
 
     // ** Control the runtime from Lua
 
+    /// Queue a callback to be executed in the next frame.
+    /// The callbacks are of the type [`Callable`].
     pub fn queue_callback(&self, callback: impl Into<Callable<'static>>) {
         // self.inner.borrow_mut().callback_queue.push(callback);
         self.inner.borrow_mut().queue.push(callback.into());
     }
 
+    /// Returns the length of the queue of tasks.
     pub fn queue_len(&self) -> usize {
         self.inner.borrow().queue.len()
     }
 
+    /// Run a single frame of the runtime. This will execute all the tasks,
+    /// up to the `max_tasks` limit. If `max_tasks` is `None`, it will execute
+    /// all the tasks in the queue.
     pub fn run_frame(&self, max_tasks: Option<usize>) {
         let mut new_queue = Vec::new();
 
@@ -248,6 +308,8 @@ impl Runtime {
     }
 }
 
+/// A callable object that can be executed in the runtime.
+/// This is used to queue tasks to be executed in the next frame.
 pub enum Callable<'lua> {
     LuaFn(LuaFunction<'lua>),
     Rust(Box<dyn FnOnce(&'lua Lua) -> LuaResult<()> + 'lua>),
@@ -256,7 +318,12 @@ pub enum Callable<'lua> {
     LuaTask(LuaTask<'lua>),
 }
 
-struct GlobalModule;
+/// A default global Rust module that provides some basic functions.
+/// This module is loaded by default when creating a new runtime.
+///
+/// The module provides the following functions:
+/// - `exit(status: number)`: Exits the process with the given status code.
+pub struct GlobalModule;
 
 impl LuaModule for GlobalModule {
     fn name(&self) -> &'static str {
