@@ -1,17 +1,23 @@
 use tlua::runtime::Runtime;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let rt = Runtime::new("tlua");
 
-    let res = rt.eval::<()>(
+    rt.eval::<()>(
         r#"
-print("Hello, world!")
+function f()
+    print("before sleep")
+    tlua.task.sleep(1)
+    print("after sleep")
+    tlua.exit(69)
+end
+tlua.task.spawn(f)
     "#,
-    );
+    )
+    .unwrap();
 
-    if let Err(e) = res {
-        eprintln!("Error: {}", e);
-    } else {
-        println!("Success!");
+    loop {
+        rt.run_frame(None);
     }
 }
