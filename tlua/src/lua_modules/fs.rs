@@ -149,7 +149,7 @@ impl LuaModule for FsModule {
         "fs"
     }
 
-    fn init<'l>(&self, rt: &Runtime, table: LuaTable<'l>) -> LuaResult<()> {
+    fn init<'l>(&self, rt: Runtime, table: LuaTable<'l>) -> LuaResult<()> {
         table.set(
             "open",
             rt.lua()

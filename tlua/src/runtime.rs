@@ -1,9 +1,11 @@
 use std::{cell::RefCell, rc::Rc};
 
 use mlua::prelude::*;
-use tokio::task::LocalSet;
 
-use crate::{lua_modules::LuaModule, util::static_ref};
+use crate::{
+    lua_modules::{task::LuaTask, LuaModule},
+    util::static_ref,
+};
 
 /// The runtime options for the Lua runtime
 ///
@@ -77,14 +79,8 @@ pub struct Runtime {
 
 pub struct RuntimeInner<'l> {
     lua: &'static Lua,
-    // callback_queue: Vec<LuaFunction<'l>>,
-    // `FnOnce` would be better, but it requires `unsized locals`
-    // which are:
-    //      1. unstable,
-    //      2. slow af
-    queue: Vec<Box<dyn Fn(&'static Lua) -> LuaResult<()>>>,
+    queue: Vec<Callable<'l>>,
     rs_obj: LuaTable<'l>,
-    local_set: LocalSet,
 }
 
 impl Runtime {
@@ -98,8 +94,13 @@ impl Runtime {
     }
 
     pub fn with_default_mods(self) -> LuaResult<Self> {
-        self.load_modules([crate::lua_modules::prelude::FsModule])
-            .map(|_| self)
+        use crate::lua_modules::prelude::*;
+        self.load_rs_module(FsModule)?;
+        self.load_rs_module(UtilModule)?;
+        self.load_rs_module(TaskModule::new(self.clone()))?;
+        self.load_g_module(GlobalModule)?;
+
+        Ok(self)
     }
 
     /// Create a new runtime with options
@@ -126,10 +127,8 @@ impl Runtime {
         Self {
             inner: Rc::new(RefCell::new(RuntimeInner {
                 lua,
-                // callback_queue: Vec::new(),
                 queue: Vec::new(),
                 rs_obj,
-                local_set: LocalSet::new(),
             })),
         }
     }
@@ -142,10 +141,8 @@ impl Runtime {
         Self {
             inner: Rc::new(RefCell::new(RuntimeInner {
                 lua,
-                // callback_queue: Vec::new(),
                 queue: Vec::new(),
                 rs_obj,
-                local_set: LocalSet::new(),
             })),
         }
     }
@@ -182,45 +179,100 @@ impl Runtime {
         Ok(())
     }
 
+    pub fn load_g_module(&self, module: impl LuaModule + 'static) -> LuaResult<()> {
+        let module = static_ref(module);
+
+        module.init(self.clone(), self.inner.borrow().rs_obj.clone())?; // only the ref
+        Ok(())
+    }
+
     pub fn load_rs_module(&self, module: impl LuaModule + 'static) -> LuaResult<()> {
         let module = static_ref(module);
 
         let dict = self.lua().create_table()?;
-        module.init(self, dict.clone())?; // only the ref
+        module.init(self.clone(), dict.clone())?; // only the ref
         self.inner.borrow_mut().rs_obj.set(module.name(), dict)?;
         Ok(())
     }
 
-    // ** Constrol the runtime from Lua
+    // ** Control the runtime from Lua
 
-    pub fn queue_callback(&self, callback: LuaFunction<'static>) {
+    pub fn queue_callback(&self, callback: impl Into<Callable<'static>>) {
         // self.inner.borrow_mut().callback_queue.push(callback);
-        self.inner.borrow_mut().queue.push(Box::new(move |_| {
-            callback.call::<(), LuaMultiValue>(()).map(|_| ())
-        }));
+        self.inner.borrow_mut().queue.push(callback.into());
     }
 
-    // pub fn spawn_lua_fn<T: for<'l> FromLuaMulti<'l> + Send + 'static>(
-    //     &self,
-    //     fn_: LuaFunction<'static>,
-    // ) -> LuaResult<JoinHandle<T>> {
-    //     Ok(tokio::task::spawn_local(async move {
-    //         fn_.call::<(), T>(()).unwrap()
-    //     }))
-    // }
+    pub fn queue_len(&self) -> usize {
+        self.inner.borrow().queue.len()
+    }
 
-    pub fn run_frame(&mut self, max_tasks: Option<usize>) {
-        if let Some(n) = max_tasks {
-            for mt in self.inner.borrow_mut().queue.drain(..n) {
-                // mt.call::<_, ()>(()).expect("error running task");
-                mt(self.lua()).expect("error running task");
+    pub fn run_frame(&self, max_tasks: Option<usize>) {
+        let mut new_queue = Vec::new();
+
+        let task_count = max_tasks.unwrap_or(self.queue_len());
+        if task_count == 0 {
+            // println!("no tasks to run");
+            return;
+        }
+
+        let mut processed = 0;
+        while let Some(clb) = {
+            // othewise we get a mutable borrow error
+            // idk why, but it should imo work
+            let mut bor = self.inner.borrow_mut();
+            bor.queue.pop()
+        } {
+            self.inner.borrow();
+            match clb {
+                Callable::LuaFn(fnc) => fnc.call::<_, ()>(()).expect("error running task"),
+                Callable::Rust(fnc) => fnc(self.lua()).expect("error running task"),
+                Callable::LuaThread(thread) => {
+                    thread.resume::<_, ()>(()).expect("error running task");
+                    new_queue.push(Callable::LuaThread(thread));
+                }
+                Callable::LuaCode(code) => self.exec(&code).expect("error running task"),
+                Callable::LuaTask(mut task) => {
+                    if task.resume().is_none() {
+                        new_queue.push(Callable::LuaTask(task));
+                    }
+                }
             }
-        } else {
-            for mt in self.inner.borrow_mut().queue.drain(..) {
-                // mt.call::<_, ()>(()).expect("error running task");
-                mt(self.lua()).expect("error running task");
+
+            processed += 1;
+            if processed >= task_count {
+                break;
             }
         }
+
+        self.inner.borrow_mut().queue.extend(new_queue);
+    }
+}
+
+pub enum Callable<'lua> {
+    LuaFn(LuaFunction<'lua>),
+    Rust(Box<dyn FnOnce(&'lua Lua) -> LuaResult<()> + 'lua>),
+    LuaThread(LuaThread<'lua>),
+    LuaCode(String),
+    LuaTask(LuaTask<'lua>),
+}
+
+struct GlobalModule;
+
+impl LuaModule for GlobalModule {
+    fn name(&self) -> &'static str {
+        "global"
+    }
+
+    fn init(&self, rt: Runtime, dict: LuaTable) -> LuaResult<()> {
+        dict.set(
+            "exit",
+            rt.lua()
+                .create_function(|_, status: Option<i32>| -> LuaResult<()> {
+                    std::process::exit(status.unwrap_or(0))
+                })?,
+        )?;
+
+        Ok(())
     }
 }
 

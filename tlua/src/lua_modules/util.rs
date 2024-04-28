@@ -11,7 +11,7 @@ impl LuaModule for UtilModule {
         "util"
     }
 
-    fn init<'l>(&self, rt: &Runtime, table: LuaTable<'l>) -> LuaResult<()> {
+    fn init<'l>(&self, rt: Runtime, table: LuaTable<'l>) -> LuaResult<()> {
         table.set(
             "to_dbg_string",
             rt.lua()
