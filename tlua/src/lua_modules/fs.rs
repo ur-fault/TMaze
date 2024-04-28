@@ -5,7 +5,7 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufStream},
 };
 
-use crate::{check_eof, util};
+use crate::{check_eof, runtime::Runtime, util};
 
 use super::LuaModule;
 
@@ -149,13 +149,14 @@ impl LuaModule for FsModule {
         "fs"
     }
 
-    fn init<'l>(&self, lua: &'l Lua, table: LuaTable<'l>) -> LuaResult<()> {
+    fn init<'l>(&self, rt: &Runtime, table: LuaTable<'l>) -> LuaResult<()> {
         table.set(
             "open",
-            lua.create_async_function(|_, path: String| async move {
-                let file = BufStream::new(TkFile::open(path).await?);
-                Ok(LuaFile { file })
-            })?,
+            rt.lua()
+                .create_async_function(|_, path: String| async move {
+                    let file = BufStream::new(TkFile::open(path).await?);
+                    Ok(LuaFile { file })
+                })?,
         )?;
         Ok(())
     }
@@ -201,7 +202,7 @@ impl IntoLua<'_> for FileReadResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lua_modules::util::UtilModule, runtime::Runtime};
+    use crate::lua_modules::util::UtilModule;
 
     #[ignore = "global io file functions are removed"]
     #[tokio::test]

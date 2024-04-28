@@ -1,7 +1,9 @@
-use mlua::prelude::*;
-use tokio::task::JoinHandle;
+use std::{cell::RefCell, rc::Rc};
 
-use crate::{lua_modules::LuaModule, task::LuaTask, util::static_ref};
+use mlua::prelude::*;
+use tokio::task::LocalSet;
+
+use crate::{lua_modules::LuaModule, util::static_ref};
 
 /// The runtime options for the Lua runtime
 ///
@@ -14,6 +16,7 @@ pub struct RuntimeOption {
     pub debug: bool,
     pub ffi: bool,
     pub rt_name: &'static str,
+    pub default_mods: bool,
     _private: (), // so that it can't be constructed outside of this module
 }
 
@@ -23,6 +26,7 @@ impl Default for RuntimeOption {
             debug: false,
             ffi: true,
             rt_name: "tlua",
+            default_mods: true,
             _private: (),
         }
     }
@@ -49,6 +53,11 @@ impl RuntimeOption {
         self
     }
 
+    pub fn with_default_mods(mut self, with_default_mods: bool) -> Self {
+        self.default_mods = with_default_mods;
+        self
+    }
+
     pub fn to_stdlib(&self) -> LuaStdLib {
         let mut lib = LuaStdLib::ALL_SAFE;
         if self.debug {
@@ -61,16 +70,36 @@ impl RuntimeOption {
     }
 }
 
-pub struct Runtime<'l> {
-    lua: &'static Lua,
-    callback_queue: Vec<LuaFunction<'l>>,
-    join_handles: Vec<LuaTask<'l>>,
-    rs_obj: LuaTable<'l>,
+#[derive(Clone)]
+pub struct Runtime {
+    inner: Rc<RefCell<RuntimeInner<'static>>>,
 }
 
-impl<'l> Runtime<'l> {
+pub struct RuntimeInner<'l> {
+    lua: &'static Lua,
+    // callback_queue: Vec<LuaFunction<'l>>,
+    // `FnOnce` would be better, but it requires `unsized locals`
+    // which are:
+    //      1. unstable,
+    //      2. slow af
+    queue: Vec<Box<dyn Fn(&'static Lua) -> LuaResult<()>>>,
+    rs_obj: LuaTable<'l>,
+    local_set: LocalSet,
+}
+
+impl Runtime {
+    // ** Creating a new instances of the runtime.
+    // ** Althought, there should be only single instance,
+    // ** since we leak the Lua state, to make it 'static.
     pub fn new(rs_mod_name: &str) -> Self {
         Self::from_lua(Lua::new(), rs_mod_name)
+            .with_default_mods()
+            .unwrap()
+    }
+
+    pub fn with_default_mods(self) -> LuaResult<Self> {
+        self.load_modules([crate::lua_modules::prelude::FsModule])
+            .map(|_| self)
     }
 
     /// Create a new runtime with options
@@ -95,10 +124,13 @@ impl<'l> Runtime<'l> {
         lua.globals().set(options.rt_name, rs_obj.clone()).unwrap();
 
         Self {
-            lua,
-            callback_queue: Vec::new(),
-            join_handles: Vec::new(),
-            rs_obj,
+            inner: Rc::new(RefCell::new(RuntimeInner {
+                lua,
+                // callback_queue: Vec::new(),
+                queue: Vec::new(),
+                rs_obj,
+                local_set: LocalSet::new(),
+            })),
         }
     }
 
@@ -108,28 +140,37 @@ impl<'l> Runtime<'l> {
         lua.globals().set(rs_mod_name, rs_obj.clone()).unwrap();
 
         Self {
-            lua,
-            callback_queue: Vec::new(),
-            join_handles: Vec::new(),
-            rs_obj,
+            inner: Rc::new(RefCell::new(RuntimeInner {
+                lua,
+                // callback_queue: Vec::new(),
+                queue: Vec::new(),
+                rs_obj,
+                local_set: LocalSet::new(),
+            })),
         }
     }
 
-    pub fn lua(&self) -> &Lua {
-        self.lua
+    // ** Utils
+
+    pub fn lua(&self) -> &'static Lua {
+        self.inner.borrow().lua
     }
+
+    // ** Loading and executing Lua code
 
     pub(crate) fn load(&self, code: &str) -> LuaResult<LuaFunction> {
-        self.lua.load(code).into_function()
+        self.lua().load(code).into_function()
     }
 
-    pub fn eval<T: FromLua<'l>>(&self, code: &str) -> LuaResult<T> {
-        self.lua.load(code).eval()
+    pub fn eval<T: FromLuaMulti<'static>>(&self, code: &str) -> LuaResult<T> {
+        self.lua().load(code).eval()
     }
 
     pub fn exec(&self, code: &str) -> LuaResult<()> {
-        self.lua.load(code).exec()
+        self.lua().load(code).exec()
     }
+
+    // ** Loading Rust modules
 
     pub fn load_modules(
         &self,
@@ -144,37 +185,40 @@ impl<'l> Runtime<'l> {
     pub fn load_rs_module(&self, module: impl LuaModule + 'static) -> LuaResult<()> {
         let module = static_ref(module);
 
-        let dict = self.lua.create_table()?;
-        module.init(self.lua, dict.clone())?; // only the ref
-        self.rs_obj.set(module.name(), dict)?;
+        let dict = self.lua().create_table()?;
+        module.init(self, dict.clone())?; // only the ref
+        self.inner.borrow_mut().rs_obj.set(module.name(), dict)?;
         Ok(())
     }
 
-    // pub fn add_handle(&mut self, handle: JoinHandle<LuaValue<'l>>) {
-    //     self.join_handles.push(LuaTask::new(handle));
+    // ** Constrol the runtime from Lua
+
+    pub fn queue_callback(&self, callback: LuaFunction<'static>) {
+        // self.inner.borrow_mut().callback_queue.push(callback);
+        self.inner.borrow_mut().queue.push(Box::new(move |_| {
+            callback.call::<(), LuaMultiValue>(()).map(|_| ())
+        }));
+    }
+
+    // pub fn spawn_lua_fn<T: for<'l> FromLuaMulti<'l> + Send + 'static>(
+    //     &self,
+    //     fn_: LuaFunction<'static>,
+    // ) -> LuaResult<JoinHandle<T>> {
+    //     Ok(tokio::task::spawn_local(async move {
+    //         fn_.call::<(), T>(()).unwrap()
+    //     }))
     // }
-
-    pub fn add_callback(&mut self, callback: LuaFunction<'l>) {
-        self.callback_queue.push(callback);
-    }
-
-    pub fn spawn_lua_fn<T: FromLuaMulti<'l> + Send + 'static>(
-        &self,
-        fn_: LuaFunction<'static>,
-    ) -> LuaResult<JoinHandle<T>> {
-        Ok(tokio::task::spawn_local(async move {
-            fn_.call::<(), T>(()).unwrap()
-        }))
-    }
 
     pub fn run_frame(&mut self, max_tasks: Option<usize>) {
         if let Some(n) = max_tasks {
-            for mt in self.callback_queue.drain(..n) {
-                mt.call::<(), ()>(()).expect("error running task");
+            for mt in self.inner.borrow_mut().queue.drain(..n) {
+                // mt.call::<_, ()>(()).expect("error running task");
+                mt(self.lua()).expect("error running task");
             }
         } else {
-            for mt in self.callback_queue.drain(..) {
-                mt.call::<(), ()>(()).expect("error running task");
+            for mt in self.inner.borrow_mut().queue.drain(..) {
+                // mt.call::<_, ()>(()).expect("error running task");
+                mt(self.lua()).expect("error running task");
             }
         }
     }

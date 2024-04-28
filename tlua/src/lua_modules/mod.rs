@@ -1,8 +1,14 @@
-mod fs;
-mod task;
-mod util;
+pub mod fs;
+pub mod task;
+pub mod util;
 
 use mlua::prelude::*;
+
+use crate::runtime::Runtime;
+
+pub mod prelude {
+    pub use crate::lua_modules::{fs::FsModule, util::UtilModule};
+}
 
 pub trait LuaModule {
     /// Returns the name of the module.
@@ -16,5 +22,5 @@ pub trait LuaModule {
     ///
     /// This method is called when the module is loaded. It should register
     /// all the functions and global variables that the module provides.
-    fn init<'l>(&self, lua: &'l Lua, table: LuaTable<'l>) -> LuaResult<()>;
+    fn init<'l>(&self, rt: &Runtime, table: LuaTable<'l>) -> LuaResult<()>;
 }

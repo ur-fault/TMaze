@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bstr = "1.9.1"
-mlua = { version = "0.9.7", features = ["async", "luajit", "serialize", "vendored", "send"]}
+futures = { version = "0.3.30", default-features = false }
+mlua = { version = "0.9.7", features = ["async", "luajit", "serialize", "vendored"]}
 serde = { version = "1.0.198", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["full"] }
