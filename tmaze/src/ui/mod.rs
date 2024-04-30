@@ -3,16 +3,20 @@ pub use std::time::Duration;
 
 use thiserror::Error;
 
-use crate::core::*;
+use crate::{core::*, renderer::Renderer};
 
 pub mod draw;
+pub mod helpers;
 pub mod menu;
 pub mod popup;
 pub mod progressbar;
-pub mod helpers;
 
 pub use draw::*;
+pub use helpers::*;
 pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
-pub use helpers::*;
+
+pub trait Screen {
+    fn draw(&self, renderer: &mut Renderer) -> Result<(), io::Error>;
+}

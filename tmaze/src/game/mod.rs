@@ -1,6 +1,7 @@
 pub mod app;
 pub mod game_state;
 pub mod activity;
+pub mod event;
 
 use std::io;
 
