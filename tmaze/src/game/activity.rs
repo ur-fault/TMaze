@@ -10,6 +10,24 @@ pub struct StackChanges {
     changes: Vec<Change>,
 }
 
+impl StackChanges {
+    pub fn push(&mut self, activity: Activity) {
+        self.changes.push(Change::Push(activity));
+    }
+
+    pub fn pop(&mut self, n: usize) {
+        self.changes.push(Change::Pop(n));
+    }
+
+    pub fn replace(&mut self, activity: Activity) {
+        self.changes.push(Change::Replace(activity));
+    }
+
+    pub fn insert(&mut self, index: usize, activity: Activity) {
+        self.changes.push(Change::Insert(index, activity));
+    }
+}
+
 pub enum Change {
     Push(Activity),
     Pop(usize),
@@ -74,5 +92,5 @@ pub struct Activity {
 
 pub trait ActivityHandler {
     fn update(&mut self, stack: &mut StackChanges, events: Vec<Event>);
-    fn screen(&self) -> Box<dyn Screen>;
+    fn screen(&self) -> &dyn Screen;
 }

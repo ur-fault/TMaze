@@ -1,22 +1,22 @@
-use std::cell::RefCell;
-use std::time::Duration;
+use std::{cell::RefCell, time::Duration};
 
-use cmaze::core::*;
-use cmaze::game::{Game, GameProperities, GameState as GameStatus};
+use cmaze::{
+    core::*,
+    game::{Game, GameProperities, GameState as GameStatus},
+};
 
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
 #[cfg(feature = "sound")]
 use rodio::Source;
 
-use crate::data::SaveData;
-use crate::gameboard::CellWall;
-use crate::gameboard::{algorithms::*, Cell};
-use crate::helpers::{constants, value_if_else, LineDir};
-use crate::renderer::helpers::term_size;
-use crate::renderer::Renderer;
-use crate::settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings};
-use crate::ui::{DrawContext, Frame, MenuError};
-use crate::{helpers, ui};
+use crate::{
+    data::SaveData,
+    gameboard::{algorithms::*, Cell, CellWall},
+    helpers::{self, constants, value_if_else, LineDir},
+    renderer::{helpers::term_size, Renderer},
+    settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings},
+    ui::{self, DrawContext, MenuError, Rect, Screen},
+};
 
 #[cfg(feature = "updates")]
 use crate::updates;
@@ -24,7 +24,7 @@ use crate::updates;
 #[cfg(feature = "sound")]
 use crate::sound::{track::MusicTracks, SoundPlayer};
 
-use super::{GameError, GameState, GameViewMode};
+use super::{activity::ActivityHandler, GameError, GameState, GameViewMode};
 
 pub struct App {
     renderer: Renderer,
@@ -42,6 +42,16 @@ struct GameDrawContexts<'a> {
     normal: DrawContext<'a>,
     player: DrawContext<'a>,
     goal: DrawContext<'a>,
+}
+
+impl ActivityHandler for App {
+    fn update(&mut self, _stack: &mut super::activity::StackChanges, _events: Vec<super::event::Event>) {
+        todo!()
+    }
+
+    fn screen(&self) -> &dyn Screen {
+        todo!()
+    }
 }
 
 impl App {
@@ -447,9 +457,9 @@ impl App {
         let renderer_cell = RefCell::new(&mut self.renderer);
 
         let text_frame = if fits_on_screen {
-            Frame::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
+            Rect::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
         } else {
-            Frame::new_sized(Dims(0, 0), size).with_margin(maze_margin)
+            Rect::new_sized(Dims(0, 0), size).with_margin(maze_margin)
         };
         let frame = text_frame.with_margin(Dims(1, 2));
 
