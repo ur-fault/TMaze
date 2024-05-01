@@ -73,7 +73,7 @@ pub fn render_popup(
         }
     }
 
-    renderer.render()?;
+    renderer.show()?;
 
     Ok(())
 }

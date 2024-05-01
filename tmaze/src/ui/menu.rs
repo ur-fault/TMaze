@@ -185,7 +185,7 @@ pub fn render_menu(
         }
     }
 
-    renderer.render()?;
+    renderer.show()?;
 
     Ok(())
 }

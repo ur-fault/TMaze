@@ -110,7 +110,7 @@ impl Renderer {
         &mut self.hidden
     }
 
-    pub fn render(&mut self) -> io::Result<()> {
+    pub fn show(&mut self) -> io::Result<()> {
         let mut tty = stdout();
 
         let mut style = ContentStyle::default();

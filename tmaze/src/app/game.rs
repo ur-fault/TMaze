@@ -13,18 +13,23 @@ use cmaze::{
 };
 
 use crate::{
+    app::{game_state::GameData, GameError, GameViewMode},
     data::SaveData,
     helpers::{self, constants, value_if_else, LineDir, ToDebug},
     renderer::{helpers::term_size, Renderer},
     settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings},
-    sound::{track::MusicTrack, SoundPlayer},
-    ui::{self, DrawContext, MenuError, Rect, Screen},
-    updates,
+    ui::{self, DrawContext, MenuError, Rect},
 };
 
-use super::{activity::ActivityHandler, game_state::GameData, GameError, GameViewMode};
+#[cfg(feature = "sound")]
+use crate::sound::{track::MusicTrack, SoundPlayer};
+
+#[cfg(feature = "updates")]
+use crate::updates;
 
 use crossterm::event::{self, poll, read, Event as TermEvent, KeyCode, KeyEvent, KeyEventKind};
+
+#[cfg(feature = "sound")]
 use rodio::Source;
 
 pub struct App {
@@ -44,20 +49,6 @@ struct GameDrawContexts<'a> {
     normal: DrawContext<'a>,
     player: DrawContext<'a>,
     goal: DrawContext<'a>,
-}
-
-impl ActivityHandler for App {
-    fn update(
-        &mut self,
-        _stack: &mut super::activity::StackChanges,
-        _events: Vec<super::event::Event>,
-    ) {
-        todo!()
-    }
-
-    fn screen(&self) -> &dyn Screen {
-        todo!()
-    }
 }
 
 impl App {
@@ -773,7 +764,7 @@ impl App {
         text_context.draw_str(str_pos_bl, texts.2);
         text_context.draw_str(str_pos_br, texts.3);
 
-        self.renderer.render()?;
+        self.renderer.show()?;
 
         Ok(())
     }
