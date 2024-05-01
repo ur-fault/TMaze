@@ -35,7 +35,7 @@ pub fn render_progress(
         }
     }
 
-    renderer.render()?;
+    renderer.show()?;
 
     Ok(())
 }
