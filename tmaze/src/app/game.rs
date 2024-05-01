@@ -1,9 +1,14 @@
 use std::{cell::RefCell, time::Duration};
 
 use cmaze::{
+    core::{Dims, Dims3D, GameMode},
     game::{Game, GameProperities, GameState},
     gameboard::{
-        Cell, CellWall, DepthFirstSearch, Dims, Dims3D, GameMode, GenerationErrorInstant, GenerationErrorThreaded, MazeAlgorithm, Progress, RndKruskals
+        algorithms::{
+            DepthFirstSearch, GenerationErrorInstant, GenerationErrorThreaded, MazeAlgorithm,
+            Progress, RndKruskals,
+        },
+        Cell, CellWall,
     },
 };
 

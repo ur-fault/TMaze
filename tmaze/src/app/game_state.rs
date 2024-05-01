@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
 use cmaze::{
-    game::{Game, MoveMode},
-    gameboard::{CellWall, Dims3D},
+    core::Dims3D, game::{Game, MoveMode}, gameboard::CellWall
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tap::Tap;
