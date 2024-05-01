@@ -1,10 +1,17 @@
-use crate::core::*;
-use crate::gameboard::{
-    CellWall, GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeGeneratorComunication,
-    Progress, StopGenerationFlag,
+use crate::{
+    core::*,
+    gameboard::{
+        algorithms::{
+            GenerationErrorInstant, GenerationErrorThreaded, MazeGeneratorComunication, Progress,
+            StopGenerationFlag,
+        },
+        CellWall, Maze,
+    },
 };
+
 use crossbeam::channel::Receiver;
 use pausable_clock::{PausableClock, PausableInstant};
+
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 

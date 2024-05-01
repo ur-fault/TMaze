@@ -1,6 +1,6 @@
 use std::{io, time::Duration};
 
-use cmaze::gameboard::Dims;
+use cmaze::core::Dims;
 
 use crate::{helpers, renderer::helpers::term_size};
 
