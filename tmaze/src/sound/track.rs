@@ -38,20 +38,20 @@ pub type Track = Box<dyn rodio::Source<Item = i16> + Send>;
 // PS: once there are mods (copium),
 // this gonna need to be reworked from the ground up
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MusicTracks {
+pub enum MusicTrack {
     Easy,
     Medium,
     Hard,
     Menu,
 }
 
-impl MusicTracks {
+impl MusicTrack {
     pub fn get_data(&self) -> &'static [u8] {
         match self {
-            MusicTracks::Easy => assets_sounds::MUSIC_EASY,
-            MusicTracks::Medium => assets_sounds::MUSIC_MEDIUM,
-            MusicTracks::Hard => assets_sounds::MUSIC_HARD,
-            MusicTracks::Menu => assets_sounds::MUSIC_MENU,
+            MusicTrack::Easy => assets_sounds::MUSIC_EASY,
+            MusicTrack::Medium => assets_sounds::MUSIC_MEDIUM,
+            MusicTrack::Hard => assets_sounds::MUSIC_HARD,
+            MusicTrack::Menu => assets_sounds::MUSIC_MENU,
         }
     }
 
@@ -73,7 +73,7 @@ impl MusicTracks {
     /// # Notes
     /// * We do *NOT* have yet a for determining the difficulty of the maze, so we just choose a random track
     pub fn choose_for_maze(_maze: &Maze) -> Self {
-        use MusicTracks::*;
+        use MusicTrack::*;
         *[Easy, Medium, Hard].choose(&mut thread_rng()).unwrap()
     }
 }
