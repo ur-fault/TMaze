@@ -1,7 +1,7 @@
 use tmaze::*;
 
+use app::{App, GameError};
 use clap::Parser;
-use game::{App, GameError};
 
 #[derive(Parser, Debug)]
 #[clap(version, author, about, name = "tmaze")]

@@ -1,12 +1,13 @@
-pub mod app;
-pub mod game_state;
 pub mod activity;
+pub mod app;
 pub mod event;
+pub mod game;
+pub mod game_state;
 
 use std::io;
 
-pub use app::App;
-pub use game_state::{GameState, GameViewMode};
+pub use game::App;
+pub use game_state::GameViewMode;
 use thiserror::Error;
 
 use crate::{settings::EditableFieldError, ui::MenuError};

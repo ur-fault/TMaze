@@ -26,7 +26,7 @@ impl Display for GameViewMode {
 
 pub struct ShowMenu;
 
-pub struct GameState {
+pub struct GameData {
     pub game: Game,
     pub camera_offset: Dims3D,
     pub view_mode: GameViewMode,
@@ -35,7 +35,7 @@ pub struct GameState {
     pub settings: Settings,
 }
 
-impl GameState {
+impl GameData {
     pub fn handle_event(&mut self, event: KeyEvent) -> Result<(), ShowMenu> {
         let KeyEvent {
             code,

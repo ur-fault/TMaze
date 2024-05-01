@@ -1,6 +1,6 @@
 pub mod constants;
 pub mod data;
-pub mod game;
+pub mod app;
 pub mod helpers;
 pub mod renderer;
 pub mod settings;
