@@ -1,30 +1,26 @@
 use std::{cell::RefCell, time::Duration};
 
 use cmaze::{
-    core::*,
-    game::{Game, GameProperities, GameState as GameStatus},
+    game::{Game, GameProperities, GameState},
+    gameboard::{
+        Cell, CellWall, DepthFirstSearch, Dims, Dims3D, GameMode, GenerationErrorInstant, GenerationErrorThreaded, MazeAlgorithm, Progress, RndKruskals
+    },
 };
-
-use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
-#[cfg(feature = "sound")]
-use rodio::Source;
 
 use crate::{
     data::SaveData,
-    gameboard::{algorithms::*, Cell, CellWall},
-    helpers::{self, constants, value_if_else, LineDir},
+    helpers::{self, constants, value_if_else, LineDir, ToDebug},
     renderer::{helpers::term_size, Renderer},
     settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings},
+    sound::{track::MusicTrack, SoundPlayer},
     ui::{self, DrawContext, MenuError, Rect, Screen},
+    updates,
 };
 
-#[cfg(feature = "updates")]
-use crate::updates;
+use super::{activity::ActivityHandler, game_state::GameData, GameError, GameViewMode};
 
-#[cfg(feature = "sound")]
-use crate::sound::{track::MusicTrack, SoundPlayer};
-
-use super::{activity::ActivityHandler, GameError, GameState, GameViewMode};
+use crossterm::event::{self, poll, read, Event as TermEvent, KeyCode, KeyEvent, KeyEventKind};
+use rodio::Source;
 
 pub struct App {
     renderer: Renderer,
@@ -99,9 +95,6 @@ impl App {
     #[cfg(feature = "updates")]
     fn check_for_updates(&mut self) -> Result<(), GameError> {
         use chrono::Local;
-        use crossterm::event::{self, KeyEventKind};
-
-        use crate::helpers::ToDebug;
 
         if !self.save_data.is_update_checked(&self.settings) {
             let last_check_before = self
@@ -138,7 +131,7 @@ impl App {
             while !handle.is_finished() {
                 if let Ok(true) = event::poll(Duration::from_millis(15)) {
                     match event::read() {
-                        Ok(Event::Key(KeyEvent {
+                        Ok(TermEvent::Key(KeyEvent {
                             code: KeyCode::Char('q'),
                             kind: KeyEventKind::Press | KeyEventKind::Repeat,
                             ..
@@ -146,7 +139,7 @@ impl App {
                             handle.abort();
                             return Ok(());
                         }
-                        Ok(Event::Key(KeyEvent {
+                        Ok(TermEvent::Key(KeyEvent {
                             code: KeyCode::Esc,
                             kind: KeyEventKind::Press | KeyEventKind::Repeat,
                             ..
@@ -325,7 +318,7 @@ impl App {
         #[cfg(feature = "sound")]
         self.play_bgm(MusicTrack::choose_for_maze(&game.get_maze()));
 
-        let mut game_state = GameState {
+        let mut game_state = GameData {
             game,
             camera_offset: Dims3D(0, 0, 0),
             is_tower,
@@ -341,7 +334,7 @@ impl App {
                 let event = read();
 
                 match event {
-                    Ok(Event::Key(key_event)) => {
+                    Ok(TermEvent::Key(key_event)) => {
                         if game_state.handle_event(key_event).is_err() {
                             game_state.game.pause().unwrap();
                             match ui::menu(
@@ -372,7 +365,7 @@ impl App {
             self.render_game(&game_state, self.settings.get_camera_mode(), is_tower, 1)?;
 
             // Check if player won
-            if game_state.game.get_state() == GameStatus::Finished {
+            if game_state.game.get_state() == GameState::Finished {
                 let play_time = game_state.game.get_elapsed().unwrap();
 
                 if let KeyCode::Char('r' | 'R') = ui::popup(
@@ -397,12 +390,12 @@ impl App {
 
     fn render_game(
         &mut self,
-        game_state: &GameState,
+        game_state: &GameData,
         camera_mode: CameraMode,
         ups_as_goal: bool,
         text_horizontal_margin: i32,
     ) -> Result<(), GameError> {
-        let GameState {
+        let GameData {
             game,
             camera_offset,
             player_char,
@@ -807,7 +800,7 @@ impl App {
             let current_progress = done as f64 / from as f64;
 
             if let Ok(true) = poll(Duration::from_nanos(1)) {
-                if let Ok(Event::Key(KeyEvent { code, .. })) = read() {
+                if let Ok(TermEvent::Key(KeyEvent { code, .. })) = read() {
                     match code {
                         KeyCode::Esc => {
                             stop_flag.stop();
