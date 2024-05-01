@@ -22,20 +22,21 @@ use crate::{
 use crate::updates;
 
 #[cfg(feature = "sound")]
-use crate::sound::{track::MusicTracks, SoundPlayer};
+use crate::sound::{track::MusicTrack, SoundPlayer};
 
 use super::{activity::ActivityHandler, GameError, GameState, GameViewMode};
 
 pub struct App {
     renderer: Renderer,
-    #[cfg(feature = "sound")]
-    sound_player: SoundPlayer,
     settings: Settings,
     save_data: SaveData,
     last_edge_follow_offset: Dims,
     last_selected_preset: Option<usize>,
+
     #[cfg(feature = "sound")]
-    bgm_track: Option<MusicTracks>,
+    sound_player: SoundPlayer,
+    #[cfg(feature = "sound")]
+    bgm_track: Option<MusicTrack>,
 }
 
 struct GameDrawContexts<'a> {
@@ -45,7 +46,11 @@ struct GameDrawContexts<'a> {
 }
 
 impl ActivityHandler for App {
-    fn update(&mut self, _stack: &mut super::activity::StackChanges, _events: Vec<super::event::Event>) {
+    fn update(
+        &mut self,
+        _stack: &mut super::activity::StackChanges,
+        _events: Vec<super::event::Event>,
+    ) {
         todo!()
     }
 
@@ -59,19 +64,20 @@ impl App {
         let settings_path = Settings::default_path();
         App {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
-            #[cfg(feature = "sound")]
-            sound_player: SoundPlayer::new(),
             settings: Settings::load(settings_path),
             save_data: SaveData::load_or(),
             last_edge_follow_offset: Dims(0, 0),
             last_selected_preset: None,
+
+            #[cfg(feature = "sound")]
+            sound_player: SoundPlayer::new(),
             #[cfg(feature = "sound")]
             bgm_track: None,
         }
     }
 
     #[cfg(feature = "sound")]
-    fn play_bgm(&mut self, track: MusicTracks) {
+    fn play_bgm(&mut self, track: MusicTrack) {
         if let Some(prev_track) = self.bgm_track {
             if prev_track == track {
                 return;
@@ -86,8 +92,8 @@ impl App {
         self.sound_player.sink().set_volume(volume);
 
         self.bgm_track = Some(track);
-        self.sound_player
-            .play_track(Box::new(track.get_track().repeat_infinite()));
+        let track = track.get_track().repeat_infinite();
+        self.sound_player.play_track(Box::new(track));
     }
 
     #[cfg(feature = "updates")]
@@ -206,7 +212,7 @@ impl App {
             }
 
             #[cfg(feature = "sound")]
-            self.play_bgm(MusicTracks::Menu);
+            self.play_bgm(MusicTrack::Menu);
 
             match ui::menu(
                 &mut self.renderer,
@@ -317,7 +323,7 @@ impl App {
         let game = self.generate_maze(game_props)?;
 
         #[cfg(feature = "sound")]
-        self.play_bgm(MusicTracks::choose_for_maze(&game.get_maze()));
+        self.play_bgm(MusicTrack::choose_for_maze(&game.get_maze()));
 
         let mut game_state = GameState {
             game,
