@@ -75,12 +75,12 @@ pub fn draw_char<'a>(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Frame {
+pub struct Rect {
     pub start: Dims,
     pub end: Dims,
 }
 
-impl Frame {
+impl Rect {
     pub fn new(start: Dims, end: Dims) -> Self {
         Self { start, end }
     }
@@ -138,7 +138,7 @@ impl Frame {
 pub struct DrawContext<'a> {
     pub renderer: &'a RefCell<&'a mut Renderer>,
     pub style: ContentStyle,
-    pub frame: Option<Frame>,
+    pub frame: Option<Rect>,
 }
 
 #[allow(dead_code)]
@@ -176,11 +176,11 @@ impl<'a> DrawContext<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Dims, Frame};
+    use super::{Dims, Rect};
 
     #[test]
     fn frame_trim_absolute() {
-        let frame = Frame::new_sized(Dims(0, 0), Dims(3, 1));
+        let frame = Rect::new_sized(Dims(0, 0), Dims(3, 1));
         let (text, ..) = frame.trim_absolute(&"123456", Dims(0, 0));
         assert_eq!(text, "123");
 

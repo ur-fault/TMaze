@@ -3,7 +3,7 @@ pub use std::time::Duration;
 
 use thiserror::Error;
 
-use crate::{core::*, renderer::Renderer};
+use crate::{core::*, renderer::Frame};
 
 pub mod draw;
 pub mod helpers;
@@ -18,5 +18,5 @@ pub use popup::*;
 pub use progressbar::*;
 
 pub trait Screen {
-    fn draw(&self, renderer: &mut Renderer) -> Result<(), io::Error>;
+    fn draw(&self, renderer: &mut Frame) -> Result<(), io::Error>;
 }
