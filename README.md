@@ -33,11 +33,6 @@ Another requirement was that it would be multiplatform so that I could play it a
 
 And it ended up as maze solving game because I just couldn't find any other.
 
-### To do
-- Better settings UI
-- Render path (you will be able to disable this)
-- Maybe multiplayer
-- Saving and exporting and importing game state, mazes
 
 ### Credits and thanks
 - Music and OST - [step](https://github.com/StepGamesOfficial)
