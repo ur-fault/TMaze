@@ -12,7 +12,7 @@ fn main() -> io::Result<()> {
     settings
         .edit(&mut renderer, settings::ColorScheme::default())
         .unwrap();
-    renderer.render()?;
+    renderer.show()?;
 
     Ok(())
 }

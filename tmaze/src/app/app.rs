@@ -1,9 +1,16 @@
+use std::time::Duration;
+
+use crossterm::event::read;
+
 use crate::renderer::Renderer;
 
 #[cfg(feature = "sound")]
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
-use super::activity::{Acitivties, Activity};
+use super::{
+    activity::{Acitivties, Activity},
+    event::Event,
+};
 
 pub struct App {
     renderer: Renderer,
@@ -36,7 +43,18 @@ impl App {
     pub fn run(&mut self) {
         loop {
             let activity = self.activities.active().expect("No active activity");
-            self.renderer.show();
+
+            let mut events = vec![];
+
+            if let Ok(true) = crossterm::event::poll(Duration::from_millis(90)) {
+                let event = read().unwrap();
+
+                events.push(Event::Term(event));
+            }
+
+            activity.screen().draw(&mut self.renderer.frame()).unwrap();
+
+            self.renderer.show().unwrap();
         }
     }
 }

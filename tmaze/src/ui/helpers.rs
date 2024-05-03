@@ -4,13 +4,13 @@ use cmaze::core::Dims;
 
 use crate::{helpers, renderer::helpers::term_size};
 
-pub fn box_center_screen(box_dims: Dims) -> io::Result<Dims> {
+pub fn box_center_screen(box_dims: Dims) -> Dims {
     let size_u16 = term_size();
-    Ok(helpers::box_center(
+    helpers::box_center(
         Dims(0, 0),
         Dims(size_u16.0 as i32, size_u16.1 as i32),
         box_dims,
-    ))
+    )
 }
 
 pub fn format_duration(dur: Duration) -> String {

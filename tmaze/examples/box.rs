@@ -16,7 +16,7 @@ fn main() -> io::Result<()> {
             Dims(10, 10),
             ContentStyle::default(),
         );
-        renderer.render()?;
+        renderer.show()?;
 
         let event = crossterm::event::read()?;
         events.push(event.clone());

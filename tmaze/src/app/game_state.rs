@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use cmaze::{
-    core::Dims3D, game::{Game, MoveMode}, gameboard::CellWall
+    core::Dims3D, game::{RunningGame, MoveMode}, gameboard::CellWall
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tap::Tap;
@@ -26,7 +26,7 @@ impl Display for GameViewMode {
 pub struct ShowMenu;
 
 pub struct GameData {
-    pub game: Game,
+    pub game: RunningGame,
     pub camera_offset: Dims3D,
     pub view_mode: GameViewMode,
     pub player_char: char,

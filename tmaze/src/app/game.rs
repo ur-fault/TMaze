@@ -2,7 +2,7 @@ use std::{cell::RefCell, time::Duration};
 
 use cmaze::{
     core::{Dims, Dims3D, GameMode},
-    game::{Game, GameProperities, GameState},
+    game::{GameProperities, GameState, RunningGame},
     gameboard::{
         algorithms::{
             DepthFirstSearch, GenerationErrorInstant, GenerationErrorThreaded, MazeAlgorithm,
@@ -32,7 +32,7 @@ use crossterm::event::{self, poll, read, Event as TermEvent, KeyCode, KeyEvent, 
 #[cfg(feature = "sound")]
 use rodio::Source;
 
-pub struct App {
+pub struct Game {
     renderer: Renderer,
     settings: Settings,
     save_data: SaveData,
@@ -51,10 +51,10 @@ struct GameDrawContexts<'a> {
     goal: DrawContext<'a>,
 }
 
-impl App {
+impl Game {
     pub fn new() -> Self {
         let settings_path = Settings::default_path();
-        App {
+        Game {
             renderer: Renderer::new().expect("Failed to initialize renderer"),
             settings: Settings::load(settings_path),
             save_data: SaveData::load_or(),
@@ -203,39 +203,40 @@ impl App {
             #[cfg(feature = "sound")]
             self.play_bgm(MusicTrack::Menu);
 
-            match ui::menu(
-                &mut self.renderer,
-                self.settings.get_color_scheme().normals(),
-                self.settings.get_color_scheme().texts(),
-                "TMaze",
-                &["New Game", "Settings", "Controls", "About", "Quit"],
-                None,
-                true,
-            ) {
-                Ok(res) => match res {
-                    0 => match self.run_game() {
-                        Ok(_) | Err(GameError::Back) => {}
-                        Err(GameError::NewGame) => {
-                            game_restart_reqested = true;
-                        }
-                        Err(_) => break,
-                    },
-
-                    1 => {
-                        self.show_settings_screen()?;
-                    }
-                    2 => {
-                        self.show_controls_popup()?;
-                    }
-                    3 => {
-                        self.show_about_popup()?;
-                    }
-                    4 => break,
-                    _ => break,
-                },
-                Err(MenuError::Exit) => break,
-                Err(_) => break,
-            };
+            // TODO: use menu
+            // match ui::menu(
+            //     &mut self.renderer,
+            //     self.settings.get_color_scheme().normals(),
+            //     self.settings.get_color_scheme().texts(),
+            //     "TMaze",
+            //     &["New Game", "Settings", "Controls", "About", "Quit"],
+            //     None,
+            //     true,
+            // ) {
+            //     Ok(res) => match res {
+            //         0 => match self.run_game() {
+            //             Ok(_) | Err(GameError::Back) => {}
+            //             Err(GameError::NewGame) => {
+            //                 game_restart_reqested = true;
+            //             }
+            //             Err(_) => break,
+            //         },
+            //
+            //         1 => {
+            //             self.show_settings_screen()?;
+            //         }
+            //         2 => {
+            //             self.show_controls_popup()?;
+            //         }
+            //         3 => {
+            //             self.show_about_popup()?;
+            //         }
+            //         4 => break,
+            //         _ => break,
+            //     },
+            //     Err(MenuError::Exit) => break,
+            //     Err(_) => break,
+            // };
         }
 
         Ok(())
@@ -333,19 +334,20 @@ impl App {
                     Ok(TermEvent::Key(key_event)) => {
                         if game_state.handle_event(key_event).is_err() {
                             game_state.game.pause().unwrap();
-                            match ui::menu(
-                                &mut self.renderer,
-                                self.settings.get_color_scheme().normals(),
-                                self.settings.get_color_scheme().texts(),
-                                "Paused",
-                                &["Resume", "Main Menu", "Quit"],
-                                None,
-                                false,
-                            )? {
-                                1 => return Err(GameError::Back),
-                                2 => return Err(GameError::FullQuit),
-                                _ => {}
-                            }
+                            // TODO: use menu
+                            // match ui::menu(
+                            //     &mut self.renderer,
+                            //     self.settings.get_color_scheme().normals(),
+                            //     self.settings.get_color_scheme().texts(),
+                            //     "Paused",
+                            //     &["Resume", "Main Menu", "Quit"],
+                            //     None,
+                            //     false,
+                            // )? {
+                            //     1 => return Err(GameError::Back),
+                            //     2 => return Err(GameError::FullQuit),
+                            //     _ => {}
+                            // }
                             game_state.game.resume().unwrap();
                         }
                     }
@@ -415,7 +417,7 @@ impl App {
 
         let maze_pos = {
             let pos = if fits_on_screen {
-                ui::box_center_screen(maze_render_size)?
+                ui::box_center_screen(maze_render_size)
             } else {
                 let last_player_real_pos = helpers::maze_pos_to_real(player_pos);
 
@@ -448,8 +450,7 @@ impl App {
         let player_style = self.settings.get_color_scheme().players();
         let goal_style = self.settings.get_color_scheme().goals();
 
-        // self.renderer.begin()?;
-        let renderer_cell = RefCell::new(&mut self.renderer);
+        let renderer_cell = RefCell::new(self.renderer.frame());
 
         let text_frame = if fits_on_screen {
             Rect::new_sized(maze_pos, maze_render_size - Dims(1, 1)).with_margin(Dims(-1, -2))
@@ -769,11 +770,11 @@ impl App {
         Ok(())
     }
 
-    fn generate_maze(&mut self, game_props: GameProperities) -> Result<Game, GameError> {
+    fn generate_maze(&mut self, game_props: GameProperities) -> Result<RunningGame, GameError> {
         let mut last_progress = f64::MIN;
 
         let msize = game_props.game_mode.size;
-        let res = Game::new_threaded(game_props);
+        let res = RunningGame::new_threaded(game_props);
 
         let (handle, stop_flag, progress) = match res {
             Ok(com) => com,
@@ -895,59 +896,67 @@ impl App {
     }
 
     fn get_game_properities(&mut self) -> Result<GameProperities, GameError> {
-        let (i, &mode) = ui::choice_menu(
-            &mut self.renderer,
-            self.settings.get_color_scheme().normals(),
-            self.settings.get_color_scheme().texts(),
-            "Maze size",
-            &self
-                .settings
-                .get_mazes()
-                .iter()
-                .map(|maze| {
-                    (
-                        GameMode {
-                            size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
-                            is_tower: maze.tower,
-                        },
-                        maze.title.as_str(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-            self.last_selected_preset.or_else(|| {
-                self.settings
-                    .get_mazes()
-                    .iter()
-                    .position(|maze| maze.default)
-            }),
-            false,
-        )?;
+        // let (i, &mode) = ui::choice_menu(
+        //     &mut self.renderer,
+        //     self.settings.get_color_scheme().normals(),
+        //     self.settings.get_color_scheme().texts(),
+        //     "Maze size",
+        //     &self
+        //         .settings
+        //         .get_mazes()
+        //         .iter()
+        //         .map(|maze| {
+        //             (
+        //                 GameMode {
+        //                     size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
+        //                     is_tower: maze.tower,
+        //                 },
+        //                 maze.title.as_str(),
+        //             )
+        //         })
+        //         .collect::<Vec<_>>(),
+        //     self.last_selected_preset.or_else(|| {
+        //         self.settings
+        //             .get_mazes()
+        //             .iter()
+        //             .position(|maze| maze.default)
+        //     }),
+        //     false,
+        // )?;
 
-        self.last_selected_preset = Some(i);
+        // self.last_selected_preset = Some(i);
+        //
+        // let gen = if self.settings.get_dont_ask_for_maze_algo() {
+        //     match self.settings.get_default_maze_gen_algo() {
+        //         MazeGenAlgo::RandomKruskals => RndKruskals::generate,
+        //         MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
+        //     }
+        // } else {
+        //     match ui::menu(
+        //         &mut self.renderer,
+        //         self.settings.get_color_scheme().normals(),
+        //         self.settings.get_color_scheme().texts(),
+        //         "Maze generation algorithm",
+        //         &["Randomized Kruskal's", "Depth-first search"],
+        //         match self.settings.get_default_maze_gen_algo() {
+        //             MazeGenAlgo::RandomKruskals => Some(0),
+        //             MazeGenAlgo::DepthFirstSearch => Some(1),
+        //         },
+        //         true,
+        //     )? {
+        //         0 => RndKruskals::generate,
+        //         1 => DepthFirstSearch::generate,
+        //         _ => panic!(),
+        //     }
+        // };
 
-        let gen = if self.settings.get_dont_ask_for_maze_algo() {
-            match self.settings.get_default_maze_gen_algo() {
-                MazeGenAlgo::RandomKruskals => RndKruskals::generate,
-                MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
-            }
-        } else {
-            match ui::menu(
-                &mut self.renderer,
-                self.settings.get_color_scheme().normals(),
-                self.settings.get_color_scheme().texts(),
-                "Maze generation algorithm",
-                &["Randomized Kruskal's", "Depth-first search"],
-                match self.settings.get_default_maze_gen_algo() {
-                    MazeGenAlgo::RandomKruskals => Some(0),
-                    MazeGenAlgo::DepthFirstSearch => Some(1),
-                },
-                true,
-            )? {
-                0 => RndKruskals::generate,
-                1 => DepthFirstSearch::generate,
-                _ => panic!(),
-            }
+        // TODO: use menu
+        let mode = GameMode {
+            size: Dims3D(10, 10, 1),
+            is_tower: false,
         };
+
+        let gen = RndKruskals::generate;
 
         Ok(GameProperities {
             game_mode: mode,
@@ -956,7 +965,7 @@ impl App {
     }
 }
 
-impl Default for App {
+impl Default for Game {
     fn default() -> Self {
         Self::new()
     }

@@ -1,20 +1,20 @@
 use std::{cell::RefCell, ops::DerefMut};
 
 use crate::core::*;
-use crate::renderer::Renderer;
+use crate::renderer::{Frame, Renderer};
 
 use crossterm::style::ContentStyle;
 
 pub use substring::Substring;
 
 pub fn draw_box<'a>(
-    mut renderer: impl DerefMut<Target = &'a mut Renderer>,
+    mut frame: impl DerefMut<Target = &'a mut Frame>,
     pos: Dims,
     size: Dims,
     style: ContentStyle,
 ) {
     draw_str(
-        &mut *renderer,
+        &mut *frame,
         pos.0,
         pos.1,
         &format!("╭{}╮", "─".repeat(size.0 as usize - 2)),
@@ -22,12 +22,12 @@ pub fn draw_box<'a>(
     );
 
     for y in pos.1 + 1..pos.1 + size.1 - 1 {
-        draw_char(&mut *renderer, pos.0, y, '│', style);
-        draw_char(&mut *renderer, pos.0 + size.0 - 1, y, '│', style);
+        draw_char(&mut *frame, pos.0, y, '│', style);
+        draw_char(&mut *frame, pos.0 + size.0 - 1, y, '│', style);
     }
 
     draw_str(
-        renderer,
+        frame,
         pos.0,
         pos.1 + size.1 - 1,
         &format!("╰{}╯", "─".repeat(size.0 as usize - 2)),
@@ -36,7 +36,7 @@ pub fn draw_box<'a>(
 }
 
 pub fn draw_str<'a>(
-    mut renderer: impl DerefMut<Target = &'a mut Renderer>,
+    mut frame: impl DerefMut<Target = &'a mut Frame>,
     mut x: i32,
     y: i32,
     mut text: &str,
@@ -55,12 +55,11 @@ pub fn draw_str<'a>(
         return;
     }
 
-    // renderer.draw_str(x as u16, y as u16, text, style);
-    renderer.frame().draw((x as u16, y as u16), (text, style));
+    frame.draw((x as u16, y as u16), (text, style));
 }
 
 pub fn draw_char<'a>(
-    mut renderer: impl DerefMut<Target = &'a mut Renderer>,
+    mut frame: impl DerefMut<Target = &'a mut Frame>,
     x: i32,
     y: i32,
     text: char,
@@ -71,7 +70,7 @@ pub fn draw_char<'a>(
     }
 
     // renderer.draw_char(x as u16, y as u16, text, style);
-    renderer.frame().draw((x as u16, y as u16), (text, style));
+    frame.draw((x as u16, y as u16), (text, style));
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,7 +135,7 @@ impl Rect {
 
 #[derive(Clone, Copy)]
 pub struct DrawContext<'a> {
-    pub renderer: &'a RefCell<&'a mut Renderer>,
+    pub renderer: &'a RefCell<&'a mut Frame>,
     pub style: ContentStyle,
     pub frame: Option<Rect>,
 }

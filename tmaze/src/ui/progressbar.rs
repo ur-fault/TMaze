@@ -14,11 +14,11 @@ pub fn render_progress(
     progress: f64,
 ) -> io::Result<()> {
     let progress_size = Dims(title.len() as i32 + 2, 4);
-    let pos = box_center_screen(progress_size)?;
+    let pos = box_center_screen(progress_size);
 
     {
         let mut context = DrawContext {
-            renderer: &RefCell::new(renderer),
+            renderer: &RefCell::new(renderer.frame()),
             style: box_style,
             frame: None,
         };
