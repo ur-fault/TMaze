@@ -8,7 +8,8 @@ use std::cell::RefCell;
 
 use crate::{
     app::{
-        activity::{ActivityHandler, Change},
+        activity::{Activity, ActivityHandler, Change},
+        app::App,
         event::Event,
     },
     helpers::{is_release, value_if},
@@ -66,10 +67,31 @@ impl MenuConfig {
             counted: false,
         }
     }
+
+    pub fn counted(mut self) -> Self {
+        self.counted = true;
+        self
+    }
+
+    pub fn default(mut self, default: usize) -> Self {
+        self.default = Some(default);
+        self
+    }
+
+    pub fn box_style(mut self, style: ContentStyle) -> Self {
+        self.box_style = style;
+        self
+    }
+
+    pub fn text_style(mut self, style: ContentStyle) -> Self {
+        self.text_style = style;
+        self
+    }
 }
 
 pub struct Menu {
     config: MenuConfig,
+    shown_options: Vec<String>,
     selected: isize, // for more readable code
 }
 
@@ -96,8 +118,14 @@ impl Menu {
 
         Self {
             config,
+            shown_options: options,
             selected: 0,
         }
+    }
+
+    pub fn into_activity(self, app: &App) -> Activity {
+        let name = format!("menu at {}", app.activity_count());
+        Activity::new("tmaze", name, Box::new(self))
     }
 }
 
@@ -107,13 +135,11 @@ impl ActivityHandler for Menu {
 
         for event in events {
             match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. }))
-                    if !is_release(kind) =>
-                {
+                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
                         KeyCode::Up | KeyCode::Char('w' | 'W') => {
                             // negative numbers wrap around zero
-                            self.selected = (self.selected).rem_euclid(opt_count);
+                            self.selected = (self.selected - 1).rem_euclid(opt_count);
                         }
                         KeyCode::Down | KeyCode::Char('s' | 'S') => {
                             self.selected = (self.selected + 1) % opt_count
@@ -157,10 +183,12 @@ impl Screen for Menu {
             box_style,
             text_style,
             title,
-            options,
             counted,
             ..
         } = &self.config;
+
+        let options = &self.shown_options;
+
         let menu_size = menu_size(title, options, *counted);
         let pos = box_center_screen(menu_size);
         let opt_count = options.len();

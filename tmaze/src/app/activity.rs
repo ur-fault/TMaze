@@ -9,27 +9,9 @@ use super::event::Event;
 
 pub type ActivityResult = Box<dyn Any>;
 
-pub struct Acitivties {
+pub struct Activities {
     activities: Vec<Activity>,
 }
-
-// pub struct StackChanges {
-//     changes: Vec<Change>,
-// }
-//
-// impl StackChanges {
-//     pub fn push(&mut self, activity: Activity) {
-//         self.changes.push(Change::Push(activity));
-//     }
-//
-//     pub fn pop(&mut self, n: usize) {
-//         self.changes.push(Change::Pop { n, result: None });
-//     }
-//
-//     pub fn pop_top(&mut self) {
-//         self.pop(1);
-//     }
-// }
 
 pub enum Change {
     Push(Activity),
@@ -42,10 +24,16 @@ pub enum Change {
     },
 }
 
-impl Acitivties {
+impl Activities {
     pub fn new(base: Activity) -> Self {
         Self {
             activities: vec![base],
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            activities: vec![],
         }
     }
 
@@ -57,6 +45,10 @@ impl Acitivties {
         self.activities.pop();
     }
 
+    pub fn pop_n(&mut self, n: usize) {
+        self.activities.truncate(self.activities.len() - n);
+    }
+
     pub fn active(&self) -> Option<&Activity> {
         self.activities.last()
     }
@@ -65,34 +57,35 @@ impl Acitivties {
         self.activities.last_mut()
     }
 
-    pub fn update(&mut self, events: Vec<Event>) -> bool {
-        if let Some(activity) = self.activities.last_mut() {
-            let stack_change = activity.handler.update(events);
-
-            if let Some(change) = stack_change {
-                match change {
-                    Change::Push(activity) => self.push(activity),
-                    Change::Pop { n, res: _ } => {
-                        self.activities.truncate(self.activities.len() - n);
-
-                        if let Some(active) = self.active_mut() {
-                            active.handler.update(vec![]);
-                        }
-                    }
-                    Change::PopTop { res: _ } => {
-                        self.activities.pop();
-
-                        if let Some(active) = self.active_mut() {
-                            active.handler.update(vec![]);
-                        }
-                    }
-                }
-            }
-
-            return false;
-        } else {
+    pub fn update(&mut self, mut events: Vec<Event>) -> bool {
+        if self.active().is_none() {
             return true;
         }
+
+        while let Some(change) = self
+            .active_mut()
+            .expect("No active activity")
+            // clone vec while clearing it
+            .update(events.drain(..).collect())
+        {
+            match change {
+                Change::Push(activity) => self.activities.push(activity),
+                Change::Pop { n, res } => {
+                    self.pop_n(n);
+                    events.push(Event::ActiveAfterPop(res));
+                }
+                Change::PopTop { res } => {
+                    self.activities.pop();
+                    events.push(Event::ActiveAfterPop(res));
+                }
+            }
+        }
+
+        return false;
+    }
+
+    pub fn len(&self) -> usize {
+        self.activities.len()
     }
 }
 

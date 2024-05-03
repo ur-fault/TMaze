@@ -1,10 +1,6 @@
 use std::io;
 
-use tmaze::{
-    app::{activity::Activity, app::App},
-    renderer::Renderer,
-    ui::{menu, Menu},
-};
+use tmaze::{app::app::App, ui::menu};
 
 fn main() -> io::Result<()> {
     let menu_config = menu::MenuConfig::new(
@@ -14,11 +10,14 @@ fn main() -> io::Result<()> {
             "Option 2".to_string(),
             "Option 3".to_string(),
         ],
-    );
+    )
+    .counted()
+    .default(1);
 
-    let menu = Menu::new(menu_config);
+    let mut app = App::empty();
 
-    let mut app = App::new(Activity::new("example", "menu", Box::new(menu)));
+    let menu = menu::Menu::new(menu_config).into_activity(&app);
+    app.activities_mut().push(menu);
 
     app.run();
 
