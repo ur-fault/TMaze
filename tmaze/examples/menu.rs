@@ -1,8 +1,6 @@
-use std::io;
-
 use tmaze::{app::app::App, ui::menu};
 
-fn main() -> io::Result<()> {
+fn main() {
     let menu_config = menu::MenuConfig::new(
         "Menu",
         vec![
@@ -20,6 +18,4 @@ fn main() -> io::Result<()> {
     app.activities_mut().push(menu);
 
     app.run();
-
-    Ok(())
 }
