@@ -12,6 +12,9 @@ fn main() {
     .counted()
     .default(1);
 
+    // We cannot create an App with menu now,
+    // since menu needs &App to correctly name itself.
+    // Otherwise we could create menu activity manually.
     let mut app = App::empty();
 
     let menu = menu::Menu::new(menu_config).into_activity(&app);
