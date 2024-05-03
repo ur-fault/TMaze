@@ -8,13 +8,13 @@ use crate::renderer::Renderer;
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
 use super::{
-    activity::{Acitivties, Activity},
+    activity::{Activities, Activity, Change},
     event::Event,
 };
 
 pub struct App {
     renderer: Renderer,
-    activities: Acitivties,
+    activities: Activities,
 
     #[cfg(feature = "sound")]
     sound_player: SoundPlayer,
@@ -25,7 +25,7 @@ pub struct App {
 impl App {
     pub fn new(base_activity: Activity) -> Self {
         let renderer = Renderer::new().expect("Failed to create renderer");
-        let activities = Acitivties::new(base_activity);
+        let activities = Activities::new(base_activity);
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new();
@@ -33,6 +33,25 @@ impl App {
         Self {
             renderer,
             activities,
+
+            #[cfg(feature = "sound")]
+            sound_player,
+            #[cfg(feature = "sound")]
+            bgm_track: None,
+        }
+    }
+
+    pub fn empty() -> Self {
+        let renderer = Renderer::new().expect("Failed to create renderer");
+        let activities = Activities::empty();
+
+        #[cfg(feature = "sound")]
+        let sound_player = SoundPlayer::new();
+
+        Self {
+            renderer,
+            activities,
+
             #[cfg(feature = "sound")]
             sound_player,
             #[cfg(feature = "sound")]
@@ -42,8 +61,6 @@ impl App {
 
     pub fn run(&mut self) {
         loop {
-            let activity = self.activities.active().expect("No active activity");
-
             let mut events = vec![];
 
             if let Ok(true) = crossterm::event::poll(Duration::from_millis(90)) {
@@ -52,9 +69,45 @@ impl App {
                 events.push(Event::Term(event));
             }
 
-            activity.screen().draw(&mut self.renderer.frame()).unwrap();
+            while let Some(change) = self
+                .activities
+                .active_mut()
+                .expect("No active activity")
+                .update(events.drain(..).collect())
+            {
+                match change {
+                    Change::Push(activity) => self.activities.push(activity),
+                    Change::Pop { n, res } => {
+                        self.activities.pop_n(n);
+                        events.push(Event::ActiveAfterPop(res));
+                    }
+                    Change::PopTop { res } => {
+                        self.activities.pop();
+                        events.push(Event::ActiveAfterPop(res));
+                    }
+                }
+            }
+
+            self.activities
+                .active()
+                .expect("No active active")
+                .screen()
+                .draw(&mut self.renderer.frame())
+                .unwrap();
 
             self.renderer.show().unwrap();
         }
+    }
+
+    pub fn activity_count(&self) -> usize {
+        self.activities.len()
+    }
+
+    pub fn activities(&self) -> &Activities {
+        &self.activities
+    }
+
+    pub fn activities_mut(&mut self) -> &mut Activities {
+        &mut self.activities
     }
 }
