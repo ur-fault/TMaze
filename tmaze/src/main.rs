@@ -1,6 +1,6 @@
 use tmaze::*;
 
-use app::{App, GameError};
+use app::{Game, GameError};
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -39,5 +39,5 @@ fn main() -> Result<(), GameError> {
         return Ok(());
     }
 
-    App::new().run()
+    Game::new().run()
 }

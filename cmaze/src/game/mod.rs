@@ -44,12 +44,12 @@ pub enum MoveMode {
 }
 
 pub type GameConstructorComunication = (
-    JoinHandle<Result<Game, GenerationErrorThreaded>>,
+    JoinHandle<Result<RunningGame, GenerationErrorThreaded>>,
     StopGenerationFlag,
     Receiver<Progress>,
 );
 
-pub struct Game {
+pub struct RunningGame {
     maze: Maze,
     state: GameState,
     game_mode: GameMode,
@@ -61,7 +61,7 @@ pub struct Game {
     moves: Vec<(Dims3D, CellWall)>,
 }
 
-impl Game {
+impl RunningGame {
     pub fn new_threaded(
         props: GameProperities,
     ) -> Result<GameConstructorComunication, GenerationErrorInstant> {
@@ -83,7 +83,7 @@ impl Game {
         Ok((
             thread::spawn(move || {
                 let maze = maze_handle.join().unwrap()?;
-                Ok(Game {
+                Ok(RunningGame {
                     maze,
                     state: GameState::NotStarted,
                     game_mode: maze_mode,

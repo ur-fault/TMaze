@@ -1,32 +1,26 @@
 use std::io;
 
-use crossterm::style::ContentStyle;
 use tmaze::{
+    app::{activity::Activity, app::App},
     renderer::Renderer,
-    ui::{menu, MenuError},
+    ui::{menu, Menu},
 };
 
 fn main() -> io::Result<()> {
-    let mut renderer = Renderer::new()?;
-
-    let res = menu::menu(
-        &mut renderer,
-        ContentStyle::default(),
-        ContentStyle::default(),
+    let menu_config = menu::MenuConfig::new(
         "Menu",
-        &["Option 1", "Option 2", "Option 3"],
-        Some(0),
-        true,
+        vec![
+            "Option 1".to_string(),
+            "Option 2".to_string(),
+            "Option 3".to_string(),
+        ],
     );
 
-    drop(renderer);
+    let menu = Menu::new(menu_config);
 
-    match res {
-        Ok(i) => println!("Selected option {}", i),
-        Err(MenuError::CrosstermError(err)) => return Err(err),
-        Err(MenuError::EmptyMenu) => println!("No options"),
-        _ => {}
-    }
+    let mut app = App::new(Activity::new("example", "menu", Box::new(menu)));
+
+    app.run();
 
     Ok(())
 }

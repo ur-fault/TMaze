@@ -48,12 +48,12 @@ pub fn render_popup(
     texts: &[&str],
 ) -> io::Result<()> {
     let box_size = popup_size(title, texts);
-    let title_pos = box_center_screen(Dims(title.len() as i32 + 2, 1))?.0;
-    let pos = box_center_screen(box_size)?;
+    let title_pos = box_center_screen(Dims(title.len() as i32 + 2, 1)).0;
+    let pos = box_center_screen(box_size);
 
     {
         let mut context = DrawContext {
-            renderer: &RefCell::new(renderer),
+            renderer: &RefCell::new(renderer.frame()),
             style: box_style,
             frame: None,
         };

@@ -6,7 +6,7 @@ pub mod game_state;
 
 use std::io;
 
-pub use game::App;
+pub use game::Game;
 pub use game_state::GameViewMode;
 use thiserror::Error;
 
