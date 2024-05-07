@@ -18,9 +18,9 @@ pub fn render_progress(
 
     {
         let mut context = DrawContext {
-            renderer: &RefCell::new(renderer.frame()),
+            frame: &RefCell::new(renderer.frame()),
             style: box_style,
-            frame: None,
+            rect: None,
         };
 
         context.draw_box(pos, progress_size);

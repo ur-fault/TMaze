@@ -60,20 +60,25 @@ impl App {
     }
 
     pub fn run(&mut self) {
-        loop {
+        'mainloop: loop {
             let mut events = vec![];
 
-            if let Ok(true) = crossterm::event::poll(Duration::from_millis(90)) {
-                let event = read().unwrap();
+            log::info!("Polling events");
 
+            let mut delay = 45;
+            while let Ok(true) = crossterm::event::poll(Duration::from_millis(delay)) {
+                let event = read().unwrap();
                 events.push(Event::Term(event));
+
+                // just so we read all events in the frame
+                delay = 1;
             }
 
-            while let Some(change) = self
-                .activities
-                .active_mut()
-                .expect("No active activity")
-                .update(events.drain(..).collect())
+            while let Some(change) = match self.activities.active_mut() {
+                Some(active) => active,
+                None => break 'mainloop,
+            }
+            .update(events.drain(..).collect())
             {
                 match change {
                     Change::Push(activity) => self.activities.push(activity),

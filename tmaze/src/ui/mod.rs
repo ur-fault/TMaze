@@ -18,5 +18,5 @@ pub use popup::*;
 pub use progressbar::*;
 
 pub trait Screen {
-    fn draw(&self, renderer: &mut Frame) -> Result<(), io::Error>;
+    fn draw(&self, frame: &mut Frame) -> io::Result<()>;
 }

@@ -1,42 +1,45 @@
 use std::io;
 
-use cmaze::gameboard::Dims;
-use crossterm::style::ContentStyle;
-use tmaze::{renderer::Renderer, ui::draw};
+use tmaze::{
+    app::{Activity, ActivityHandler, App, Change, Event},
+    helpers::is_release,
+    renderer::Frame,
+    ui::Screen,
+};
 
-fn main() -> io::Result<()> {
-    let mut renderer = Renderer::new()?;
+use crossterm::event::{Event as TermEvent, KeyEvent};
 
-    let mut events = vec![];
+fn main() {
+    let mut app = App::new(Activity::new("example", "box", Box::new(MyActivity)));
 
-    loop {
-        draw::draw_box(
-            &mut &mut renderer,
-            Dims(0, 0),
-            Dims(10, 10),
-            ContentStyle::default(),
-        );
-        renderer.show()?;
+    log::info!("Starting app");
 
-        let event = crossterm::event::read()?;
-        events.push(event.clone());
+    app.run();
+}
 
-        match event {
-            crossterm::event::Event::Key(crossterm::event::KeyEvent {
-                code:
-                    crossterm::event::KeyCode::Char('q')
-                    | crossterm::event::KeyCode::Esc
-                    | crossterm::event::KeyCode::Enter,
-                kind,
-                ..
-            }) if kind != crossterm::event::KeyEventKind::Release => break,
-            _ => {}
+struct MyActivity;
+
+impl ActivityHandler for MyActivity {
+    fn update(&mut self, events: Vec<Event>) -> Option<Change> {
+        for event in events {
+            match event {
+                Event::Term(TermEvent::Key(KeyEvent { kind, .. })) if !is_release(kind) => {
+                    return Some(Change::PopTop { res: None });
+                }
+                _ => {}
+            }
         }
+
+        None
     }
 
-    drop(renderer);
+    fn screen(&self) -> &dyn Screen {
+        self
+    }
+}
 
-    println!("Events: {:#?}", events);
-
-    Ok(())
+impl Screen for MyActivity {
+    fn draw(&self, frame: &mut Frame) -> io::Result<()> {
+        Ok(())
+    }
 }

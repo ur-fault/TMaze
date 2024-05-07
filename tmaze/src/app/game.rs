@@ -460,24 +460,24 @@ impl Game {
         let frame = text_frame.with_margin(Dims(1, 2));
 
         let mut normal_context = DrawContext {
-            renderer: &renderer_cell,
+            frame: &renderer_cell,
             style: normal_style,
-            frame: frame.into(),
+            rect: frame.into(),
         };
         let mut text_context = DrawContext {
-            renderer: &renderer_cell,
+            frame: &renderer_cell,
             style: text_style,
-            frame: text_frame.into(),
+            rect: text_frame.into(),
         };
         let mut player_context = DrawContext {
-            renderer: &renderer_cell,
+            frame: &renderer_cell,
             style: player_style,
-            frame: frame.into(),
+            rect: frame.into(),
         };
         let mut goal_context = DrawContext {
-            renderer: &renderer_cell,
+            frame: &renderer_cell,
             style: goal_style,
-            frame: frame.into(),
+            rect: frame.into(),
         };
 
         let box_frame = text_frame.with_margin(Dims(0, 1));
