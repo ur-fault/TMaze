@@ -112,6 +112,10 @@ impl Activity {
     pub fn new_base(name: impl Into<String>, handler: Box<dyn ActivityHandler>) -> Self {
         Self::new("tmaze".to_string(), name.into(), handler)
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 impl Deref for Activity {

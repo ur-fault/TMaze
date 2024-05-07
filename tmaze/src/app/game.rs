@@ -5,8 +5,7 @@ use cmaze::{
     game::{GameProperities, GameState, RunningGame},
     gameboard::{
         algorithms::{
-            DepthFirstSearch, GenerationErrorInstant, GenerationErrorThreaded, MazeAlgorithm,
-            Progress, RndKruskals,
+            GenerationErrorInstant, GenerationErrorThreaded, MazeAlgorithm, Progress, RndKruskals,
         },
         Cell, CellWall,
     },
@@ -17,8 +16,8 @@ use crate::{
     data::SaveData,
     helpers::{self, constants, value_if_else, LineDir, ToDebug},
     renderer::{helpers::term_size, Renderer},
-    settings::{editable::EditableField, CameraMode, MazeGenAlgo, Settings},
-    ui::{self, DrawContext, MenuError, Rect},
+    settings::{editable::EditableField, CameraMode, Settings},
+    ui::{self, DrawContext, Rect},
 };
 
 #[cfg(feature = "sound")]

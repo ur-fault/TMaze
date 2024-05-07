@@ -60,10 +60,10 @@ impl App {
     }
 
     pub fn run(&mut self) {
+        log::info!("Starting main loop");
+
         'mainloop: loop {
             let mut events = vec![];
-
-            log::info!("Polling events");
 
             let mut delay = 45;
             while let Ok(true) = crossterm::event::poll(Duration::from_millis(delay)) {
@@ -75,7 +75,10 @@ impl App {
             }
 
             while let Some(change) = match self.activities.active_mut() {
-                Some(active) => active,
+                Some(active) => {
+                    log::info!("New frame with activity: '{}'", active.name());
+                    active
+                }
                 None => break 'mainloop,
             }
             .update(events.drain(..).collect())
@@ -114,5 +117,9 @@ impl App {
 
     pub fn activities_mut(&mut self) -> &mut Activities {
         &mut self.activities
+    }
+
+    pub fn active_name(&self) -> Option<&str> {
+        self.activities.active().map(|a| a.name())
     }
 }

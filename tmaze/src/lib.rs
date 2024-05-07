@@ -1,7 +1,8 @@
+pub mod app;
 pub mod constants;
 pub mod data;
-pub mod app;
 pub mod helpers;
+pub mod logging;
 pub mod renderer;
 pub mod settings;
 #[cfg(feature = "sound")]
