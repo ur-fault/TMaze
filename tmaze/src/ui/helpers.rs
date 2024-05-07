@@ -1,4 +1,4 @@
-use std::{io, time::Duration};
+use std::time::Duration;
 
 use cmaze::core::Dims;
 

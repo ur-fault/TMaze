@@ -1,7 +1,7 @@
 use std::{cell::RefCell, ops::DerefMut};
 
 use crate::core::*;
-use crate::renderer::{Frame, Renderer};
+use crate::renderer::Frame;
 
 use crossterm::style::ContentStyle;
 

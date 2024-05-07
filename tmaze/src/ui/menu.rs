@@ -198,47 +198,45 @@ impl Screen for Menu {
 
         let max_count = opt_count.to_string().len();
 
-        {
-            let mut context = DrawContext {
-                frame: &RefCell::new(renderer),
-                style: *box_style,
-                rect: None,
+        let mut context = DrawContext {
+            frame: &RefCell::new(renderer),
+            style: *box_style,
+            rect: None,
+        };
+
+        context.draw_box(pos, menu_size);
+
+        context.draw_str_styled(pos + Dims(3, 1), title, *text_style);
+        context.draw_str(pos + Dims(1, 2), &"─".repeat(menu_size.0 as usize - 2));
+
+        for (i, option) in options.iter().enumerate() {
+            let style = if i == self.selected as usize {
+                ContentStyle {
+                    background_color: Some(text_style.foreground_color.unwrap_or(Color::White)),
+                    foreground_color: Some(text_style.background_color.unwrap_or(Color::Black)),
+                    underline_color: None,
+                    attributes: Default::default(),
+                }
+            } else {
+                *text_style
             };
 
-            context.draw_box(pos, menu_size);
-
-            context.draw_str_styled(pos + Dims(3, 1), title, *text_style);
-            context.draw_str(pos + Dims(1, 2), &"─".repeat(menu_size.0 as usize - 2));
-
-            for (i, option) in options.iter().enumerate() {
-                let style = if i == self.selected as usize {
-                    ContentStyle {
-                        background_color: Some(text_style.foreground_color.unwrap_or(Color::White)),
-                        foreground_color: Some(text_style.background_color.unwrap_or(Color::Black)),
-                        underline_color: None,
-                        attributes: Default::default(),
-                    }
-                } else {
-                    *text_style
-                };
-
-                context.draw_str_styled(
-                    pos + Dims(1, i as i32 + 3),
-                    &format!(
-                        "{} {}{}",
-                        if i == self.selected as usize {
-                            ">"
-                        } else {
-                            " "
-                        },
-                        value_if(*counted, || format!("{}.", i + 1)
-                            .pad_to_width((max_count as f64).log10().floor() as usize + 3)),
-                        option,
-                    )
-                    .pad_to_width(menu_size.0 as usize - 2),
-                    style,
-                );
-            }
+            context.draw_str_styled(
+                pos + Dims(1, i as i32 + 3),
+                &format!(
+                    "{} {}{}",
+                    if i == self.selected as usize {
+                        ">"
+                    } else {
+                        " "
+                    },
+                    value_if(*counted, || format!("{}.", i + 1)
+                        .pad_to_width((max_count as f64).log10().floor() as usize + 3)),
+                    option,
+                )
+                .pad_to_width(menu_size.0 as usize - 2),
+                style,
+            );
         }
 
         Ok(())
