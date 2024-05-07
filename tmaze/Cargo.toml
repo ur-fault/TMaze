@@ -29,6 +29,7 @@ tap = "1.0.1"
 thiserror = "1.0.48"
 humantime = "2.1.0"
 chrono = { version = "0.4.30", features = ["serde"] }
+log = "0.4"
 
 # optional 
 crates_io_api = { version = "0.8.1", optional = true, default-features = false, features = ["rustls"] }
