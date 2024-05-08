@@ -1083,10 +1083,10 @@ impl ActivityHandler for MainMenu {
                     .expect("menu should return index");
                 match index {
                     0 /* new game */ => todo!(),
-                    1 /* settings */ =>Some(self.show_settings_screen(&data.settings)),
-                    2 /* controls */ =>Some(self.show_controls_popup()),
-                    3 /* about    */ =>Some(self.show_about_popup()),
-                    4 /* quit     */ =>Some(Change::pop_top()),
+                    1 /* settings */ => Some(self.show_settings_screen(&data.settings)),
+                    2 /* controls */ => Some(self.show_controls_popup()),
+                    3 /* about    */ => Some(self.show_about_popup()),
+                    4 /* quit     */ => Some(Change::pop_top()),
                     _ => panic!("main menu should only return valid index between 0 and 4"),
                 }
             }
