@@ -1,6 +1,7 @@
 use tmaze::*;
 
 use app::{Game, GameError};
+
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -14,8 +15,19 @@ struct Args {
     debug_config: bool,
 }
 
+macro_rules! testmacro {
+    (eof $( $x:expr ),*) => {
+        println!("eof");
+    };
+    ( $x:expr, $( $y:expr ),* ) => {
+        println!("not eof");
+    };
+}
+
 fn main() -> Result<(), GameError> {
     let _args = Args::parse();
+
+    println!("gjklfdgh, {} {},. dfdsfg", 5, true);
 
     if _args.reset_config {
         settings::Settings::reset_config(settings::Settings::default_path());
@@ -39,5 +51,15 @@ fn main() -> Result<(), GameError> {
         return Ok(());
     }
 
+    testmacro!(eof 1, 2, 3);
+
     Game::new().run()
+}
+
+fn f1() {
+    f2()
+}
+
+fn f2() {
+    f1()
 }

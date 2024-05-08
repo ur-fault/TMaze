@@ -34,7 +34,7 @@ pub fn popup(
             }
         }
 
-        renderer.on_event(&event)?;
+        renderer.on_event(&event);
 
         render_popup(renderer, box_style, text_style, title, texts)?;
     }
