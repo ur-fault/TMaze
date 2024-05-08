@@ -1,6 +1,6 @@
 # TMaze
 
-Simple multiplatform maze solving game for terminal written entirely in  Rust
+Simple multiplatform maze solving game for terminal, written entirely in Rust
 
 ### Install with `cargo install tmaze` and run with `tmaze`
 ---
@@ -43,15 +43,16 @@ And it ended up as maze solving game because I just couldn't find any other.
 - Everything else - [me, ie. ur-fault](https://github.com/ur-fault)
 
 ## How to run
-- You can either download from [Github releases](https://github.com/ur-fault/TMaze/releases), they are built automatically now, using GitHub Actions ~~althought there are old builds, and I won't update them so frequently, maybe in the future~~
+- You can either:
+- Download from [Github releases](https://github.com/ur-fault/TMaze/releases), they are built automatically now, using GitHub Actions
 - Install it with your favorite package manager
-- Build from source, you need cargo installed on your system
+- Build from source (you need cargo installed on your system)
 
 ### Using package managers
 #### Scoop - Scoop's official repository
 1. Make sure you have the latest version of Scoop installed
 2. Add games bucket using `scoop bucket add games` if you did not before
-3. And finally install tmaze with `scoop install games/tmaze`
+3. And finally, install tmaze with `scoop install games/tmaze`
 
 #### Scoop - Henshouse repository
 1. Make sure you have the latest version of Scoop installed
@@ -59,7 +60,7 @@ And it ended up as maze solving game because I just couldn't find any other.
 3. And finally install tmaze with `scoop install henshouse/tmaze`
 
 ### Feature flags
-TMaze uses cargo features to enable/disable some features. In Github release binaries they are all enabled, ~~but not all of them are enabled by default when building from source.~~ From version 1.14.0 all features are enabled by default and should be disabled manually. To disable them, use `--no-default-features` flag. After disabling them, enable specific ones you want with `--features <feature1>,<feature2>,...` flag.
+TMaze uses cargo features to enable/disable some features. In Github release binaries, they are all enabled. From version 1.14.0, all features are enabled by default and should be disabled manually. To disable them, use `--no-default-features` flag. After disabling them, enable specific ones you want with `--features <feature1>,<feature2>,...` flag.
 
 The features are:
 
