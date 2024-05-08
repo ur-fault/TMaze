@@ -150,18 +150,11 @@ impl ActivityHandler for Menu {
                         KeyCode::Enter | KeyCode::Char(' ') => {
                             return Some(Change::PopTop(Some(Box::new(self.selected))))
                         }
-                        KeyCode::Char(ch) => {
-                            if self.config.counted {
-                                self.selected = match ch {
-                                    'q' | 'Q' => {
-                                        return Some(Change::PopTop(None));
-                                    }
-                                    '1'..='9' => ch as isize - '1' as isize,
-                                    _ => self.selected,
-                                }
-                                .clamp(0, opt_count - 1);
-                            }
+                        KeyCode::Char('q' | 'Q') => return Some(Change::PopTop(None)),
+                        KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
+                            self.selected = (ch as isize - '1' as isize).clamp(0, opt_count - 1);
                         }
+                        KeyCode::Char(_) => {}
                         KeyCode::Esc => return Some(Change::PopTop(None)),
                         _ => {}
                     }
