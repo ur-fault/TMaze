@@ -1021,7 +1021,7 @@ impl MainMenu {
             "Settings".to_string(),
             vec![
                 "Path to the current settings:".to_string(),
-                settings.path().to_string_lossy().to_string(),
+                format!(" {}", settings.path().to_string_lossy().to_string()),
             ],
         );
 
