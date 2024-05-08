@@ -1006,7 +1006,7 @@ impl MainMenu {
                     "New Game".to_string(),
                     "Settings".to_string(),
                     "Controls".to_string(),
-                    "Controls".to_string(),
+                    "About".to_string(),
                     "Quit".to_string(),
                 ],
             )
