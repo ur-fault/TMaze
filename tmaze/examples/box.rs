@@ -3,7 +3,7 @@ use std::io;
 use tmaze::{
     app::{Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
-    renderer::Frame,
+    renderer::{Cell, Frame},
     ui::Screen,
 };
 
@@ -24,7 +24,7 @@ impl ActivityHandler for MyActivity {
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { kind, .. })) if !is_release(kind) => {
-                    return Some(Change::PopTop { res: None });
+                    return Some(Change::PopTop(None));
                 }
                 _ => {}
             }
@@ -40,6 +40,12 @@ impl ActivityHandler for MyActivity {
 
 impl Screen for MyActivity {
     fn draw(&self, frame: &mut Frame) -> io::Result<()> {
+        for y in 0..5 {
+            for x in 0..5 {
+                frame.set((x, y), Cell::new('█'));
+            }
+        }
+
         Ok(())
     }
 }

@@ -48,7 +48,7 @@ impl Renderer {
             crossterm::terminal::EnterAlternateScreen,
         )?;
 
-        self.on_resize(None)?;
+        self.on_resize(None);
 
         Ok(())
     }
@@ -89,21 +89,17 @@ impl Renderer {
         }
     }
 
-    fn on_resize(&mut self, size: Option<Pos>) -> io::Result<()> {
+    fn on_resize(&mut self, size: Option<Pos>) {
         self.size = size.unwrap_or_else(|| crossterm::terminal::size().unwrap());
         self.shown.resize(self.size);
         self.hidden.resize(self.size);
         self.full_redraw = true;
-
-        Ok(())
     }
 
-    pub fn on_event(&mut self, event: &Event) -> io::Result<()> {
+    pub fn on_event(&mut self, event: &Event) {
         if let Event::Resize(x, y) = event {
-            self.on_resize(Some((*x, *y)))?
+            self.on_resize(Some((*x, *y)))
         }
-
-        Ok(())
     }
 
     pub fn frame(&mut self) -> &mut Frame {

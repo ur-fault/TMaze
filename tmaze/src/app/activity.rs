@@ -19,9 +19,7 @@ pub enum Change {
         n: usize,
         res: Option<ActivityResult>,
     },
-    PopTop {
-        res: Option<ActivityResult>,
-    },
+    PopTop(Option<ActivityResult>),
 }
 
 impl Activities {
@@ -32,9 +30,7 @@ impl Activities {
     }
 
     pub fn empty() -> Self {
-        Self {
-            activities: vec![],
-        }
+        Self { activities: vec![] }
     }
 
     pub fn push(&mut self, activity: Activity) {
@@ -74,7 +70,7 @@ impl Activities {
                     self.pop_n(n);
                     events.push(Event::ActiveAfterPop(res));
                 }
-                Change::PopTop { res } => {
+                Change::PopTop(res) => {
                     self.activities.pop();
                     events.push(Event::ActiveAfterPop(res));
                 }

@@ -356,7 +356,7 @@ impl Game {
                     _ => {}
                 }
 
-                self.renderer.on_event(&event.unwrap())?;
+                self.renderer.on_event(&event.unwrap());
             }
 
             self.render_game(&game_state, self.settings.get_camera_mode(), is_tower, 1)?;

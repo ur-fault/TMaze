@@ -1,8 +1,11 @@
-use std::time::Duration;
+use std::time::{self, Duration};
 
 use crossterm::event::read;
 
-use crate::renderer::Renderer;
+use crate::{
+    logging,
+    renderer::{drawable::Drawable, Renderer},
+};
 
 #[cfg(feature = "sound")]
 use crate::sound::{track::MusicTrack, SoundPlayer};
@@ -26,6 +29,8 @@ impl App {
     pub fn new(base_activity: Activity) -> Self {
         let renderer = Renderer::new().expect("Failed to create renderer");
         let activities = Activities::new(base_activity);
+
+        logging::init();
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new();
@@ -60,7 +65,7 @@ impl App {
     }
 
     pub fn run(&mut self) {
-        log::info!("Starting main loop");
+        log::trace!("Starting main loop");
 
         'mainloop: loop {
             let mut events = vec![];
@@ -68,6 +73,9 @@ impl App {
             let mut delay = 45;
             while let Ok(true) = crossterm::event::poll(Duration::from_millis(delay)) {
                 let event = read().unwrap();
+
+                self.renderer.on_event(&event);
+
                 events.push(Event::Term(event));
 
                 // just so we read all events in the frame
@@ -76,7 +84,7 @@ impl App {
 
             while let Some(change) = match self.activities.active_mut() {
                 Some(active) => {
-                    log::info!("New frame with activity: '{}'", active.name());
+                    log::trace!("Active activity: '{}'", active.name());
                     active
                 }
                 None => break 'mainloop,
@@ -88,10 +96,12 @@ impl App {
                     Change::Pop { n, res } => {
                         self.activities.pop_n(n);
                         events.push(Event::ActiveAfterPop(res));
+                        log::trace!("Popped {} activities", n);
                     }
-                    Change::PopTop { res } => {
+                    Change::PopTop(res) => {
                         self.activities.pop();
                         events.push(Event::ActiveAfterPop(res));
+                        log::trace!("Popped top activity");
                     }
                 }
             }
@@ -100,8 +110,10 @@ impl App {
                 .active()
                 .expect("No active active")
                 .screen()
-                .draw(&mut self.renderer.frame())
+                .draw(self.renderer.frame())
                 .unwrap();
+
+            logging::get_logger().draw((0, 0), self.renderer.frame());
 
             self.renderer.show().unwrap();
         }
