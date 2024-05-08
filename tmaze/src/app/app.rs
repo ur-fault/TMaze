@@ -11,7 +11,7 @@ use crate::{
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
 use super::{
-    activity::{Activities, Activity, Change},
+    activity::{Activities, Activity, ActivityResult, Change},
     event::Event,
 };
 
@@ -65,10 +65,10 @@ impl App {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Option<ActivityResult> {
         log::trace!("Starting main loop");
 
-        'mainloop: loop {
+        let rem_events = 'mainloop: loop {
             let mut events = vec![];
 
             let mut delay = 45;
@@ -88,7 +88,7 @@ impl App {
                     log::trace!("Active activity: '{}'", active.name());
                     active
                 }
-                None => break 'mainloop,
+                None => break 'mainloop events,
             }
             .update(events.drain(..).collect())
             {
@@ -117,7 +117,16 @@ impl App {
             logging::get_logger().draw((0, 0), self.renderer.frame());
 
             self.renderer.show().unwrap();
-        }
+        };
+
+        log::trace!("Main loop ended");
+
+        let res = rem_events.into_iter().find_map(|e| match e {
+            Event::ActiveAfterPop(Some(res)) => Some(res),
+            _ => None,
+        });
+
+        res
     }
 
     pub fn activity_count(&self) -> usize {

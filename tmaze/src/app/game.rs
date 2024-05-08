@@ -111,12 +111,12 @@ impl Game {
                 Default::default(),
                 "Checking for newer version",
                 &[
-                    "Please wait...",
-                    &update_interval,
-                    &last_check_before
+                    "Please wait...".to_string(),
+                    update_interval,
+                    last_check_before
                         .map(|lc| format!("Last check before: {}", lc))
                         .unwrap_or("Never checked for updates".to_owned()),
-                    "Press 'q' to cancel or Esc to skip",
+                    "Press 'q' to cancel or Esc to skip".to_string(),
                 ],
             )?;
 
@@ -152,8 +152,8 @@ impl Game {
                         Default::default(),
                         "New version available",
                         &[
-                            format!("New version {} is available", version).as_str(),
-                            format!("Your version is {}", env!("CARGO_PKG_VERSION")).as_str(),
+                            format!("New version {} is available", version),
+                            format!("Your version is {}", env!("CARGO_PKG_VERSION")),
                         ],
                     )?;
                 }
@@ -164,8 +164,8 @@ impl Game {
                         Default::default(),
                         "Error while checking for updates",
                         &[
-                            "There was an error while checking for updates",
-                            &format!("Error: {}", err),
+                            "There was an error while checking for updates".to_string(),
+                            format!("Error: {}", err),
                         ],
                     )?;
                 }
@@ -258,12 +258,12 @@ impl Game {
             self.settings.get_color_scheme().texts(),
             "Controls",
             &[
-                "WASD and arrows: move",
-                "Space: switch adventure/spectaror mode",
-                "Q, F or L: move down",
-                "E, R or P: move up",
-                "With SHIFT move at the end in single dir",
-                "Escape: pause menu",
+                "WASD and arrows: move".to_string(),
+                "Space: switch adventure/spectaror mode".to_string(),
+                "Q, F or L: move down".to_string(),
+                "E, R or P: move up".to_string(),
+                "With SHIFT move at the end in single dir".to_string(),
+                "Escape: pause menu".to_string(),
             ],
         )?;
 
@@ -277,17 +277,17 @@ impl Game {
             self.settings.get_color_scheme().texts(),
             "About",
             &[
-                "This is simple maze solving game",
-                "Supported algorithms:",
-                "    - Depth-first search",
-                "    - Kruskal's algorithm",
-                "Supports 3D mazes",
-                "",
-                "Created by:",
-                &format!("    - {}", env!("CARGO_PKG_AUTHORS")),
-                "",
-                "Version:",
-                &format!("    {}", env!("CARGO_PKG_VERSION")),
+                "This is simple maze solving game".to_string(),
+                "Supported algorithms:".to_string(),
+                "    - Depth-first search".to_string(),
+                "    - Kruskal's algorithm".to_string(),
+                "Supports 3D mazes".to_string(),
+                "".to_string(),
+                "Created by:".to_string(),
+                format!("    - {}", env!("CARGO_PKG_AUTHORS")),
+                "".to_string(),
+                "Version:".to_string(),
+                format!("    {}", env!("CARGO_PKG_VERSION")),
             ],
         )?;
 
@@ -371,11 +371,11 @@ impl Game {
                     self.settings.get_color_scheme().texts(),
                     "You won",
                     &[
-                        &format!("Time:  {}", ui::format_duration(play_time)),
-                        &format!("Moves: {}", game_state.game.get_move_count()),
-                        &format!("Size:  {}x{}x{}", msize.0, msize.1, msize.2),
-                        "",
-                        "R for new game",
+                        format!("Time:  {}", ui::format_duration(play_time)),
+                        format!("Moves: {}", game_state.game.get_move_count()),
+                        format!("Size:  {}x{}x{}", msize.0, msize.1, msize.2),
+                        "".to_string(),
+                        "R for new game".to_string(),
                     ],
                 )? {
                     break Err(GameError::NewGame);
@@ -784,8 +784,8 @@ impl Game {
                     self.settings.get_color_scheme().texts(),
                     "Error",
                     &[
-                        "Invalid maze size",
-                        &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
+                        "Invalid maze size".to_string(),
+                        format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                     ],
                 )?;
                 return Err(GameError::EmptyMenu);
@@ -842,8 +842,8 @@ impl Game {
                     self.settings.get_color_scheme().texts(),
                     "Error",
                     &[
-                        "Invalid maze size",
-                        &format!(" {}x{}x{}", dims.0, dims.1, dims.2),
+                        "Invalid maze size".to_string(),
+                        format!(" {}x{}x{}", dims.0, dims.1, dims.2),
                     ],
                 )?;
                 Err(GameError::EmptyMenu)

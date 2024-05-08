@@ -133,3 +133,5 @@ pub trait ToDebug: fmt::Debug {
 }
 
 impl<T: fmt::Debug> ToDebug for T {}
+
+// TODO: enum holding either String or &'static str

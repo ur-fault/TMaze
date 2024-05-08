@@ -1,25 +1,37 @@
 use std::io;
 
-use crossterm::style::ContentStyle;
+use crossterm::event::KeyCode;
 use tmaze::{
-    renderer::Renderer,
-    ui::popup::{self},
+    app::{Activity, App},
+    ui::popup,
 };
 
 fn main() -> io::Result<()> {
-    let mut renderer = Renderer::new()?;
+    let mut app = App::new(Activity::new_base(
+        "popup",
+        Box::new(popup::Popup::new(
+            "Title".to_string(),
+            vec![
+                "Line 1".to_string(),
+                "Line 2".to_string(),
+                "Line 3".to_string(),
+            ],
+        )),
+    ));
 
-    // renderer.term_on(&mut stdout())?;
+    let res = app.run();
 
-    popup::popup(
-        &mut renderer,
-        ContentStyle::default(),
-        ContentStyle::default(),
-        "Title",
-        &["Line 1", "Line 2", "Line 3"],
-    )?;
+    // Manually drop the app, so we can se the printout
+    drop(app);
 
-    // renderer.term_off(&mut stdout())?;
+    match res {
+        Some(res) => {
+            println!("Result: {:?}", res.downcast::<KeyCode>());
+        }
+        None => {
+            println!("No result");
+        }
+    }
 
     Ok(())
 }
