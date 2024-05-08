@@ -43,7 +43,7 @@ And it ended up as maze solving game because I just couldn't find any other.
 - Everything else - [me, ie. ur-fault](https://github.com/ur-fault)
 
 ## How to run
-- You can either download from GitHub releases,  they are built automatically now, using GitHub Actions ~~althought there are old builds, and I won't update them so frequently, maybe in the future~~
+- You can either download from [Github releases](https://github.com/ur-fault/TMaze/releases), they are built automatically now, using GitHub Actions ~~althought there are old builds, and I won't update them so frequently, maybe in the future~~
 - Install it with your favorite package manager
 - Build from source, you need cargo installed on your system
 
