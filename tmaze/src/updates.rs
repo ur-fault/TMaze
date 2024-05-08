@@ -1,7 +1,15 @@
 use std::time::Duration;
 
+use chrono::Local;
 use crates_io_api::{AsyncClient, Error as CratesError};
+use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 use semver::{Comparator, Version, VersionReq};
+
+use crate::{
+    app::{app::AppData, ActivityHandler, Change, Event},
+    helpers::ToDebug,
+    ui::Popup,
+};
 
 pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
     let client = AsyncClient::new("tmaze", Duration::from_secs(1)).unwrap();
@@ -30,5 +38,119 @@ pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
         Ok(Some(latest_version))
     } else {
         Ok(None)
+    }
+}
+
+pub struct UpdateCheckerActivity {
+    popup: Option<Popup>,
+    task: Option<(
+        tokio::task::JoinHandle<Result<Option<Version>, CratesError>>,
+        tokio::runtime::Runtime,
+    )>,
+}
+
+impl UpdateCheckerActivity {
+    pub fn new() -> Self {
+        Self {
+            popup: None,
+            task: None,
+        }
+    }
+}
+
+impl ActivityHandler for UpdateCheckerActivity {
+    fn update(
+        &mut self,
+        events: Vec<crate::app::Event>,
+        app_data: &mut AppData,
+    ) -> Option<crate::app::Change> {
+        for event in events {
+            match event {
+                Event::Term(TermEvent::Key(KeyEvent {
+                    code: KeyCode::Char('q') | KeyCode::Esc,
+                    ..
+                })) => {
+                    return Some(Change::pop_top());
+                }
+                _ => {}
+            }
+        }
+
+        if self.popup.is_none() {
+            let last_check_before = app_data
+                .save
+                .last_update_check
+                .map(|l| Local::now().signed_duration_since(l))
+                .map(|d| d.to_std().expect("Failed to convert to std duration"))
+                .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)) // remove subsec time
+                .map(humantime::format_duration);
+
+            let update_interval = format!(
+                "Currently checkes {} for updates",
+                app_data
+                    .settings
+                    .get_check_interval()
+                    .to_debug()
+                    .to_lowercase()
+            );
+
+            let popup = Popup::new(
+                "Checking for newer version".to_string(),
+                vec![
+                    "Please wait...".to_string(),
+                    update_interval,
+                    last_check_before
+                        .map(|lc| format!("Last check before: {}", lc))
+                        .unwrap_or("Never checked for updates".to_owned()),
+                    "Press 'q' to cancel or Esc to skip".to_string(),
+                ],
+            );
+
+            self.popup = Some(popup);
+        }
+
+        if self.task.is_none() {
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            let handle = rt.spawn(get_newer_async());
+            self.task = Some((handle, rt));
+            return None;
+        }
+
+        let (handle, rt) = self.task.as_mut().unwrap();
+        if !handle.is_finished() {
+            return None;
+        }
+
+        // `block_on` should not block here, since it's already finished
+        let result = rt
+            .block_on(handle)
+            .expect("Failed to join the update check task");
+
+        match result {
+            Ok(Some(version)) => {
+                app_data
+                    .save
+                    .update_last_check()
+                    .expect("Failed to save the save data");
+                log::info!("Newer version found: {}", version);
+            }
+            Err(err) if app_data.settings.get_display_update_check_errors() => {
+                log::error!("Error while checking for updates: {}", err);
+            }
+            Ok(None) => {
+                log::info!("No newer version found");
+                app_data
+                    .save
+                    .update_last_check()
+                    .expect("Failed to save the save data");
+            }
+            Err(_) => {}
+        }
+
+        Some(Change::pop_top())
+    }
+
+    fn screen(&self) -> &dyn crate::ui::Screen {
+        self.popup.as_ref().unwrap()
     }
 }

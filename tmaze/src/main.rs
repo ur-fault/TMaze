@@ -1,6 +1,9 @@
-use tmaze::*;
+use tmaze::{
+    app::{game::MainMenu, Activity, App},
+    *,
+};
 
-use app::{Game, GameError};
+use app::GameError;
 
 use clap::Parser;
 
@@ -17,8 +20,6 @@ struct Args {
 
 fn main() -> Result<(), GameError> {
     let _args = Args::parse();
-
-    println!("gjklfdgh, {} {},. dfdsfg", 5, true);
 
     if _args.reset_config {
         settings::Settings::reset_config(settings::Settings::default_path());
@@ -42,5 +43,12 @@ fn main() -> Result<(), GameError> {
         return Ok(());
     }
 
-    Game::new().run()
+    let mut app = App::empty();
+    let menu = MainMenu::new(&app.data().settings);
+    app.activities_mut()
+        .push(Activity::new_base("activity", Box::new(menu)));
+
+    app.run();
+
+    Ok(())
 }

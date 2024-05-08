@@ -16,7 +16,7 @@ pub fn get_logger() -> &'static AppLogger {
     const DEFAULT_DECAY: Duration = Duration::from_secs(5);
     const DEFAULT_MAX_VISIBLE: usize = 5;
 
-    LOGGER.get_or_init(|| AppLogger::new(log::Level::Debug, DEFAULT_DECAY, DEFAULT_MAX_VISIBLE))
+    LOGGER.get_or_init(|| AppLogger::new(log::Level::Info, DEFAULT_DECAY, DEFAULT_MAX_VISIBLE))
 }
 
 pub fn init() {
@@ -162,8 +162,8 @@ impl Drawable for AppLogger {
             let pos = (x as u16, y);
 
             // TODO: make this a setting
-            // const INDICATOR_CHAR: char = '|';
-            const INDICATOR_CHAR: char = '*';
+            const INDICATOR_CHAR: char = '|';
+            // const INDICATOR_CHAR: char = '*';
             // const INDICATOR_CHAR: char = '█';
             // const INDICATOR_CHAR: char = '•';
 

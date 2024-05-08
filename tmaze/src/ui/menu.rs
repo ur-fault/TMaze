@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use crate::{
     app::{
         activity::{Activity, ActivityHandler, Change},
-        app::App,
+        app::{App, AppData},
         event::Event,
     },
     helpers::{is_release, value_if},
@@ -132,15 +132,15 @@ impl Menu {
 }
 
 impl ActivityHandler for Menu {
-    fn update(&mut self, events: Vec<Event>) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
         let opt_count = self.config.options.len() as isize;
 
         if opt_count == 1 {
             log::warn!("Menu with only one option, returning that");
-            return Some(Change::PopTop(Some(Box::new(0))));
-        } else if opt_count == 0{
+            return Some(Change::pop_top_with(Box::new(0)));
+        } else if opt_count == 0 {
             log::warn!("Empty menu, returning `None`");
-            return Some(Change::PopTop(Some(Box::new(0))));
+            return Some(Change::pop_top_with(Box::new(0)));
         }
 
         for event in events {
@@ -155,14 +155,14 @@ impl ActivityHandler for Menu {
                             self.selected = (self.selected + 1) % opt_count
                         }
                         KeyCode::Enter | KeyCode::Char(' ') => {
-                            return Some(Change::PopTop(Some(Box::new(self.selected))))
+                            return Some(Change::pop_top_with(self.selected as usize))
                         }
-                        KeyCode::Char('q' | 'Q') => return Some(Change::PopTop(None)),
+                        KeyCode::Char('q' | 'Q') => return Some(Change::pop_top()),
                         KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
                             self.selected = (ch as isize - '1' as isize).clamp(0, opt_count - 1);
                         }
                         KeyCode::Char(_) => {}
-                        KeyCode::Esc => return Some(Change::PopTop(None)),
+                        KeyCode::Esc => return Some(Change::pop_top()),
                         _ => {}
                     }
                 }

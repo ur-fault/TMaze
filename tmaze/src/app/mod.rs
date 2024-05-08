@@ -15,7 +15,7 @@ pub use event::Event;
 
 use thiserror::Error;
 
-use crate::{settings::EditableFieldError, ui::MenuError};
+use crate::ui::MenuError;
 
 #[derive(Debug, Error)]
 pub enum GameError {
@@ -38,16 +38,6 @@ impl From<MenuError> for GameError {
             MenuError::EmptyMenu => Self::EmptyMenu,
             MenuError::Exit => Self::Back,
             MenuError::FullQuit => Self::FullQuit,
-        }
-    }
-}
-
-impl From<EditableFieldError> for GameError {
-    fn from(error: EditableFieldError) -> Self {
-        match error {
-            EditableFieldError::Back => Self::Back,
-            EditableFieldError::Quit => Self::FullQuit,
-            EditableFieldError::Crossterm(error) => Self::CrosstermError(error),
         }
     }
 }
