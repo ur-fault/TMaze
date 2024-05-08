@@ -23,7 +23,7 @@ pub struct GameNotRunningError {}
 pub struct GameNotPausedError {}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum GameState {
+pub enum RunningGameState {
     NotStarted,
     Running,
     Paused,
@@ -51,7 +51,7 @@ pub type GameConstructorComunication = (
 
 pub struct RunningGame {
     maze: Maze,
-    state: GameState,
+    state: RunningGameState,
     game_mode: GameMode,
     #[allow(dead_code)]
     clock: Option<PausableClock>,
@@ -85,7 +85,7 @@ impl RunningGame {
                 let maze = maze_handle.join().unwrap()?;
                 Ok(RunningGame {
                     maze,
-                    state: GameState::NotStarted,
+                    state: RunningGameState::NotStarted,
                     game_mode: maze_mode,
                     clock: None,
                     start: None,
@@ -99,7 +99,7 @@ impl RunningGame {
         ))
     }
 
-    pub fn get_state(&self) -> GameState {
+    pub fn get_state(&self) -> RunningGameState {
         self.state
     }
 
@@ -125,8 +125,8 @@ impl RunningGame {
 
     pub fn start(&mut self) -> Result<(), GameAlreadyRunningError> {
         match self.get_state() {
-            GameState::NotStarted => {
-                self.state = GameState::Running;
+            RunningGameState::NotStarted => {
+                self.state = RunningGameState::Running;
                 self.clock = Some(PausableClock::default());
                 self.start = Some(self.clock.as_mut().unwrap().now());
 
@@ -137,7 +137,7 @@ impl RunningGame {
     }
 
     pub fn quit(&mut self) {
-        self.state = GameState::Quitted;
+        self.state = RunningGameState::Quitted;
         self.clock = None;
         self.start = None;
     }
@@ -210,7 +210,7 @@ impl RunningGame {
         }
 
         if self.player_pos == self.goal_pos {
-            self.state = GameState::Finished;
+            self.state = RunningGameState::Finished;
             self.clock.as_mut().unwrap().pause();
         }
 
@@ -219,14 +219,14 @@ impl RunningGame {
 
     pub fn check_running(&self) -> Result<(), GameNotRunningError> {
         match self.state {
-            GameState::Running => Ok(()),
+            RunningGameState::Running => Ok(()),
             _ => Err(GameNotRunningError {}),
         }
     }
 
     pub fn check_paused(&self) -> Result<(), GameNotPausedError> {
         match self.state {
-            GameState::Paused => Ok(()),
+            RunningGameState::Paused => Ok(()),
             _ => Err(GameNotPausedError {}),
         }
     }
@@ -238,7 +238,7 @@ impl RunningGame {
     pub fn pause(&mut self) -> Result<(), GameNotRunningError> {
         self.check_running()?;
 
-        self.state = GameState::Paused;
+        self.state = RunningGameState::Paused;
         self.clock.as_mut().unwrap().pause();
 
         Ok(())
@@ -247,14 +247,14 @@ impl RunningGame {
     pub fn resume(&mut self) -> Result<(), GameNotPausedError> {
         self.check_paused()?;
 
-        self.state = GameState::Running;
+        self.state = RunningGameState::Running;
         self.clock.as_mut().unwrap().resume();
 
         Ok(())
     }
 
     pub fn reset(&mut self) {
-        self.state = GameState::NotStarted;
+        self.state = RunningGameState::NotStarted;
         self.moves.clear();
         self.player_pos = Dims3D(0, 0, 0);
 

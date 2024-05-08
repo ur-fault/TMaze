@@ -3,8 +3,10 @@ use std::time::Duration;
 use crossterm::event::read;
 
 use crate::{
+    data::SaveData,
     logging,
     renderer::{drawable::Drawable, Renderer},
+    settings::Settings,
 };
 
 #[cfg(feature = "sound")]
@@ -19,6 +21,7 @@ use super::{
 pub struct App {
     renderer: Renderer,
     activities: Activities,
+    data: AppData,
 
     #[cfg(feature = "sound")]
     sound_player: SoundPlayer,
@@ -26,10 +29,18 @@ pub struct App {
     bgm_track: Option<MusicTrack>,
 }
 
+pub struct AppData {
+    pub settings: Settings,
+    pub save: SaveData,
+}
+
 impl App {
     pub fn new(base_activity: Activity) -> Self {
         let renderer = Renderer::new().expect("Failed to create renderer");
         let activities = Activities::new(base_activity);
+
+        let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
+        let save = SaveData::load().expect("Failed to load save data");
 
         logging::init();
 
@@ -39,6 +50,7 @@ impl App {
         Self {
             renderer,
             activities,
+            data: AppData { settings, save },
 
             #[cfg(feature = "sound")]
             sound_player,
@@ -51,12 +63,16 @@ impl App {
         let renderer = Renderer::new().expect("Failed to create renderer");
         let activities = Activities::empty();
 
+        let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
+        let save = SaveData::load().expect("Failed to load save data");
+
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new();
 
         Self {
             renderer,
             activities,
+            data: AppData { settings, save },
 
             #[cfg(feature = "sound")]
             sound_player,
@@ -90,7 +106,7 @@ impl App {
                 }
                 None => break 'mainloop events,
             }
-            .update(events.drain(..).collect())
+            .update(events.drain(..).collect(), &mut self.data)
             {
                 match change {
                     Change::Push(activity) => self.activities.push(activity),
@@ -98,11 +114,6 @@ impl App {
                         self.activities.pop_n(n);
                         events.push(Event::ActiveAfterPop(res));
                         log::trace!("Popped {} activities", n);
-                    }
-                    Change::PopTop(res) => {
-                        self.activities.pop();
-                        events.push(Event::ActiveAfterPop(res));
-                        log::trace!("Popped top activity");
                     }
                 }
             }
@@ -143,5 +154,13 @@ impl App {
 
     pub fn active_name(&self) -> Option<&str> {
         self.activities.active().map(|a| a.name())
+    }
+
+    pub fn data(&self) -> &AppData {
+        &self.data
+    }
+
+    pub fn data_mut(&mut self) -> &mut AppData {
+        &mut self.data
     }
 }

@@ -5,7 +5,7 @@ use std::{
 
 use crate::ui::Screen;
 
-use super::event::Event;
+use super::{app::AppData, event::Event};
 
 pub type ActivityResult = Box<dyn Any>;
 
@@ -19,7 +19,6 @@ pub enum Change {
         n: usize,
         res: Option<ActivityResult>,
     },
-    PopTop(Option<ActivityResult>),
 }
 
 impl Change {
@@ -38,12 +37,15 @@ impl Change {
         }
     }
 
-    pub fn pop_top<T>() -> Self {
-        Self::PopTop(None)
+    pub fn pop_top() -> Self {
+        Self::Pop { n: 1, res: None }
     }
 
     pub fn pop_top_with<T: 'static>(res: T) -> Self {
-        Self::PopTop(Some(Box::new(res)))
+        Self::Pop {
+            n: 1,
+            res: Some(Box::new(res)),
+        }
     }
 }
 
@@ -78,32 +80,28 @@ impl Activities {
         self.activities.last_mut()
     }
 
-    pub fn update(&mut self, mut events: Vec<Event>) -> bool {
-        if self.active().is_none() {
-            return true;
-        }
-
-        while let Some(change) = self
-            .active_mut()
-            .expect("No active activity")
-            // clone vec while clearing it
-            .update(events.drain(..).collect())
-        {
-            match change {
-                Change::Push(activity) => self.activities.push(activity),
-                Change::Pop { n, res } => {
-                    self.pop_n(n);
-                    events.push(Event::ActiveAfterPop(res));
-                }
-                Change::PopTop(res) => {
-                    self.activities.pop();
-                    events.push(Event::ActiveAfterPop(res));
-                }
-            }
-        }
-
-        return false;
-    }
+    // pub fn update(&mut self, mut events: Vec<Event>, data: &mut AppData) -> bool {
+    //     if self.active().is_none() {
+    //         return true;
+    //     }
+    //
+    //     while let Some(change) = self
+    //         .active_mut()
+    //         .expect("No active activity")
+    //         // clone vec while clearing it
+    //         .update(events.drain(..).collect(), data)
+    //     {
+    //         match change {
+    //             Change::Push(activity) => self.activities.push(activity),
+    //             Change::Pop { n, res } => {
+    //                 self.pop_n(n);
+    //                 events.push(Event::ActiveAfterPop(res));
+    //             }
+    //         }
+    //     }
+    //
+    //     return false;
+    // }
 
     pub fn len(&self) -> usize {
         self.activities.len()
@@ -155,7 +153,7 @@ impl DerefMut for Activity {
 
 pub trait ActivityHandler {
     #[must_use]
-    fn update(&mut self, events: Vec<Event>) -> Option<Change>;
+    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change>;
 
     fn screen(&self) -> &dyn Screen;
 }

@@ -1,17 +1,13 @@
-pub mod editable;
-
 use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
-    path::PathBuf,
+    fs, io,
+    path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
 
-use self::editable::EditableField;
-pub use self::editable::EditableFieldError;
 use crate::{constants::base_path, renderer::Renderer};
 
 const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
@@ -38,12 +34,6 @@ pub struct MazePreset {
 
 fn default_depth() -> u16 {
     1
-}
-
-impl EditableField for MazePreset {
-    fn print(&self) -> String {
-        self.title.to_string()
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,26 +114,11 @@ impl Default for ColorScheme {
     }
 }
 
-impl EditableField for ColorScheme {
-    fn print(&self) -> String {
-        todo!();
-    }
-}
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum MazeGenAlgo {
     #[default]
     RandomKruskals,
     DepthFirstSearch,
-}
-
-impl EditableField for MazeGenAlgo {
-    fn print(&self) -> String {
-        match self {
-            MazeGenAlgo::RandomKruskals => "Random Kruskals".to_string(),
-            MazeGenAlgo::DepthFirstSearch => "Depth First Search".to_string(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
@@ -218,31 +193,6 @@ impl Default for Settings {
     }
 }
 
-impl EditableField for Settings {
-    fn print(&self) -> String {
-        String::from("Settings")
-    }
-
-    fn edit(
-        &mut self,
-        renderer: &mut Renderer,
-        color_scheme: ColorScheme,
-    ) -> Result<bool, EditableFieldError> {
-        crate::ui::popup(
-            renderer,
-            color_scheme.normals(),
-            color_scheme.texts(),
-            "Edit settings",
-            &[
-                "Path to the current settings".to_string(),
-                format!(" {}", self.read().path.display()),
-            ],
-        )
-        .map(|_| false)
-        .map_err(|e| e.into())
-    }
-}
-
 #[allow(dead_code)]
 impl Settings {
     pub fn default_path() -> PathBuf {
@@ -251,6 +201,10 @@ impl Settings {
 
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn path(&self) -> PathBuf {
+        self.0.read().unwrap().path.clone()
     }
 
     pub fn read(&self) -> std::sync::RwLockReadGuard<SettingsInner> {
@@ -380,27 +334,24 @@ impl Settings {
 }
 
 impl Settings {
-    pub fn load(path: PathBuf) -> Self {
+    pub fn load(path: PathBuf) -> io::Result<Self> {
         let default_settings_string = DEFAULT_SETTINGS;
 
         let settings_string = fs::read_to_string(&path);
         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
         let mut settings: SettingsInner = if let Ok(settings_string) = settings_string {
-            match options.from_str(&settings_string) {
-                Ok(settings) => settings,
-                Err(err) => {
-                    panic!("Error reading settings file ({:?}), {}", path, err);
-                }
-            }
+            options
+                .from_str(&settings_string)
+                .expect("Could not parse settings file")
         } else {
-            fs::create_dir_all(path.parent().unwrap()).unwrap();
-            fs::write(&path, default_settings_string).unwrap();
+            fs::create_dir_all(path.parent().unwrap())?;
+            fs::write(&path, default_settings_string)?;
             options.from_str(default_settings_string).unwrap()
         };
 
         settings.path = path;
 
-        Self(Arc::new(RwLock::new(settings)))
+        Ok(Self(Arc::new(RwLock::new(settings))))
     }
 
     pub fn reset(&mut self) {
