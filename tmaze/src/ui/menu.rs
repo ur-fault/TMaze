@@ -135,6 +135,14 @@ impl ActivityHandler for Menu {
     fn update(&mut self, events: Vec<Event>) -> Option<Change> {
         let opt_count = self.config.options.len() as isize;
 
+        if opt_count == 1 {
+            log::warn!("Menu with only one option, returning that");
+            return Some(Change::PopTop(Some(Box::new(0))));
+        } else if opt_count == 0{
+            log::warn!("Empty menu, returning `None`");
+            return Some(Change::PopTop(Some(Box::new(0))));
+        }
+
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {

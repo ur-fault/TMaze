@@ -13,7 +13,7 @@ static LOGGER: OnceLock<AppLogger> = OnceLock::new();
 
 pub fn get_logger() -> &'static AppLogger {
     // default configuration
-    const DEFAULT_DECAY: Duration = Duration::from_secs(1);
+    const DEFAULT_DECAY: Duration = Duration::from_secs(5);
     const DEFAULT_MAX_VISIBLE: usize = 5;
 
     LOGGER.get_or_init(|| AppLogger::new(log::Level::Debug, DEFAULT_DECAY, DEFAULT_MAX_VISIBLE))
