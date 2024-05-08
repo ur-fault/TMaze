@@ -126,9 +126,8 @@ impl Menu {
         }
     }
 
-    pub fn into_activity(self, app: &App) -> Activity {
-        let name = format!("menu at {}", app.activity_count());
-        Activity::new("tmaze", name, Box::new(self))
+    pub fn into_activity(self) -> Activity {
+        Activity::new("tmaze", "menu", Box::new(self))
     }
 }
 
