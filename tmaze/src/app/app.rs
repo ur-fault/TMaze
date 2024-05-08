@@ -1,4 +1,4 @@
-use std::time::{self, Duration};
+use std::time::Duration;
 
 use crossterm::event::read;
 
@@ -15,6 +15,7 @@ use super::{
     event::Event,
 };
 
+#[allow(dead_code)]
 pub struct App {
     renderer: Renderer,
     activities: Activities,
