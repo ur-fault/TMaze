@@ -1082,7 +1082,7 @@ impl ActivityHandler for MainMenu {
                     .downcast::<usize>()
                     .expect("menu should return index");
                 match index {
-                    0 => todo!(),
+                    0 /* new game */ => todo!(),
                     1 /* settings */ =>Some(self.show_settings_screen(&data.settings)),
                     2 /* controls */ =>Some(self.show_controls_popup()),
                     3 /* about    */ =>Some(self.show_about_popup()),
