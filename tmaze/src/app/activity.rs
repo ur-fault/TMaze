@@ -22,6 +22,31 @@ pub enum Change {
     PopTop(Option<ActivityResult>),
 }
 
+impl Change {
+    pub fn push(activity: Activity) -> Self {
+        Self::Push(activity)
+    }
+
+    pub fn pop(n: usize) -> Self {
+        Self::Pop { n, res: None }
+    }
+
+    pub fn pop_with<T: 'static>(n: usize, res: T) -> Self {
+        Self::Pop {
+            n,
+            res: Some(Box::new(res)),
+        }
+    }
+
+    pub fn pop_top<T>() -> Self {
+        Self::PopTop(None)
+    }
+
+    pub fn pop_top_with<T: 'static>(res: T) -> Self {
+        Self::PopTop(Some(Box::new(res)))
+    }
+}
+
 impl Activities {
     pub fn new(base: Activity) -> Self {
         Self {

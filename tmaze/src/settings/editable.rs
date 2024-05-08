@@ -23,7 +23,7 @@ pub trait EditableField {
             color_scheme.normals(),
             color_scheme.texts(),
             &format!("Current value: {}", self.print()),
-            &["Cannot edit this field"],
+            &["Cannot edit this field".to_string()],
         )
         .map(|_| false)
         .map_err(|e| e.into())

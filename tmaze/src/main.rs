@@ -15,15 +15,6 @@ struct Args {
     debug_config: bool,
 }
 
-macro_rules! testmacro {
-    (eof $( $x:expr ),*) => {
-        println!("eof");
-    };
-    ( $x:expr, $( $y:expr ),* ) => {
-        println!("not eof");
-    };
-}
-
 fn main() -> Result<(), GameError> {
     let _args = Args::parse();
 
@@ -51,15 +42,5 @@ fn main() -> Result<(), GameError> {
         return Ok(());
     }
 
-    testmacro!(eof 1, 2, 3);
-
     Game::new().run()
-}
-
-fn f1() {
-    f2()
-}
-
-fn f2() {
-    f1()
 }

@@ -234,8 +234,8 @@ impl EditableField for Settings {
             color_scheme.texts(),
             "Edit settings",
             &[
-                "Path to the current settings",
-                &format!(" {}", self.read().path.display()),
+                "Path to the current settings".to_string(),
+                format!(" {}", self.read().path.display()),
             ],
         )
         .map(|_| false)
