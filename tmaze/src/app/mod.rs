@@ -6,7 +6,6 @@ pub mod game_state;
 
 use std::io;
 
-pub use game::Game;
 pub use game_state::GameViewMode;
 
 pub use activity::{Activity, ActivityHandler, Change};

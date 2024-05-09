@@ -1,12 +1,13 @@
-use self::CellWall::*;
-use super::super::cell::{Cell, CellWall};
+use rand::{seq::SliceRandom, thread_rng};
+
+use std::sync::{Arc, Mutex};
+
 use super::{
-    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, Progress,
-    StopGenerationFlag,
+    super::cell::{Cell, CellWall},
+    GenErrorInstant, GenErrorThreaded, Maze, MazeAlgorithm, Progress, StopGenerationFlag,
 };
 use crate::core::*;
-use crossbeam::channel::Sender;
-use rand::{seq::SliceRandom, thread_rng};
+use CellWall::*;
 
 #[cfg(feature = "hashbrown")]
 use hashbrown::HashSet;
@@ -18,11 +19,11 @@ impl MazeAlgorithm for RndKruskals {
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
-        progress: Sender<Progress>,
-    ) -> Result<Maze, GenerationErrorThreaded> {
+        progress: Arc<Mutex<Progress>>,
+    ) -> Result<Maze, GenErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
-            return Err(GenerationErrorThreaded::GenerationError(
-                GenerationErrorInstant::InvalidSize(size),
+            return Err(GenErrorThreaded::GenerationError(
+                GenErrorInstant::InvalidSize(size),
             ));
         }
 
@@ -42,6 +43,7 @@ impl MazeAlgorithm for RndKruskals {
 
         let wall_count = (hu * (wu - 1) + wu * (hu - 1)) * du + wu * hu * (du - 1);
         let mut walls: Vec<(Dims3D, CellWall)> = Vec::with_capacity(wall_count);
+        progress.lock().unwrap().from = wall_count;
 
         for (iz, floor) in cells.iter().enumerate() {
             for (iy, row) in floor.iter().enumerate() {
@@ -79,6 +81,7 @@ impl MazeAlgorithm for RndKruskals {
             width: w as usize,
             height: h as usize,
             depth: d as usize,
+            is_tower: false,
         };
 
         walls.shuffle(&mut thread_rng());
@@ -106,17 +109,14 @@ impl MazeAlgorithm for RndKruskals {
             };
             sets[set1_i].extend(set0);
 
-            progress
-                .send(Progress {
-                    done: wall_count - walls.len(),
-                    from: wall_count,
-                })
-                .unwrap();
+            progress.lock().unwrap().done = wall_count - walls.len();
 
             if stopper.is_stopped() {
-                return Err(GenerationErrorThreaded::AbortGeneration);
+                return Err(GenErrorThreaded::AbortGeneration);
             }
         }
+
+        progress.lock().unwrap().is_finished = true;
 
         Ok(maze)
     }

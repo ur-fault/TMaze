@@ -32,6 +32,7 @@ pub struct App {
 pub struct AppData {
     pub settings: Settings,
     pub save: SaveData,
+    pub use_data: AppStateData,
 }
 
 impl App {
@@ -41,6 +42,7 @@ impl App {
 
         let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
         let save = SaveData::load().expect("Failed to load save data");
+        let use_data = AppStateData::default();
 
         logging::init();
 
@@ -50,7 +52,11 @@ impl App {
         Self {
             renderer,
             activities,
-            data: AppData { settings, save },
+            data: AppData {
+                settings,
+                save,
+                use_data,
+            },
 
             #[cfg(feature = "sound")]
             sound_player,
@@ -65,6 +71,9 @@ impl App {
 
         let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
         let save = SaveData::load().expect("Failed to load save data");
+        let use_data = AppStateData::default();
+
+        logging::init();
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new();
@@ -72,7 +81,11 @@ impl App {
         Self {
             renderer,
             activities,
-            data: AppData { settings, save },
+            data: AppData {
+                settings,
+                save,
+                use_data,
+            },
 
             #[cfg(feature = "sound")]
             sound_player,
@@ -109,11 +122,24 @@ impl App {
             .update(events.drain(..).collect(), &mut self.data)
             {
                 match change {
-                    Change::Push(activity) => self.activities.push(activity),
+                    Change::Push(activity) => {
+                        log::trace!(
+                            "Pushed new activity `{}/{}`",
+                            activity.source(),
+                            activity.name()
+                        );
+                        self.activities.push(activity);
+                    }
                     Change::Pop { n, res } => {
                         self.activities.pop_n(n);
                         events.push(Event::ActiveAfterPop(res));
                         log::trace!("Popped {} activities", n);
+                    }
+                    Change::Replace(activity) => self.activities.replace(activity),
+                    Change::PopUntil { name, res } => {
+                        self.activities.pop_until(&name);
+                        events.push(Event::ActiveAfterPop(res));
+                        log::trace!("Popped until '{}'", name);
                     }
                 }
             }
@@ -162,5 +188,17 @@ impl App {
 
     pub fn data_mut(&mut self) -> &mut AppData {
         &mut self.data
+    }
+}
+
+pub struct AppStateData {
+    pub last_selected_preset: Option<usize>,
+}
+
+impl Default for AppStateData {
+    fn default() -> Self {
+        Self {
+            last_selected_preset: None,
+        }
     }
 }

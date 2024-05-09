@@ -19,6 +19,11 @@ pub enum Change {
         n: usize,
         res: Option<ActivityResult>,
     },
+    Replace(Activity),
+    PopUntil {
+        name: String,
+        res: Option<ActivityResult>,
+    },
 }
 
 impl Change {
@@ -47,6 +52,31 @@ impl Change {
             res: Some(Box::new(res)),
         }
     }
+
+    pub fn pop_all() -> Self {
+        Self::Pop {
+            n: usize::MAX,
+            res: None,
+        }
+    }
+
+    pub fn replace(activity: Activity) -> Self {
+        Self::Replace(activity)
+    }
+
+    pub fn pop_until(name: impl Into<String>) -> Self {
+        Self::PopUntil {
+            name: name.into(),
+            res: None,
+        }
+    }
+
+    pub fn pop_until_with<T: 'static>(name: impl Into<String>, res: T) -> Self {
+        Self::PopUntil {
+            name: name.into(),
+            res: Some(Box::new(res)),
+        }
+    }
 }
 
 impl Activities {
@@ -69,9 +99,27 @@ impl Activities {
     }
 
     pub fn pop_n(&mut self, n: usize) {
-        self.activities.truncate(self.activities.len() - n);
+        self.activities
+            .truncate(self.activities.len() - n.min(self.activities.len()));
     }
 
+    pub fn replace(&mut self, activity: Activity) {
+        self.activities.pop();
+        self.activities.push(activity);
+    }
+
+    pub fn pop_until(&mut self, name: &str) -> usize {
+        if let Some(index) = self.activities.iter().rposition(|a| a.name() == name) {
+            self.activities.truncate(index);
+            index
+        } else {
+            log::warn!("Activity `{}` not found, popping top", name);
+            self.pop_n(1);
+            1
+        }
+    }
+
+    // -- Getters
     pub fn active(&self) -> Option<&Activity> {
         self.activities.last()
     }
@@ -79,29 +127,6 @@ impl Activities {
     pub fn active_mut(&mut self) -> Option<&mut Activity> {
         self.activities.last_mut()
     }
-
-    // pub fn update(&mut self, mut events: Vec<Event>, data: &mut AppData) -> bool {
-    //     if self.active().is_none() {
-    //         return true;
-    //     }
-    //
-    //     while let Some(change) = self
-    //         .active_mut()
-    //         .expect("No active activity")
-    //         // clone vec while clearing it
-    //         .update(events.drain(..).collect(), data)
-    //     {
-    //         match change {
-    //             Change::Push(activity) => self.activities.push(activity),
-    //             Change::Pop { n, res } => {
-    //                 self.pop_n(n);
-    //                 events.push(Event::ActiveAfterPop(res));
-    //             }
-    //         }
-    //     }
-    //
-    //     return false;
-    // }
 
     pub fn len(&self) -> usize {
         self.activities.len()
@@ -130,6 +155,10 @@ impl Activity {
 
     pub fn new_base(name: impl Into<String>, handler: Box<dyn ActivityHandler>) -> Self {
         Self::new("tmaze".to_string(), name.into(), handler)
+    }
+
+    pub fn source(&self) -> &str {
+        &self.source
     }
 
     pub fn name(&self) -> &str {
