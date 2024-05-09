@@ -1,11 +1,12 @@
-use super::super::cell::Cell;
+use std::sync::{Arc, Mutex};
+
+use rand::seq::SliceRandom;
+
 use super::{
-    GenerationErrorInstant, GenerationErrorThreaded, Maze, MazeAlgorithm, Progress,
+    super::cell::Cell, GenErrorInstant, GenErrorThreaded, Maze, MazeAlgorithm, Progress,
     StopGenerationFlag,
 };
 use crate::core::*;
-use crossbeam::channel::Sender;
-use rand::seq::SliceRandom;
 
 pub struct DepthFirstSearch {}
 
@@ -13,16 +14,17 @@ impl MazeAlgorithm for DepthFirstSearch {
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
-        progress: Sender<Progress>,
-    ) -> Result<Maze, GenerationErrorThreaded> {
+        progress: Arc<Mutex<Progress>>,
+    ) -> Result<Maze, GenErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
-            return Err(GenerationErrorThreaded::GenerationError(
-                GenerationErrorInstant::InvalidSize(size),
+            return Err(GenErrorThreaded::GenerationError(
+                GenErrorInstant::InvalidSize(size),
             ));
         }
         let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
         let cell_count = wu * hu * du;
+        progress.lock().unwrap().from = cell_count;
 
         let mut visited: Vec<Dims3D> = Vec::with_capacity(cell_count);
         let mut stack: Vec<Dims3D> = Vec::with_capacity(cell_count);
@@ -43,6 +45,7 @@ impl MazeAlgorithm for DepthFirstSearch {
             width: wu,
             height: hu,
             depth: du,
+            is_tower: false,
         };
 
         let mut current = Dims3D(sx, sy, sz);
@@ -66,17 +69,14 @@ impl MazeAlgorithm for DepthFirstSearch {
                 stack.push(chosen);
             }
 
-            progress
-                .send(Progress {
-                    done: visited.len(),
-                    from: cell_count,
-                })
-                .unwrap();
+            progress.lock().unwrap().done = visited.len();
 
             if stopper.is_stopped() {
-                return Err(GenerationErrorThreaded::AbortGeneration);
+                return Err(GenErrorThreaded::AbortGeneration);
             }
         }
+
+        progress.lock().unwrap().is_finished = true;
 
         Ok(maze)
     }

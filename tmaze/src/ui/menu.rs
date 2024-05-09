@@ -17,6 +17,10 @@ use crate::{
 
 use super::{draw::*, *};
 
+pub fn panic_on_menu_push() -> ! {
+    panic!("menu should only be popping itself or staying");
+}
+
 #[derive(Debug, Error)]
 pub enum MenuError {
     #[error(transparent)]
@@ -57,6 +61,7 @@ pub struct MenuConfig {
     pub options: Vec<String>,
     pub default: Option<usize>,
     pub counted: bool,
+    pub q_to_quit: bool,
 }
 
 impl MenuConfig {
@@ -68,6 +73,7 @@ impl MenuConfig {
             options: options.into(),
             default: None,
             counted: false,
+            q_to_quit: true,
         }
     }
 
@@ -88,6 +94,11 @@ impl MenuConfig {
 
     pub fn text_style(mut self, style: ContentStyle) -> Self {
         self.text_style = style;
+        self
+    }
+
+    pub fn no_q(mut self) -> Self {
+        self.q_to_quit = false;
         self
     }
 }
@@ -137,10 +148,10 @@ impl ActivityHandler for Menu {
 
         if opt_count == 1 {
             log::warn!("Menu with only one option, returning that");
-            return Some(Change::pop_top_with(Box::new(0)));
+            return Some(Change::pop_top_with(0 as usize));
         } else if opt_count == 0 {
             log::warn!("Empty menu, returning `None`");
-            return Some(Change::pop_top_with(Box::new(0)));
+            return Some(Change::pop_top());
         }
 
         for event in events {
@@ -157,7 +168,12 @@ impl ActivityHandler for Menu {
                         KeyCode::Enter | KeyCode::Char(' ') => {
                             return Some(Change::pop_top_with(self.selected as usize))
                         }
-                        KeyCode::Char('q' | 'Q') => return Some(Change::pop_top()),
+                        KeyCode::Char('q') if !self.config.q_to_quit => {
+                            return Some(Change::pop_top())
+                        }
+                        KeyCode::Char('q') if self.config.q_to_quit => {
+                            return Some(Change::pop_all())
+                        }
                         KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
                             self.selected = (ch as isize - '1' as isize).clamp(0, opt_count - 1);
                         }

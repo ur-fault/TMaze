@@ -2,10 +2,11 @@ use std::{cell::RefCell, time::Duration};
 
 use cmaze::{
     core::{Dims, Dims3D, GameMode},
-    game::{GameProperities, RunningGame, RunningGameState},
+    game::{GameProperities, GeneratorFn, ProgressComm, RunningGame, RunningGameState},
     gameboard::{
         algorithms::{
-            GenerationErrorInstant, GenerationErrorThreaded, MazeAlgorithm, Progress, RndKruskals,
+            DepthFirstSearch, GenErrorInstant, GenErrorThreaded, MazeAlgorithm, Progress,
+            RndKruskals,
         },
         Cell, CellWall,
     },
@@ -13,10 +14,10 @@ use cmaze::{
 
 use crate::{
     app::{game_state::GameData, GameError, GameViewMode},
-    helpers::{self, constants, value_if_else, LineDir, ToDebug},
+    helpers::{self, constants, is_release, value_if_else, LineDir, ToDebug},
     renderer::helpers::term_size,
-    settings::{CameraMode, Settings},
-    ui::{self, DrawContext, Menu, Popup, Rect},
+    settings::{self, CameraMode, Settings},
+    ui::{self, panic_on_menu_push, DrawContext, Menu, Popup, ProgressBar, Rect, Screen},
 };
 
 #[cfg(feature = "sound")]
@@ -30,18 +31,18 @@ use crossterm::event::{poll, read, Event as TermEvent, KeyCode, KeyEvent};
 #[cfg(feature = "sound")]
 use rodio::Source;
 
-use super::{Activity, ActivityHandler, Change};
+use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
 
-pub struct Game {
-    last_edge_follow_offset: Dims,
-    last_selected_preset: Option<usize>,
-}
+// pub struct Game {
+//     last_edge_follow_offset: Dims,
+//     last_selected_preset: Option<usize>,
+// }
 
-struct GameDrawContexts<'a> {
-    normal: DrawContext<'a>,
-    player: DrawContext<'a>,
-    goal: DrawContext<'a>,
-}
+// struct GameDrawContexts<'a> {
+//     normal: DrawContext<'a>,
+//     player: DrawContext<'a>,
+//     goal: DrawContext<'a>,
+// }
 
 // impl Game {
 //     pub fn new() -> Self {
@@ -70,99 +71,6 @@ struct GameDrawContexts<'a> {
 //     //     self.bgm_track = Some(track);
 //     //     let track = track.get_track().repeat_infinite();
 //     //     self.sound_player.play_track(Box::new(track));
-//     // }
-//
-//     // #[cfg(feature = "updates")]
-//     // fn check_for_updates(&mut self) -> Result<(), GameError> {
-//     //     use chrono::Local;
-//     //
-//     //     if !self.save_data.is_update_checked(&self.settings) {
-//     //         let last_check_before = self
-//     //             .save_data
-//     //             .last_update_check
-//     //             .map(|l| Local::now().signed_duration_since(l))
-//     //             .map(|d| d.to_std().expect("Failed to convert to std duration"))
-//     //             .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)) // Remove subsec time
-//     //             .map(humantime::format_duration);
-//     //
-//     //         let update_interval = format!(
-//     //             "Currently checkes {} for updates",
-//     //             self.settings.get_check_interval().to_debug().to_lowercase()
-//     //         );
-//     //
-//     //         ui::popup::render_popup(
-//     //             &mut self.renderer,
-//     //             Default::default(),
-//     //             Default::default(),
-//     //             "Checking for newer version",
-//     //             &[
-//     //                 "Please wait...".to_string(),
-//     //                 update_interval,
-//     //                 last_check_before
-//     //                     .map(|lc| format!("Last check before: {}", lc))
-//     //                     .unwrap_or("Never checked for updates".to_owned()),
-//     //                 "Press 'q' to cancel or Esc to skip".to_string(),
-//     //             ],
-//     //         )?;
-//     //
-//     //         let rt = tokio::runtime::Runtime::new().unwrap();
-//     //
-//     //         let handle = rt.spawn(updates::get_newer_async());
-//     //         while !handle.is_finished() {
-//     //             if let Ok(true) = event::poll(Duration::from_millis(15)) {
-//     //                 match event::read() {
-//     //                     Ok(TermEvent::Key(KeyEvent {
-//     //                         code: KeyCode::Char('q'),
-//     //                         kind: KeyEventKind::Press | KeyEventKind::Repeat,
-//     //                         ..
-//     //                     })) => {
-//     //                         handle.abort();
-//     //                         return Ok(());
-//     //                     }
-//     //                     Ok(TermEvent::Key(KeyEvent {
-//     //                         code: KeyCode::Esc,
-//     //                         kind: KeyEventKind::Press | KeyEventKind::Repeat,
-//     //                         ..
-//     //                     })) => handle.abort(),
-//     //                     _ => (),
-//     //                 }
-//     //             }
-//     //         }
-//     //
-//     //         match rt.block_on(handle).unwrap() {
-//     //             Ok(Some(version)) => {
-//     //                 ui::popup(
-//     //                     &mut self.renderer,
-//     //                     Default::default(),
-//     //                     Default::default(),
-//     //                     "New version available",
-//     //                     &[
-//     //                         format!("New version {} is available", version),
-//     //                         format!("Your version is {}", env!("CARGO_PKG_VERSION")),
-//     //                     ],
-//     //                 )?;
-//     //             }
-//     //             Err(err) if self.settings.get_display_update_check_errors() => {
-//     //                 ui::popup(
-//     //                     &mut self.renderer,
-//     //                     Default::default(),
-//     //                     Default::default(),
-//     //                     "Error while checking for updates",
-//     //                     &[
-//     //                         "There was an error while checking for updates".to_string(),
-//     //                         format!("Error: {}", err),
-//     //                     ],
-//     //                 )?;
-//     //             }
-//     //             _ => {}
-//     //         }
-//     //
-//     //         self.save_data
-//     //             .update_last_check()
-//     //             .expect("Failed to save data");
-//     //     }
-//     //
-//     //     Ok(())
 //     // }
 //
 //     pub fn run(mut self) -> Result<(), GameError> {
@@ -223,99 +131,6 @@ struct GameDrawContexts<'a> {
 //         }
 //
 //         Ok(())
-//     }
-//
-//     fn show_settings_screen(&mut self, settings: &Settings) -> Change {
-//         let popup = Popup::new(
-//             "Settings".to_string(),
-//             vec![
-//                 "Path to the current settings:".to_string(),
-//                 settings.path().to_string_lossy().to_string(),
-//             ],
-//         );
-//
-//         Change::push(Activity::new_base("controls".to_string(), Box::new(popup)))
-//
-//         // let mut settings = self.settings.clone();
-//         // settings.edit(
-//         //     &mut self.renderer,
-//         //     self.settings.read().color_scheme.clone().unwrap(),
-//         // )?;
-//         // self.settings = settings;
-//         // Ok(())
-//     }
-//
-//     fn show_controls_popup(&mut self) -> Change {
-//         // ui::popup(
-//         //     &mut self.renderer,
-//         //     self.settings.get_color_scheme().normals(),
-//         //     self.settings.get_color_scheme().texts(),
-//         //     "Controls",
-//         //     &[
-//         //         "WASD and arrows: move".to_string(),
-//         //         "Space: switch adventure/spectaror mode".to_string(),
-//         //         "Q, F or L: move down".to_string(),
-//         //         "E, R or P: move up".to_string(),
-//         //         "With SHIFT move at the end in single dir".to_string(),
-//         //         "Escape: pause menu".to_string(),
-//         //     ],
-//         // )?;
-//         //
-//         // Ok(())
-//         let popup = Popup::new(
-//             "Controls".to_string(),
-//             vec![
-//                 "WASD and arrows: move".to_string(),
-//                 "Space: switch adventure/spectaror mode".to_string(),
-//                 "Q, F or L: move down".to_string(),
-//                 "E, R or P: move up".to_string(),
-//                 "With SHIFT move at the end in single dir".to_string(),
-//                 "Escape: pause menu".to_string(),
-//             ],
-//         );
-//
-//         Change::push(Activity::new_base("controls".to_string(), Box::new(popup)))
-//     }
-//
-//     fn show_about_popup(&mut self) -> Change {
-//         // ui::popup(
-//         //     &mut self.renderer,
-//         //     self.settings.get_color_scheme().normals(),
-//         //     self.settings.get_color_scheme().texts(),
-//         //     "About",
-//         //     &[
-//         //         "This is simple maze solving game".to_string(),
-//         //         "Supported algorithms:".to_string(),
-//         //         "    - Depth-first search".to_string(),
-//         //         "    - Kruskal's algorithm".to_string(),
-//         //         "Supports 3D mazes".to_string(),
-//         //         "".to_string(),
-//         //         "Created by:".to_string(),
-//         //         format!("    - {}", env!("CARGO_PKG_AUTHORS")),
-//         //         "".to_string(),
-//         //         "Version:".to_string(),
-//         //         format!("    {}", env!("CARGO_PKG_VERSION")),
-//         //     ],
-//         // )?;
-//
-//         let popup = Popup::new(
-//             "About".to_string(),
-//             vec![
-//                 "This is simple maze solving game".to_string(),
-//                 "Supported algorithms:".to_string(),
-//                 "    - Depth-first search".to_string(),
-//                 "    - Kruskal's algorithm".to_string(),
-//                 "Supports 3D mazes".to_string(),
-//                 "".to_string(),
-//                 "Created by:".to_string(),
-//                 format!("    - {}", env!("CARGO_PKG_AUTHORS")),
-//                 "".to_string(),
-//                 "Version:".to_string(),
-//                 format!("    {}", env!("CARGO_PKG_VERSION")),
-//             ],
-//         );
-//
-//         Change::push(Activity::new_base("about".to_string(), Box::new(popup)))
 //     }
 //
 //     fn run_game(&mut self) -> Result<(), GameError> {
@@ -793,90 +608,6 @@ struct GameDrawContexts<'a> {
 //         Ok(())
 //     }
 //
-//     fn generate_maze(&mut self, game_props: GameProperities) -> Result<RunningGame, GameError> {
-//         let mut last_progress = f64::MIN;
-//
-//         let msize = game_props.game_mode.size;
-//         let res = RunningGame::new_threaded(game_props);
-//
-//         let (handle, stop_flag, progress) = match res {
-//             Ok(com) => com,
-//             Err(GenerationErrorInstant::InvalidSize(dims)) => {
-//                 ui::popup(
-//                     &mut self.renderer,
-//                     self.settings.get_color_scheme().normals(),
-//                     self.settings.get_color_scheme().texts(),
-//                     "Error",
-//                     &[
-//                         "Invalid maze size".to_string(),
-//                         format!(" {}x{}x{}", dims.0, dims.1, dims.2),
-//                     ],
-//                 )?;
-//                 return Err(GameError::EmptyMenu);
-//             }
-//         };
-//
-//         for Progress { done, from } in progress.iter() {
-//             let current_progress = done as f64 / from as f64;
-//
-//             if let Ok(true) = poll(Duration::from_nanos(1)) {
-//                 if let Ok(TermEvent::Key(KeyEvent { code, .. })) = read() {
-//                     match code {
-//                         KeyCode::Esc => {
-//                             stop_flag.stop();
-//                             let _ = handle.join().unwrap();
-//                             return Err(GameError::Back);
-//                         }
-//                         KeyCode::Char('q' | 'Q') => {
-//                             stop_flag.stop();
-//                             let _ = handle.join().unwrap();
-//                             return Err(GameError::FullQuit);
-//                         }
-//                         _ => {}
-//                     }
-//                 }
-//             }
-//
-//             if current_progress - last_progress > 0.0001 {
-//                 last_progress = current_progress;
-//                 ui::render_progress(
-//                     &mut self.renderer,
-//                     self.settings.get_color_scheme().normals(),
-//                     self.settings.get_color_scheme().texts(),
-//                     &format!(
-//                         " Generating maze ({}x{}x{})... {:.2} % ",
-//                         msize.0,
-//                         msize.1,
-//                         msize.2,
-//                         current_progress * 100.0
-//                     ),
-//                     current_progress,
-//                 )?;
-//             }
-//         }
-//
-//         match handle.join().unwrap() {
-//             Ok(game) => Ok(game),
-//             Err(GenerationErrorThreaded::GenerationError(GenerationErrorInstant::InvalidSize(
-//                 dims,
-//             ))) => {
-//                 ui::popup(
-//                     &mut self.renderer,
-//                     self.settings.get_color_scheme().normals(),
-//                     self.settings.get_color_scheme().texts(),
-//                     "Error",
-//                     &[
-//                         "Invalid maze size".to_string(),
-//                         format!(" {}x{}x{}", dims.0, dims.1, dims.2),
-//                     ],
-//                 )?;
-//                 Err(GameError::EmptyMenu)
-//             }
-//             Err(GenerationErrorThreaded::AbortGeneration) => Err(GameError::Back),
-//             Err(GenerationErrorThreaded::UnknownError(err)) => panic!("{:?}", err),
-//         }
-//     }
-//
 //     fn draw_stairs(
 //         contexts: GameDrawContexts,
 //         cell: &Cell,
@@ -917,75 +648,6 @@ struct GameDrawContexts<'a> {
 //             }
 //         }
 //     }
-//
-//     fn get_game_properities(&mut self) -> Result<GameProperities, GameError> {
-//         // let (i, &mode) = ui::choice_menu(
-//         //     &mut self.renderer,
-//         //     self.settings.get_color_scheme().normals(),
-//         //     self.settings.get_color_scheme().texts(),
-//         //     "Maze size",
-//         //     &self
-//         //         .settings
-//         //         .get_mazes()
-//         //         .iter()
-//         //         .map(|maze| {
-//         //             (
-//         //                 GameMode {
-//         //                     size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
-//         //                     is_tower: maze.tower,
-//         //                 },
-//         //                 maze.title.as_str(),
-//         //             )
-//         //         })
-//         //         .collect::<Vec<_>>(),
-//         //     self.last_selected_preset.or_else(|| {
-//         //         self.settings
-//         //             .get_mazes()
-//         //             .iter()
-//         //             .position(|maze| maze.default)
-//         //     }),
-//         //     false,
-//         // )?;
-//
-//         // self.last_selected_preset = Some(i);
-//         //
-//         // let gen = if self.settings.get_dont_ask_for_maze_algo() {
-//         //     match self.settings.get_default_maze_gen_algo() {
-//         //         MazeGenAlgo::RandomKruskals => RndKruskals::generate,
-//         //         MazeGenAlgo::DepthFirstSearch => DepthFirstSearch::generate,
-//         //     }
-//         // } else {
-//         //     match ui::menu(
-//         //         &mut self.renderer,
-//         //         self.settings.get_color_scheme().normals(),
-//         //         self.settings.get_color_scheme().texts(),
-//         //         "Maze generation algorithm",
-//         //         &["Randomized Kruskal's", "Depth-first search"],
-//         //         match self.settings.get_default_maze_gen_algo() {
-//         //             MazeGenAlgo::RandomKruskals => Some(0),
-//         //             MazeGenAlgo::DepthFirstSearch => Some(1),
-//         //         },
-//         //         true,
-//         //     )? {
-//         //         0 => RndKruskals::generate,
-//         //         1 => DepthFirstSearch::generate,
-//         //         _ => panic!(),
-//         //     }
-//         // };
-//
-//         // TODO: use menu
-//         let mode = GameMode {
-//             size: Dims3D(10, 10, 1),
-//             is_tower: false,
-//         };
-//
-//         let gen = RndKruskals::generate;
-//
-//         Ok(GameProperities {
-//             game_mode: mode,
-//             generator: gen,
-//         })
-//     }
 // }
 //
 // impl Default for Game {
@@ -995,6 +657,7 @@ struct GameDrawContexts<'a> {
 // }
 
 pub struct MainMenu(Menu);
+
 impl MainMenu {
     pub fn new(settings: &Settings) -> Self {
         let color_scheme = settings.get_color_scheme();
@@ -1064,6 +727,13 @@ impl MainMenu {
 
         Change::push(Activity::new_base("about".to_string(), Box::new(popup)))
     }
+
+    fn start_new_game(&mut self, settings: &Settings, use_data: &AppStateData) -> Change {
+        Change::push(Activity::new_base(
+            "maze size",
+            Box::new(MazeSizeMenu::new(settings, use_data)),
+        ))
+    }
 }
 
 impl ActivityHandler for MainMenu {
@@ -1072,17 +742,19 @@ impl ActivityHandler for MainMenu {
         events: Vec<super::Event>,
         data: &mut super::app::AppData,
     ) -> Option<Change> {
-        match self.0.update(events, data) {
-            Some(Change::Push(_)) => panic!("menu should only be popping itself or staying"),
-            Some(Change::Pop {
+        match self.0.update(events, data)? {
+            Change::Push(_) | Change::Replace(_) => {
+                panic!("menu should only be popping itself or staying")
+            }
+            Change::Pop {
                 res: Some(sub_activity),
                 ..
-            }) => {
+            } => {
                 let index = *sub_activity
                     .downcast::<usize>()
                     .expect("menu should return index");
                 match index {
-                    0 /* new game */ => todo!(),
+                    0 /* new game */ => Some(self.start_new_game(&data.settings, &data.use_data)),
                     1 /* settings */ => Some(self.show_settings_screen(&data.settings)),
                     2 /* controls */ => Some(self.show_controls_popup()),
                     3 /* about    */ => Some(self.show_about_popup()),
@@ -1090,12 +762,391 @@ impl ActivityHandler for MainMenu {
                     _ => panic!("main menu should only return valid index between 0 and 4"),
                 }
             }
-            Some(Change::Pop { res: None, .. }) => Some(Change::pop_top()),
-            None => None,
+            top @ Change::Pop { res: None, .. } => Some(top),
+            pop @ Change::PopUntil { .. } => Some(pop),
         }
     }
 
     fn screen(&self) -> &dyn ui::Screen {
         &self.0
+    }
+}
+
+pub struct MazeSizeMenu {
+    menu: Menu,
+    presets: Vec<GameMode>,
+}
+
+impl MazeSizeMenu {
+    pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
+        let color_scheme = settings.get_color_scheme();
+        let mut menu_config = ui::MenuConfig::new(
+            "Maze size".to_string(),
+            settings
+                .get_mazes()
+                .iter()
+                .map(|maze| maze.title.clone())
+                .collect::<Vec<_>>(),
+            // vec!["100x100".to_string()],
+        )
+        .box_style(color_scheme.normals())
+        .text_style(color_scheme.texts());
+
+        let last_selected = app_state_data
+            .last_selected_preset
+            .or_else(|| settings.get_mazes().iter().position(|maze| maze.default));
+
+        if let Some(i) = last_selected {
+            menu_config = menu_config.default(i);
+        }
+
+        let menu = Menu::new(menu_config);
+
+        let presets = settings
+            .get_mazes()
+            .iter()
+            .map(|maze| GameMode {
+                size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
+                is_tower: maze.tower,
+            })
+            .collect::<Vec<_>>();
+        // let presets = vec![GameMode {
+        //     size: Dims3D(100, 100, 1),
+        //     is_tower: false,
+        // }];
+
+        Self { menu, presets }
+    }
+
+    // TODO: custom maze size popup
+    // just one time, since settings have it there too
+}
+
+impl ActivityHandler for MazeSizeMenu {
+    fn update(
+        &mut self,
+        events: Vec<super::Event>,
+        data: &mut super::app::AppData,
+    ) -> Option<Change> {
+        match self.menu.update(events, data) {
+            Some(change) => match change {
+                Change::Push(_) | Change::Replace(_) => panic_on_menu_push(),
+                Change::Pop {
+                    res: Some(size), ..
+                } => {
+                    let index = *size.downcast::<usize>().expect("menu should return index");
+                    data.use_data.last_selected_preset = Some(index);
+
+                    let preset = self.presets[index];
+
+                    return Some(Change::push(Activity::new_base(
+                        "maze_gen".to_string(),
+                        Box::new(MazeAlgorithmMenu::new(preset, &data.settings)),
+                    )));
+                }
+                top @ Change::Pop { res: None, .. } => Some(top),
+                pop @ Change::PopUntil { .. } => Some(pop),
+            },
+            None => None,
+        }
+    }
+
+    fn screen(&self) -> &dyn ui::Screen {
+        &self.menu
+    }
+}
+
+pub struct MazeAlgorithmMenu {
+    preset: GameMode,
+    menu: Menu,
+}
+
+impl MazeAlgorithmMenu {
+    pub fn new(preset: GameMode, settings: &Settings) -> Self {
+        let color_scheme = settings.get_color_scheme();
+        let menu = Menu::new(
+            ui::MenuConfig::new(
+                "Maze generation algorithm".to_string(),
+                vec![
+                    "Randomized Kruskal's".to_string(),
+                    "Depth-first search".to_string(),
+                ],
+            )
+            .counted()
+            .box_style(color_scheme.normals())
+            .text_style(color_scheme.texts()),
+        );
+
+        Self { menu, preset }
+    }
+}
+
+impl ActivityHandler for MazeAlgorithmMenu {
+    fn update(
+        &mut self,
+        events: Vec<super::Event>,
+        data: &mut super::app::AppData,
+    ) -> Option<Change> {
+        match self.menu.update(events, data) {
+            Some(change) => match change {
+                Change::Push(_) | Change::Replace(_) => {
+                    panic!("menu should only be popping itself or staying")
+                }
+                Change::Pop {
+                    res: Some(algo), ..
+                } => {
+                    let index = *algo.downcast::<usize>().expect("menu should return index");
+
+                    let gen = match index {
+                        0 => RndKruskals::generate,
+                        1 => DepthFirstSearch::generate,
+                        _ => panic!(),
+                    };
+
+                    return Some(Change::push(Activity::new_base(
+                        "maze_gen".to_string(),
+                        Box::new(MazeGenerationActivity::new(
+                            self.preset,
+                            gen,
+                            &data.settings,
+                        )),
+                    )));
+                }
+                top @ Change::Pop { res: None, .. } => Some(top),
+                pop @ Change::PopUntil { .. } => Some(pop),
+            },
+            None => None,
+        }
+    }
+
+    fn screen(&self) -> &dyn ui::Screen {
+        &self.menu
+    }
+}
+
+pub struct MazeGenerationActivity {
+    comm: Option<ProgressComm<Result<RunningGame, GenErrorThreaded>>>,
+    game_props: GameProperities,
+    progress_bar: ProgressBar,
+}
+
+impl MazeGenerationActivity {
+    pub fn new(game_mode: GameMode, maze_gen: GeneratorFn, settings: &Settings) -> Self {
+        let game_props = GameProperities {
+            game_mode,
+            generator: maze_gen,
+        };
+
+        let color_scheme = settings.get_color_scheme();
+        let progress_bar = ProgressBar::new(format!("Generating maze: {:?}", game_mode.size))
+            .box_style(color_scheme.normals())
+            .text_style(color_scheme.texts());
+
+        Self {
+            comm: None,
+            game_props,
+            progress_bar,
+        }
+    }
+}
+
+impl ActivityHandler for MazeGenerationActivity {
+    fn update(
+        &mut self,
+        events: Vec<super::Event>,
+        data: &mut super::app::AppData,
+    ) -> Option<Change> {
+        for event in events {
+            match event {
+                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
+                    match code {
+                        KeyCode::Esc | KeyCode::Char('q') => {
+                            match self.comm.take() {
+                                Some(comm) => {
+                                    comm.stop_flag.stop();
+                                    let _ = comm.handle.join().unwrap();
+                                }
+                                None => {}
+                            };
+                            return Some(Change::pop_top());
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if self.comm.is_none() {
+            return match RunningGame::new_threaded(self.game_props.clone()) {
+                Ok(comm) => {
+                    log::info!("Maze generation thread started");
+                    self.comm = Some(comm);
+
+                    None
+                }
+                Err(err) => match err {
+                    GenErrorInstant::InvalidSize(size) => {
+                        let popup = Popup::new(
+                            "Invalid maze size".to_string(),
+                            vec![format!("Size: {:?}", size)],
+                        );
+
+                        Some(Change::replace(Activity::new_base(
+                            "invalid size".to_string(),
+                            Box::new(popup),
+                        )))
+                    }
+                },
+            };
+        }
+
+        if self.comm.as_ref().unwrap().handle.is_finished() {
+            let res = self
+                .comm
+                .take()
+                .unwrap()
+                .handle
+                .join()
+                .expect("Could not join maze generation thread");
+
+            match res {
+                Ok(game) => {
+                    let game_data = GameData {
+                        camera_pos: game.get_player_pos(),
+                        game,
+                        view_mode: GameViewMode::Adventure,
+                        player_char: constants::get_random_player_char(),
+                    };
+                    Some(Change::replace(Activity::new_base(
+                        "game".to_string(),
+                        Box::new(GameActivity::new(game_data)),
+                    )))
+                }
+                Err(err) => match err {
+                    GenErrorThreaded::AbortGeneration => Some(Change::pop_top()),
+                    GenErrorThreaded::GenerationError(_) => {
+                        panic!("Instant generation error should be handled before");
+                    }
+                },
+            }
+        } else {
+            let Progress { done, from, .. } = self.comm.as_ref().unwrap().progress();
+            self.progress_bar.update_progress(done as f64 / from as f64);
+            self.progress_bar.update_title(format!(
+                "Generating maze: {}/{} - {:.2} %",
+                done,
+                from,
+                done as f64 / from as f64 * 100.0
+            ));
+            None
+        }
+    }
+
+    fn screen(&self) -> &dyn ui::Screen {
+        &self.progress_bar
+    }
+}
+
+pub struct PauseMenu {
+    menu: Menu,
+}
+
+impl PauseMenu {
+    pub fn new(settings: &Settings) -> Self {
+        let color_scheme = settings.get_color_scheme();
+        let menu = Menu::new(
+            ui::MenuConfig::new(
+                "Paused".to_string(),
+                vec![
+                    "Resume".to_string(),
+                    "Main Menu".to_string(),
+                    "Quit".to_string(),
+                ],
+            )
+            .box_style(color_scheme.normals())
+            .text_style(color_scheme.texts()),
+        );
+
+        Self { menu }
+    }
+}
+
+impl ActivityHandler for PauseMenu {
+    fn update(&mut self, events: Vec<Event>, data: &mut super::app::AppData) -> Option<Change> {
+        match self.menu.update(events, data) {
+            Some(change) => match change {
+                Change::Push(_) | Change::Replace(_) => {
+                    panic_on_menu_push();
+                }
+                Change::Pop { res: Some(res), .. } => {
+                    let index = *res.downcast::<usize>().expect("menu should return index");
+
+                    match index {
+                        0 => Some(Change::pop_top()),
+                        1 => Some(Change::pop_until("main menu")),
+                        2 => Some(Change::pop_all()),
+                        _ => panic!(),
+                    }
+                }
+                top @ Change::Pop { res: None, .. } => Some(top),
+                pop @ Change::PopUntil { .. } => Some(pop),
+            },
+            None => None,
+        }
+    }
+
+    fn screen(&self) -> &dyn Screen {
+        &self.menu
+    }
+}
+
+pub struct GameActivity {
+    last_view_offset: Dims,
+    game: GameData,
+}
+
+impl GameActivity {
+    pub fn new(game: GameData) -> Self {
+        let last_view_offset = Dims(0, 0);
+        let game = game;
+
+        Self {
+            last_view_offset,
+            game,
+        }
+    }
+}
+
+impl ActivityHandler for GameActivity {
+    fn update(&mut self, events: Vec<Event>, data: &mut super::app::AppData) -> Option<Change> {
+        for event in events {
+            match event {
+                Event::Term(TermEvent::Key(key_event)) => {
+                    if self.game.handle_event(&data.settings, key_event).is_err() {
+                        self.game.game.pause().unwrap();
+
+                        return Some(Change::push(Activity::new_base(
+                            "pause".to_string(),
+                            Box::new(PauseMenu::new(&data.settings)),
+                        )));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
+    fn screen(&self) -> &dyn ui::Screen {
+        self
+    }
+}
+
+impl Screen for GameActivity {
+    fn draw(&self, frame: &mut crate::renderer::Frame) -> std::io::Result<()> {
+        frame.draw((0, 0), "In game");
+        Ok(())
     }
 }

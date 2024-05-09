@@ -1,32 +1,30 @@
 mod depth_first_search;
 mod rnd_kruskals;
 
-use super::{Cell, CellWall, Maze};
-pub use crate::core::*;
-use crossbeam::{
-    channel::{unbounded, Receiver, Sender},
-    scope,
-};
-pub use depth_first_search::DepthFirstSearch;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
-pub use rnd_kruskals::RndKruskals;
+
 use std::{
-    any::Any,
-    sync::{Arc, RwLock},
-    thread::{self, JoinHandle},
+    sync::{Arc, Mutex, RwLock},
+    thread,
 };
 
+use super::{Cell, CellWall, Maze};
+
+pub use crate::core::*;
+use crate::game::ProgressComm;
+pub use depth_first_search::DepthFirstSearch;
+pub use rnd_kruskals::RndKruskals;
+
 #[derive(Debug)]
-pub enum GenerationErrorInstant {
+pub enum GenErrorInstant {
     InvalidSize(Dims3D),
 }
 
 #[derive(Debug)]
-pub enum GenerationErrorThreaded {
-    GenerationError(GenerationErrorInstant),
+pub enum GenErrorThreaded {
+    GenerationError(GenErrorInstant),
     AbortGeneration,
-    UnknownError(Box<dyn Send + Any + 'static>),
 }
 
 #[derive(Debug)]
@@ -60,44 +58,39 @@ impl Default for StopGenerationFlag {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Progress {
     pub done: usize,
     pub from: usize,
+    is_finished: bool,
 }
-
-pub type MazeGeneratorComunication = (
-    JoinHandle<Result<Maze, GenerationErrorThreaded>>,
-    StopGenerationFlag,
-    Receiver<Progress>,
-);
 
 pub trait MazeAlgorithm {
     fn generate(
         size: Dims3D,
         floored: bool,
-        parallel_floor_generation: bool,
-    ) -> Result<MazeGeneratorComunication, GenerationErrorInstant> {
+    ) -> Result<ProgressComm<Result<Maze, GenErrorThreaded>>, GenErrorInstant> {
         if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
-            return Err(GenerationErrorInstant::InvalidSize(size));
+            return Err(GenErrorInstant::InvalidSize(size));
         }
 
         let stop_flag = StopGenerationFlag::new();
-        let (s_progress, r_progress) = unbounded::<Progress>();
+        let progress = Arc::new(Mutex::new(Progress {
+            done: 0,
+            from: 1,
+            is_finished: false,
+        }));
+        let recv = Arc::clone(&progress);
 
         let stop_flag_clone = stop_flag.clone();
 
-        Ok((
-            thread::spawn(move || {
+        Ok(ProgressComm {
+            handle: thread::spawn(move || {
                 let Dims3D(w, h, d) = size;
                 let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
                 let cells = if floored && d > 1 {
-                    let mut cells = Self::generate_floors(
-                        size,
-                        s_progress,
-                        stop_flag,
-                        parallel_floor_generation,
-                    )?;
+                    let mut cells = Self::generate_floors(size, progress, stop_flag)?;
 
                     for floor in 0..du - 1 {
                         let (x, y) = (thread_rng().gen_range(0..wu), thread_rng().gen_range(0..hu));
@@ -107,7 +100,7 @@ pub trait MazeAlgorithm {
 
                     cells
                 } else {
-                    Self::generate_individual(Dims3D(w, h, d), stop_flag, s_progress)?.cells
+                    Self::generate_individual(Dims3D(w, h, d), stop_flag, progress)?.cells
                 };
 
                 Ok(Maze {
@@ -115,71 +108,74 @@ pub trait MazeAlgorithm {
                     width: wu,
                     height: hu,
                     depth: du,
+                    is_tower: floored,
                 })
             }),
-            stop_flag_clone,
-            r_progress,
-        ))
+            stop_flag: stop_flag_clone,
+            recv,
+        })
     }
 
     fn generate_floors(
         size: Dims3D,
-        progres_sender: Sender<Progress>,
+        progress: Arc<Mutex<Progress>>,
         stop_flag: StopGenerationFlag,
-        parallel_floor_generation: bool,
-    ) -> Result<Vec<Vec<Vec<Cell>>>, GenerationErrorThreaded> {
+    ) -> Result<Vec<Vec<Vec<Cell>>>, GenErrorThreaded> {
         let Dims3D(w, h, d) = size;
         let (.., du) = (w as usize, h as usize, d as usize);
-        let s_progress = progres_sender;
-
-        let generate_floor = |maze_i: usize| {
-            let (s, r) = unbounded();
-
-            let s_progress = s_progress.clone();
+        let generate_floor = |progress| {
             let stop_flag = stop_flag.clone();
-            match scope(|scope| {
-                scope.spawn(move |_| {
-                    for Progress { done, from } in r.iter() {
-                        s_progress
-                            .send(Progress {
-                                done: done + maze_i * from,
-                                from: from * du,
-                            })
-                            .unwrap();
-                    }
-                });
 
-                if stop_flag.is_stopped() {
-                    return Err(GenerationErrorThreaded::AbortGeneration);
+            let generation_result = Self::generate_individual(Dims3D(w, h, 1), stop_flag, progress);
+
+            generation_result.map(|mut res| res.cells.remove(0))
+        };
+
+        let stop_flag = stop_flag.clone();
+
+        thread::scope(|s| {
+            let mut local_progresses = (0..du)
+                .map(|_| Progress {
+                    done: 0,
+                    from: 1,
+                    is_finished: false,
+                })
+                .collect::<Vec<_>>();
+            let shared_progresses = local_progresses
+                .iter()
+                .map(|p| Arc::new(Mutex::new(*p)))
+                .collect::<Vec<_>>();
+
+            let shared2 = shared_progresses.clone();
+
+            s.spawn(move || loop {
+                for (i, progress) in shared2.iter().enumerate() {
+                    let p = *progress.lock().unwrap();
+                    local_progresses[i] = p;
                 }
 
-                Self::generate_individual(Dims3D(w, h, 1), stop_flag, s)
-            })
-            .map(|res| Ok(res?.cells.remove(0)))
-            {
-                Ok(Ok(maze)) => Ok(maze),
-                Err(e) => Err(GenerationErrorThreaded::UnknownError(e)),
-                Ok(Err(e)) => Err(e),
-            }
-        };
+                let all_done = local_progresses.iter().all(|p| p.is_finished);
+                let mut progress = progress.lock().unwrap();
+                progress.is_finished = all_done;
+                progress.done = local_progresses.iter().map(|p| p.done).sum();
+                progress.from = local_progresses.iter().map(|p| p.from).sum();
 
-        let cells: Vec<Vec<Vec<Cell>>> = if parallel_floor_generation {
+                if all_done || stop_flag.is_stopped() {
+                    break;
+                }
+            });
+
             (0..du)
                 .into_par_iter()
+                .map(|i| shared_progresses[i].clone())
                 .map(generate_floor)
-                .collect::<Result<Vec<_>, GenerationErrorThreaded>>()?
-        } else {
-            (0..du)
-                .map(generate_floor)
-                .collect::<Result<Vec<_>, GenerationErrorThreaded>>()?
-        };
-
-        Ok(cells)
+                .collect::<Result<Vec<_>, GenErrorThreaded>>()
+        })
     }
 
     fn generate_individual(
         size: Dims3D,
         stopper: StopGenerationFlag,
-        progress: Sender<Progress>,
-    ) -> Result<Maze, GenerationErrorThreaded>;
+        progress: Arc<Mutex<Progress>>,
+    ) -> Result<Maze, GenErrorThreaded>;
 }
