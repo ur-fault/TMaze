@@ -1,8 +1,12 @@
 use cmaze::{
     core::{Dims, Dims3D, GameMode},
     game::{GameProperities, GeneratorFn, ProgressComm, RunningGame, RunningGameState},
-    gameboard::algorithms::{
-        DepthFirstSearch, GenErrorInstant, GenErrorThreaded, MazeAlgorithm, Progress, RndKruskals,
+    gameboard::{
+        algorithms::{
+            DepthFirstSearch, GenErrorInstant, GenErrorThreaded, MazeAlgorithm, Progress,
+            RndKruskals,
+        },
+        CellWall,
     },
 };
 
@@ -33,12 +37,6 @@ use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
 // pub struct Game {
 //     last_edge_follow_offset: Dims,
 //     last_selected_preset: Option<usize>,
-// }
-
-// struct GameDrawContexts<'a> {
-//     normal: DrawContext<'a>,
-//     player: DrawContext<'a>,
-//     goal: DrawContext<'a>,
 // }
 
 // impl Game {
@@ -816,7 +814,7 @@ impl MazeSizeMenu {
     }
 
     // TODO: custom maze size popup
-    // just one time, since settings have it there too
+    // just one-time, since it's already in settings
 }
 
 impl ActivityHandler for MazeSizeMenu {
@@ -1206,11 +1204,11 @@ impl MazeBoard {
                 let cell_pos = Dims3D(x, y, floor);
                 let Dims(rx, ry) = maze_pos_to_real(cell_pos);
 
-                if maze.get_wall(cell_pos, cell_pos + Dims3D(1, 0, 0)).unwrap() {
+                if maze.get_wall(cell_pos, CellWall::Right).unwrap() {
                     draw((rx + 1, ry), LineDir::Vertical);
                 }
 
-                if maze.get_wall(cell_pos, cell_pos + Dims3D(0, 1, 0)).unwrap() {
+                if maze.get_wall(cell_pos, CellWall::Down).unwrap() {
                     draw((rx, ry + 1), LineDir::Horizontal);
                 }
 
@@ -1218,10 +1216,10 @@ impl MazeBoard {
                 let cp2 = cell_pos + Dims3D(1, 1, 0);
 
                 let dir = LineDir::from_bools(
-                    maze.get_wall(cp1, cp1 + Dims3D(0, 1, 0)).unwrap(),
-                    maze.get_wall(cp1, cp1 + Dims3D(1, 0, 0)).unwrap(),
-                    maze.get_wall(cp2, cp1 + Dims3D(1, 0, 0)).unwrap(),
-                    maze.get_wall(cp2, cp1 + Dims3D(0, 1, 0)).unwrap(),
+                    maze.get_wall(cp1, CellWall::Down).unwrap(),
+                    maze.get_wall(cp1, CellWall::Right).unwrap(),
+                    maze.get_wall(cp2, CellWall::Up).unwrap(),
+                    maze.get_wall(cp2, CellWall::Left).unwrap(),
                 );
 
                 draw((rx + 1, ry + 1), dir);

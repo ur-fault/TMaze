@@ -7,7 +7,9 @@ use semver::{Comparator, Version, VersionReq};
 
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
+    data::SaveData,
     helpers::ToDebug,
+    settings::Settings,
     ui::Popup,
 };
 
@@ -41,8 +43,11 @@ pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
     }
 }
 
+// TODO: Updates should be checked in the background
+// and the user should get a notification if a newer version is available
+
 pub struct UpdateCheckerActivity {
-    popup: Option<Popup>,
+    popup: Popup,
     task: Option<(
         tokio::task::JoinHandle<Result<Option<Version>, CratesError>>,
         tokio::runtime::Runtime,
@@ -50,11 +55,31 @@ pub struct UpdateCheckerActivity {
 }
 
 impl UpdateCheckerActivity {
-    pub fn new() -> Self {
-        Self {
-            popup: None,
-            task: None,
-        }
+    pub fn new(settings: &Settings, save: &SaveData) -> Self {
+        let last_check_before = save
+            .last_update_check
+            .map(|l| Local::now().signed_duration_since(l))
+            .map(|d| d.to_std().expect("Failed to convert to std duration"))
+            .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)) // remove subsec time
+            .map(humantime::format_duration);
+
+        let update_interval = format!(
+            "Currently checkes {} for updates",
+            settings.get_check_interval().to_debug().to_lowercase()
+        );
+
+        let popup = Popup::new(
+            "Checking for newer version".to_string(),
+            vec![
+                "Please wait...".to_string(),
+                update_interval,
+                last_check_before
+                    .map(|lc| format!("Last check before: {}", lc))
+                    .unwrap_or("Never checked for updates".to_owned()),
+                "Press 'q' to cancel or Esc to skip".to_string(),
+            ],
+        );
+        Self { popup, task: None }
     }
 }
 
@@ -74,39 +99,6 @@ impl ActivityHandler for UpdateCheckerActivity {
                 }
                 _ => {}
             }
-        }
-
-        if self.popup.is_none() {
-            let last_check_before = app_data
-                .save
-                .last_update_check
-                .map(|l| Local::now().signed_duration_since(l))
-                .map(|d| d.to_std().expect("Failed to convert to std duration"))
-                .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)) // remove subsec time
-                .map(humantime::format_duration);
-
-            let update_interval = format!(
-                "Currently checkes {} for updates",
-                app_data
-                    .settings
-                    .get_check_interval()
-                    .to_debug()
-                    .to_lowercase()
-            );
-
-            let popup = Popup::new(
-                "Checking for newer version".to_string(),
-                vec![
-                    "Please wait...".to_string(),
-                    update_interval,
-                    last_check_before
-                        .map(|lc| format!("Last check before: {}", lc))
-                        .unwrap_or("Never checked for updates".to_owned()),
-                    "Press 'q' to cancel or Esc to skip".to_string(),
-                ],
-            );
-
-            self.popup = Some(popup);
         }
 
         if self.task.is_none() {
@@ -151,6 +143,6 @@ impl ActivityHandler for UpdateCheckerActivity {
     }
 
     fn screen(&self) -> &dyn crate::ui::Screen {
-        self.popup.as_ref().unwrap()
+        &self.popup
     }
 }
