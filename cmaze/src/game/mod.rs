@@ -45,12 +45,6 @@ pub enum MoveMode {
     Fast,
 }
 
-// pub struct GameConstructorCommunication {
-//     pub handle: JoinHandle<Result<RunningGame, GenerationErrorThreaded>>,
-//     pub stop_flag: StopGenerationFlag,
-//     pub recv: Arc<Mutex<Progress>>,
-// }
-
 pub struct ProgressComm<R> {
     pub handle: JoinHandle<R>,
     pub stop_flag: StopGenerationFlag,
@@ -142,15 +136,14 @@ impl RunningGame {
     }
 
     pub fn start(&mut self) -> Result<(), GameAlreadyRunningError> {
-        match self.get_state() {
-            RunningGameState::NotStarted => {
-                self.state = RunningGameState::Running;
-                self.clock = Some(PausableClock::default());
-                self.start = Some(self.clock.as_mut().unwrap().now());
+        if let RunningGameState::NotStarted = self.get_state() {
+            self.state = RunningGameState::Running;
+            self.clock = Some(PausableClock::default());
+            self.start = Some(self.clock.as_mut().unwrap().now());
 
-                Ok(())
-            }
-            _ => Err(GameAlreadyRunningError {}),
+            Ok(())
+        } else {
+            Err(GameAlreadyRunningError {})
         }
     }
 

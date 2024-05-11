@@ -1,21 +1,24 @@
+use cmaze::core::Dims;
 use crossterm::{
     event::{Event as TermEvent, KeyCode, KeyEvent},
     style::{Color, ContentStyle},
 };
 
 use pad::PadStr;
-use std::cell::RefCell;
+use std::io;
+use thiserror::Error;
 
 use crate::{
     app::{
         activity::{Activity, ActivityHandler, Change},
-        app::{App, AppData},
+        app::AppData,
         event::Event,
     },
     helpers::{is_release, value_if},
+    renderer::Frame,
 };
 
-use super::{draw::*, *};
+use super::{box_center_screen, draw_box, Screen};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
@@ -195,7 +198,7 @@ impl ActivityHandler for Menu {
 }
 
 impl Screen for Menu {
-    fn draw(&self, renderer: &mut Frame) -> Result<(), io::Error> {
+    fn draw(&self, frame: &mut Frame) -> Result<(), io::Error> {
         let MenuConfig {
             box_style,
             text_style,
@@ -212,16 +215,13 @@ impl Screen for Menu {
 
         let max_count = opt_count.to_string().len();
 
-        let mut context = DrawContext {
-            frame: &RefCell::new(renderer),
-            style: *box_style,
-            rect: None,
-        };
+        draw_box(frame, pos, menu_size, *box_style);
 
-        context.draw_box(pos, menu_size);
-
-        context.draw_str_styled(pos + Dims(3, 1), title, *text_style);
-        context.draw_str(pos + Dims(1, 2), &"─".repeat(menu_size.0 as usize - 2));
+        frame.draw_styled((pos + Dims(3, 1)).into(), title.as_str(), *text_style);
+        frame.draw(
+            (pos + Dims(1, 2)).into(),
+            "─".repeat(menu_size.0 as usize - 2),
+        );
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == self.selected as usize {
@@ -235,9 +235,9 @@ impl Screen for Menu {
                 *text_style
             };
 
-            context.draw_str_styled(
-                pos + Dims(1, i as i32 + 3),
-                &format!(
+            frame.draw_styled(
+                (pos + Dims(1, i as i32 + 3)).into(),
+                format!(
                     "{} {}{}",
                     if i == self.selected as usize {
                         ">"

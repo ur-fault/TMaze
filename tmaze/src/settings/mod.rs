@@ -4,11 +4,11 @@ use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, RwLock},
 };
 
-use crate::{constants::base_path, renderer::Renderer};
+use crate::constants::base_path;
 
 const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
 

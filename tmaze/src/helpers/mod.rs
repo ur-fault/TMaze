@@ -59,21 +59,21 @@ pub enum LineDir {
 }
 
 impl LineDir {
-    pub fn double_line(&self) -> &'static str {
+    pub fn double(&self) -> char {
         match self {
-            Self::Empty => " ",
-            Self::Cross => "╬",
-            Self::Horizontal => "═",
-            Self::Vertical => "║",
-            Self::OpenTop | Self::OpenBottom | Self::OpenLeft | Self::OpenRight => "▪",
-            Self::ClosedTop => "╦",
-            Self::ClosedBottom => "╩",
-            Self::ClosedLeft => "╠",
-            Self::ClosedRight => "╣",
-            Self::TopLeft => "╝",
-            Self::TopRight => "╚",
-            Self::BottomLeft => "╗",
-            Self::BottomRight => "╔",
+            Self::Empty => ' ',
+            Self::Cross => '╬',
+            Self::Horizontal => '═',
+            Self::Vertical => '║',
+            Self::OpenTop | Self::OpenBottom | Self::OpenLeft | Self::OpenRight => '▪',
+            Self::ClosedTop => '╦',
+            Self::ClosedBottom => '╩',
+            Self::ClosedLeft => '╠',
+            Self::ClosedRight => '╣',
+            Self::TopLeft => '╝',
+            Self::TopRight => '╚',
+            Self::BottomLeft => '╗',
+            Self::BottomRight => '╔',
         }
     }
 
@@ -99,21 +99,21 @@ impl LineDir {
     }
 
     #[allow(dead_code)]
-    pub fn single_round_line(&self) -> &'static str {
+    pub fn round(&self) -> char {
         match self {
-            Self::Empty => " ",
-            Self::Cross => "┼",
-            Self::Horizontal => "─",
-            Self::Vertical => "│",
-            Self::OpenTop | Self::OpenBottom | Self::OpenLeft | Self::OpenRight => "#",
-            Self::ClosedLeft => "├",
-            Self::ClosedTop => "┬",
-            Self::ClosedRight => "┤",
-            Self::ClosedBottom => "┴",
-            Self::TopLeft => "╯",
-            Self::TopRight => "╰",
-            Self::BottomLeft => "╮",
-            Self::BottomRight => "╭",
+            Self::Empty => ' ',
+            Self::Cross => '┼',
+            Self::Horizontal => '─',
+            Self::Vertical => '│',
+            Self::OpenTop | Self::OpenBottom | Self::OpenLeft | Self::OpenRight => '▪',
+            Self::ClosedLeft => '├',
+            Self::ClosedTop => '┬',
+            Self::ClosedRight => '┤',
+            Self::ClosedBottom => '┴',
+            Self::TopLeft => '╯',
+            Self::TopRight => '╰',
+            Self::BottomLeft => '╮',
+            Self::BottomRight => '╭',
         }
     }
 }

@@ -53,6 +53,20 @@ impl Maze {
         }
     }
 
+    pub fn get_wall(&self, from: Dims3D, to: Dims3D) -> Option<bool> {
+        if self.is_in_bounds(from) != self.is_in_bounds(to) {
+            return Some(true);
+        }
+
+        let wall = Self::which_wall_between(from, to)?;
+
+        Some(
+            self.get_cell(from)
+                .map(|c| c.get_wall(wall))
+                .unwrap_or(false),
+        )
+    }
+
     pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
         let offsets = [
             Dims3D(-1, 0, 0),

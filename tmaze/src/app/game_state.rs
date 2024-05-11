@@ -25,7 +25,7 @@ impl Display for GameViewMode {
     }
 }
 
-pub struct ShowMenu;
+pub struct ShowPauseMenu;
 
 pub struct GameData {
     pub game: RunningGame,
@@ -35,7 +35,7 @@ pub struct GameData {
 }
 
 impl GameData {
-    pub fn handle_event(&mut self, settings: &Settings, event: KeyEvent) -> Result<(), ShowMenu> {
+    pub fn handle_event(&mut self, settings: &Settings, event: KeyEvent) -> Result<(), bool> {
         let KeyEvent {
             code,
             modifiers,
@@ -61,18 +61,21 @@ impl GameData {
             KeyCode::Right | KeyCode::Char('d' | 'D') => {
                 self.apply_move(settings, CellWall::Right, is_fast);
             }
-            KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
-                self.apply_move(settings, CellWall::Down, is_fast);
-            }
-            KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
-                self.apply_move(settings, CellWall::Up, is_fast);
-            }
+            KeyCode::Char('q') => return Err(true),
+            // KeyCode::Char('f' | 'F' | 'q' | 'Q' | 'l' | 'L') => {
+            //     self.apply_move(settings, CellWall::Down, is_fast);
+            // }
+            // KeyCode::Char('r' | 'R' | 'e' | 'E' | 'p' | 'P') => {
+            //     self.apply_move(settings, CellWall::Up, is_fast);
+            // }
             KeyCode::Char(' ') => {
                 if self.view_mode == GameViewMode::Spectator {
                     self.camera_pos = Dims3D(0, 0, 0);
                     self.view_mode = GameViewMode::Adventure;
+                    log::info!("Switched to Adventure mode");
                 } else {
                     self.view_mode = GameViewMode::Spectator;
+                    log::info!("Switched to Spectator mode");
                 }
             }
             KeyCode::Char('.') => {
@@ -80,7 +83,7 @@ impl GameData {
                 self.camera_pos = self.game.get_player_pos() - self.game.get_goal_pos();
                 self.camera_pos.2 *= -1;
             }
-            KeyCode::Esc => return Err(ShowMenu),
+            KeyCode::Esc => return Err(false),
             _ => {}
         }
 

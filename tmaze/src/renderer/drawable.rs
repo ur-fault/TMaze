@@ -29,12 +29,11 @@ impl Drawable for String {
 
 impl<'a> Drawable for &'a str {
     fn draw(&self, pos: Pos, frame: &mut Frame) {
-        for (i, character) in self.chars().enumerate() {
-            frame.put_char((pos.0 + i as u16, pos.1), character);
-        }
+        self.draw_with_style(pos, frame, ContentStyle::default());
     }
 
     fn draw_with_style(&self, pos: Pos, frame: &mut Frame, style: ContentStyle) {
+        // TODO: Custom iterator which returns (total_width, char)
         for (i, character) in self.chars().enumerate() {
             frame.put_char_styled((pos.0 + i as u16, pos.1), character, style);
         }
