@@ -68,6 +68,18 @@ impl Div<i32> for Dims {
     }
 }
 
+impl From<(u16, u16)> for Dims {
+    fn from(tuple: (u16, u16)) -> Self {
+        Dims(tuple.0 as i32, tuple.1 as i32)
+    }
+}
+
+impl From<Dims> for (u16, u16) {
+    fn from(val: Dims) -> Self {
+        (val.0 as u16, val.1 as u16)
+    }
+}
+
 impl DivAssign<i32> for Dims {
     fn div_assign(&mut self, other: i32) {
         self.0 /= other;

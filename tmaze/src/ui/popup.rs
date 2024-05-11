@@ -2,8 +2,7 @@ use crossterm::{
     event::{Event as TermEvent, KeyEvent},
     style::ContentStyle,
 };
-
-use std::cell::RefCell;
+use unicode_width::UnicodeWidthStr;
 
 use super::draw::*;
 use super::*;
@@ -13,16 +12,45 @@ use crate::helpers::is_release;
 pub struct Popup {
     title: String,
     texts: Vec<String>,
+    title_style: ContentStyle,
+    text_style: ContentStyle,
+    box_style: ContentStyle,
 }
 
 impl Popup {
     pub fn new(title: String, texts: Vec<String>) -> Self {
-        Self { title, texts }
+        let style = ContentStyle::default();
+        Self {
+            title,
+            texts,
+            title_style: style,
+            text_style: style,
+            box_style: style,
+        }
+    }
+
+    pub fn title_style(mut self, style: ContentStyle) -> Self {
+        self.title_style = style;
+        self
+    }
+
+    pub fn text_style(mut self, style: ContentStyle) -> Self {
+        self.text_style = style;
+        self
+    }
+
+    pub fn box_style(mut self, style: ContentStyle) -> Self {
+        self.box_style = style;
+        self
     }
 }
 
 impl ActivityHandler for Popup {
-    fn update(&mut self, events: Vec<crate::app::Event>, _: &mut AppData) -> Option<crate::app::Change> {
+    fn update(
+        &mut self,
+        events: Vec<crate::app::Event>,
+        _: &mut AppData,
+    ) -> Option<crate::app::Change> {
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) => {
@@ -44,30 +72,28 @@ impl ActivityHandler for Popup {
 
 impl Screen for Popup {
     fn draw(&self, frame: &mut Frame) -> io::Result<()> {
-        let box_style = ContentStyle::default();
-        let text_style = ContentStyle::default();
-
         let box_size = popup_size(&self.title, &self.texts);
-        let title_pos = box_center_screen(Dims(self.title.len() as i32 + 2, 1)).0;
+        let title_pos = box_center_screen(Dims(self.title.width() as i32 + 3, 1)).0;
         let pos = box_center_screen(box_size);
 
-        let mut context = DrawContext {
-            frame: &RefCell::new(frame),
-            style: box_style,
-            rect: None,
-        };
-
-        context.draw_box(pos, box_size);
-        context.draw_str_styled(
-            Dims(title_pos, pos.1 + 1),
-            &format!(" {} ", self.title),
-            text_style,
+        draw_box(frame, pos, box_size, self.box_style);
+        frame.draw_styled(
+            (Dims(title_pos, pos.1 + 1)).into(),
+            self.title.as_str(),
+            self.title_style,
         );
 
         if !self.texts.is_empty() {
-            context.draw_str(pos + Dims(1, 2), &"─".repeat(box_size.0 as usize - 2));
+            frame.draw(
+                (pos + Dims(1, 2)).into(),
+                "─".repeat(box_size.0 as usize - 2),
+            );
             for (i, text) in self.texts.iter().enumerate() {
-                context.draw_str_styled(pos + Dims(2, i as i32 + 3), text, text_style);
+                frame.draw_styled(
+                    (pos + Dims(2, i as i32 + 3)).into(),
+                    text.as_str(),
+                    self.text_style,
+                );
             }
         }
 

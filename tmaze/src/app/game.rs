@@ -1,34 +1,31 @@
-use std::{cell::RefCell, time::Duration};
-
 use cmaze::{
     core::{Dims, Dims3D, GameMode},
     game::{GameProperities, GeneratorFn, ProgressComm, RunningGame, RunningGameState},
-    gameboard::{
-        algorithms::{
-            DepthFirstSearch, GenErrorInstant, GenErrorThreaded, MazeAlgorithm, Progress,
-            RndKruskals,
-        },
-        Cell, CellWall,
+    gameboard::algorithms::{
+        DepthFirstSearch, GenErrorInstant, GenErrorThreaded, MazeAlgorithm, Progress, RndKruskals,
     },
 };
 
 use crate::{
-    app::{game_state::GameData, GameError, GameViewMode},
-    helpers::{self, constants, is_release, value_if_else, LineDir, ToDebug},
-    renderer::helpers::term_size,
-    settings::{self, CameraMode, Settings},
-    ui::{self, panic_on_menu_push, DrawContext, Menu, Popup, ProgressBar, Rect, Screen},
+    app::{game_state::GameData, GameViewMode},
+    helpers::{constants, is_release, maze_pos_to_real, LineDir},
+    renderer::{Frame, OffsetedFrame},
+    settings::{CameraMode, ColorScheme, Settings},
+    ui::{self, panic_on_menu_push, Menu, Popup, ProgressBar, Screen},
 };
 
 #[cfg(feature = "sound")]
+#[allow(unused_imports)]
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
 #[cfg(feature = "updates")]
+#[allow(unused_imports)]
 use crate::updates;
 
-use crossterm::event::{poll, read, Event as TermEvent, KeyCode, KeyEvent};
+use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 
 #[cfg(feature = "sound")]
+#[allow(unused_imports)]
 use rodio::Source;
 
 use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
@@ -1020,7 +1017,7 @@ impl ActivityHandler for MazeGenerationActivity {
                     };
                     Some(Change::replace(Activity::new_base(
                         "game".to_string(),
-                        Box::new(GameActivity::new(game_data)),
+                        Box::new(GameActivity::new(game_data, &data.settings)),
                     )))
                 }
                 Err(err) => match err {
@@ -1102,34 +1099,50 @@ impl ActivityHandler for PauseMenu {
 }
 
 pub struct GameActivity {
-    last_view_offset: Dims,
+    camera_mode: CameraMode,
+    color_scheme: ColorScheme,
     game: GameData,
+    maze_board: MazeBoard,
 }
 
 impl GameActivity {
-    pub fn new(game: GameData) -> Self {
-        let last_view_offset = Dims(0, 0);
+    pub fn new(game: GameData, settings: &Settings) -> Self {
+        let camera_mode = settings.get_camera_mode();
+        let color_scheme = settings.get_color_scheme();
         let game = game;
+        let maze_board = MazeBoard::new(&game.game, settings);
 
         Self {
-            last_view_offset,
+            camera_mode,
+            color_scheme,
             game,
+            maze_board,
         }
     }
 }
 
 impl ActivityHandler for GameActivity {
     fn update(&mut self, events: Vec<Event>, data: &mut super::app::AppData) -> Option<Change> {
+        match self.game.game.get_state() {
+            RunningGameState::NotStarted => self.game.game.start().unwrap(),
+            RunningGameState::Paused => self.game.game.resume().unwrap(),
+            _ => {}
+        }
+
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(key_event)) => {
-                    if self.game.handle_event(&data.settings, key_event).is_err() {
-                        self.game.game.pause().unwrap();
+                    match self.game.handle_event(&data.settings, key_event) {
+                        Err(false) => {
+                            self.game.game.pause().unwrap();
 
-                        return Some(Change::push(Activity::new_base(
-                            "pause".to_string(),
-                            Box::new(PauseMenu::new(&data.settings)),
-                        )));
+                            return Some(Change::push(Activity::new_base(
+                                "pause".to_string(),
+                                Box::new(PauseMenu::new(&data.settings)),
+                            )));
+                        }
+                        Err(true) => return Some(Change::pop_all()),
+                        Ok(_) => {}
                     }
                 }
                 _ => {}
@@ -1146,7 +1159,77 @@ impl ActivityHandler for GameActivity {
 
 impl Screen for GameActivity {
     fn draw(&self, frame: &mut crate::renderer::Frame) -> std::io::Result<()> {
-        frame.draw((0, 0), "In game");
+        let viewport_size = Dims::from(frame.size) / 2;
+        let mut viewport = Frame::new(viewport_size.into());
+
+        let player_floor = self.game.game.get_player_pos().2 as usize;
+        viewport.draw((0, 0), &self.maze_board.frames[player_floor]);
+
+        let offset = Dims(0, 0) - self.game.camera_pos.into() + viewport_size / 2;
+        frame.draw((0, 0), OffsetedFrame::new(offset, &viewport));
+
         Ok(())
+    }
+}
+
+pub struct MazeBoard {
+    frames: Vec<Frame>,
+}
+
+impl MazeBoard {
+    pub fn new(game: &RunningGame, settings: &Settings) -> Self {
+        let maze = game.get_maze();
+        let scheme = settings.get_color_scheme();
+
+        let frames = (0..maze.size().2)
+            .map(|floor| Self::render_floor(game, floor, scheme.clone()))
+            .collect();
+
+        Self { frames }
+    }
+
+    fn render_floor(game: &RunningGame, floor: i32, scheme: ColorScheme) -> Frame {
+        let maze = game.get_maze();
+        let (normals, goals) = (scheme.normals(), scheme.goals());
+
+        let size = Dims(maze.size().0, maze.size().1) * 2 + Dims(1, 1);
+        let u16size = (size.0 as u16, size.1 as u16);
+
+        let mut frame = Frame::new(u16size);
+
+        let mut draw =
+            |pos, l: LineDir| frame.draw_styled(Dims::from(pos).into(), l.double(), normals);
+
+        // Maze itself
+        for y in -1..maze.size().1 {
+            for x in -1..maze.size().0 {
+                let cell_pos = Dims3D(x, y, floor);
+                let Dims(rx, ry) = maze_pos_to_real(cell_pos);
+
+                if maze.get_wall(cell_pos, cell_pos + Dims3D(1, 0, 0)).unwrap() {
+                    draw((rx + 1, ry), LineDir::Vertical);
+                }
+
+                if maze.get_wall(cell_pos, cell_pos + Dims3D(0, 1, 0)).unwrap() {
+                    draw((rx, ry + 1), LineDir::Horizontal);
+                }
+
+                let cp1 = cell_pos;
+                let cp2 = cell_pos + Dims3D(1, 1, 0);
+
+                let dir = LineDir::from_bools(
+                    maze.get_wall(cp1, cp1 + Dims3D(0, 1, 0)).unwrap(),
+                    maze.get_wall(cp1, cp1 + Dims3D(1, 0, 0)).unwrap(),
+                    maze.get_wall(cp2, cp1 + Dims3D(1, 0, 0)).unwrap(),
+                    maze.get_wall(cp2, cp1 + Dims3D(0, 1, 0)).unwrap(),
+                );
+
+                draw((rx + 1, ry + 1), dir);
+            }
+        }
+
+        // Goal
+
+        frame
     }
 }

@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use crossterm::style::ContentStyle;
 use unicode_width::UnicodeWidthStr;
 
@@ -46,18 +44,15 @@ impl Screen for ProgressBar {
         let progress_size = Dims(self.title.width() as i32 + 2 + 2, 4);
         let pos = box_center_screen(progress_size);
 
-        let mut context = DrawContext {
-            frame: &RefCell::new(frame),
-            style: self.box_style,
-            rect: None,
-        };
+        let prg = "█".repeat((self.title.width() as f64 * self.progress) as usize);
 
-        context.draw_box(pos, progress_size);
-        context.draw_str_styled(pos + Dims(2, 1), &self.title, self.text_style);
-        context.draw_str(
-            pos + Dims(2, 2),
-            &"█".repeat((self.title.width() as f64 * self.progress) as usize),
+        draw_box(frame, pos, progress_size, self.box_style);
+        frame.draw_styled(
+            (pos + Dims(2, 1)).into(),
+            self.title.as_str(),
+            self.text_style,
         );
+        frame.draw((pos + Dims(2, 2)).into(), prg);
 
         Ok(())
     }

@@ -9,6 +9,7 @@ pub struct Cell {
     bottom: bool,
     up: bool,
     down: bool,
+
     coord: Dims3D,
 }
 

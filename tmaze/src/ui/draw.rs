@@ -1,5 +1,3 @@
-use std::{cell::RefCell, ops::DerefMut};
-
 use crate::core::*;
 use crate::renderer::Frame;
 
@@ -7,14 +5,9 @@ use crossterm::style::ContentStyle;
 
 pub use substring::Substring;
 
-pub fn draw_box<'a>(
-    mut frame: impl DerefMut<Target = &'a mut Frame>,
-    pos: Dims,
-    size: Dims,
-    style: ContentStyle,
-) {
+pub fn draw_box<'a>(frame: &mut Frame, pos: Dims, size: Dims, style: ContentStyle) {
     draw_str(
-        &mut *frame,
+        frame,
         pos.0,
         pos.1,
         &format!("╭{}╮", "─".repeat(size.0 as usize - 2)),
@@ -22,8 +15,8 @@ pub fn draw_box<'a>(
     );
 
     for y in pos.1 + 1..pos.1 + size.1 - 1 {
-        draw_char(&mut *frame, pos.0, y, '│', style);
-        draw_char(&mut *frame, pos.0 + size.0 - 1, y, '│', style);
+        draw_char(frame, pos.0, y, '│', style);
+        draw_char(frame, pos.0 + size.0 - 1, y, '│', style);
     }
 
     draw_str(
@@ -35,13 +28,7 @@ pub fn draw_box<'a>(
     );
 }
 
-pub fn draw_str<'a>(
-    mut frame: impl DerefMut<Target = &'a mut Frame>,
-    mut x: i32,
-    y: i32,
-    mut text: &str,
-    style: ContentStyle,
-) {
+pub fn draw_str<'a>(frame: &mut Frame, mut x: i32, y: i32, mut text: &str, style: ContentStyle) {
     if y < 0 {
         return;
     }
@@ -58,18 +45,11 @@ pub fn draw_str<'a>(
     frame.draw((x as u16, y as u16), (text, style));
 }
 
-pub fn draw_char<'a>(
-    mut frame: impl DerefMut<Target = &'a mut Frame>,
-    x: i32,
-    y: i32,
-    text: char,
-    style: ContentStyle,
-) {
+pub fn draw_char<'a>(frame: &mut Frame, x: i32, y: i32, text: char, style: ContentStyle) {
     if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32 {
         return;
     }
 
-    // renderer.draw_char(x as u16, y as u16, text, style);
     frame.draw((x as u16, y as u16), (text, style));
 }
 
@@ -133,45 +113,45 @@ impl Rect {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct DrawContext<'a> {
-    pub frame: &'a RefCell<&'a mut Frame>,
-    pub style: ContentStyle,
-    pub rect: Option<Rect>,
-}
-
-#[allow(dead_code)]
-impl<'a> DrawContext<'a> {
-    pub fn draw_char(&mut self, pos: Dims, text: char) {
-        self.draw_char_styled(pos, text, self.style);
-    }
-
-    pub fn draw_str(&mut self, pos: Dims, text: &str) {
-        self.draw_str_styled(pos, text, self.style);
-    }
-
-    pub fn draw_box(&mut self, pos: Dims, size: Dims) {
-        draw_box(self.frame.borrow_mut(), pos, size, self.style);
-    }
-
-    pub fn draw_char_styled(&mut self, pos: Dims, text: char, style: ContentStyle) {
-        if self.rect.as_ref().map_or(true, |f| f.contains(pos)) {
-            draw_char(self.frame.borrow_mut(), pos.0, pos.1, text, style);
-        }
-    }
-
-    pub fn draw_str_styled(&mut self, pos: Dims, text: &str, style: ContentStyle) {
-        let (text, pos) = self
-            .rect
-            .as_ref()
-            .map_or((text, pos), |f| f.trim_absolute(&text, pos));
-        draw_str(self.frame.borrow_mut(), pos.0, pos.1, text, style);
-    }
-
-    pub fn draw_box_styled(&mut self, pos: Dims, size: Dims, style: ContentStyle) {
-        draw_box(self.frame.borrow_mut(), pos, size, style);
-    }
-}
+// #[derive(Clone, Copy)]
+// pub struct DrawContext<'a> {
+//     pub frame: &'a RefCell<&'a mut Frame>,
+//     pub style: ContentStyle,
+//     pub rect: Option<Rect>,
+// }
+//
+// #[allow(dead_code)]
+// impl<'a> DrawContext<'a> {
+//     pub fn draw_char(&mut self, pos: Dims, text: char) {
+//         self.draw_char_styled(pos, text, self.style);
+//     }
+//
+//     pub fn draw_str(&mut self, pos: Dims, text: &str) {
+//         self.draw_str_styled(pos, text, self.style);
+//     }
+//
+//     pub fn draw_box(&mut self, pos: Dims, size: Dims) {
+//         draw_box(self.frame.borrow_mut(), pos, size, self.style);
+//     }
+//
+//     pub fn draw_char_styled(&mut self, pos: Dims, text: char, style: ContentStyle) {
+//         if self.rect.as_ref().map_or(true, |f| f.contains(pos)) {
+//             draw_char(self.frame.borrow_mut(), pos.0, pos.1, text, style);
+//         }
+//     }
+//
+//     pub fn draw_str_styled(&mut self, pos: Dims, text: &str, style: ContentStyle) {
+//         let (text, pos) = self
+//             .rect
+//             .as_ref()
+//             .map_or((text, pos), |f| f.trim_absolute(&text, pos));
+//         draw_str(self.frame.borrow_mut(), pos.0, pos.1, text, style);
+//     }
+//
+//     pub fn draw_box_styled(&mut self, pos: Dims, size: Dims, style: ContentStyle) {
+//         draw_box(self.frame.borrow_mut(), pos, size, style);
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
