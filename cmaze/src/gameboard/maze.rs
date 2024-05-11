@@ -53,7 +53,8 @@ impl Maze {
         }
     }
 
-    pub fn get_wall(&self, from: Dims3D, to: Dims3D) -> Option<bool> {
+    pub fn get_wall(&self, from: Dims3D, wall: CellWall) -> Option<bool> {
+        let to = from + wall.to_coord();
         if self.is_in_bounds(from) != self.is_in_bounds(to) {
             return Some(true);
         }
