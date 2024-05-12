@@ -136,11 +136,14 @@ impl App {
                         events.push(Event::ActiveAfterPop(res));
                         log::trace!("Popped {} activities", n);
                     }
-                    Change::Replace(activity) => self.activities.replace(activity),
                     Change::PopUntil { name, res } => {
                         self.activities.pop_until(&name);
                         events.push(Event::ActiveAfterPop(res));
                         log::trace!("Popped until '{}'", name);
+                    }
+                    Change::Replace(activity) => self.activities.replace(activity),
+                    Change::ReplaceAt { index, activity } => {
+                        self.activities.replace_at(index, activity);
                     }
                 }
             }
