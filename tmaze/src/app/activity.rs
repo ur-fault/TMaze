@@ -19,10 +19,14 @@ pub enum Change {
         n: usize,
         res: Option<ActivityResult>,
     },
-    Replace(Activity),
     PopUntil {
         name: String,
         res: Option<ActivityResult>,
+    },
+    Replace(Activity),
+    ReplaceAt {
+        index: usize,
+        activity: Activity,
     },
 }
 
@@ -60,10 +64,6 @@ impl Change {
         }
     }
 
-    pub fn replace(activity: Activity) -> Self {
-        Self::Replace(activity)
-    }
-
     pub fn pop_until(name: impl Into<String>) -> Self {
         Self::PopUntil {
             name: name.into(),
@@ -76,6 +76,14 @@ impl Change {
             name: name.into(),
             res: Some(Box::new(res)),
         }
+    }
+
+    pub fn replace(activity: Activity) -> Self {
+        Self::Replace(activity)
+    }
+
+    pub fn replace_at(index: usize, activity: Activity) -> Self {
+        Self::ReplaceAt { index, activity }
     }
 }
 
@@ -103,11 +111,6 @@ impl Activities {
             .truncate(self.activities.len() - n.min(self.activities.len()));
     }
 
-    pub fn replace(&mut self, activity: Activity) {
-        self.activities.pop();
-        self.activities.push(activity);
-    }
-
     pub fn pop_until(&mut self, name: &str) -> usize {
         if let Some(index) = self.activities.iter().rposition(|a| a.name() == name) {
             self.activities.truncate(index);
@@ -117,6 +120,16 @@ impl Activities {
             self.pop_n(1);
             1
         }
+    }
+
+    pub fn replace(&mut self, activity: Activity) {
+        self.activities.pop();
+        self.activities.push(activity);
+    }
+
+    pub fn replace_at(&mut self, index: usize, activity: Activity) {
+        self.activities[index] = activity;
+        self.activities.truncate(index + 1);
     }
 
     // -- Getters

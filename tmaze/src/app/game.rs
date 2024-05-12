@@ -736,9 +736,6 @@ impl ActivityHandler for MainMenu {
         data: &mut super::app::AppData,
     ) -> Option<Change> {
         match self.0.update(events, data)? {
-            Change::Push(_) | Change::Replace(_) => {
-                panic!("menu should only be popping itself or staying")
-            }
             Change::Pop {
                 res: Some(sub_activity),
                 ..
@@ -755,8 +752,9 @@ impl ActivityHandler for MainMenu {
                     _ => panic!("main menu should only return valid index between 0 and 4"),
                 }
             }
-            top @ Change::Pop { res: None, .. } => Some(top),
-            pop @ Change::PopUntil { .. } => Some(pop),
+            _ => {
+                panic!("menu should only be popping itself or staying")
+            }
         }
     }
 
@@ -823,7 +821,6 @@ impl ActivityHandler for MazeSizeMenu {
     ) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
-                Change::Push(_) | Change::Replace(_) => panic_on_menu_push(),
                 Change::Pop {
                     res: Some(size), ..
                 } => {
@@ -837,8 +834,7 @@ impl ActivityHandler for MazeSizeMenu {
                         Box::new(MazeAlgorithmMenu::new(preset, &data.settings)),
                     )));
                 }
-                top @ Change::Pop { res: None, .. } => Some(top),
-                pop @ Change::PopUntil { .. } => Some(pop),
+                _ => panic_on_menu_push(),
             },
             None => None,
         }
@@ -882,9 +878,6 @@ impl ActivityHandler for MazeAlgorithmMenu {
     ) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
-                Change::Push(_) | Change::Replace(_) => {
-                    panic!("menu should only be popping itself or staying")
-                }
                 Change::Pop {
                     res: Some(algo), ..
                 } => {
@@ -905,8 +898,7 @@ impl ActivityHandler for MazeAlgorithmMenu {
                         )),
                     )));
                 }
-                top @ Change::Pop { res: None, .. } => Some(top),
-                pop @ Change::PopUntil { .. } => Some(pop),
+                _ => panic_on_menu_push(),
             },
             None => None,
         }
@@ -1069,9 +1061,6 @@ impl ActivityHandler for PauseMenu {
     fn update(&mut self, events: Vec<Event>, data: &mut super::app::AppData) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
-                Change::Push(_) | Change::Replace(_) => {
-                    panic_on_menu_push();
-                }
                 Change::Pop { res: Some(res), .. } => {
                     let index = *res.downcast::<usize>().expect("menu should return index");
 
@@ -1082,8 +1071,7 @@ impl ActivityHandler for PauseMenu {
                         _ => panic!(),
                     }
                 }
-                top @ Change::Pop { res: None, .. } => Some(top),
-                pop @ Change::PopUntil { .. } => Some(pop),
+                _ => panic_on_menu_push(),
             },
             None => None,
         }
@@ -1145,9 +1133,28 @@ impl ActivityHandler for GameActivity {
             }
         }
 
-        self.game.game.get_state() == RunningGameState::Finished {
+        if self.game.game.get_state() == RunningGameState::Finished {
+            let game = &self.game.game;
+            let texts = vec![
+                format!(
+                    "Time:  {}",
+                    ui::format_duration(game.get_elapsed().unwrap())
+                ),
+                format!("Moves: {}", game.get_move_count()),
+                format!(
+                    "Size:  {}x{}x{}",
+                    game.get_maze().size().0,
+                    game.get_maze().size().1,
+                    game.get_maze().size().2,
+                ),
+            ];
+            let popup = Popup::new("You won".to_string(), texts);
+            let activity = Activity::new_base("won".to_string(), Box::new(popup));
 
-        }
+            // TODO: add R to new game
+
+            return Some(Change::replace_at(1, activity));
+        };
 
         None
     }
