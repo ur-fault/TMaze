@@ -59,8 +59,6 @@ impl Maze {
             return Some(true);
         }
 
-        let wall = Self::which_wall_between(from, to)?;
-
         Some(
             self.get_cell(from)
                 .map(|c| c.get_wall(wall))

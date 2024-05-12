@@ -13,9 +13,9 @@ use cmaze::{
 use crate::{
     app::{game_state::GameData, GameViewMode},
     helpers::{constants, is_release, maze_pos_to_real, LineDir},
-    renderer::{Frame, OffsetedFrame},
+    renderer::Frame,
     settings::{CameraMode, ColorScheme, Settings},
-    ui::{self, panic_on_menu_push, Menu, Popup, ProgressBar, Screen},
+    ui::{self, draw_box, panic_on_menu_push, Menu, Popup, ProgressBar, Screen},
 };
 
 #[cfg(feature = "sound")]
@@ -89,7 +89,6 @@ use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
 //             // #[cfg(feature = "sound")]
 //             // self.play_bgm(MusicTrack::Menu);
 //
-//             // TODO: use menu
 //             // match ui::menu(
 //             //     &mut self.renderer,
 //             //     self.settings.get_color_scheme().normals(),
@@ -167,7 +166,6 @@ use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
 //                     Ok(TermEvent::Key(key_event)) => {
 //                         if game_state.handle_event(key_event).is_err() {
 //                             game_state.game.pause().unwrap();
-//                             // TODO: use menu
 //                             // match ui::menu(
 //                             //     &mut self.renderer,
 //                             //     self.settings.get_color_scheme().normals(),
@@ -1147,6 +1145,10 @@ impl ActivityHandler for GameActivity {
             }
         }
 
+        self.game.game.get_state() == RunningGameState::Finished {
+
+        }
+
         None
     }
 
@@ -1157,14 +1159,42 @@ impl ActivityHandler for GameActivity {
 
 impl Screen for GameActivity {
     fn draw(&self, frame: &mut crate::renderer::Frame) -> std::io::Result<()> {
-        let viewport_size = Dims::from(frame.size) / 2;
-        let mut viewport = Frame::new(viewport_size.into());
+        let vp_size = Dims::from(frame.size) / 2;
 
-        let player_floor = self.game.game.get_player_pos().2 as usize;
-        viewport.draw((0, 0), &self.maze_board.frames[player_floor]);
+        let player = self.game.game.get_player_pos();
+        let player_floor = player.2 as usize;
+        let maze_frame = &self.maze_board.frames[player_floor];
+        let floor_size = maze_frame.size;
 
-        let offset = Dims(0, 0) - self.game.camera_pos.into() + viewport_size / 2;
-        frame.draw((0, 0), OffsetedFrame::new(offset, &viewport));
+        let does_fit = floor_size.0 <= vp_size.0 || floor_size.1 <= vp_size.1;
+        let (vp_size, maze_pos) = if does_fit {
+            (floor_size, Dims(0, 0))
+        } else {
+            (vp_size, vp_size / 2 - self.game.camera_pos.into())
+        };
+
+        let mut viewport = Frame::new(vp_size.into());
+
+        // maze
+        viewport.draw(maze_pos, maze_frame);
+
+        // player
+        if player_floor == player.2 as usize {
+            viewport.draw_styled(
+                maze_pos + maze_pos_to_real(player),
+                self.game.player_char,
+                self.color_scheme.players(),
+            );
+        }
+
+        let offset = (frame.size - vp_size) / 2;
+        draw_box(
+            frame,
+            offset - Dims(1, 1),
+            vp_size + Dims(2, 2),
+            self.color_scheme.normals(),
+        );
+        frame.draw(offset, &viewport);
 
         Ok(())
     }
@@ -1179,26 +1209,26 @@ impl MazeBoard {
         let maze = game.get_maze();
         let scheme = settings.get_color_scheme();
 
-        let frames = (0..maze.size().2)
+        let mut frames = (0..maze.size().2)
             .map(|floor| Self::render_floor(game, floor, scheme.clone()))
             .collect();
+
+        Self::render_special(&mut frames, game, scheme.clone());
 
         Self { frames }
     }
 
     fn render_floor(game: &RunningGame, floor: i32, scheme: ColorScheme) -> Frame {
         let maze = game.get_maze();
-        let (normals, goals) = (scheme.normals(), scheme.goals());
+        let normals = scheme.normals();
 
         let size = Dims(maze.size().0, maze.size().1) * 2 + Dims(1, 1);
-        let u16size = (size.0 as u16, size.1 as u16);
 
-        let mut frame = Frame::new(u16size);
+        let mut frame = Frame::new(size);
 
         let mut draw =
             |pos, l: LineDir| frame.draw_styled(Dims::from(pos).into(), l.double(), normals);
 
-        // Maze itself
         for y in -1..maze.size().1 {
             for x in -1..maze.size().0 {
                 let cell_pos = Dims3D(x, y, floor);
@@ -1208,7 +1238,7 @@ impl MazeBoard {
                     draw((rx + 1, ry), LineDir::Vertical);
                 }
 
-                if maze.get_wall(cell_pos, CellWall::Down).unwrap() {
+                if maze.get_wall(cell_pos, CellWall::Bottom).unwrap() {
                     draw((rx, ry + 1), LineDir::Horizontal);
                 }
 
@@ -1216,9 +1246,9 @@ impl MazeBoard {
                 let cp2 = cell_pos + Dims3D(1, 1, 0);
 
                 let dir = LineDir::from_bools(
-                    maze.get_wall(cp1, CellWall::Down).unwrap(),
+                    maze.get_wall(cp1, CellWall::Bottom).unwrap(),
                     maze.get_wall(cp1, CellWall::Right).unwrap(),
-                    maze.get_wall(cp2, CellWall::Up).unwrap(),
+                    maze.get_wall(cp2, CellWall::Top).unwrap(),
                     maze.get_wall(cp2, CellWall::Left).unwrap(),
                 );
 
@@ -1226,8 +1256,14 @@ impl MazeBoard {
             }
         }
 
-        // Goal
-
         frame
+    }
+
+    fn render_special(frames: &mut Vec<Frame>, game: &RunningGame, scheme: ColorScheme) {
+        let goals = scheme.goals();
+
+        let goal_pos = game.get_goal_pos();
+
+        frames[goal_pos.2 as usize].draw_styled(maze_pos_to_real(goal_pos), '$', goals);
     }
 }
