@@ -113,7 +113,7 @@ impl Activities {
 
     pub fn pop_until(&mut self, name: &str) -> usize {
         if let Some(index) = self.activities.iter().rposition(|a| a.name() == name) {
-            self.activities.truncate(index);
+            self.activities.truncate(index + 1);
             index
         } else {
             log::warn!("Activity `{}` not found, popping top", name);

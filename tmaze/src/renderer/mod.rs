@@ -297,6 +297,12 @@ impl std::ops::Index<Dims> for Frame {
     }
 }
 
+impl std::ops::IndexMut<Dims> for Frame {
+    fn index_mut(&mut self, index: Dims) -> &mut Self::Output {
+        &mut self.buffer[index.1 as usize][index.0 as usize]
+    }
+}
+
 impl std::ops::Index<i32> for Frame {
     type Output = [Cell];
 

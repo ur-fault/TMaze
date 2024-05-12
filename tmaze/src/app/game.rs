@@ -6,7 +6,7 @@ use cmaze::{
             DepthFirstSearch, GenErrorInstant, GenErrorThreaded, MazeAlgorithm, Progress,
             RndKruskals,
         },
-        CellWall,
+        Cell, CellWall,
     },
 };
 
@@ -1125,7 +1125,7 @@ impl ActivityHandler for GameActivity {
                                 Box::new(PauseMenu::new(&data.settings)),
                             )));
                         }
-                        Err(true) => return Some(Change::pop_all()),
+                        Err(true) => return Some(Change::pop_until("main menu")),
                         Ok(_) => {}
                     }
                 }
@@ -1151,7 +1151,7 @@ impl ActivityHandler for GameActivity {
             let popup = Popup::new("You won".to_string(), texts);
             let activity = Activity::new_base("won".to_string(), Box::new(popup));
 
-            // TODO: add R to new game
+            // TODO: add R to play a new game
 
             return Some(Change::replace_at(1, activity));
         };
@@ -1263,7 +1263,27 @@ impl MazeBoard {
             }
         }
 
+        Self::render_stairs(&mut frame, &maze.get_cells()[floor as usize], scheme);
+
         frame
+    }
+
+    fn render_stairs(frame: &mut Frame, floor: &Vec<Vec<Cell>>, scheme: ColorScheme) {
+        let style = scheme.normals();
+
+        for (y, row) in floor.iter().enumerate() {
+            for (x, cell) in row.iter().enumerate() {
+                let ch = match (cell.get_wall(CellWall::Up), cell.get_wall(CellWall::Down)) {
+                    (false, false) => '⥮',
+                    (false, true) => '↑',
+                    (true, false) => '↓',
+                    _ => continue,
+                };
+
+                let pos = maze_pos_to_real(Dims(x as i32, y as i32).into());
+                frame.draw_styled(pos, ch, style);
+            }
+        }
     }
 
     fn render_special(frames: &mut Vec<Frame>, game: &RunningGame, scheme: ColorScheme) {
