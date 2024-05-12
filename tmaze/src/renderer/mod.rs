@@ -7,15 +7,13 @@ use std::{
 };
 
 use cmaze::core::Dims;
-use crossterm::{event::Event, execute, style::ContentStyle, QueueableCommand};
+use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
 use unicode_width::UnicodeWidthChar;
 
 use self::{drawable::Drawable, helpers::term_size};
 
-pub type Pos = (u16, u16);
-
 pub struct Renderer {
-    size: (u16, u16),
+    size: Dims,
     shown: Frame,
     hidden: Frame,
     full_redraw: bool,
@@ -23,7 +21,8 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new() -> io::Result<Self> {
-        let size = term_size();
+        let (w, h) = term_size();
+        let size = Dims(w as i32, h as i32);
         let hidden = Frame::new(size);
         let shown = Frame::new(size);
 
@@ -90,8 +89,8 @@ impl Renderer {
         }
     }
 
-    fn on_resize(&mut self, size: Option<Pos>) {
-        self.size = size.unwrap_or_else(|| crossterm::terminal::size().unwrap());
+    fn on_resize(&mut self, size: Option<Dims>) {
+        self.size = size.unwrap_or_else(|| terminal::size().unwrap().into());
         self.shown.resize(self.size);
         self.hidden.resize(self.size);
         self.full_redraw = true;
@@ -99,7 +98,7 @@ impl Renderer {
 
     pub fn on_event(&mut self, event: &Event) {
         if let Event::Resize(x, y) = event {
-            self.on_resize(Some((*x, *y)))
+            self.on_resize(Some((*x, *y).into()))
         }
     }
 
@@ -118,7 +117,7 @@ impl Renderer {
                 continue;
             }
 
-            tty.queue(crossterm::cursor::MoveTo(0, y))?;
+            tty.queue(crossterm::cursor::MoveTo(0, y as u16))?;
 
             for x in 0..self.size.0 {
                 if let Cell::Content(c) = &self.hidden[y][x as usize] {
@@ -213,11 +212,11 @@ impl Cell {
 
 pub struct Frame {
     pub(crate) buffer: Vec<Vec<Cell>>,
-    pub(crate) size: Pos,
+    pub(crate) size: Dims,
 }
 
 impl Frame {
-    pub fn new(size: Pos) -> Self {
+    pub fn new(size: Dims) -> Self {
         let mut buffer = Vec::new();
         for _ in 0..size.1 {
             buffer.push(vec![Cell::new(' '); size.0 as usize]);
@@ -225,12 +224,12 @@ impl Frame {
         Frame { buffer, size }
     }
 
-    pub fn put_char_styled(&mut self, (x, y): Pos, character: char, style: ContentStyle) {
+    pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: ContentStyle) {
         if x >= self.size.0 || y >= self.size.1 {
             return;
         }
 
-        let width = character.width().unwrap_or(1) as u16;
+        let width = character.width().unwrap_or(1) as i32;
         if width == 0 {
             return;
         }
@@ -244,12 +243,12 @@ impl Frame {
         }
     }
 
-    pub fn put_char(&mut self, pos: Pos, character: char) {
+    pub fn put_char(&mut self, pos: Dims, character: char) {
         self.put_char_styled(pos, character, ContentStyle::default());
     }
 
-    pub fn try_set(&mut self, pos: Pos, cell: Cell) -> bool {
-        if pos.0 >= self.size.0 || pos.1 >= self.size.1 {
+    pub fn try_set(&mut self, pos: Dims, cell: Cell) -> bool {
+        if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
             return false;
         }
 
@@ -257,19 +256,19 @@ impl Frame {
         true
     }
 
-    pub fn set(&mut self, pos: Pos, cell: Cell) {
+    pub fn set(&mut self, pos: Dims, cell: Cell) {
         self.buffer[pos.1 as usize][pos.0 as usize] = cell;
     }
 
-    pub fn draw(&mut self, pos: Pos, content: impl Drawable) {
+    pub fn draw(&mut self, pos: Dims, content: impl Drawable) {
         content.draw(pos, self);
     }
 
-    pub fn draw_styled(&mut self, pos: Pos, content: impl Drawable, style: ContentStyle) {
+    pub fn draw_styled(&mut self, pos: Dims, content: impl Drawable, style: ContentStyle) {
         content.draw_with_style(pos, self, style);
     }
 
-    pub fn resize(&mut self, size: Pos) {
+    pub fn resize(&mut self, size: Dims) {
         if self.size == size {
             return;
         }
@@ -290,76 +289,33 @@ impl Frame {
     }
 }
 
-impl std::ops::Index<Pos> for Frame {
+impl std::ops::Index<Dims> for Frame {
     type Output = Cell;
 
-    fn index(&self, index: Pos) -> &Self::Output {
+    fn index(&self, index: Dims) -> &Self::Output {
         &self.buffer[index.1 as usize][index.0 as usize]
     }
 }
 
-impl std::ops::Index<u16> for Frame {
+impl std::ops::Index<i32> for Frame {
     type Output = [Cell];
 
-    fn index(&self, index: u16) -> &Self::Output {
+    fn index(&self, index: i32) -> &Self::Output {
         &self.buffer[index as usize]
     }
 }
 
 impl Drawable for &Frame {
-    fn draw(&self, pos: Pos, frame: &mut Frame) {
+    fn draw(&self, pos: Dims, frame: &mut Frame) {
         for y in 0..self.size.1 {
             for x in 0..self.size.0 {
-                frame.try_set((pos.0 + x, pos.1 + y), self[(x, y)]);
+                frame.try_set(Dims(pos.0 + x, pos.1 + y), self[Dims(x, y)]);
             }
         }
     }
 
-    fn draw_with_style(&self, pos: Pos, frame: &mut Frame, _: ContentStyle) {
+    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, _: ContentStyle) {
         // we ignore the style
-        self.draw(pos, frame);
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct OffsetedFrame<'f> {
-    pub offset: Dims,
-    pub frame: &'f Frame,
-}
-
-impl<'f> OffsetedFrame<'f> {
-    pub fn new(offset: Dims, frame: &'f Frame) -> Self {
-        OffsetedFrame { offset, frame }
-    }
-}
-
-impl Drawable for OffsetedFrame<'_> {
-    fn draw(&self, pos: Pos, frame: &mut Frame) {
-        let intersection = (
-            Dims::from((
-                (pos.0 as i32).max(self.offset.0),
-                (pos.1 as i32).max(self.offset.1),
-            )),
-            Dims::from((
-                ((pos.0 + self.frame.size.0) as i32).min(frame.size.0 as i32),
-                ((pos.1 + self.frame.size.1) as i32).min(frame.size.1 as i32),
-            )),
-        );
-
-        // for y in 0..self.frame.size.1 {
-        //     for x in 0..self.frame.size.0 {
-        //         frame.try_set(
-        //             (
-        //                 ((pos.0 + x) as i32 + self.offset.0) as u16,
-        //                 ((pos.1 + y) as i32 + self.offset.1) as u16,
-        //             ),
-        //             self.frame[(x, y)],
-        //         );
-        //     }
-        // }
-    }
-
-    fn draw_with_style(&self, pos: Pos, frame: &mut Frame, _: ContentStyle) {
         self.draw(pos, frame);
     }
 }

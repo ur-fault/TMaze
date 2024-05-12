@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use cmaze::core::Dims;
 use crossterm::event::read;
 
 use crate::{
@@ -151,7 +152,7 @@ impl App {
                 .draw(self.renderer.frame())
                 .unwrap();
 
-            logging::get_logger().draw((0, 0), self.renderer.frame());
+            logging::get_logger().draw(Dims(0, 0), self.renderer.frame());
 
             self.renderer.show().unwrap();
         };

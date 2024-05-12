@@ -3,6 +3,7 @@ use std::{
     time::Duration,
 };
 
+use cmaze::core::Dims;
 use crossterm::style::{Color, ContentStyle};
 use log::{Log, Metadata, Record};
 use unicode_width::UnicodeWidthStr;
@@ -132,16 +133,11 @@ impl Log for AppLogger {
 }
 
 impl Drawable for AppLogger {
-    fn draw(&self, pos: renderer::Pos, frame: &mut renderer::Frame) {
+    fn draw(&self, pos: Dims, frame: &mut renderer::Frame) {
         self.draw_with_style(pos, frame, crossterm::style::ContentStyle::default());
     }
 
-    fn draw_with_style(
-        &self,
-        pos: renderer::Pos,
-        frame: &mut renderer::Frame,
-        style: ContentStyle,
-    ) {
+    fn draw_with_style(&self, pos: Dims, frame: &mut renderer::Frame, style: ContentStyle) {
         for (i, log) in self.get_logs().take(self.max_visible).enumerate() {
             let color = match log.level {
                 log::Level::Error => Color::Red,
@@ -156,10 +152,10 @@ impl Drawable for AppLogger {
                 ..style
             };
 
-            let y = pos.1 + i as u16;
+            let y = pos.1 + i as i32;
             let len = log.message.width();
             let x = frame.size.0 as usize - len - 2;
-            let pos = (x as u16, y);
+            let pos = Dims(x as i32, y);
 
             // TODO: make this a setting
             const INDICATOR_CHAR: char = '|';
@@ -168,7 +164,7 @@ impl Drawable for AppLogger {
             // const INDICATOR_CHAR: char = '•';
 
             log.message.draw_with_style(pos, frame, style);
-            INDICATOR_CHAR.draw_with_style((frame.size.0 - 1, y), frame, indicator_style);
+            INDICATOR_CHAR.draw_with_style(Dims(frame.size.0 - 1, y), frame, indicator_style);
         }
     }
 }
