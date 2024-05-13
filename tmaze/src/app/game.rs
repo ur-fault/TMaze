@@ -15,7 +15,7 @@ use crate::{
     helpers::{constants, is_release, maze_pos_to_real, LineDir},
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Settings},
-    ui::{self, draw_box, panic_on_menu_push, Menu, Popup, ProgressBar, Screen},
+    ui::{self, draw_box, Menu, Popup, ProgressBar, Screen},
 };
 
 #[cfg(feature = "sound")]
@@ -34,20 +34,6 @@ use rodio::Source;
 
 use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
 
-// pub struct Game {
-//     last_edge_follow_offset: Dims,
-//     last_selected_preset: Option<usize>,
-// }
-
-// impl Game {
-//     pub fn new() -> Self {
-//         let settings_path = Settings::default_path();
-//         Game {
-//             last_edge_follow_offset: Dims(0, 0),
-//             last_selected_preset: None,
-//         }
-//     }
-//
 //     // #[cfg(feature = "sound")]
 //     // fn play_bgm(&mut self, track: MusicTrack) {
 //     //     if let Some(prev_track) = self.bgm_track {
@@ -67,155 +53,6 @@ use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
 //     //     let track = track.get_track().repeat_infinite();
 //     //     self.sound_player.play_track(Box::new(track));
 //     // }
-//
-//     pub fn run(mut self) -> Result<(), GameError> {
-//         #[cfg(feature = "updates")]
-//         // self.check_for_updates()?;
-//         let mut game_restart_reqested = false;
-//
-//         loop {
-//             if game_restart_reqested {
-//                 game_restart_reqested = false;
-//                 match self.run_game() {
-//                     Ok(_) | Err(GameError::Back) => {}
-//                     Err(GameError::NewGame) => {
-//                         game_restart_reqested = true;
-//                     }
-//                     Err(_) => break,
-//                 }
-//                 continue;
-//             }
-//
-//             // #[cfg(feature = "sound")]
-//             // self.play_bgm(MusicTrack::Menu);
-//
-//             // match ui::menu(
-//             //     &mut self.renderer,
-//             //     self.settings.get_color_scheme().normals(),
-//             //     self.settings.get_color_scheme().texts(),
-//             //     "TMaze",
-//             //     &["New Game", "Settings", "Controls", "About", "Quit"],
-//             //     None,
-//             //     true,
-//             // ) {
-//             //     Ok(res) => match res {
-//             //         0 => match self.run_game() {
-//             //             Ok(_) | Err(GameError::Back) => {}
-//             //             Err(GameError::NewGame) => {
-//             //                 game_restart_reqested = true;
-//             //             }
-//             //             Err(_) => break,
-//             //         },
-//             //
-//             //         1 => {
-//             //             self.show_settings_screen()?;
-//             //         }
-//             //         2 => {
-//             //             self.show_controls_popup()?;
-//             //         }
-//             //         3 => {
-//             //             self.show_about_popup()?;
-//             //         }
-//             //         4 => break,
-//             //         _ => break,
-//             //     },
-//             //     Err(MenuError::Exit) => break,
-//             //     Err(_) => break,
-//             // };
-//         }
-//
-//         Ok(())
-//     }
-//
-//     fn run_game(&mut self) -> Result<(), GameError> {
-//         let props = self.get_game_properities()?;
-//         self.run_game_with_props(props)
-//     }
-//
-//     fn run_game_with_props(&mut self, game_props: GameProperities) -> Result<(), GameError> {
-//         let GameProperities {
-//             game_mode:
-//                 GameMode {
-//                     size: msize,
-//                     is_tower,
-//                 },
-//             ..
-//         } = game_props;
-//
-//         let game = self.generate_maze(game_props)?;
-//
-//         #[cfg(feature = "sound")]
-//         self.play_bgm(MusicTrack::choose_for_maze(&game.get_maze()));
-//
-//         let mut game_state = GameData {
-//             game,
-//             camera_offset: Dims3D(0, 0, 0),
-//             is_tower,
-//             player_char: constants::get_random_player_char(),
-//             view_mode: GameViewMode::Adventure,
-//             settings: self.settings.clone(),
-//         };
-//
-//         game_state.game.start().unwrap();
-//
-//         loop {
-//             if let Ok(true) = poll(Duration::from_millis(90)) {
-//                 let event = read();
-//
-//                 match event {
-//                     Ok(TermEvent::Key(key_event)) => {
-//                         if game_state.handle_event(key_event).is_err() {
-//                             game_state.game.pause().unwrap();
-//                             // match ui::menu(
-//                             //     &mut self.renderer,
-//                             //     self.settings.get_color_scheme().normals(),
-//                             //     self.settings.get_color_scheme().texts(),
-//                             //     "Paused",
-//                             //     &["Resume", "Main Menu", "Quit"],
-//                             //     None,
-//                             //     false,
-//                             // )? {
-//                             //     1 => return Err(GameError::Back),
-//                             //     2 => return Err(GameError::FullQuit),
-//                             //     _ => {}
-//                             // }
-//                             game_state.game.resume().unwrap();
-//                         }
-//                     }
-//                     Err(err) => {
-//                         break Err(err.into());
-//                     }
-//                     _ => {}
-//                 }
-//
-//                 self.renderer.on_event(&event.unwrap());
-//             }
-//
-//             self.render_game(&game_state, self.settings.get_camera_mode(), is_tower, 1)?;
-//
-//             // Check if player won
-//             if game_state.game.get_state() == RunningGameState::Finished {
-//                 let play_time = game_state.game.get_elapsed().unwrap();
-//
-//                 if let KeyCode::Char('r' | 'R') = ui::popup(
-//                     &mut self.renderer,
-//                     self.settings.get_color_scheme().normals(),
-//                     self.settings.get_color_scheme().texts(),
-//                     "You won",
-//                     &[
-//                         format!("Time:  {}", ui::format_duration(play_time)),
-//                         format!("Moves: {}", game_state.game.get_move_count()),
-//                         format!("Size:  {}x{}x{}", msize.0, msize.1, msize.2),
-//                         "".to_string(),
-//                         "R for new game".to_string(),
-//                     ],
-//                 )? {
-//                     break Err(GameError::NewGame);
-//                 }
-//                 break Ok(());
-//             }
-//         }
-//     }
 //
 //     fn render_game(
 //         &mut self,
@@ -600,53 +437,6 @@ use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
 //
 //         Ok(())
 //     }
-//
-//     fn draw_stairs(
-//         contexts: GameDrawContexts,
-//         cell: &Cell,
-//         stairs_pos: (i32, i32),
-//         maze_pos: (i32, i32),
-//         floor: i32,
-//         player_pos: Dims3D,
-//         ups_as_goal: bool,
-//     ) {
-//         let real_pos = helpers::maze_pos_to_real(Dims3D(stairs_pos.0, stairs_pos.1, floor))
-//             + Dims::from(maze_pos);
-//
-//         let GameDrawContexts {
-//             normal: mut normal_context,
-//             player: mut player_context,
-//             goal: mut goal_context,
-//         } = contexts;
-//
-//         if !cell.get_wall(CellWall::Up) && !cell.get_wall(CellWall::Down) {
-//             if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-//                 player_context.draw_char(real_pos, '⥮');
-//             } else {
-//                 normal_context.draw_char(real_pos, '⥮');
-//             };
-//         } else if !cell.get_wall(CellWall::Up) {
-//             if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-//                 player_context.draw_char(real_pos, '↑');
-//             } else if ups_as_goal {
-//                 goal_context.draw_char(real_pos, '↑');
-//             } else {
-//                 normal_context.draw_char(real_pos, '↑');
-//             }
-//         } else if !cell.get_wall(CellWall::Down) {
-//             if player_pos.2 == floor && Dims::from(player_pos) == stairs_pos.into() {
-//                 player_context.draw_char(real_pos, '↓');
-//             } else {
-//                 normal_context.draw_char(real_pos, '↓');
-//             }
-//         }
-//     }
-// }
-//
-// impl Default for Game {
-//     fn default() -> Self {
-//         Self::new()
-//     }
 // }
 
 pub struct MainMenu(Menu);
@@ -834,7 +624,7 @@ impl ActivityHandler for MazeSizeMenu {
                         Box::new(MazeAlgorithmMenu::new(preset, &data.settings)),
                     )));
                 }
-                _ => panic_on_menu_push(),
+                res => Some(res),
             },
             None => None,
         }
@@ -898,7 +688,7 @@ impl ActivityHandler for MazeAlgorithmMenu {
                         )),
                     )));
                 }
-                _ => panic_on_menu_push(),
+                res => Some(res),
             },
             None => None,
         }
@@ -1071,7 +861,7 @@ impl ActivityHandler for PauseMenu {
                         _ => panic!(),
                     }
                 }
-                _ => panic_on_menu_push(),
+                res => Some(res),
             },
             None => None,
         }
@@ -1290,7 +1080,6 @@ impl MazeBoard {
         let goals = scheme.goals();
 
         let goal_pos = game.get_goal_pos();
-
         frames[goal_pos.2 as usize].draw_styled(maze_pos_to_real(goal_pos), '$', goals);
     }
 }
