@@ -12,7 +12,7 @@ use cmaze::{
 
 use crate::{
     app::{game_state::GameData, GameViewMode},
-    helpers::{constants, is_release, maze_pos_to_real, LineDir},
+    helpers::{constants, is_release, maze2screen, maze2screen_3d, LineDir},
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Settings},
     ui::{self, draw_box, Menu, Popup, ProgressBar, Screen},
@@ -788,7 +788,7 @@ impl ActivityHandler for MazeGenerationActivity {
             match res {
                 Ok(game) => {
                     let game_data = GameData {
-                        camera_pos: game.get_player_pos(),
+                        camera_pos: maze2screen_3d(game.get_player_pos()),
                         game,
                         view_mode: GameViewMode::Adventure,
                         player_char: constants::get_random_player_char(),
@@ -923,6 +923,14 @@ impl ActivityHandler for GameActivity {
             }
         }
 
+        self.camera_mode = CameraMode::CloseFollow;
+        match self.camera_mode {
+            CameraMode::CloseFollow => {
+                self.game.camera_pos = maze2screen_3d(self.game.game.get_player_pos());
+            }
+            CameraMode::EdgeFollow(_, _) => todo!("EdgeFollow not implemented"),
+        }
+
         if self.game.game.get_state() == RunningGameState::Finished {
             let game = &self.game.game;
             let texts = vec![
@@ -938,7 +946,12 @@ impl ActivityHandler for GameActivity {
                     game.get_maze().size().2,
                 ),
             ];
-            let popup = Popup::new("You won".to_string(), texts);
+
+            let color_scheme = &self.color_scheme;
+            let popup = Popup::new("You won".to_string(), texts)
+                .box_style(color_scheme.normals())
+                .text_style(color_scheme.texts())
+                .title_style(color_scheme.texts());
             let activity = Activity::new_base("won".to_string(), Box::new(popup));
 
             // TODO: add R to play a new game
@@ -956,20 +969,21 @@ impl ActivityHandler for GameActivity {
 
 impl Screen for GameActivity {
     fn draw(&self, frame: &mut crate::renderer::Frame) -> std::io::Result<()> {
-        let vp_size = Dims::from(frame.size) / 2;
+        let vp_size = frame.size - Dims(8, 6);
 
         let player = self.game.game.get_player_pos();
         let player_floor = player.2 as usize;
         let maze_frame = &self.maze_board.frames[player_floor];
         let floor_size = maze_frame.size;
 
-        let does_fit = floor_size.0 <= vp_size.0 || floor_size.1 <= vp_size.1;
+        let does_fit = floor_size.0 <= vp_size.0 && floor_size.1 <= vp_size.1;
         let (vp_size, maze_pos) = if does_fit {
             (floor_size, Dims(0, 0))
         } else {
             (vp_size, vp_size / 2 - self.game.camera_pos.into())
         };
 
+        // TODO: reuse the viewport between frames and resize it when needed
         let mut viewport = Frame::new(vp_size.into());
 
         // maze
@@ -978,11 +992,13 @@ impl Screen for GameActivity {
         // player
         if player_floor == player.2 as usize {
             viewport.draw_styled(
-                maze_pos + maze_pos_to_real(player),
+                maze_pos + maze2screen(player),
                 self.game.player_char,
                 self.color_scheme.players(),
             );
         }
+
+        // TODO: draw meta texts around the viewport
 
         let offset = (frame.size - vp_size) / 2;
         draw_box(
@@ -1029,7 +1045,7 @@ impl MazeBoard {
         for y in -1..maze.size().1 {
             for x in -1..maze.size().0 {
                 let cell_pos = Dims3D(x, y, floor);
-                let Dims(rx, ry) = maze_pos_to_real(cell_pos);
+                let Dims(rx, ry) = maze2screen(cell_pos);
 
                 if maze.get_wall(cell_pos, CellWall::Right).unwrap() {
                     draw((rx + 1, ry), LineDir::Vertical);
@@ -1070,7 +1086,7 @@ impl MazeBoard {
                     _ => continue,
                 };
 
-                let pos = maze_pos_to_real(Dims(x as i32, y as i32).into());
+                let pos = maze2screen(Dims(x as i32, y as i32).into());
                 frame.draw_styled(pos, ch, style);
             }
         }
@@ -1080,6 +1096,6 @@ impl MazeBoard {
         let goals = scheme.goals();
 
         let goal_pos = game.get_goal_pos();
-        frames[goal_pos.2 as usize].draw_styled(maze_pos_to_real(goal_pos), '$', goals);
+        frames[goal_pos.2 as usize].draw_styled(maze2screen(goal_pos), '$', goals);
     }
 }
