@@ -224,9 +224,10 @@ impl Screen for Menu {
         draw_box(frame, pos, menu_size, *box_style);
 
         frame.draw_styled((pos + Dims(3, 1)).into(), title.as_str(), *text_style);
-        frame.draw(
+        frame.draw_styled(
             (pos + Dims(1, 2)).into(),
             "─".repeat(menu_size.0 as usize - 2),
+            *box_style,
         );
 
         for (i, option) in options.iter().enumerate() {
