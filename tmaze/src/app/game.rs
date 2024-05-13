@@ -573,11 +573,11 @@ impl MazeSizeMenu {
         .box_style(color_scheme.normals())
         .text_style(color_scheme.texts());
 
-        let last_selected = app_state_data
+        let default = app_state_data
             .last_selected_preset
             .or_else(|| settings.get_mazes().iter().position(|maze| maze.default));
 
-        if let Some(i) = last_selected {
+        if let Some(i) = default {
             menu_config = menu_config.default(i);
         }
 
