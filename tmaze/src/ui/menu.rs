@@ -133,10 +133,16 @@ impl Menu {
                 .collect::<Vec<_>>()
         };
 
+        let default = config
+            .default
+            .map(|d| d as isize)
+            .unwrap_or(0)
+            .clamp(0, options.len() as isize - 1);
+
         Self {
+            selected: default,
             config,
             shown_options: options,
-            selected: 0,
         }
     }
 
