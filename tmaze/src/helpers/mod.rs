@@ -118,7 +118,11 @@ impl LineDir {
     }
 }
 
-pub fn maze_pos_to_real(pos_on_maze: Dims3D) -> Dims {
+pub fn maze2screen_3d(pos_on_maze: Dims3D) -> Dims3D {
+    Dims3D(pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1, pos_on_maze.2)
+}
+
+pub fn maze2screen(pos_on_maze: Dims3D) -> Dims {
     Dims(pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1)
 }
 
