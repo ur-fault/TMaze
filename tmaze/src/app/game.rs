@@ -12,7 +12,7 @@ use cmaze::{
 
 use crate::{
     app::{game_state::GameData, GameViewMode},
-    helpers::{constants, is_release, maze2screen, maze2screen_3d, LineDir},
+    helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Settings},
     ui::{self, draw_box, Menu, Popup, ProgressBar, Screen},
@@ -32,7 +32,10 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 #[allow(unused_imports)]
 use rodio::Source;
 
-use super::{app::AppStateData, Activity, ActivityHandler, Change, Event};
+use super::{
+    app::{AppData, AppStateData},
+    Activity, ActivityHandler, Change, Event,
+};
 
 //     // #[cfg(feature = "sound")]
 //     // fn play_bgm(&mut self, track: MusicTrack) {
@@ -520,11 +523,7 @@ impl MainMenu {
 }
 
 impl ActivityHandler for MainMenu {
-    fn update(
-        &mut self,
-        events: Vec<super::Event>,
-        data: &mut super::app::AppData,
-    ) -> Option<Change> {
+    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         match self.0.update(events, data)? {
             Change::Pop {
                 res: Some(sub_activity),
@@ -604,11 +603,7 @@ impl MazeSizeMenu {
 }
 
 impl ActivityHandler for MazeSizeMenu {
-    fn update(
-        &mut self,
-        events: Vec<super::Event>,
-        data: &mut super::app::AppData,
-    ) -> Option<Change> {
+    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
                 Change::Pop {
@@ -661,11 +656,7 @@ impl MazeAlgorithmMenu {
 }
 
 impl ActivityHandler for MazeAlgorithmMenu {
-    fn update(
-        &mut self,
-        events: Vec<super::Event>,
-        data: &mut super::app::AppData,
-    ) -> Option<Change> {
+    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
                 Change::Pop {
@@ -726,11 +717,7 @@ impl MazeGenerationActivity {
 }
 
 impl ActivityHandler for MazeGenerationActivity {
-    fn update(
-        &mut self,
-        events: Vec<super::Event>,
-        data: &mut super::app::AppData,
-    ) -> Option<Change> {
+    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
@@ -848,7 +835,7 @@ impl PauseMenu {
 }
 
 impl ActivityHandler for PauseMenu {
-    fn update(&mut self, events: Vec<Event>, data: &mut super::app::AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
                 Change::Pop { res: Some(res), .. } => {
@@ -893,10 +880,29 @@ impl GameActivity {
             maze_board,
         }
     }
+
+    /// Returns the size of the viewport and whether the floor fits in the viewport
+    pub fn viewport_size(&self, screen_size: Dims) -> (Dims, bool) {
+        let vp_size = screen_size - Dims(8, 6);
+
+        let maze_frame = &self.maze_board.frames[self.game.game.get_player_pos().2 as usize];
+        let floor_size = maze_frame.size;
+
+        let does_fit = floor_size.0 <= vp_size.0 && floor_size.1 <= vp_size.1;
+        if does_fit {
+            (floor_size, does_fit)
+        } else {
+            (vp_size, does_fit)
+        }
+    }
+
+    fn current_floor_frame(&self) -> &Frame {
+        &self.maze_board.frames[self.game.game.get_player_pos().2 as usize]
+    }
 }
 
 impl ActivityHandler for GameActivity {
-    fn update(&mut self, events: Vec<Event>, data: &mut super::app::AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
         match self.game.game.get_state() {
             RunningGameState::NotStarted => self.game.game.start().unwrap(),
             RunningGameState::Paused => self.game.game.resume().unwrap(),
@@ -923,12 +929,41 @@ impl ActivityHandler for GameActivity {
             }
         }
 
-        self.camera_mode = CameraMode::CloseFollow;
-        match self.camera_mode {
-            CameraMode::CloseFollow => {
-                self.game.camera_pos = maze2screen_3d(self.game.game.get_player_pos());
+        // self.camera_mode = CameraMode::SmoothFollow(0.3);
+        // self.camera_mode = CameraMode::CloseFollow;
+        if self.game.view_mode == GameViewMode::Adventure {
+            match self.camera_mode {
+                CameraMode::CloseFollow => {
+                    self.game.camera_pos = maze2screen_3d(self.game.game.get_player_pos());
+                }
+                CameraMode::EdgeFollow(xoff, yoff) => {
+                    let (vp_size, does_fit) = self.viewport_size(data.screen_size);
+                    if !does_fit {
+                        let xoff = xoff.to_chars(vp_size.0);
+                        let yoff = yoff.to_chars(vp_size.1);
+
+                        let player_pos = maze2screen(self.game.game.get_player_pos());
+                        let player_pos_in_vp =
+                            player_pos - self.game.camera_pos.into() + vp_size / 2 + Dims(1, 1);
+
+                        if player_pos_in_vp.0 < xoff || player_pos_in_vp.0 > vp_size.0 - xoff {
+                            self.game.camera_pos.0 = player_pos.0;
+                        }
+
+                        if player_pos_in_vp.1 < yoff || player_pos_in_vp.1 > vp_size.1 - yoff {
+                            self.game.camera_pos.1 = player_pos.1;
+                        }
+                    }
+                } // TODO: implement smooth follow, but as separate flag
+                  // CameraMode::SmoothFollow(t) => {
+                  //     let old = self.game.camera_pos;
+                  //     let new = maze2screen_3d(self.game.game.get_player_pos());
+                  //     let Dims(x, y) = Dims::from(new) - old.into();
+                  //     let x = (x as f32 * t).round() as i32;
+                  //     let y = (y as f32 * t).round() as i32;
+                  //     self.game.camera_pos = old + Dims3D(x, y, new.2);
+                  // }
             }
-            CameraMode::EdgeFollow(_, _) => todo!("EdgeFollow not implemented"),
         }
 
         if self.game.game.get_state() == RunningGameState::Finished {
@@ -969,18 +1004,13 @@ impl ActivityHandler for GameActivity {
 
 impl Screen for GameActivity {
     fn draw(&self, frame: &mut crate::renderer::Frame) -> std::io::Result<()> {
-        let vp_size = frame.size - Dims(8, 6);
+        let maze_frame = self.current_floor_frame();
+        let color_scheme = &self.color_scheme;
 
-        let player = self.game.game.get_player_pos();
-        let player_floor = player.2 as usize;
-        let maze_frame = &self.maze_board.frames[player_floor];
-        let floor_size = maze_frame.size;
-
-        let does_fit = floor_size.0 <= vp_size.0 && floor_size.1 <= vp_size.1;
-        let (vp_size, maze_pos) = if does_fit {
-            (floor_size, Dims(0, 0))
-        } else {
-            (vp_size, vp_size / 2 - self.game.camera_pos.into())
+        let (vp_size, does_fit) = self.viewport_size(frame.size);
+        let maze_pos = match does_fit {
+            true => Dims(0, 0),
+            false => vp_size / 2 - self.game.camera_pos.into(),
         };
 
         // TODO: reuse the viewport between frames and resize it when needed
@@ -990,23 +1020,61 @@ impl Screen for GameActivity {
         viewport.draw(maze_pos, maze_frame);
 
         // player
-        if player_floor == player.2 as usize {
+        if (self.game.game.get_player_pos().2 as usize)
+            == self.game.game.get_player_pos().2 as usize
+        {
             viewport.draw_styled(
-                maze_pos + maze2screen(player),
+                maze_pos + maze2screen(self.game.game.get_player_pos()),
                 self.game.player_char,
-                self.color_scheme.players(),
+                color_scheme.players(),
             );
         }
 
-        // TODO: draw meta texts around the viewport
+        // TODO: draw meta texts around the viewport, false
 
         let offset = (frame.size - vp_size) / 2;
         draw_box(
             frame,
             offset - Dims(1, 1),
             vp_size + Dims(2, 2),
-            self.color_scheme.normals(),
+            color_scheme.normals(),
         );
+
+        if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
+            // for future use: ['↑', '↓', '←, false', '→']
+
+            let xoff = xoff.to_chars(vp_size.0);
+            let yoff = yoff.to_chars(vp_size.1);
+
+            use LineDir::{Horizontal, Vertical};
+            const V: char = Vertical.round();
+            const H: char = Horizontal.round();
+
+            let mut draw = |pos, dir, end| {
+                frame.draw_styled(
+                    (offset - Dims(1, 1)) + pos,
+                    dir,
+                    match end {
+                        false => color_scheme.goals(),
+                        true => color_scheme.players(),
+                    },
+                )
+            };
+
+            #[rustfmt::skip]
+            (|| {
+                draw(Dims(xoff            , 0)               , V, false);
+                draw(Dims(vp_size.0 - xoff, 0)               , V, true);
+                draw(Dims(xoff            , vp_size.1 + 1)   , V, false);
+                draw(Dims(vp_size.0 - xoff, vp_size.1 + 1)   , V, true);
+
+                draw(Dims(0               , yoff)            , H, false);
+                draw(Dims(0               , vp_size.1 - yoff), H, true);
+                draw(Dims(vp_size.0 + 1   , yoff)            , H, false);
+                draw(Dims(vp_size.0 + 1   , vp_size.1 - yoff), H, true);
+            })();
+        }
+
         frame.draw(offset, &viewport);
 
         Ok(())
@@ -1035,7 +1103,7 @@ impl MazeBoard {
         let maze = game.get_maze();
         let normals = scheme.normals();
 
-        let size = Dims(maze.size().0, maze.size().1) * 2 + Dims(1, 1);
+        let size = maze_render_size(maze);
 
         let mut frame = Frame::new(size);
 

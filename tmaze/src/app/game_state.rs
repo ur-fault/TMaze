@@ -8,7 +8,10 @@ use cmaze::{
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tap::Tap;
 
-use crate::{helpers::is_release, settings::Settings};
+use crate::{
+    helpers::{is_release, maze2screen_3d},
+    settings::Settings,
+};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum GameViewMode {
@@ -68,16 +71,17 @@ impl GameData {
             KeyCode::Char('r' | 'e' | 'p') => {
                 self.apply_move(settings, CellWall::Up, is_fast);
             }
-            KeyCode::Char(' ') => {
-                if self.view_mode == GameViewMode::Spectator {
-                    self.camera_pos = Dims3D(0, 0, 0);
+            KeyCode::Char(' ') => match self.view_mode {
+                GameViewMode::Spectator => {
+                    self.camera_pos = maze2screen_3d(self.game.get_player_pos());
                     self.view_mode = GameViewMode::Adventure;
                     log::info!("Switched to Adventure mode");
-                } else {
+                }
+                GameViewMode::Adventure => {
                     self.view_mode = GameViewMode::Spectator;
                     log::info!("Switched to Spectator mode");
                 }
-            }
+            },
             KeyCode::Char('.') => {
                 self.view_mode = GameViewMode::Spectator;
                 self.camera_pos = self.game.get_player_pos() - self.game.get_goal_pos();
@@ -95,6 +99,8 @@ impl GameData {
             GameViewMode::Spectator => {
                 let cam_off =
                     wall.reverse_wall().to_coord().tap_mut(|c| c.2 *= -1) + self.camera_pos;
+
+                // TODO: allow `fast` movement
 
                 self.camera_pos = Dims3D(
                     cam_off.0,

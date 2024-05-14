@@ -34,6 +34,7 @@ pub struct AppData {
     pub settings: Settings,
     pub save: SaveData,
     pub use_data: AppStateData,
+    pub screen_size: Dims,
     app_start: Instant,
 }
 
@@ -58,6 +59,7 @@ impl App {
         let save = SaveData::load().expect("Failed to load save data");
         let use_data = AppStateData::default();
         let app_start = Instant::now();
+        let frame_size = renderer.frame_size();
 
         logging::init();
 
@@ -72,6 +74,7 @@ impl App {
                 settings,
                 save,
                 use_data,
+                screen_size: frame_size,
             },
 
             #[cfg(feature = "sound")]
@@ -92,6 +95,7 @@ impl App {
                 let event = read().unwrap();
 
                 self.renderer.on_event(&event);
+                self.data.screen_size = self.renderer.frame_size();
 
                 events.push(Event::Term(event));
 
