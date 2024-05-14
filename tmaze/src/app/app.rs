@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use cmaze::core::Dims;
 use crossterm::event::read;
@@ -34,36 +34,20 @@ pub struct AppData {
     pub settings: Settings,
     pub save: SaveData,
     pub use_data: AppStateData,
+    app_start: Instant,
+}
+
+impl AppData {
+    pub fn from_start(&self) -> Duration {
+        self.app_start.elapsed()
+    }
 }
 
 impl App {
     pub fn new(base_activity: Activity) -> Self {
-        let renderer = Renderer::new().expect("Failed to create renderer");
-        let activities = Activities::new(base_activity);
-
-        let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
-        let save = SaveData::load().expect("Failed to load save data");
-        let use_data = AppStateData::default();
-
-        logging::init();
-
-        #[cfg(feature = "sound")]
-        let sound_player = SoundPlayer::new();
-
-        Self {
-            renderer,
-            activities,
-            data: AppData {
-                settings,
-                save,
-                use_data,
-            },
-
-            #[cfg(feature = "sound")]
-            sound_player,
-            #[cfg(feature = "sound")]
-            bgm_track: None,
-        }
+        let mut s = Self::empty();
+        s.activities.push(base_activity);
+        s
     }
 
     pub fn empty() -> Self {
@@ -73,6 +57,7 @@ impl App {
         let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
         let save = SaveData::load().expect("Failed to load save data");
         let use_data = AppStateData::default();
+        let app_start = Instant::now();
 
         logging::init();
 
@@ -83,6 +68,7 @@ impl App {
             renderer,
             activities,
             data: AppData {
+                app_start,
                 settings,
                 save,
                 use_data,
