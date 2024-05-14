@@ -84,10 +84,12 @@ impl Screen for Popup {
         );
 
         if !self.texts.is_empty() {
-            frame.draw(
+            frame.draw_styled(
                 (pos + Dims(1, 2)).into(),
                 "─".repeat(box_size.0 as usize - 2),
+                self.box_style,
             );
+
             for (i, text) in self.texts.iter().enumerate() {
                 frame.draw_styled(
                     (pos + Dims(2, i as i32 + 3)).into(),

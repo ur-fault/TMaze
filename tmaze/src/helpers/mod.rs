@@ -59,7 +59,7 @@ pub enum LineDir {
 }
 
 impl LineDir {
-    pub fn double(&self) -> char {
+    pub const fn double(&self) -> char {
         match self {
             Self::Empty => ' ',
             Self::Cross => '╬',
@@ -77,7 +77,7 @@ impl LineDir {
         }
     }
 
-    pub fn from_bools(left: bool, top: bool, right: bool, bottom: bool) -> Self {
+    pub const fn from_bools(left: bool, top: bool, right: bool, bottom: bool) -> Self {
         match (left, top, right, bottom) {
             (false, false, false, false) => Self::Empty,
             (true, true, true, true) => Self::Cross,
@@ -99,7 +99,7 @@ impl LineDir {
     }
 
     #[allow(dead_code)]
-    pub fn round(&self) -> char {
+    pub const fn round(&self) -> char {
         match self {
             Self::Empty => ' ',
             Self::Cross => '┼',

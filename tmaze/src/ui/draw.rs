@@ -28,6 +28,16 @@ pub fn draw_box(frame: &mut Frame, pos: Dims, size: Dims, style: ContentStyle) {
     );
 }
 
+pub fn draw_line(frame: &mut Frame, pos: Dims, vertical: bool, len: usize, style: ContentStyle) {
+    if vertical {
+        for y in 0..len {
+            draw_char(frame, pos.0, pos.1 + y as i32, '│', style);
+        }
+    } else {
+        draw_str(frame, pos.0, pos.1, &"─".repeat(len), style);
+    }
+}
+
 pub fn draw_str(frame: &mut Frame, mut x: i32, y: i32, mut text: &str, style: ContentStyle) {
     if y < 0 {
         return;

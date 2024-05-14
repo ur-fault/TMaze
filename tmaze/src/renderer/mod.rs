@@ -106,6 +106,10 @@ impl Renderer {
         &mut self.hidden
     }
 
+    pub fn frame_size(&self) -> Dims {
+        self.size
+    }
+
     pub fn show(&mut self) -> io::Result<()> {
         let mut tty = stdout();
 
@@ -225,7 +229,7 @@ impl Frame {
     }
 
     pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: ContentStyle) {
-        if x >= self.size.0 || y >= self.size.1 {
+        if x < 0 || self.size.0 <= x || y < 0 || self.size.1 <= y {
             return;
         }
 
