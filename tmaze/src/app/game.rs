@@ -14,7 +14,7 @@ use crate::{
     app::{game_state::GameData, GameViewMode},
     helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
     renderer::Frame,
-    settings::{CameraMode, ColorScheme, Settings},
+    settings::{CameraMode, ColorScheme, Offset, Settings},
     ui::{self, draw_box, Menu, Popup, ProgressBar, Screen},
 };
 
@@ -864,6 +864,7 @@ pub struct GameActivity {
     color_scheme: ColorScheme,
     game: GameData,
     maze_board: MazeBoard,
+    show_debug: bool,
 }
 
 impl GameActivity {
@@ -878,6 +879,7 @@ impl GameActivity {
             color_scheme,
             game,
             maze_board,
+            show_debug: false,
         }
     }
 
@@ -966,6 +968,8 @@ impl ActivityHandler for GameActivity {
             }
         }
 
+        self.show_debug = data.use_data.show_debug;
+
         if self.game.game.get_state() == RunningGameState::Finished {
             let game = &self.game.game;
             let texts = vec![
@@ -1032,53 +1036,66 @@ impl Screen for GameActivity {
 
         // TODO: draw meta texts around the viewport, false
 
-        let offset = (frame.size - vp_size) / 2;
+        let vp_pos = (frame.size - vp_size) / 2;
         draw_box(
             frame,
-            offset - Dims(1, 1),
+            vp_pos - Dims(1, 1),
             vp_size + Dims(2, 2),
             color_scheme.normals(),
         );
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
-            // for future use: ['↑', '↓', '←, false', '→']
-
-            let xoff = xoff.to_chars(vp_size.0);
-            let yoff = yoff.to_chars(vp_size.1);
-
-            use LineDir::{Horizontal, Vertical};
-            const V: char = Vertical.round();
-            const H: char = Horizontal.round();
-
-            let mut draw = |pos, dir, end| {
-                frame.draw_styled(
-                    (offset - Dims(1, 1)) + pos,
-                    dir,
-                    match end {
-                        false => color_scheme.goals(),
-                        true => color_scheme.players(),
-                    },
-                )
-            };
-
-            #[rustfmt::skip]
-            (|| {
-                draw(Dims(xoff            , 0)               , V, false);
-                draw(Dims(vp_size.0 - xoff, 0)               , V, true);
-                draw(Dims(xoff            , vp_size.1 + 1)   , V, false);
-                draw(Dims(vp_size.0 - xoff, vp_size.1 + 1)   , V, true);
-
-                draw(Dims(0               , yoff)            , H, false);
-                draw(Dims(0               , vp_size.1 - yoff), H, true);
-                draw(Dims(vp_size.0 + 1   , yoff)            , H, false);
-                draw(Dims(vp_size.0 + 1   , vp_size.1 - yoff), H, true);
-            })();
+            if !does_fit && self.show_debug {
+                render_edge_follow_rulers((xoff, yoff), frame, vp_size, vp_pos, color_scheme);
+            }
         }
 
-        frame.draw(offset, &viewport);
+        frame.draw(vp_pos, &viewport);
 
         Ok(())
     }
+}
+
+#[inline]
+fn render_edge_follow_rulers(
+    rulers: (Offset, Offset),
+    frame: &mut Frame,
+    vp_size: Dims,
+    vp_pos: Dims,
+    color_scheme: &ColorScheme,
+) {
+    // for future use: ['↑', '↓', '←, '→']
+
+    let xoff = rulers.0.to_chars(vp_size.0);
+    let yoff = rulers.1.to_chars(vp_size.1);
+
+    use LineDir::{Horizontal, Vertical};
+    const V: char = Vertical.round();
+    const H: char = Horizontal.round();
+
+    let mut draw = |pos, dir, end| {
+        frame.draw_styled(
+            (vp_pos - Dims(1, 1)) + pos,
+            dir,
+            match end {
+                false => color_scheme.goals(),
+                true => color_scheme.players(),
+            },
+        )
+    };
+
+    #[rustfmt::skip]
+    (|| {
+        draw(Dims(xoff            , 0)               , V, false);
+        draw(Dims(vp_size.0 - xoff, 0)               , V, true);
+        draw(Dims(xoff            , vp_size.1 + 1)   , V, false);
+        draw(Dims(vp_size.0 - xoff, vp_size.1 + 1)   , V, true);
+
+        draw(Dims(0               , yoff)            , H, false);
+        draw(Dims(0               , vp_size.1 - yoff), H, true);
+        draw(Dims(vp_size.0 + 1   , yoff)            , H, false);
+        draw(Dims(vp_size.0 + 1   , vp_size.1 - yoff), H, true);
+    })();
 }
 
 pub struct MazeBoard {
