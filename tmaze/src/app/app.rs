@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use cmaze::core::Dims;
-use crossterm::event::read;
+use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
     data::SaveData,
@@ -97,7 +97,14 @@ impl App {
                 self.renderer.on_event(&event);
                 self.data.screen_size = self.renderer.frame_size();
 
-                events.push(Event::Term(event));
+                match event {
+                    crossterm::event::Event::Key(KeyEvent {
+                        code: KeyCode::F(3),
+                        kind: KeyEventKind::Press,
+                        ..
+                    }) => self.data.use_data.show_debug = !self.data.use_data.show_debug,
+                    event => events.push(Event::Term(event)),
+                }
 
                 // just so we read all events in the frame
                 delay = 1;
@@ -187,12 +194,14 @@ impl App {
 
 pub struct AppStateData {
     pub last_selected_preset: Option<usize>,
+    pub show_debug: bool,
 }
 
 impl Default for AppStateData {
     fn default() -> Self {
         Self {
             last_selected_preset: None,
+            show_debug: false,
         }
     }
 }
