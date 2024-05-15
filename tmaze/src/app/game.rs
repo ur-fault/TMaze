@@ -541,9 +541,7 @@ impl ActivityHandler for MainMenu {
                     _ => panic!("main menu should only return valid index between 0 and 4"),
                 }
             }
-            _ => {
-                panic!("menu should only be popping itself or staying")
-            }
+            res => Some(res),
         }
     }
 
@@ -598,7 +596,7 @@ impl MazeSizeMenu {
         Self { menu, presets }
     }
 
-    // TODO: custom maze size popup
+    // TODO: custom maze size config
     // just one-time, since it's already in settings
 }
 

@@ -154,6 +154,9 @@ impl App {
 
             logging::get_logger().draw(Dims(0, 0), self.renderer.frame());
 
+            // TODO: let activities show debug info and about the app itself
+            // then we can draw it here
+
             self.renderer.show().unwrap();
         };
 
