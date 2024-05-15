@@ -154,8 +154,8 @@ impl Drawable for AppLogger {
 
             let y = pos.1 + i as i32;
             let len = log.message.width();
-            let x = frame.size.0 as usize - len - 2;
-            let pos = Dims(x as i32, y);
+            let x = frame.size.0 - len as i32 - 2;
+            let pos = Dims(x, y);
 
             // TODO: make this a setting
             const INDICATOR_CHAR: char = '|';

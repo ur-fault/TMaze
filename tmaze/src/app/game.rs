@@ -15,7 +15,7 @@ use crate::{
     helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Offset, Settings},
-    ui::{self, draw_box, Menu, Popup, ProgressBar, Screen},
+    ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
 };
 
 #[cfg(feature = "sound")]
@@ -907,16 +907,47 @@ impl GameActivity {
         vp_pos: Dims,
         vp_size: Dims,
     ) {
+        let max_width = (vp_size.0 / 2 + 1) as usize;
+
         let pl_pos = self.game.game.get_player_pos() + Dims3D(1, 1, 1);
 
-        let from_start = ui::format_duration(self.game.game.get_elapsed().unwrap());
-        let move_count = format!("{} moves", self.game.game.get_move_count());
-        let pos_text = format!("x:{} y:{} f:{}", pl_pos.0, pl_pos.1, pl_pos.2);
-        let view_mode = "TODO".to_string(); // TODO: view mode text
+        // texts
+        let from_start =
+            ui::multisize_duration_format(self.game.game.get_elapsed().unwrap(), max_width);
+        let move_count = ui::multisize_string(
+            [
+                format!("{} moves", self.game.game.get_move_count()),
+                format!("{}m", self.game.game.get_move_count()),
+            ],
+            max_width,
+        );
 
+        let pos_text = if self.game.game.get_maze().size().2 > 1 {
+            multisize_string(
+                [
+                    format!("x:{} y:{} floor:{}", pl_pos.0, pl_pos.1, pl_pos.2),
+                    format!("x:{} y:{} f:{}", pl_pos.0, pl_pos.1, pl_pos.2),
+                    format!("{}:{}:{}", pl_pos.0, pl_pos.1, pl_pos.2),
+                ],
+                max_width,
+            )
+        } else {
+            multisize_string(
+                [
+                    format!("x:{} y:{}", pl_pos.0, pl_pos.1),
+                    format!("x:{} y:{}", pl_pos.0, pl_pos.1),
+                    format!("{}:{}", pl_pos.0, pl_pos.1),
+                ],
+                max_width,
+            )
+        };
+        let view_mode = self.game.view_mode;
+        let view_mode = multisize_string(view_mode.to_multisize_strings(), max_width as usize);
+
+        // draw them
         let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
 
-        let tl = vp_pos - Dims(2, 2);
+        let tl = vp_pos - Dims(1, 2);
         let br = vp_pos + vp_size + Dims(1, 1);
 
         draw(&pos_text, tl);
@@ -1090,6 +1121,9 @@ fn render_edge_follow_rulers(
 ) {
     // for future use: ['↑', '↓', '←, '→']
 
+    let goals = color_scheme.goals();
+    let players = color_scheme.players();
+
     let xo = rulers.0.to_chars(vps.0);
     let yo = rulers.1.to_chars(vps.1);
 
@@ -1102,8 +1136,8 @@ fn render_edge_follow_rulers(
             (vp_pos - Dims(1, 1)) + pos,
             dir,
             match end {
-                false => color_scheme.goals(),
-                true => color_scheme.players(),
+                false => goals,
+                true => players,
             },
         )
     };

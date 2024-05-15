@@ -19,6 +19,19 @@ pub enum GameViewMode {
     Spectator,
 }
 
+impl GameViewMode {
+    pub fn to_multisize_strings(&self) -> [String; 3] {
+        match self {
+            GameViewMode::Adventure => {
+                ["Adventure".to_string(), "Adv".to_string(), "A".to_string()]
+            }
+            GameViewMode::Spectator => {
+                ["Spectator".to_string(), "Spec".to_string(), "S".to_string()]
+            }
+        }
+    }
+}
+
 impl Display for GameViewMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
