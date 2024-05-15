@@ -941,19 +941,33 @@ impl GameActivity {
                 max_width,
             )
         };
+
         let view_mode = self.game.view_mode;
         let view_mode = multisize_string(view_mode.to_multisize_strings(), max_width as usize);
 
-        // draw them
-        let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
-
         let tl = vp_pos - Dims(1, 2);
         let br = vp_pos + vp_size + Dims(1, 1);
+
+        // draw them
+        let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
 
         draw(&pos_text, tl);
         draw(&view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
         draw(&move_count, Dims(tl.0, br.1));
         draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
+    }
+
+    pub fn render_visited_places(&self, frame: &mut Frame) {
+        use CellWall::{Down, Up};
+
+        let game = &self.game.game;
+        for (move_pos, _) in game.get_moves() {
+            let cell = game.get_maze().get_cell(*move_pos).unwrap();
+            if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
+                let real_pos = maze2screen(*move_pos);
+                frame.draw_styled(real_pos, '.', self.color_scheme.normals());
+            }
+        }
     }
 }
 
@@ -1076,6 +1090,7 @@ impl Screen for GameActivity {
 
         // maze
         viewport.draw(maze_pos, maze_frame);
+        self.render_visited_places(&mut viewport);
 
         // player
         if (self.game.game.get_player_pos().2 as usize)
