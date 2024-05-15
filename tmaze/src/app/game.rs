@@ -1084,14 +1084,14 @@ impl Screen for GameActivity {
 fn render_edge_follow_rulers(
     rulers: (Offset, Offset),
     frame: &mut Frame,
-    vp_size: Dims,
+    vps: Dims,
     vp_pos: Dims,
     color_scheme: &ColorScheme,
 ) {
     // for future use: ['↑', '↓', '←, '→']
 
-    let xoff = rulers.0.to_chars(vp_size.0);
-    let yoff = rulers.1.to_chars(vp_size.1);
+    let xo = rulers.0.to_chars(vps.0);
+    let yo = rulers.1.to_chars(vps.1);
 
     use LineDir::{Horizontal, Vertical};
     const V: char = Vertical.round();
@@ -1108,17 +1108,18 @@ fn render_edge_follow_rulers(
         )
     };
 
+    // not allowed on blocks, so we use a closure
     #[rustfmt::skip]
     (|| {
-        draw(Dims(xoff            , 0)               , V, false);
-        draw(Dims(vp_size.0 - xoff, 0)               , V, true);
-        draw(Dims(xoff            , vp_size.1 + 1)   , V, false);
-        draw(Dims(vp_size.0 - xoff, vp_size.1 + 1)   , V, true);
+        draw(Dims(xo        , 0)         , V, false);
+        draw(Dims(vps.0 - xo, 0)         , V, true);
+        draw(Dims(xo        , vps.1 + 1) , V, false);
+        draw(Dims(vps.0 - xo, vps.1 + 1) , V, true);
 
-        draw(Dims(0               , yoff)            , H, false);
-        draw(Dims(0               , vp_size.1 - yoff), H, true);
-        draw(Dims(vp_size.0 + 1   , yoff)            , H, false);
-        draw(Dims(vp_size.0 + 1   , vp_size.1 - yoff), H, true);
+        draw(Dims(0         , yo)        , H, false);
+        draw(Dims(0         , vps.1 - yo), H, true);
+        draw(Dims(vps.0 + 1 , yo)        , H, false);
+        draw(Dims(vps.0 + 1 , vps.1 - yo), H, true);
     })();
 }
 
