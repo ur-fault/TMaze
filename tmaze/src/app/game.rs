@@ -1078,6 +1078,7 @@ impl Screen for GameActivity {
     fn draw(&self, frame: &mut crate::renderer::Frame) -> std::io::Result<()> {
         let maze_frame = self.current_floor_frame();
         let color_scheme = &self.color_scheme;
+        let game = &self.game.game;
 
         let (vp_size, does_fit) = self.viewport_size(frame.size);
         let maze_pos = match does_fit {
@@ -1093,15 +1094,22 @@ impl Screen for GameActivity {
         self.render_visited_places(&mut viewport);
 
         // player
-        if (self.game.game.get_player_pos().2 as usize)
-            == self.game.game.get_player_pos().2 as usize
-        {
-            // TODO: player rendered as a strairs when standing on them
-            viewport.draw_styled(
-                maze_pos + maze2screen(self.game.game.get_player_pos()),
-                self.game.player_char,
-                color_scheme.players(),
-            );
+        if (game.get_player_pos().2 as usize) == game.get_player_pos().2 as usize {
+            let player = game.get_player_pos();
+            let cell = game.get_maze().get_cell(player).unwrap();
+            if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
+                viewport[maze2screen(game.get_player_pos())]
+                    .content_mut()
+                    .unwrap()
+                    .style
+                    .foreground_color = Some(color_scheme.player);
+            } else {
+                viewport.draw_styled(
+                    maze_pos + maze2screen(player),
+                    self.game.player_char,
+                    color_scheme.players(),
+                );
+            }
         }
 
         let vp_pos = (frame.size - vp_size) / 2;
