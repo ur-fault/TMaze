@@ -899,6 +899,31 @@ impl GameActivity {
     fn current_floor_frame(&self) -> &Frame {
         &self.maze_board.frames[self.game.game.get_player_pos().2 as usize]
     }
+
+    fn render_meta_texts(
+        &self,
+        frame: &mut Frame,
+        color_scheme: &ColorScheme,
+        vp_pos: Dims,
+        vp_size: Dims,
+    ) {
+        let pl_pos = self.game.game.get_player_pos() + Dims3D(1, 1, 1);
+
+        let from_start = ui::format_duration(self.game.game.get_elapsed().unwrap());
+        let move_count = format!("{} moves", self.game.game.get_move_count());
+        let pos_text = format!("x:{} y:{} f:{}", pl_pos.0, pl_pos.1, pl_pos.2);
+        let view_mode = "TODO".to_string(); // TODO: view mode text
+
+        let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
+
+        let tl = vp_pos - Dims(2, 2);
+        let br = vp_pos + vp_size + Dims(1, 1);
+
+        draw(&pos_text, tl);
+        draw(&view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
+        draw(&move_count, Dims(tl.0, br.1));
+        draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
+    }
 }
 
 impl ActivityHandler for GameActivity {
@@ -1025,14 +1050,13 @@ impl Screen for GameActivity {
         if (self.game.game.get_player_pos().2 as usize)
             == self.game.game.get_player_pos().2 as usize
         {
+            // TODO: player rendered as a strairs when standing on them
             viewport.draw_styled(
                 maze_pos + maze2screen(self.game.game.get_player_pos()),
                 self.game.player_char,
                 color_scheme.players(),
             );
         }
-
-        // TODO: draw meta texts around the viewport, false
 
         let vp_pos = (frame.size - vp_size) / 2;
         draw_box(
@@ -1047,6 +1071,8 @@ impl Screen for GameActivity {
                 render_edge_follow_rulers((xoff, yoff), frame, vp_size, vp_pos, color_scheme);
             }
         }
+
+        self.render_meta_texts(frame, color_scheme, vp_pos, vp_size);
 
         frame.draw(vp_pos, &viewport);
 
@@ -1152,15 +1178,20 @@ impl MazeBoard {
             }
         }
 
-        Self::render_stairs(&mut frame, &maze.get_cells()[floor as usize], scheme);
+        let cells = &maze.get_cells()[floor as usize];
+        Self::render_stairs(&mut frame, cells, maze.is_tower(), scheme);
 
         frame
     }
 
-    fn render_stairs(frame: &mut Frame, floor: &Vec<Vec<Cell>>, scheme: ColorScheme) {
-        let style = scheme.normals();
+    fn render_stairs(frame: &mut Frame, floors: &Vec<Vec<Cell>>, tower: bool, scheme: ColorScheme) {
+        let style = if tower {
+            scheme.goals()
+        } else {
+            scheme.normals()
+        };
 
-        for (y, row) in floor.iter().enumerate() {
+        for (y, row) in floors.iter().enumerate() {
             for (x, cell) in row.iter().enumerate() {
                 let ch = match (cell.get_wall(CellWall::Up), cell.get_wall(CellWall::Down)) {
                     (false, false) => '⥮',
