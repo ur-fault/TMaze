@@ -212,6 +212,20 @@ impl Cell {
     pub fn new(c: char) -> Self {
         Cell::styled(c, ContentStyle::default())
     }
+
+    pub fn content(&self) -> Option<&CellContent> {
+        match self {
+            Cell::Content(c) => Some(c),
+            _ => None,
+        }
+    }
+
+    pub fn content_mut(&mut self) -> Option<&mut CellContent> {
+        match self {
+            Cell::Content(c) => Some(c),
+            _ => None,
+        }
+    }
 }
 
 pub struct Frame {

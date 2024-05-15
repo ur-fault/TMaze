@@ -39,9 +39,13 @@ Settings (
     //  - CloseFollow - player will always be centered
     //  - EdgeFollow(horizontal margin, vertical margin)
     //     player will move on screen, but when he hits margin
-    //     he will be centered on that axis
+    //     he will be centered on that axis.
+    //     margin can be either relative (0.0 - 0.5 or absolute
+    //     when it's fractional, it's relative to the viewport size
+    //     when it's absolute, it's in characters
     camera_mode: CloseFollow,
     // camera_mode: EdgeFollow(10, 5),
+    // camera_mode: EdgeFollow(0.25, 0.25),
 
     // default algorithm used for maze generation
     default_maze_gen_algo: RandomKruskals,
