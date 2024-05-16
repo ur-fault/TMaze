@@ -44,7 +44,7 @@ And it ended up as maze solving game because I just couldn't find any other.
 
 ## How to run
 - You can either:
-- Download from [Github releases](https://github.com/ur-fault/TMaze/releases), they are built automatically now, using GitHub Actions
+- Download from [Github releases](https://github.com/ur-fault/TMaze/releases/latest), they are built automatically now, using GitHub Actions
 - Install it with your favorite package manager
 - Build from source (you need cargo installed on your system)
 
