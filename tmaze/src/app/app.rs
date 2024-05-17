@@ -1,7 +1,9 @@
 use std::time::{Duration, Instant};
 
 use cmaze::core::Dims;
+
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
+use rodio::Source;
 
 use crate::{
     data::SaveData,
@@ -23,11 +25,6 @@ pub struct App {
     renderer: Renderer,
     activities: Activities,
     data: AppData,
-
-    #[cfg(feature = "sound")]
-    sound_player: SoundPlayer,
-    #[cfg(feature = "sound")]
-    bgm_track: Option<MusicTrack>,
 }
 
 pub struct AppData {
@@ -36,11 +33,36 @@ pub struct AppData {
     pub use_data: AppStateData,
     pub screen_size: Dims,
     app_start: Instant,
+
+    #[cfg(feature = "sound")]
+    sound_player: SoundPlayer,
+    #[cfg(feature = "sound")]
+    bgm_track: Option<MusicTrack>,
 }
 
 impl AppData {
     pub fn from_start(&self) -> Duration {
         self.app_start.elapsed()
+    }
+
+    #[cfg(feature = "sound")]
+    pub fn play_bgm(&mut self, track: MusicTrack) {
+        if let Some(prev_track) = self.bgm_track {
+            if prev_track == track {
+                return;
+            }
+        }
+
+        if !self.settings.get_enable_audio() || !self.settings.get_enable_music() {
+            return;
+        }
+
+        let volume = self.settings.get_audio_volume() * self.settings.get_music_volume();
+        self.sound_player.sink().set_volume(volume);
+
+        self.bgm_track = Some(track);
+        let track = track.get_track().repeat_infinite();
+        self.sound_player.play_track(Box::new(track));
     }
 }
 
@@ -75,12 +97,12 @@ impl App {
                 save,
                 use_data,
                 screen_size: frame_size,
-            },
 
-            #[cfg(feature = "sound")]
-            sound_player,
-            #[cfg(feature = "sound")]
-            bgm_track: None,
+                #[cfg(feature = "sound")]
+                sound_player,
+                #[cfg(feature = "sound")]
+                bgm_track: None,
+            },
         }
     }
 

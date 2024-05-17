@@ -37,26 +37,6 @@ use super::{
     Activity, ActivityHandler, Change, Event,
 };
 
-//     // #[cfg(feature = "sound")]
-//     // fn play_bgm(&mut self, track: MusicTrack) {
-//     //     if let Some(prev_track) = self.bgm_track {
-//     //         if prev_track == track {
-//     //             return;
-//     //         }
-//     //     }
-//     //
-//     //     if !self.settings.get_enable_audio() || !self.settings.get_enable_music() {
-//     //         return;
-//     //     }
-//     //
-//     //     let volume = self.settings.get_audio_volume() * self.settings.get_music_volume();
-//     //     self.sound_player.sink().set_volume(volume);
-//     //
-//     //     self.bgm_track = Some(track);
-//     //     let track = track.get_track().repeat_infinite();
-//     //     self.sound_player.play_track(Box::new(track));
-//     // }
-
 pub struct MainMenu(Menu);
 
 impl MainMenu {
@@ -135,10 +115,18 @@ impl MainMenu {
             Box::new(MazeSizeMenu::new(settings, use_data)),
         ))
     }
+
+    #[cfg(feature = "sound")]
+    fn play_menu_bgm(data: &mut AppData) {
+        data.play_bgm(MusicTrack::Menu);
+    }
 }
 
 impl ActivityHandler for MainMenu {
     fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
+        #[cfg(feature = "sound")]
+        Self::play_menu_bgm(data);
+
         match self.0.update(events, data)? {
             Change::Pop {
                 res: Some(sub_activity),
@@ -395,7 +383,7 @@ impl ActivityHandler for MazeGenerationActivity {
                     };
                     Some(Change::replace(Activity::new_base(
                         "game".to_string(),
-                        Box::new(GameActivity::new(game_data, &data.settings)),
+                        Box::new(GameActivity::new(game_data, data)),
                     )))
                 }
                 Err(err) => match err {
@@ -481,11 +469,15 @@ pub struct GameActivity {
 }
 
 impl GameActivity {
-    pub fn new(game: GameData, settings: &Settings) -> Self {
+    pub fn new(game: GameData, app_data: &mut AppData) -> Self {
+        let settings = &app_data.settings;
         let camera_mode = settings.get_camera_mode();
         let color_scheme = settings.get_color_scheme();
         let game = game;
         let maze_board = MazeBoard::new(&game.game, settings);
+
+        #[cfg(feature = "sound")]
+        app_data.play_bgm(MusicTrack::choose_for_maze(game.game.get_maze()));
 
         Self {
             camera_mode,
