@@ -61,6 +61,7 @@ pub struct RunningGame {
     maze: Maze,
     state: RunningGameState,
     game_mode: GameMode,
+    gen_fn: GeneratorFn,
     #[allow(dead_code)]
     clock: Option<PausableClock>,
     start: Option<PausableInstant>,
@@ -99,6 +100,7 @@ impl RunningGame {
                     maze,
                     state: RunningGameState::NotStarted,
                     game_mode: maze_mode,
+                    gen_fn: generation_func,
                     clock: None,
                     start: None,
                     player_pos,
@@ -133,6 +135,14 @@ impl RunningGame {
 
     pub fn get_move_count(&self) -> usize {
         self.moves.len()
+    }
+
+    pub fn get_game_mode(&self) -> GameMode {
+        self.game_mode
+    }
+
+    pub fn get_gen_fn(&self) -> GeneratorFn {
+        self.gen_fn
     }
 
     pub fn start(&mut self) -> Result<(), GameAlreadyRunningError> {

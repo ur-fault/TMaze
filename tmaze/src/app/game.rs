@@ -460,6 +460,74 @@ impl ActivityHandler for PauseMenu {
     }
 }
 
+pub struct EndGamePopup {
+    popup: Popup,
+    game_mode: GameMode,
+    gen_fn: GeneratorFn,
+}
+
+impl EndGamePopup {
+    pub fn new(game: &RunningGame, color_scheme: ColorScheme) -> Self {
+        let texts = vec![
+            format!(
+                "Time:  {}",
+                ui::format_duration(game.get_elapsed().unwrap())
+            ),
+            format!("Moves: {}", game.get_move_count()),
+            format!(
+                "Size:  {}x{}x{}",
+                game.get_maze().size().0,
+                game.get_maze().size().1,
+                game.get_maze().size().2,
+            ),
+        ];
+
+        let popup = Popup::new("You won".to_string(), texts)
+            .box_style(color_scheme.normals())
+            .text_style(color_scheme.texts())
+            .title_style(color_scheme.texts());
+
+        let game_mode = game.get_game_mode();
+        let gen_fn = game.get_gen_fn();
+
+        Self {
+            popup,
+            game_mode,
+            gen_fn,
+        }
+    }
+}
+
+impl ActivityHandler for EndGamePopup {
+    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
+        match self.popup.update(events, data) {
+            Some(Change::Pop {
+                n: 1,
+                res: Some(code),
+            }) => match code.downcast::<KeyCode>() {
+                Ok(b) => match *b {
+                    KeyCode::Char('r') => Some(Change::replace(Activity::new_base(
+                        "game",
+                        Box::new(MazeGenerationActivity::new(
+                            self.game_mode,
+                            self.gen_fn,
+                            &data.settings,
+                        )),
+                    ))),
+                    KeyCode::Char('q') => Some(Change::pop_all()),
+                    c => Some(Change::pop_top_with(c)),
+                },
+                _ => panic!("expected `KeyCode` from `Popup`"),
+            },
+            res => res,
+        }
+    }
+
+    fn screen(&self) -> &dyn Screen {
+        &self.popup
+    }
+}
+
 pub struct GameActivity {
     camera_mode: CameraMode,
     color_scheme: ColorScheme,
@@ -606,8 +674,6 @@ impl ActivityHandler for GameActivity {
             }
         }
 
-        // self.camera_mode = CameraMode::SmoothFollow(0.3);
-        // self.camera_mode = CameraMode::CloseFollow;
         if self.game.view_mode == GameViewMode::Adventure {
             match self.camera_mode {
                 CameraMode::CloseFollow => {
@@ -646,31 +712,16 @@ impl ActivityHandler for GameActivity {
         self.show_debug = data.use_data.show_debug;
 
         if self.game.game.get_state() == RunningGameState::Finished {
-            let game = &self.game.game;
-            let texts = vec![
-                format!(
-                    "Time:  {}",
-                    ui::format_duration(game.get_elapsed().unwrap())
+            return Some(Change::replace_at(
+                1,
+                Activity::new_base(
+                    "won".to_string(),
+                    Box::new(EndGamePopup::new(
+                        &self.game.game,
+                        self.color_scheme.clone(),
+                    )),
                 ),
-                format!("Moves: {}", game.get_move_count()),
-                format!(
-                    "Size:  {}x{}x{}",
-                    game.get_maze().size().0,
-                    game.get_maze().size().1,
-                    game.get_maze().size().2,
-                ),
-            ];
-
-            let color_scheme = &self.color_scheme;
-            let popup = Popup::new("You won".to_string(), texts)
-                .box_style(color_scheme.normals())
-                .text_style(color_scheme.texts())
-                .title_style(color_scheme.texts());
-            let activity = Activity::new_base("won".to_string(), Box::new(popup));
-
-            // TODO: add R to play a new game
-
-            return Some(Change::replace_at(1, activity));
+            ));
         };
 
         None
