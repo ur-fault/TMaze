@@ -2,6 +2,7 @@ use self::CellWall::*;
 use crate::core::*;
 use crate::gameboard::cell::{Cell, CellWall};
 
+#[derive(Clone)]
 pub struct Maze {
     pub(crate) cells: Vec<Vec<Vec<Cell>>>,
     pub(crate) width: usize,
