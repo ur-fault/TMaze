@@ -632,14 +632,14 @@ impl GameActivity {
         draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
     }
 
-    pub fn render_visited_places(&self, frame: &mut Frame) {
+    pub fn render_visited_places(&self, frame: &mut Frame, maze_pos: Dims) {
         use CellWall::{Down, Up};
 
         let game = &self.game.game;
         for (move_pos, _) in game.get_moves() {
             let cell = game.get_maze().get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
-                let real_pos = maze2screen(*move_pos);
+                let real_pos = maze2screen(*move_pos) + maze_pos;
                 frame.draw_styled(real_pos, '.', self.color_scheme.normals());
             }
         }
@@ -749,7 +749,7 @@ impl Screen for GameActivity {
 
         // maze
         viewport.draw(maze_pos, maze_frame);
-        self.render_visited_places(&mut viewport);
+        self.render_visited_places(&mut viewport, maze_pos);
 
         // player
         if (game.get_player_pos().2 as usize) == game.get_player_pos().2 as usize {
