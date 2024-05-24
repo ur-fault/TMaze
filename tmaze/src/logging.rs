@@ -17,7 +17,10 @@ pub fn get_logger() -> &'static AppLogger {
     const DEFAULT_DECAY: Duration = Duration::from_secs(5);
     const DEFAULT_MAX_VISIBLE: usize = 5;
 
-    LOGGER.get_or_init(|| AppLogger::new(log::Level::Info, DEFAULT_DECAY, DEFAULT_MAX_VISIBLE))
+    let level = log::Level::Warn;
+    // let level = log::Level::Info;
+
+    LOGGER.get_or_init(|| AppLogger::new(level, DEFAULT_DECAY, DEFAULT_MAX_VISIBLE))
 }
 
 pub fn init() {
@@ -30,6 +33,7 @@ pub struct Message {
     pub level: log::Level,
     pub pushed: std::time::Instant,
     pub message: String,
+    pub source: String,
 }
 
 struct Logs {
@@ -123,6 +127,7 @@ impl Log for AppLogger {
                 level: record.level(),
                 pushed: std::time::Instant::now(),
                 message: record.args().to_string(),
+                source: record.module_path().unwrap_or("unknown").to_string(),
             });
         }
     }
@@ -152,10 +157,18 @@ impl Drawable for AppLogger {
                 ..style
             };
 
+            let source_style = ContentStyle {
+                attributes: style.attributes | crossterm::style::Attribute::Dim,
+                ..style
+            };
+
             let y = pos.1 + i as i32;
-            let len = log.message.width();
-            let x = frame.size.0 - len as i32 - 2;
-            let pos = Dims(x, y);
+            let len = log.source.width() + 4 + log.message.width();
+
+            let src_x = frame.size.0 - len as i32 - 2;
+            let msg_x = src_x + log.source.width() as i32 + 4;
+            let src_pos = Dims(src_x, y);
+            let msg_pos = Dims(msg_x, y);
 
             // TODO: make this a setting
             const INDICATOR_CHAR: char = '|';
@@ -163,7 +176,9 @@ impl Drawable for AppLogger {
             // const INDICATOR_CHAR: char = '█';
             // const INDICATOR_CHAR: char = '•';
 
-            log.message.draw_with_style(pos, frame, style);
+            log.source.draw_with_style(src_pos, frame, source_style);
+            "->".draw_with_style(Dims(msg_x - 3, y), frame, style);
+            log.message.draw_with_style(msg_pos, frame, style);
             INDICATOR_CHAR.draw_with_style(Dims(frame.size.0 - 1, y), frame, indicator_style);
         }
     }
