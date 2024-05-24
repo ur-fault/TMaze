@@ -3,7 +3,7 @@ use tmaze::{
         app::{App, AppData},
         Activity, ActivityHandler,
     },
-    ui::{menu, Popup},
+    ui::Popup,
     updates::UpdateCheckerActivity,
 };
 
@@ -30,7 +30,10 @@ impl ActivityHandler for MyActivity {
         if !self.0 {
             self.0 = true;
 
-            let update_act = Activity::new_base("update", Box::new(UpdateCheckerActivity::new()));
+            let update_act = Activity::new_base(
+                "update",
+                Box::new(UpdateCheckerActivity::new(&data.settings, &data.save)),
+            );
 
             return Some(tmaze::app::Change::Push(update_act));
         }
