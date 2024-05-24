@@ -60,8 +60,9 @@ impl UpdateCheckerActivity {
             .last_update_check
             .map(|l| Local::now().signed_duration_since(l))
             .map(|d| d.to_std().expect("Failed to convert to std duration"))
-            .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)) // remove subsec time
-            .map(humantime::format_duration);
+            .map(|d| d - Duration::from_nanos(d.subsec_nanos() as u64)); // remove subsec time
+
+        let last_check_before_str = last_check_before.map(humantime::format_duration);
 
         let update_interval = format!(
             "Currently checkes {} for updates",
@@ -73,7 +74,7 @@ impl UpdateCheckerActivity {
             vec![
                 "Please wait...".to_string(),
                 update_interval,
-                last_check_before
+                last_check_before_str
                     .map(|lc| format!("Last check before: {}", lc))
                     .unwrap_or("Never checked for updates".to_owned()),
                 "Press 'q' to cancel or Esc to skip".to_string(),
@@ -101,6 +102,10 @@ impl ActivityHandler for UpdateCheckerActivity {
             }
         }
 
+        if app_data.save.is_update_checked(&app_data.settings) {
+            return Some(Change::pop_top());
+        }
+
         if self.task.is_none() {
             let rt = tokio::runtime::Runtime::new().unwrap();
             let handle = rt.spawn(get_newer_async());
@@ -118,13 +123,15 @@ impl ActivityHandler for UpdateCheckerActivity {
             .block_on(handle)
             .expect("Failed to join the update check task");
 
+        // log::warn!("Update check result: {:?}", result);
+
         match result {
             Ok(Some(version)) => {
                 app_data
                     .save
                     .update_last_check()
                     .expect("Failed to save the save data");
-                log::info!("Newer version found: {}", version);
+                log::warn!("Newer version found: {}", version);
             }
             Err(err) if app_data.settings.get_display_update_check_errors() => {
                 log::error!("Error while checking for updates: {}", err);

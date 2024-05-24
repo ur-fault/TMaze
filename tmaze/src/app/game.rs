@@ -16,6 +16,7 @@ use crate::{
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Offset, Settings},
     ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
+    updates::UpdateCheckerActivity,
 };
 
 #[cfg(feature = "sound")]
@@ -37,27 +38,33 @@ use super::{
     Activity, ActivityHandler, Change, Event,
 };
 
-pub struct MainMenu(Menu);
+pub struct MainMenu {
+    menu: Menu,
+    update_checked: bool,
+}
 
 impl MainMenu {
     pub fn new(settings: &Settings) -> Self {
         let color_scheme = settings.get_color_scheme();
 
-        Self(Menu::new(
-            ui::MenuConfig::new(
-                "TMaze".to_string(),
-                vec![
-                    "New Game".to_string(),
-                    "Settings".to_string(),
-                    "Controls".to_string(),
-                    "About".to_string(),
-                    "Quit".to_string(),
-                ],
-            )
-            .counted()
-            .box_style(color_scheme.normals())
-            .text_style(color_scheme.texts()),
-        ))
+        Self {
+            menu: Menu::new(
+                ui::MenuConfig::new(
+                    "TMaze".to_string(),
+                    vec![
+                        "New Game".to_string(),
+                        "Settings".to_string(),
+                        "Controls".to_string(),
+                        "About".to_string(),
+                        "Quit".to_string(),
+                    ],
+                )
+                .counted()
+                .box_style(color_scheme.normals())
+                .text_style(color_scheme.texts()),
+            ),
+            update_checked: false,
+        }
     }
 
     fn show_settings_screen(&mut self, settings: &Settings) -> Change {
@@ -127,7 +134,15 @@ impl ActivityHandler for MainMenu {
         #[cfg(feature = "sound")]
         Self::play_menu_bgm(data);
 
-        match self.0.update(events, data)? {
+        if !self.update_checked {
+            self.update_checked = true;
+            return Some(Change::push(Activity::new_base(
+                "update check",
+                Box::new(UpdateCheckerActivity::new(&data.settings, &data.save)),
+            )));
+        }
+
+        match self.menu.update(events, data)? {
             Change::Pop {
                 res: Some(sub_activity),
                 ..
@@ -149,7 +164,7 @@ impl ActivityHandler for MainMenu {
     }
 
     fn screen(&self) -> &dyn ui::Screen {
-        &self.0
+        &self.menu
     }
 }
 
