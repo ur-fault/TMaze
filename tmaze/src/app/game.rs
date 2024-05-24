@@ -168,7 +168,6 @@ impl MazeSizeMenu {
                 .iter()
                 .map(|maze| maze.title.clone())
                 .collect::<Vec<_>>(),
-            // vec!["100x100".to_string()],
         )
         .box_style(color_scheme.normals())
         .text_style(color_scheme.texts());
@@ -191,10 +190,6 @@ impl MazeSizeMenu {
                 is_tower: maze.tower,
             })
             .collect::<Vec<_>>();
-        // let presets = vec![GameMode {
-        //     size: Dims3D(100, 100, 1),
-        //     is_tower: false,
-        // }];
 
         Self { menu, presets }
     }
@@ -340,69 +335,73 @@ impl ActivityHandler for MazeGenerationActivity {
             }
         }
 
-        if self.comm.is_none() {
-            return match RunningGame::new_threaded(self.game_props.clone()) {
-                Ok(comm) => {
-                    log::info!("Maze generation thread started");
-                    self.comm = Some(comm);
+        match self.comm {
+            None => {
+                return match RunningGame::new_threaded(self.game_props.clone()) {
+                    Ok(comm) => {
+                        log::info!("Maze generation thread started");
+                        self.comm = Some(comm);
 
-                    None
-                }
-                Err(err) => match err {
-                    GenErrorInstant::InvalidSize(size) => {
-                        let popup = Popup::new(
-                            "Invalid maze size".to_string(),
-                            vec![format!("Size: {:?}", size)],
-                        );
+                        None
+                    }
+                    Err(err) => match err {
+                        GenErrorInstant::InvalidSize(size) => {
+                            let popup = Popup::new(
+                                "Invalid maze size".to_string(),
+                                vec![format!("Size: {:?}", size)],
+                            );
 
+                            Some(Change::replace(Activity::new_base(
+                                "invalid size".to_string(),
+                                Box::new(popup),
+                            )))
+                        }
+                    },
+                };
+            }
+
+            Some(ref comm) if comm.handle.is_finished() => {
+                let res = self
+                    .comm
+                    .take()
+                    .unwrap()
+                    .handle
+                    .join()
+                    .expect("Could not join maze generation thread");
+
+                match res {
+                    Ok(game) => {
+                        let game_data = GameData {
+                            camera_pos: maze2screen_3d(game.get_player_pos()),
+                            game,
+                            view_mode: GameViewMode::Adventure,
+                            player_char: constants::get_random_player_char(),
+                        };
                         Some(Change::replace(Activity::new_base(
-                            "invalid size".to_string(),
-                            Box::new(popup),
+                            "game".to_string(),
+                            Box::new(GameActivity::new(game_data, data)),
                         )))
                     }
-                },
-            };
-        }
-
-        if self.comm.as_ref().unwrap().handle.is_finished() {
-            let res = self
-                .comm
-                .take()
-                .unwrap()
-                .handle
-                .join()
-                .expect("Could not join maze generation thread");
-
-            match res {
-                Ok(game) => {
-                    let game_data = GameData {
-                        camera_pos: maze2screen_3d(game.get_player_pos()),
-                        game,
-                        view_mode: GameViewMode::Adventure,
-                        player_char: constants::get_random_player_char(),
-                    };
-                    Some(Change::replace(Activity::new_base(
-                        "game".to_string(),
-                        Box::new(GameActivity::new(game_data, data)),
-                    )))
+                    Err(err) => match err {
+                        GenErrorThreaded::AbortGeneration => Some(Change::pop_top()),
+                        GenErrorThreaded::GenerationError(_) => {
+                            panic!("Instant generation error should be handled before");
+                        }
+                    },
                 }
-                Err(err) => match err {
-                    GenErrorThreaded::AbortGeneration => Some(Change::pop_top()),
-                    GenErrorThreaded::GenerationError(_) => {
-                        panic!("Instant generation error should be handled before");
-                    }
-                },
             }
-        } else {
-            let Progress { done, from, .. } = self.comm.as_ref().unwrap().progress();
-            self.progress_bar.update_progress(done as f64 / from as f64);
-            self.progress_bar.update_title(format!(
-                "Generating maze: {}/{} - {:.2} %",
-                done,
-                from,
-                done as f64 / from as f64 * 100.0
-            ));
-            None
+
+            Some(ref comm) => {
+                let Progress { done, from, .. } = comm.progress();
+                self.progress_bar.update_progress(done as f64 / from as f64);
+                self.progress_bar.update_title(format!(
+                    "Generating maze: {}/{} - {:.2} %",
+                    done,
+                    from,
+                    done as f64 / from as f64 * 100.0
+                ));
+                None
+            }
         }
     }
 
