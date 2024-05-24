@@ -1,7 +1,7 @@
 use std::io;
 
 use tmaze::{
-    app::{Activity, ActivityHandler, App, Change, Event},
+    app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
     renderer::Frame,
     ui::Screen,
@@ -20,12 +20,12 @@ fn main() {
 struct MyActivity;
 
 impl ActivityHandler for MyActivity {
-    fn update(&mut self, events: Vec<Event>) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     if code == crossterm::event::KeyCode::Char('q') {
-                        return Some(Change::PopTop(None));
+                        return Some(Change::pop_top());
                     }
 
                     match code {
