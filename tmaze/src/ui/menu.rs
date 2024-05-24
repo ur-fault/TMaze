@@ -90,6 +90,11 @@ impl MenuConfig {
         self
     }
 
+    pub fn maybe_default(mut self, default: Option<usize>) -> Self {
+        self.default = default;
+        self
+    }
+
     pub fn box_style(mut self, style: ContentStyle) -> Self {
         self.box_style = style;
         self

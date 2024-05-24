@@ -1,3 +1,4 @@
+use cmaze::{game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
 use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
@@ -143,6 +144,17 @@ pub enum MazeGenAlgo {
     #[default]
     RandomKruskals,
     DepthFirstSearch,
+}
+
+impl MazeGenAlgo {
+    pub fn to_fn(&self) -> GeneratorFn {
+        match self {
+            MazeGenAlgo::RandomKruskals => cmaze::gameboard::algorithms::RndKruskals::generate,
+            MazeGenAlgo::DepthFirstSearch => {
+                cmaze::gameboard::algorithms::DepthFirstSearch::generate
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
