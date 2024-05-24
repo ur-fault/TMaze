@@ -249,18 +249,19 @@ pub struct MazeAlgorithmMenu {
 impl MazeAlgorithmMenu {
     pub fn new(preset: GameMode, settings: &Settings) -> Self {
         let color_scheme = settings.get_color_scheme();
-        let menu = Menu::new(
-            ui::MenuConfig::new(
-                "Maze generation algorithm".to_string(),
-                vec![
-                    "Randomized Kruskal's".to_string(),
-                    "Depth-first search".to_string(),
-                ],
-            )
-            .counted()
-            .box_style(color_scheme.normals())
-            .text_style(color_scheme.texts()),
-        );
+        let menu_config = ui::MenuConfig::new(
+            "Maze generation algorithm".to_string(),
+            vec![
+                "Randomized Kruskal's".to_string(),
+                "Depth-first search".to_string(),
+            ],
+        )
+        .counted()
+        .box_style(color_scheme.normals())
+        .text_style(color_scheme.texts())
+        .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
+
+        let menu = Menu::new(menu_config);
 
         Self { menu, preset }
     }
@@ -268,6 +269,17 @@ impl MazeAlgorithmMenu {
 
 impl ActivityHandler for MazeAlgorithmMenu {
     fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
+        if data.settings.get_dont_ask_for_maze_algo() {
+            return Some(Change::push(Activity::new_base(
+                "maze_gen".to_string(),
+                Box::new(MazeGenerationActivity::new(
+                    self.preset,
+                    data.settings.get_default_maze_gen_algo().to_fn(),
+                    &data.settings,
+                )),
+            )));
+        }
+
         match self.menu.update(events, data) {
             Some(change) => match change {
                 Change::Pop {
