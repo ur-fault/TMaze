@@ -1,5 +1,8 @@
 use tmaze::{
-    app::{app::App, Activity, ActivityHandler},
+    app::{
+        app::{App, AppData},
+        Activity, ActivityHandler,
+    },
     ui::{menu, Popup},
 };
 
@@ -18,7 +21,11 @@ fn main() {
 struct MyActivity(bool, Popup);
 
 impl ActivityHandler for MyActivity {
-    fn update(&mut self, events: Vec<tmaze::app::Event>) -> Option<tmaze::app::Change> {
+    fn update(
+        &mut self,
+        events: Vec<tmaze::app::Event>,
+        data: &mut AppData,
+    ) -> Option<tmaze::app::Change> {
         if !self.0 {
             self.0 = true;
 
@@ -28,7 +35,7 @@ impl ActivityHandler for MyActivity {
             return Some(tmaze::app::Change::Push(menu));
         }
 
-        self.1.update(events)
+        self.1.update(events, data)
     }
 
     fn screen(&self) -> &dyn tmaze::ui::Screen {
