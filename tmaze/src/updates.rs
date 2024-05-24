@@ -43,7 +43,7 @@ pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
     }
 }
 
-// TODO: Updates should be checked in the background
+// TODO: updates should be checked in the background
 // and the user should get a notification if a newer version is available
 
 pub struct UpdateCheckerActivity {
