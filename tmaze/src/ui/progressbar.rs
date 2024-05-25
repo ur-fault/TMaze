@@ -47,12 +47,8 @@ impl Screen for ProgressBar {
         let prg = "█".repeat((self.title.width() as f64 * self.progress) as usize);
 
         draw_box(frame, pos, progress_size, self.box_style);
-        frame.draw_styled(
-            (pos + Dims(2, 1)).into(),
-            self.title.as_str(),
-            self.text_style,
-        );
-        frame.draw((pos + Dims(2, 2)).into(), prg);
+        frame.draw_styled(pos + Dims(2, 1), self.title.as_str(), self.text_style);
+        frame.draw(pos + Dims(2, 2), prg);
 
         Ok(())
     }

@@ -53,3 +53,9 @@ impl SoundPlayer {
         &self.sink
     }
 }
+
+impl Default for SoundPlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}

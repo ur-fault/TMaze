@@ -132,10 +132,7 @@ impl Menu {
                 })
                 .collect::<Vec<_>>()
         } else {
-            options
-                .iter()
-                .map(|opt| String::from(opt))
-                .collect::<Vec<_>>()
+            options.iter().map(String::from).collect::<Vec<_>>()
         };
 
         let default = config
@@ -162,7 +159,7 @@ impl ActivityHandler for Menu {
 
         if opt_count == 1 {
             log::warn!("Menu with only one option, returning that");
-            return Some(Change::pop_top_with(0 as usize));
+            return Some(Change::pop_top_with::<usize>(0));
         } else if opt_count == 0 {
             log::warn!("Empty menu, returning `None`");
             return Some(Change::pop_top());
@@ -228,9 +225,9 @@ impl Screen for Menu {
 
         draw_box(frame, pos, menu_size, *box_style);
 
-        frame.draw_styled((pos + Dims(3, 1)).into(), title.as_str(), *text_style);
+        frame.draw_styled(pos + Dims(3, 1), title.as_str(), *text_style);
         frame.draw_styled(
-            (pos + Dims(1, 2)).into(),
+            pos + Dims(1, 2),
             "─".repeat(menu_size.0 as usize - 2),
             *box_style,
         );
@@ -246,23 +243,20 @@ impl Screen for Menu {
             } else {
                 *text_style
             };
+            let item = format!(
+                "{} {}{}",
+                if i == self.selected as usize {
+                    ">"
+                } else {
+                    " "
+                },
+                value_if(*counted, || format!("{}.", i + 1)
+                    .pad_to_width((max_count as f64).log10().floor() as usize + 3)),
+                option,
+            )
+            .pad_to_width(menu_size.0 as usize - 2);
 
-            frame.draw_styled(
-                (pos + Dims(1, i as i32 + 3)).into(),
-                format!(
-                    "{} {}{}",
-                    if i == self.selected as usize {
-                        ">"
-                    } else {
-                        " "
-                    },
-                    value_if(*counted, || format!("{}.", i + 1)
-                        .pad_to_width((max_count as f64).log10().floor() as usize + 3)),
-                    option,
-                )
-                .pad_to_width(menu_size.0 as usize - 2),
-                style,
-            );
+            frame.draw_styled(pos + Dims(1, i as i32 + 3), item, style);
         }
 
         Ok(())

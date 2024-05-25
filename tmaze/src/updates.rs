@@ -46,12 +46,14 @@ pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
 // TODO: updates should be checked in the background
 // and the user should get a notification if a newer version is available
 
+type SelfContainedTask = (
+    tokio::task::JoinHandle<Result<Option<Version>, CratesError>>,
+    tokio::runtime::Runtime,
+);
+
 pub struct UpdateCheckerActivity {
     popup: Popup,
-    task: Option<(
-        tokio::task::JoinHandle<Result<Option<Version>, CratesError>>,
-        tokio::runtime::Runtime,
-    )>,
+    task: Option<SelfContainedTask>,
 }
 
 impl UpdateCheckerActivity {
@@ -91,14 +93,12 @@ impl ActivityHandler for UpdateCheckerActivity {
         app_data: &mut AppData,
     ) -> Option<crate::app::Change> {
         for event in events {
-            match event {
-                Event::Term(TermEvent::Key(KeyEvent {
-                    code: KeyCode::Char('q') | KeyCode::Esc,
-                    ..
-                })) => {
-                    return Some(Change::pop_top());
-                }
-                _ => {}
+            if let Event::Term(TermEvent::Key(KeyEvent {
+                code: KeyCode::Char('q') | KeyCode::Esc,
+                ..
+            })) = event
+            {
+                return Some(Change::pop_top());
             }
         }
 

@@ -1,4 +1,5 @@
 pub mod activity;
+#[allow(clippy::module_inception)]
 pub mod app;
 pub mod event;
 pub mod game;
