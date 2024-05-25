@@ -83,21 +83,23 @@ impl GameData {
             KeyCode::Char('r' | 'e' | 'p') => {
                 self.apply_move(settings, CellWall::Up, is_fast);
             }
-            KeyCode::Char(' ') => match self.view_mode {
-                GameViewMode::Spectator => {
-                    self.camera_pos = maze2screen_3d(self.game.get_player_pos());
-                    self.view_mode = GameViewMode::Adventure;
-                    log::info!("Switched to Adventure mode");
+            KeyCode::Char(' ') => {
+                match self.view_mode {
+                    GameViewMode::Spectator => {
+                        self.camera_pos = maze2screen_3d(self.game.get_player_pos());
+                        self.view_mode = GameViewMode::Adventure;
+                    }
+                    GameViewMode::Adventure => {
+                        self.view_mode = GameViewMode::Spectator;
+                    }
                 }
-                GameViewMode::Adventure => {
-                    self.view_mode = GameViewMode::Spectator;
-                    log::info!("Switched to Spectator mode");
-                }
-            },
+                log::info!("Switched to {}", self.view_mode);
+            }
             KeyCode::Char('.') => {
                 self.view_mode = GameViewMode::Spectator;
                 self.camera_pos = self.game.get_player_pos() - self.game.get_goal_pos();
                 self.camera_pos.2 *= -1;
+                log::info!("Switched to {} and reseted view pos", self.view_mode);
             }
             KeyCode::Esc => return Err(false),
             _ => {}
@@ -111,6 +113,10 @@ impl GameData {
             GameViewMode::Spectator => {
                 let mut off = wall.reverse_wall().to_coord();
                 off.0 *= 2;
+                if fast {
+                    off.0 *= 5;
+                    off.1 *= 5;
+                }
 
                 let mut pos = self.camera_pos - off;
                 pos.2 = pos.2.clamp(0, self.game.get_maze().size().2 - 1);
