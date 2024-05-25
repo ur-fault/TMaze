@@ -469,10 +469,10 @@ impl ActivityHandler for PauseMenu {
                     let index = *res.downcast::<usize>().expect("menu should return index");
 
                     match index {
-                        0 /* resume    */  => Some(Change::pop_top()),
-                        1 /* main menu */  => Some(Change::pop_until("main menu")),
-                        2 /* controls  */  => Some(Change::push(create_controls_popup())),
-                        4 /* quit      */  => Some(Change::pop_all()),
+                        0 /* resume    */ => Some(Change::pop_top()),
+                        1 /* main menu */ => Some(Change::pop_until("main menu")),
+                        2 /* controls  */ => Some(Change::push(create_controls_popup())),
+                        4 /* quit      */ => Some(Change::pop_all()),
                         _ => panic!(),
                     }
                 }
