@@ -38,6 +38,22 @@ use super::{
     Activity, ActivityHandler, Change, Event,
 };
 
+pub fn create_controls_popup() -> Activity {
+    let popup = Popup::new(
+        "Controls".to_string(),
+        vec![
+            "WASD and arrows: move".to_string(),
+            "Space: switch adventure/spectaror mode".to_string(),
+            "Q, F or L: move down".to_string(),
+            "E, R or P: move up".to_string(),
+            "With SHIFT move at the end in single dir".to_string(),
+            "Escape: pause menu".to_string(),
+        ],
+    );
+
+    Activity::new_base("controls".to_string(), Box::new(popup))
+}
+
 pub struct MainMenu {
     menu: Menu,
     update_checked: bool,
@@ -76,23 +92,11 @@ impl MainMenu {
             ],
         );
 
-        Change::push(Activity::new_base("controls".to_string(), Box::new(popup)))
+        Change::push(Activity::new_base("settings".to_string(), Box::new(popup)))
     }
 
     fn show_controls_popup(&mut self) -> Change {
-        let popup = Popup::new(
-            "Controls".to_string(),
-            vec![
-                "WASD and arrows: move".to_string(),
-                "Space: switch adventure/spectaror mode".to_string(),
-                "Q, F or L: move down".to_string(),
-                "E, R or P: move up".to_string(),
-                "With SHIFT move at the end in single dir".to_string(),
-                "Escape: pause menu".to_string(),
-            ],
-        );
-
-        Change::push(Activity::new_base("controls".to_string(), Box::new(popup)))
+        Change::push(create_controls_popup())
     }
 
     fn show_about_popup(&mut self) -> Change {
@@ -445,6 +449,7 @@ impl PauseMenu {
                 vec![
                     "Resume".to_string(),
                     "Main Menu".to_string(),
+                    "Controls".to_string(),
                     "Quit".to_string(),
                 ],
             )
@@ -464,9 +469,10 @@ impl ActivityHandler for PauseMenu {
                     let index = *res.downcast::<usize>().expect("menu should return index");
 
                     match index {
-                        0 => Some(Change::pop_top()),
-                        1 => Some(Change::pop_until("main menu")),
-                        2 => Some(Change::pop_all()),
+                        0 /* resume    */  => Some(Change::pop_top()),
+                        1 /* main menu */  => Some(Change::pop_until("main menu")),
+                        2 /* controls  */  => Some(Change::push(create_controls_popup())),
+                        4 /* quit      */  => Some(Change::pop_all()),
                         _ => panic!(),
                     }
                 }
