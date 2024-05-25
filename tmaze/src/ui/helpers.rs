@@ -45,7 +45,7 @@ pub fn smart_format_duration(dur: Duration, fract: bool) -> String {
 
 pub fn multisize_duration_format(dur: Duration, max_size: usize) -> String {
     multisize_string(
-        vec![
+        [
             smart_format_duration(dur, true),
             smart_format_duration(dur, false),
         ],

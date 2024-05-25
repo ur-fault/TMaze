@@ -598,7 +598,7 @@ impl GameActivity {
     }
 
     fn current_floor_frame(&self) -> &Frame {
-        &self.maze_board.frames[self.game.game.get_player_pos().2 as usize]
+        &self.maze_board.frames[self.game.camera_pos.2 as usize]
     }
 
     fn render_meta_texts(
@@ -763,7 +763,10 @@ impl Screen for GameActivity {
 
         let (vp_size, does_fit) = self.viewport_size(frame.size);
         let maze_pos = match does_fit {
-            true => Dims(0, 0),
+            true => match self.game.view_mode {
+                GameViewMode::Adventure => Dims(0, 0),
+                GameViewMode::Spectator => maze2screen(Dims(0, 0)) - self.game.camera_pos.into(),
+            },
             false => vp_size / 2 - self.game.camera_pos.into(),
         };
 
@@ -775,18 +778,19 @@ impl Screen for GameActivity {
         self.render_visited_places(&mut viewport, maze_pos);
 
         // player
-        if (game.get_player_pos().2 as usize) == game.get_player_pos().2 as usize {
+        if (game.get_player_pos().2 as usize) == self.game.camera_pos.2 as usize {
             let player = game.get_player_pos();
+            let player_draw_pos = maze2screen(player) + maze_pos;
             let cell = game.get_maze().get_cell(player).unwrap();
             if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
-                viewport[maze2screen(game.get_player_pos())]
+                viewport[player_draw_pos]
                     .content_mut()
                     .unwrap()
                     .style
                     .foreground_color = Some(color_scheme.player);
             } else {
                 viewport.draw_styled(
-                    maze_pos + maze2screen(player),
+                    player_draw_pos,
                     self.game.player_char,
                     color_scheme.players(),
                 );
@@ -937,7 +941,7 @@ impl MazeBoard {
                     _ => continue,
                 };
 
-                let pos = maze2screen(Dims(x as i32, y as i32).into());
+                let pos = maze2screen(Dims(x as i32, y as i32));
                 frame.draw_styled(pos, ch, style);
             }
         }

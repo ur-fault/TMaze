@@ -118,11 +118,13 @@ impl LineDir {
     }
 }
 
-pub fn maze2screen_3d(pos_on_maze: Dims3D) -> Dims3D {
+pub fn maze2screen_3d(pos_on_maze: impl Into<Dims3D>) -> Dims3D {
+    let pos_on_maze = pos_on_maze.into();
     Dims3D(pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1, pos_on_maze.2)
 }
 
-pub fn maze2screen(pos_on_maze: Dims3D) -> Dims {
+pub fn maze2screen(pos_on_maze: impl Into<Dims3D>) -> Dims {
+    let pos_on_maze = pos_on_maze.into();
     Dims(pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1)
 }
 

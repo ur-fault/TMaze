@@ -6,7 +6,6 @@ use cmaze::{
     gameboard::CellWall,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tap::Tap;
 
 use crate::{
     helpers::{is_release, maze2screen_3d},
@@ -110,19 +109,13 @@ impl GameData {
     pub fn apply_move(&mut self, settings: &Settings, wall: CellWall, fast: bool) {
         match self.view_mode {
             GameViewMode::Spectator => {
-                let cam_off =
-                    wall.reverse_wall().to_coord().tap_mut(|c| c.2 *= -1) + self.camera_pos;
+                let mut off = wall.reverse_wall().to_coord();
+                off.0 *= 2;
 
-                // TODO: allow `fast` movement
+                let mut pos = self.camera_pos - off;
+                pos.2 = pos.2.clamp(0, self.game.get_maze().size().2 - 1);
 
-                self.camera_pos = Dims3D(
-                    cam_off.0,
-                    cam_off.1,
-                    (-self.game.get_player_pos().2).max(
-                        (self.game.get_maze().size().2 - self.game.get_player_pos().2 - 1)
-                            .min(cam_off.2),
-                    ),
-                )
+                self.camera_pos = pos;
             }
             GameViewMode::Adventure => {
                 self.game
