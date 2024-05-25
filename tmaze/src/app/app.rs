@@ -139,7 +139,7 @@ impl App {
                 }
                 None => break 'mainloop events,
             }
-            .update(events.drain(..).collect(), &mut self.data)
+            .update(std::mem::take(&mut events), &mut self.data)
             {
                 match change {
                     Change::Push(activity) => {
@@ -184,12 +184,10 @@ impl App {
 
         log::trace!("Main loop ended");
 
-        let res = rem_events.into_iter().find_map(|e| match e {
+        rem_events.into_iter().find_map(|e| match e {
             Event::ActiveAfterPop(Some(res)) => Some(res),
             _ => None,
-        });
-
-        res
+        })
     }
 
     pub fn activity_count(&self) -> usize {
@@ -217,16 +215,8 @@ impl App {
     }
 }
 
+#[derive(Default)]
 pub struct AppStateData {
     pub last_selected_preset: Option<usize>,
     pub show_debug: bool,
-}
-
-impl Default for AppStateData {
-    fn default() -> Self {
-        Self {
-            last_selected_preset: None,
-            show_debug: false,
-        }
-    }
 }

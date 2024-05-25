@@ -52,13 +52,10 @@ impl ActivityHandler for Popup {
         _: &mut AppData,
     ) -> Option<crate::app::Change> {
         for event in events {
-            match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) => {
-                    if !is_release(kind) {
-                        return Some(Change::pop_top_with(code));
-                    }
+            if let Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) = event {
+                if !is_release(kind) {
+                    return Some(Change::pop_top_with(code));
                 }
-                _ => {}
             }
         }
 
@@ -78,24 +75,20 @@ impl Screen for Popup {
 
         draw_box(frame, pos, box_size, self.box_style);
         frame.draw_styled(
-            (Dims(title_pos, pos.1 + 1)).into(),
+            Dims(title_pos, pos.1 + 1),
             self.title.as_str(),
             self.title_style,
         );
 
         if !self.texts.is_empty() {
             frame.draw_styled(
-                (pos + Dims(1, 2)).into(),
+                pos + Dims(1, 2),
                 "─".repeat(box_size.0 as usize - 2),
                 self.box_style,
             );
 
             for (i, text) in self.texts.iter().enumerate() {
-                frame.draw_styled(
-                    (pos + Dims(2, i as i32 + 3)).into(),
-                    text.as_str(),
-                    self.text_style,
-                );
+                frame.draw_styled(pos + Dims(2, i as i32 + 3), text.as_str(), self.text_style);
             }
         }
 

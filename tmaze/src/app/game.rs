@@ -225,10 +225,10 @@ impl ActivityHandler for MazeSizeMenu {
 
                     let preset = self.presets[index];
 
-                    return Some(Change::push(Activity::new_base(
+                    Some(Change::push(Activity::new_base(
                         "maze_gen".to_string(),
                         Box::new(MazeAlgorithmMenu::new(preset, &data.settings)),
-                    )));
+                    )))
                 }
                 res => Some(res),
             },
@@ -293,14 +293,14 @@ impl ActivityHandler for MazeAlgorithmMenu {
                         _ => panic!(),
                     };
 
-                    return Some(Change::push(Activity::new_base(
+                    Some(Change::push(Activity::new_base(
                         "maze_gen".to_string(),
                         Box::new(MazeGenerationActivity::new(
                             self.preset,
                             gen,
                             &data.settings,
                         )),
-                    )));
+                    )))
                 }
                 res => Some(res),
             },
@@ -346,12 +346,9 @@ impl ActivityHandler for MazeGenerationActivity {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
                         KeyCode::Esc | KeyCode::Char('q') => {
-                            match self.comm.take() {
-                                Some(comm) => {
-                                    comm.stop_flag.stop();
-                                    let _ = comm.handle.join().unwrap();
-                                }
-                                None => {}
+                            if let Some(comm) = self.comm.take() {
+                                comm.stop_flag.stop();
+                                let _ = comm.handle.join().unwrap();
                             };
                             return Some(Change::pop_top());
                         }
@@ -363,29 +360,27 @@ impl ActivityHandler for MazeGenerationActivity {
         }
 
         match self.comm {
-            None => {
-                return match RunningGame::new_threaded(self.game_props.clone()) {
-                    Ok(comm) => {
-                        log::info!("Maze generation thread started");
-                        self.comm = Some(comm);
+            None => match RunningGame::new_threaded(self.game_props.clone()) {
+                Ok(comm) => {
+                    log::info!("Maze generation thread started");
+                    self.comm = Some(comm);
 
-                        None
+                    None
+                }
+                Err(err) => match err {
+                    GenErrorInstant::InvalidSize(size) => {
+                        let popup = Popup::new(
+                            "Invalid maze size".to_string(),
+                            vec![format!("Size: {:?}", size)],
+                        );
+
+                        Some(Change::replace(Activity::new_base(
+                            "invalid size".to_string(),
+                            Box::new(popup),
+                        )))
                     }
-                    Err(err) => match err {
-                        GenErrorInstant::InvalidSize(size) => {
-                            let popup = Popup::new(
-                                "Invalid maze size".to_string(),
-                                vec![format!("Size: {:?}", size)],
-                            );
-
-                            Some(Change::replace(Activity::new_base(
-                                "invalid size".to_string(),
-                                Box::new(popup),
-                            )))
-                        }
-                    },
-                };
-            }
+                },
+            },
 
             Some(ref comm) if comm.handle.is_finished() => {
                 let res = self
@@ -567,7 +562,6 @@ impl GameActivity {
         let settings = &app_data.settings;
         let camera_mode = settings.get_camera_mode();
         let color_scheme = settings.get_color_scheme();
-        let game = game;
         let maze_board = MazeBoard::new(&game.game, settings);
 
         #[cfg(feature = "sound")]
@@ -644,7 +638,7 @@ impl GameActivity {
         };
 
         let view_mode = self.game.view_mode;
-        let view_mode = multisize_string(view_mode.to_multisize_strings(), max_width as usize);
+        let view_mode = multisize_string(view_mode.to_multisize_strings(), max_width);
 
         let tl = vp_pos - Dims(1, 2);
         let br = vp_pos + vp_size + Dims(1, 1);
@@ -681,22 +675,19 @@ impl ActivityHandler for GameActivity {
         }
 
         for event in events {
-            match event {
-                Event::Term(TermEvent::Key(key_event)) => {
-                    match self.game.handle_event(&data.settings, key_event) {
-                        Err(false) => {
-                            self.game.game.pause().unwrap();
+            if let Event::Term(TermEvent::Key(key_event)) = event {
+                match self.game.handle_event(&data.settings, key_event) {
+                    Err(false) => {
+                        self.game.game.pause().unwrap();
 
-                            return Some(Change::push(Activity::new_base(
-                                "pause".to_string(),
-                                Box::new(PauseMenu::new(&data.settings)),
-                            )));
-                        }
-                        Err(true) => return Some(Change::pop_until("main menu")),
-                        Ok(_) => {}
+                        return Some(Change::push(Activity::new_base(
+                            "pause".to_string(),
+                            Box::new(PauseMenu::new(&data.settings)),
+                        )));
                     }
+                    Err(true) => return Some(Change::pop_until("main menu")),
+                    Ok(_) => {}
                 }
-                _ => {}
             }
         }
 
@@ -771,7 +762,7 @@ impl Screen for GameActivity {
         };
 
         // TODO: reuse the viewport between frames and resize it when needed
-        let mut viewport = Frame::new(vp_size.into());
+        let mut viewport = Frame::new(vp_size);
 
         // maze
         viewport.draw(maze_pos, maze_frame);
@@ -849,9 +840,8 @@ fn render_edge_follow_rulers(
         )
     };
 
-    // not allowed on blocks, so we use a closure
     #[rustfmt::skip]
-    (|| {
+    {
         draw(Dims(xo        , 0)         , V, false);
         draw(Dims(vps.0 - xo, 0)         , V, true);
         draw(Dims(xo        , vps.1 + 1) , V, false);
@@ -861,7 +851,7 @@ fn render_edge_follow_rulers(
         draw(Dims(0         , vps.1 - yo), H, true);
         draw(Dims(vps.0 + 1 , yo)        , H, false);
         draw(Dims(vps.0 + 1 , vps.1 - yo), H, true);
-    })();
+    };
 }
 
 pub struct MazeBoard {
@@ -873,7 +863,7 @@ impl MazeBoard {
         let maze = game.get_maze();
         let scheme = settings.get_color_scheme();
 
-        let mut frames = (0..maze.size().2)
+        let mut frames: Vec<_> = (0..maze.size().2)
             .map(|floor| Self::render_floor(game, floor, scheme.clone()))
             .collect();
 
@@ -890,8 +880,7 @@ impl MazeBoard {
 
         let mut frame = Frame::new(size);
 
-        let mut draw =
-            |pos, l: LineDir| frame.draw_styled(Dims::from(pos).into(), l.double(), normals);
+        let mut draw = |pos, l: LineDir| frame.draw_styled(Dims::from(pos), l.double(), normals);
 
         for y in -1..maze.size().1 {
             for x in -1..maze.size().0 {
@@ -926,7 +915,7 @@ impl MazeBoard {
         frame
     }
 
-    fn render_stairs(frame: &mut Frame, floors: &Vec<Vec<Cell>>, tower: bool, scheme: ColorScheme) {
+    fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, scheme: ColorScheme) {
         let style = if tower {
             scheme.goals()
         } else {
@@ -948,7 +937,7 @@ impl MazeBoard {
         }
     }
 
-    fn render_special(frames: &mut Vec<Frame>, game: &RunningGame, scheme: ColorScheme) {
+    fn render_special(frames: &mut [Frame], game: &RunningGame, scheme: ColorScheme) {
         let goals = scheme.goals();
 
         let goal_pos = game.get_goal_pos();

@@ -144,6 +144,10 @@ impl Activities {
     pub fn len(&self) -> usize {
         self.activities.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.activities.is_empty()
+    }
 }
 
 pub struct Activity {

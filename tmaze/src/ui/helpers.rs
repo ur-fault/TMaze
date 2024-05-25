@@ -32,16 +32,14 @@ pub fn smart_format_duration(dur: Duration, fract: bool) -> String {
         } else {
             format!("{}s", dur.as_secs())
         }
+    } else if fract {
+        format_duration(dur)
     } else {
-        if fract {
-            format_duration(dur)
-        } else {
-            format!(
-                "{}m{}s",
-                dur.as_secs() / 60,
-                dur.as_secs() % 60 + dur.subsec_millis() as u64 / 1000
-            )
-        }
+        format!(
+            "{}m{}s",
+            dur.as_secs() / 60,
+            dur.as_secs() % 60 + dur.subsec_millis() as u64 / 1000
+        )
     }
 }
 
