@@ -141,3 +141,10 @@ pub trait ToDebug: fmt::Debug {
 impl<T: fmt::Debug> ToDebug for T {}
 
 // TODO: enum holding either String or &'static str
+
+#[macro_export]
+macro_rules! lerp {
+    (($a:expr) -> ($b:expr) : $t:expr) => {
+        $a + ($b - $a) * $t
+    };
+}
