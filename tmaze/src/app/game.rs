@@ -13,6 +13,7 @@ use cmaze::{
 use crate::{
     app::{game_state::GameData, GameViewMode},
     helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
+    lerp,
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Offset, Settings},
     ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
@@ -561,6 +562,10 @@ pub struct GameActivity {
     game: GameData,
     maze_board: MazeBoard,
     show_debug: bool,
+
+    // smooth
+    sm_camera_pos: Dims3D,
+    sm_player_pos: Dims3D,
 }
 
 impl GameActivity {
@@ -573,12 +578,18 @@ impl GameActivity {
         #[cfg(feature = "sound")]
         app_data.play_bgm(MusicTrack::choose_for_maze(game.game.get_maze()));
 
+        let sm_camera_pos = game.camera_pos;
+        let sm_player_pos = maze2screen_3d(game.game.get_player_pos());
+
         Self {
             camera_mode,
             color_scheme,
             game,
             maze_board,
             show_debug: false,
+
+            sm_camera_pos,
+            sm_player_pos,
         }
     }
 
@@ -732,6 +743,10 @@ impl ActivityHandler for GameActivity {
             }
         }
 
+        self.sm_player_pos =
+            lerp!((self.sm_player_pos) -> (maze2screen_3d(self.game.game.get_player_pos())) : 0.8);
+        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.game.camera_pos) : 0.5);
+
         self.show_debug = data.use_data.show_debug;
 
         if self.game.game.get_state() == RunningGameState::Finished {
@@ -765,9 +780,9 @@ impl Screen for GameActivity {
         let maze_pos = match does_fit {
             true => match self.game.view_mode {
                 GameViewMode::Adventure => Dims(0, 0),
-                GameViewMode::Spectator => maze2screen(Dims(0, 0)) - self.game.camera_pos.into(),
+                GameViewMode::Spectator => maze2screen(Dims(0, 0)) - self.sm_camera_pos.into(),
             },
-            false => vp_size / 2 - self.game.camera_pos.into(),
+            false => vp_size / 2 - self.sm_camera_pos.into(),
         };
 
         // TODO: reuse the viewport between frames and resize it when needed
@@ -778,10 +793,13 @@ impl Screen for GameActivity {
         self.render_visited_places(&mut viewport, maze_pos);
 
         // player
-        if (game.get_player_pos().2 as usize) == self.game.camera_pos.2 as usize {
-            let player = game.get_player_pos();
-            let player_draw_pos = maze2screen(player) + maze_pos;
-            let cell = game.get_maze().get_cell(player).unwrap();
+        if (self.game.game.get_player_pos().2) == self.sm_camera_pos.2 {
+            let player = self.sm_player_pos;
+            let player_draw_pos = maze_pos + player.into();
+            let cell = game
+                .get_maze()
+                .get_cell(self.game.game.get_player_pos())
+                .unwrap();
             if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
                 viewport[player_draw_pos]
                     .content_mut()

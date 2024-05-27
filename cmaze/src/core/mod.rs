@@ -145,6 +145,18 @@ impl Mul<i32> for Dims3D {
     }
 }
 
+impl Mul<f32> for Dims3D {
+    type Output = Dims3D;
+
+    fn mul(self, other: f32) -> Dims3D {
+        Dims3D(
+            (self.0 as f32 * other).round() as i32,
+            (self.1 as f32 * other).round() as i32,
+            (self.2 as f32 * other).round() as i32,
+        )
+    }
+}
+
 impl MulAssign<i32> for Dims3D {
     fn mul_assign(&mut self, other: i32) {
         self.0 *= other;
