@@ -207,7 +207,7 @@ jobs:
         cp "$BIN" "$NEW_BIN"
 
     - name: Upload release archive
-      if: ${{ needs.create-release.outputs.do_smt == true }}
+      if: ${{ needs.create-release.outputs.do_smt == "true" }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -276,7 +276,7 @@ jobs:
         mv $DEB_DIR/$DEB_BUILD_NAME $DEB_NAME
 
     - name: Upload release archive
-      if: ${{ needs.create-release.outputs.do_smt == true }}
+      if: ${{ needs.create-release.outputs.do_smt == "true" }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -305,7 +305,7 @@ jobs:
         - run: sudo apt update && sudo apt install libasound2-dev
 
         - name: publish cmaze
-          if: ${{ needs.create-release.outputs.do_smt == true }}
+          if: ${{ needs.create-release.outputs.do_smt == "true" }}
           uses: katyo/publish-crates@v2
           with:
               path: ./cmaze
@@ -313,7 +313,7 @@ jobs:
               ignore-unpublished-changes: true
 
         - name: publish tmaze
-          if: ${{ needs.create-release.outputs.do_smt == true }}
+          if: ${{ needs.create-release.outputs.do_smt == "true" }}
           uses: katyo/publish-crates@v2
           with:
               path: ./tmaze
