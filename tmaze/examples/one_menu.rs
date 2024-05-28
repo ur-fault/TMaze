@@ -29,7 +29,7 @@ impl ActivityHandler for MyActivity {
         if !self.0 {
             self.0 = true;
 
-            let menu_config = menu::MenuConfig::new("Menu", vec!["Option 1".to_string()])
+            let menu_config = menu::MenuConfig::new_from_strings("Menu", vec!["Option 1".to_string()])
                 .counted()
                 .default(1);
 
