@@ -4,9 +4,12 @@ use tmaze::{
         Activity, ActivityHandler,
     },
     ui::Popup,
-    updates::UpdateCheckerActivity,
 };
 
+#[cfg(feature = "updates")]
+use tmaze::updates::UpdateCheckerActivity;
+
+#[cfg(feature = "updates")]
 fn main() {
     let mut app = App::new(Activity::new_base(
         "activity",
@@ -19,8 +22,15 @@ fn main() {
     app.run();
 }
 
+#[cfg(not(feature = "updates"))]
+fn main() {
+    panic!("Cannot run `updates` example without the `updates` feature");
+}
+
+#[cfg(feature = "updates")]
 struct MyActivity(bool, Popup);
 
+#[cfg(feature = "updates")]
 impl ActivityHandler for MyActivity {
     fn update(
         &mut self,
