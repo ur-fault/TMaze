@@ -17,7 +17,6 @@ use crate::{
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Offset, Settings},
     ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
-    updates::UpdateCheckerActivity,
 };
 
 #[cfg(feature = "sound")]
@@ -26,7 +25,7 @@ use crate::sound::{track::MusicTrack, SoundPlayer};
 
 #[cfg(feature = "updates")]
 #[allow(unused_imports)]
-use crate::updates;
+use crate::updates::UpdateCheckerActivity;
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 
@@ -66,6 +65,8 @@ pub fn create_controls_popup() -> Activity {
 
 pub struct MainMenu {
     menu: Menu,
+
+    #[cfg(feature = "updates")]
     update_checked: bool,
 }
 
@@ -89,6 +90,8 @@ impl MainMenu {
                 .box_style(color_scheme.normals())
                 .text_style(color_scheme.texts()),
             ),
+
+            #[cfg(feature = "updates")]
             update_checked: false,
         }
     }
@@ -148,6 +151,7 @@ impl ActivityHandler for MainMenu {
         #[cfg(feature = "sound")]
         Self::play_menu_bgm(data);
 
+        #[cfg(feature = "updates")]
         if !self.update_checked {
             self.update_checked = true;
             return Some(Change::push(Activity::new_base(

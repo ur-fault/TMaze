@@ -3,7 +3,6 @@ use std::time::{Duration, Instant};
 use cmaze::core::Dims;
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
-use rodio::Source;
 
 use crate::{
     data::SaveData,
@@ -14,6 +13,9 @@ use crate::{
 
 #[cfg(feature = "sound")]
 use crate::sound::{track::MusicTrack, SoundPlayer};
+
+#[cfg(feature = "sound")]
+use rodio::Source;
 
 use super::{
     activity::{Activities, Activity, ActivityResult, Change},
