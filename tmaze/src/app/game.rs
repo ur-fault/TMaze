@@ -731,15 +731,7 @@ impl ActivityHandler for GameActivity {
                             self.game.camera_pos.1 = player_pos.1;
                         }
                     }
-                } // TODO: implement smooth follow, but as separate flag
-                  // CameraMode::SmoothFollow(t) => {
-                  //     let old = self.game.camera_pos;
-                  //     let new = maze2screen_3d(self.game.game.get_player_pos());
-                  //     let Dims(x, y) = Dims::from(new) - old.into();
-                  //     let x = (x as f32 * t).round() as i32;
-                  //     let y = (y as f32 * t).round() as i32;
-                  //     self.game.camera_pos = old + Dims3D(x, y, new.2);
-                  // }
+                }
             }
         }
 
