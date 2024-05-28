@@ -364,7 +364,7 @@ impl ActivityHandler for MazeGenerationActivity {
                                 comm.stop_flag.stop();
                                 let _ = comm.handle.join().unwrap();
                             };
-                            return Some(Change::pop_top());
+                            return Some(Change::pop(2));
                         }
                         _ => {}
                     }
