@@ -1,6 +1,7 @@
 pub mod constants;
 
 use core::fmt;
+use std::ops::Deref;
 
 use crossterm::event::KeyEventKind;
 
@@ -104,9 +105,9 @@ impl LineDir {
             Self::Cross => '┼',
             Self::Horizontal => '─',
             Self::Vertical => '│',
-            Self::OpenTop => '╷', 
-            Self::OpenBottom => '╵', 
-            Self::OpenLeft => '╴', 
+            Self::OpenTop => '╷',
+            Self::OpenBottom => '╵',
+            Self::OpenLeft => '╴',
             Self::OpenRight => '╶',
             Self::ClosedLeft => '├',
             Self::ClosedTop => '┬',
@@ -142,7 +143,51 @@ pub trait ToDebug: fmt::Debug {
 
 impl<T: fmt::Debug> ToDebug for T {}
 
-// TODO: enum holding either String or &'static str
+pub enum MbyStaticStr {
+    Static(&'static str),
+    Dynamic(String),
+}
+
+impl fmt::Display for MbyStaticStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Static(s) => write!(f, "{}", s),
+            Self::Dynamic(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl fmt::Debug for MbyStaticStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Static(s) => write!(f, "{:?}", s),
+            Self::Dynamic(s) => write!(f, "{:?}", s),
+        }
+    }
+}
+
+impl From<&'static str> for MbyStaticStr {
+    fn from(s: &'static str) -> Self {
+        Self::Static(s)
+    }
+}
+
+impl From<String> for MbyStaticStr {
+    fn from(s: String) -> Self {
+        Self::Dynamic(s)
+    }
+}
+
+impl Deref for MbyStaticStr {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Static(s) => s,
+            Self::Dynamic(s) => s,
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! lerp {

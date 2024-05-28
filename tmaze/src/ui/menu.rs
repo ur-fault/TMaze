@@ -1,11 +1,13 @@
-use cmaze::core::Dims;
 use crossterm::{
     event::{Event as TermEvent, KeyCode, KeyEvent},
     style::{Color, ContentStyle},
 };
-
 use pad::PadStr;
+use unicode_width::UnicodeWidthStr;
+
 use std::io;
+
+use cmaze::core::Dims;
 
 use crate::{
     app::{
@@ -13,7 +15,7 @@ use crate::{
         app::AppData,
         event::Event,
     },
-    helpers::{is_release, value_if},
+    helpers::{is_release, value_if, MbyStaticStr},
     renderer::Frame,
 };
 
@@ -41,21 +43,46 @@ pub fn menu_size(title: &str, options: &[String], counted: bool) -> Dims {
     }
 }
 
-// TODO: `struct MenuOption` with text and other stuff,
-// text should be either 'static or String
+pub enum MenuItem {
+    Text(MbyStaticStr),
+    Option(MbyStaticStr, bool, Box<dyn FnMut() -> bool>),
+    Slider(MbyStaticStr, f32, Box<dyn FnMut(bool) -> f32>),
+    Separator,
+}
+
+impl From<String> for MenuItem {
+    fn from(s: String) -> Self {
+        MenuItem::Text(s.into())
+    }
+}
+
+impl From<&str> for MenuItem {
+    fn from(s: &str) -> Self {
+        MenuItem::Text(s.to_string().into())
+    }
+}
 
 pub struct MenuConfig {
     pub box_style: ContentStyle,
     pub text_style: ContentStyle,
     pub title: String,
-    pub options: Vec<String>,
+    pub options: Vec<MenuItem>,
     pub default: Option<usize>,
     pub counted: bool,
     pub q_to_quit: bool,
 }
 
 impl MenuConfig {
-    pub fn new(title: impl Into<String>, options: impl Into<Vec<String>>) -> Self {
+    pub fn new_from_strings(title: impl Into<String>, options: impl Into<Vec<String>>) -> Self {
+        let options: Vec<_> = Into::<Vec<_>>::into(options)
+            .into_iter()
+            .map(MenuItem::from)
+            .collect();
+
+        Self::new(title, options)
+    }
+
+    pub fn new(title: impl Into<String>, options: impl Into<Vec<MenuItem>>) -> Self {
         Self {
             box_style: ContentStyle::default(),
             text_style: ContentStyle::default(),
@@ -96,31 +123,54 @@ impl MenuConfig {
         self.q_to_quit = false;
         self
     }
+
+    fn option_width(&self, option: &MenuItem) -> Option<usize> {
+        let mut special = 2; // 2 is for cursor
+
+        if self.default.is_some() {
+            special += 2;
+        }
+
+        if self.counted {
+            let max_num_w = (self.options.len() as f64).log10().ceil() as usize;
+            special += max_num_w + 2;
+        }
+
+        match option {
+            MenuItem::Text(text) => Some(text.width()),
+            MenuItem::Option(text, _, _) => Some(text.width() + 4),
+            MenuItem::Slider(text, _, _) => Some(text.width() + 4),
+            MenuItem::Separator => None,
+        }
+        .map(|w| w + special)
+    }
+
+    fn render_option(&self, option: &MenuItem, width: usize) -> String {
+        match option {
+            MenuItem::Text(text) => text.to_string(),
+            MenuItem::Option(text, selected, _) => {
+                let prefix = if *selected { "[▪]" } else { "[ ]" };
+                format!("{} {}", prefix, text)
+            }
+            MenuItem::Slider(text, value, _) => {
+                let slider_len = width - text.width() - 2;
+                let slider = "█".repeat((slider_len as f32 * value).round() as usize);
+                let empty = " ".repeat(slider_len - slider.len());
+                format!("{} [{}{}]", text, slider, empty)
+            }
+            MenuItem::Separator => "-".repeat(width),
+        }
+    }
 }
 
 pub struct Menu {
     config: MenuConfig,
-    shown_options: Vec<String>,
     selected: isize, // isize for more readable code
 }
 
 impl Menu {
     pub fn new(config: MenuConfig) -> Self {
-        let MenuConfig {
-            default, options, ..
-        } = &config;
-
-        let options = if default.is_some() {
-            options
-                .iter()
-                .enumerate()
-                .map(|(i, opt)| {
-                    format!("{} {}", if i == default.unwrap() { "▪" } else { " " }, opt)
-                })
-                .collect::<Vec<_>>()
-        } else {
-            options.iter().map(String::from).collect::<Vec<_>>()
-        };
+        let MenuConfig { options, .. } = &config;
 
         let default = config
             .default
@@ -131,7 +181,6 @@ impl Menu {
         Self {
             selected: default,
             config,
-            shown_options: options,
         }
     }
 
@@ -164,7 +213,8 @@ impl ActivityHandler for Menu {
                             self.selected = (self.selected + 1) % opt_count
                         }
                         KeyCode::Enter | KeyCode::Char(' ') => {
-                            return Some(Change::pop_top_with(self.selected as usize))
+                            // let selected_opt = &self.config.options[self.selected as usize];
+                            return Some(Change::pop_top_with(self.selected as usize));
                         }
                         KeyCode::Char('q') if !self.config.q_to_quit => {
                             return Some(Change::pop_top())
@@ -202,9 +252,32 @@ impl Screen for Menu {
             ..
         } = &self.config;
 
-        let options = &self.shown_options;
+        let menu_size = {
+            let items_width = self
+                .config
+                .options
+                .iter()
+                .map(|opt| self.config.option_width(opt).unwrap_or(0))
+                .max()
+                .unwrap_or(0)
+                .max(title.width())
+                // .max(10) // why copilot, i didn't ask for it
+                .min(frame.size.0 as usize);
 
-        let menu_size = menu_size(title, options, *counted);
+            let width = items_width + 2;
+
+            let height = self.config.options.len() + 4;
+
+            Dims(width as i32, height as i32)
+        };
+
+        let options = self
+            .config
+            .options
+            .iter()
+            .map(|opt| self.config.render_option(opt, frame.size.0 as usize))
+            .collect::<Vec<_>>();
+
         let pos = box_center_screen(menu_size);
         let opt_count = options.len();
 

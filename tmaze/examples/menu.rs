@@ -1,7 +1,7 @@
 use tmaze::{app::app::App, ui::menu};
 
 fn main() {
-    let menu_config = menu::MenuConfig::new(
+    let menu_config = menu::MenuConfig::new_from_strings(
         "Menu",
         vec![
             "Option 1".to_string(),

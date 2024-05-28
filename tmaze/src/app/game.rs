@@ -76,7 +76,7 @@ impl MainMenu {
 
         Self {
             menu: Menu::new(
-                ui::MenuConfig::new(
+                ui::MenuConfig::new_from_strings(
                     "TMaze".to_string(),
                     vec![
                         "New Game".to_string(),
@@ -194,7 +194,7 @@ pub struct MazeSizeMenu {
 impl MazeSizeMenu {
     pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
         let color_scheme = settings.get_color_scheme();
-        let mut menu_config = ui::MenuConfig::new(
+        let mut menu_config = ui::MenuConfig::new_from_strings(
             "Maze size".to_string(),
             settings
                 .get_mazes()
@@ -267,7 +267,7 @@ pub struct MazeAlgorithmMenu {
 impl MazeAlgorithmMenu {
     pub fn new(preset: GameMode, settings: &Settings) -> Self {
         let color_scheme = settings.get_color_scheme();
-        let menu_config = ui::MenuConfig::new(
+        let menu_config = ui::MenuConfig::new_from_strings(
             "Maze generation algorithm".to_string(),
             vec![
                 "Randomized Kruskal's".to_string(),
@@ -458,7 +458,7 @@ impl PauseMenu {
     pub fn new(settings: &Settings) -> Self {
         let color_scheme = settings.get_color_scheme();
         let menu = Menu::new(
-            ui::MenuConfig::new(
+            ui::MenuConfig::new_from_strings(
                 "Paused".to_string(),
                 vec![
                     "Resume".to_string(),
