@@ -47,6 +47,12 @@ Settings (
     // camera_mode: EdgeFollow(10, 5),
     // camera_mode: EdgeFollow(0.25, 0.25),
 
+    // smoothing of the camera movement, values 0.5 - 1.0
+    camera_smoothing: 0.8,
+
+    // player movement smoothing, values 0.5 - 1.0
+    player_smoothing: 0.5,
+
     // default algorithm used for maze generation
     default_maze_gen_algo: RandomKruskals,
     // default_maze_gen_algo: DepthFirstSearch,

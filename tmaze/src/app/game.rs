@@ -716,8 +716,8 @@ impl ActivityHandler for GameActivity {
                 CameraMode::EdgeFollow(xoff, yoff) => {
                     let (vp_size, does_fit) = self.viewport_size(data.screen_size);
                     if !does_fit {
-                        let xoff = xoff.to_chars(vp_size.0);
-                        let yoff = yoff.to_chars(vp_size.1);
+                        let xoff = xoff.to_abs(vp_size.0);
+                        let yoff = yoff.to_abs(vp_size.1);
 
                         let player_pos = maze2screen(self.game.game.get_player_pos());
                         let player_pos_in_vp =
@@ -743,9 +743,8 @@ impl ActivityHandler for GameActivity {
             }
         }
 
-        self.sm_player_pos =
-            lerp!((self.sm_player_pos) -> (maze2screen_3d(self.game.game.get_player_pos())) : 0.8);
-        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.game.camera_pos) : 0.5);
+        self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.game.game.get_player_pos())) : data.settings.get_player_smoothing());
+        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.game.camera_pos) : data.settings.get_camera_smoothing());
 
         self.show_debug = data.use_data.show_debug;
 
@@ -850,8 +849,8 @@ fn render_edge_follow_rulers(
     let goals = color_scheme.goals();
     let players = color_scheme.players();
 
-    let xo = rulers.0.to_chars(vps.0);
-    let yo = rulers.1.to_chars(vps.1);
+    let xo = rulers.0.to_abs(vps.0);
+    let yo = rulers.1.to_abs(vps.1);
 
     use LineDir::{Horizontal, Vertical};
     const V: char = Vertical.round();

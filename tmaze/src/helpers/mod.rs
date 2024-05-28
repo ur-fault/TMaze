@@ -59,24 +59,6 @@ pub enum LineDir {
 }
 
 impl LineDir {
-    pub const fn double(&self) -> char {
-        match self {
-            Self::Empty => ' ',
-            Self::Cross => '╬',
-            Self::Horizontal => '═',
-            Self::Vertical => '║',
-            Self::OpenTop | Self::OpenBottom | Self::OpenLeft | Self::OpenRight => '▪',
-            Self::ClosedTop => '╦',
-            Self::ClosedBottom => '╩',
-            Self::ClosedLeft => '╠',
-            Self::ClosedRight => '╣',
-            Self::TopLeft => '╝',
-            Self::TopRight => '╚',
-            Self::BottomLeft => '╗',
-            Self::BottomRight => '╔',
-        }
-    }
-
     pub const fn from_bools(left: bool, top: bool, right: bool, bottom: bool) -> Self {
         match (left, top, right, bottom) {
             (false, false, false, false) => Self::Empty,
@@ -98,14 +80,34 @@ impl LineDir {
         }
     }
 
-    #[allow(dead_code)]
+    pub const fn double(&self) -> char {
+        match self {
+            Self::Empty => ' ',
+            Self::Cross => '╬',
+            Self::Horizontal => '═',
+            Self::Vertical => '║',
+            Self::OpenTop | Self::OpenBottom | Self::OpenLeft | Self::OpenRight => '▪',
+            Self::ClosedTop => '╦',
+            Self::ClosedBottom => '╩',
+            Self::ClosedLeft => '╠',
+            Self::ClosedRight => '╣',
+            Self::TopLeft => '╝',
+            Self::TopRight => '╚',
+            Self::BottomLeft => '╗',
+            Self::BottomRight => '╔',
+        }
+    }
+
     pub const fn round(&self) -> char {
         match self {
             Self::Empty => ' ',
             Self::Cross => '┼',
             Self::Horizontal => '─',
             Self::Vertical => '│',
-            Self::OpenTop | Self::OpenBottom | Self::OpenLeft | Self::OpenRight => '▪',
+            Self::OpenTop => '╷', 
+            Self::OpenBottom => '╵', 
+            Self::OpenLeft => '╴', 
+            Self::OpenRight => '╶',
             Self::ClosedLeft => '├',
             Self::ClosedTop => '┬',
             Self::ClosedRight => '┤',
