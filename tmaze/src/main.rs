@@ -43,6 +43,8 @@ fn main() -> Result<(), GameError> {
         return Ok(());
     }
 
+    better_panic::install();
+
     let mut app = App::empty();
     let menu = MainMenu::new(&app.data().settings);
     app.activities_mut()
