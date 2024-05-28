@@ -15,8 +15,6 @@ pub use event::Event;
 
 use thiserror::Error;
 
-use crate::ui::MenuError;
-
 #[derive(Debug, Error)]
 pub enum GameError {
     #[error("Crossterm error: {0}")]
@@ -29,15 +27,4 @@ pub enum GameError {
     FullQuit,
     #[error("New game")]
     NewGame,
-}
-
-impl From<MenuError> for GameError {
-    fn from(error: MenuError) -> Self {
-        match error {
-            MenuError::CrosstermError(error) => Self::CrosstermError(error),
-            MenuError::EmptyMenu => Self::EmptyMenu,
-            MenuError::Exit => Self::Back,
-            MenuError::FullQuit => Self::FullQuit,
-        }
-    }
 }

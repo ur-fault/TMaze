@@ -6,7 +6,6 @@ use crossterm::{
 
 use pad::PadStr;
 use std::io;
-use thiserror::Error;
 
 use crate::{
     app::{
@@ -22,18 +21,6 @@ use super::{box_center_screen, draw_box, Screen};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
-}
-
-#[derive(Debug, Error)]
-pub enum MenuError {
-    #[error(transparent)]
-    CrosstermError(#[from] io::Error),
-    #[error("Empty menu, nothing to select")]
-    EmptyMenu,
-    #[error("Exit")]
-    Exit,
-    #[error("Full quit")]
-    FullQuit,
 }
 
 pub fn menu_size(title: &str, options: &[String], counted: bool) -> Dims {
