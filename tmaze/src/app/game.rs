@@ -42,14 +42,23 @@ use super::{
 pub fn create_controls_popup() -> Activity {
     let popup = Popup::new(
         "Controls".to_string(),
-        vec![
-            "WASD and arrows: move".to_string(),
-            "Space: switch adventure/spectaror mode".to_string(),
-            "Q, F or L: move down".to_string(),
-            "E, R or P: move up".to_string(),
-            "With SHIFT move at the end in single dir".to_string(),
-            "Escape: pause menu".to_string(),
-        ],
+        [
+            "~ In game",
+            " WASD and arrows: move",
+            " Space: switch adventure/spectaror mode",
+            " Q, F or L: move down",
+            " E, R or P: move up",
+            " With SHIFT move at the end in single dir",
+            " Escape: pause menu",
+            "",
+            "~ In game end popup",
+            " Enter or space: main menu",
+            " Q: quit TMaze",
+            " R: restart game",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
     );
 
     Activity::new_base("controls".to_string(), Box::new(popup))
@@ -496,18 +505,14 @@ pub struct EndGamePopup {
 
 impl EndGamePopup {
     pub fn new(game: &RunningGame, color_scheme: ColorScheme) -> Self {
+        let maze_size = game.get_maze().size();
         let texts = vec![
             format!(
                 "Time:  {}",
                 ui::format_duration(game.get_elapsed().unwrap())
             ),
             format!("Moves: {}", game.get_move_count()),
-            format!(
-                "Size:  {}x{}x{}",
-                game.get_maze().size().0,
-                game.get_maze().size().1,
-                game.get_maze().size().2,
-            ),
+            format!("Size:  {}x{}x{}", maze_size.0, maze_size.1, maze_size.2,),
         ];
 
         let popup = Popup::new("You won".to_string(), texts)
@@ -543,7 +548,8 @@ impl ActivityHandler for EndGamePopup {
                         )),
                     ))),
                     KeyCode::Char('q') => Some(Change::pop_all()),
-                    c => Some(Change::pop_top_with(c)),
+                    KeyCode::Enter | KeyCode::Char(' ') => Some(Change::pop_top()),
+                    _ => None,
                 },
                 _ => panic!("expected `KeyCode` from `Popup`"),
             },
