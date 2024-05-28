@@ -21,7 +21,7 @@ pub enum Offset {
 }
 
 impl Offset {
-    pub fn to_chars(self, size: i32) -> i32 {
+    pub fn to_abs(self, size: i32) -> i32 {
         match self {
             Offset::Rel(ratio) => (size as f32 * ratio.clamp(0., 0.5)).round() as i32,
             Offset::Abs(chars) => chars,
@@ -40,8 +40,6 @@ pub enum CameraMode {
     #[default]
     CloseFollow,
     EdgeFollow(Offset, Offset),
-    // TODO: smooth follow, but as a separate setting
-    // SmoothFollow(f32),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,6 +180,10 @@ pub struct SettingsInner {
     pub disable_tower_auto_up: Option<bool>,
     #[serde(default)]
     pub camera_mode: Option<CameraMode>,
+    #[serde(default)]
+    pub camera_smoothing: Option<f32>,
+    #[serde[default]]
+    pub player_smoothing: Option<f32>,
 
     // game config
     #[serde(default)]
@@ -285,6 +287,24 @@ impl Settings {
 
     pub fn get_camera_mode(&self) -> CameraMode {
         self.read().camera_mode.unwrap_or_default()
+    }
+
+    pub fn set_camera_smoothing(mut self, value: f32) -> Self {
+        self.write().camera_smoothing = Some(value.clamp(0.5, 1.0));
+        self
+    }
+
+    pub fn get_camera_smoothing(&self) -> f32 {
+        self.read().camera_smoothing.unwrap_or(0.5).clamp(0.5, 1.0)
+    }
+
+    pub fn set_player_smoothing(mut self, value: f32) -> Self {
+        self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
+        self
+    }
+
+    pub fn get_player_smoothing(&self) -> f32 {
+        self.read().player_smoothing.unwrap_or(0.8).clamp(0.5, 1.0)
     }
 
     pub fn set_default_maze_gen_algo(mut self, value: MazeGenAlgo) -> Self {
