@@ -2,10 +2,15 @@ use crossterm::{
     event::{Event as TermEvent, KeyCode, KeyEvent},
     style::{Color, ContentStyle},
 };
+
 use pad::PadStr;
 use unicode_width::UnicodeWidthStr;
 
-use std::io;
+use std::{
+    fmt::{self, Write},
+    io,
+    ops::RangeInclusive,
+};
 
 use cmaze::core::Dims;
 
@@ -15,39 +20,68 @@ use crate::{
         app::AppData,
         event::Event,
     },
-    helpers::{is_release, value_if, MbyStaticStr},
+    helpers::{is_release, LineDir, MbyStaticStr},
     renderer::Frame,
 };
 
-use super::{box_center_screen, draw_box, Screen};
+use super::{center_box_in_screen, draw_box, Screen};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
 }
 
-pub fn menu_size(title: &str, options: &[String], counted: bool) -> Dims {
-    match options.iter().map(|opt| opt.len()).max() {
-        Some(l) => Dims(
-            ((2 + if counted {
-                (options.len() + 1).to_string().len() + 2
-            } else {
-                0
-            } + l
-                - 2)
-            .max(title.len() + 2)
-                + 2) as i32
-                + 2,
-            options.len() as i32 + 2 + 2,
-        ),
-        None => Dims(0, 0),
-    }
+pub struct SliderDef {
+    pub text: MbyStaticStr,
+    pub val: i32,
+    pub range: RangeInclusive<i32>,
+    pub fun: Box<dyn FnMut(bool, &mut i32, &mut AppData)>,
+    pub as_num: bool,
+}
+
+pub struct OptionDef {
+    pub text: MbyStaticStr,
+    pub val: bool,
+    pub fun: Box<dyn FnMut(&mut bool, &mut AppData)>,
 }
 
 pub enum MenuItem {
     Text(MbyStaticStr),
-    Option(MbyStaticStr, bool, Box<dyn FnMut() -> bool>),
-    Slider(MbyStaticStr, f32, Box<dyn FnMut(bool) -> f32>),
+    Option(OptionDef),
+    Slider(SliderDef),
     Separator,
+}
+
+impl MenuItem {
+    fn width(&self, special: usize) -> Option<usize> {
+        match self {
+            MenuItem::Text(text) => Some(text.width()),
+            MenuItem::Option(OptionDef { text, .. }) => Some(text.width() + 4),
+            MenuItem::Slider(SliderDef {
+                text,
+                range,
+                as_num: show_as_number,
+                ..
+            }) => {
+                assert!(range.start() <= range.end());
+                assert!(
+                    !(!*show_as_number && *range.start() < 0),
+                    "if range is not shown as number, it must be positive"
+                );
+
+                let text_width = text.width();
+                if *show_as_number {
+                    let min = range.start().to_string().len();
+                    let max = range.end().to_string().len();
+                    Some(text_width + min.max(max) + 3)
+                } else {
+                    let boxes = range.end() - range.start();
+                    Some(text_width + boxes as usize + 3)
+                }
+            }
+            MenuItem::Separator => None,
+        }
+        .map(|w| w + special)
+    }
 }
 
 impl From<String> for MenuItem {
@@ -59,6 +93,19 @@ impl From<String> for MenuItem {
 impl From<&str> for MenuItem {
     fn from(s: &str) -> Self {
         MenuItem::Text(s.to_string().into())
+    }
+}
+
+impl fmt::Debug for MenuItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MenuItem::Text(s) => write!(f, "Text({})", s),
+            MenuItem::Option(OptionDef { text, val, .. }) => write!(f, "Option({}, {})", text, val),
+            MenuItem::Slider(SliderDef {
+                text, val, range, ..
+            }) => write!(f, "Slider({}, {}, {:?})", text, val, range),
+            MenuItem::Separator => write!(f, "Separator"),
+        }
     }
 }
 
@@ -124,7 +171,7 @@ impl MenuConfig {
         self
     }
 
-    fn option_width(&self, option: &MenuItem) -> Option<usize> {
+    fn special_width(&self) -> usize {
         let mut special = 2; // 2 is for cursor
 
         if self.default.is_some() {
@@ -136,30 +183,49 @@ impl MenuConfig {
             special += max_num_w + 2;
         }
 
-        match option {
-            MenuItem::Text(text) => Some(text.width()),
-            MenuItem::Option(text, _, _) => Some(text.width() + 4),
-            MenuItem::Slider(text, _, _) => Some(text.width() + 4),
-            MenuItem::Separator => None,
-        }
-        .map(|w| w + special)
+        special
     }
 
     fn render_option(&self, option: &MenuItem, width: usize) -> String {
         match option {
             MenuItem::Text(text) => text.to_string(),
-            MenuItem::Option(text, selected, _) => {
-                let prefix = if *selected { "[▪]" } else { "[ ]" };
-                format!("{} {}", prefix, text)
+            MenuItem::Option(OptionDef { text, val, .. }) => {
+                let prefix = if *val { "[▪]" } else { "[ ]" };
+                format!("{prefix} {text}")
             }
-            MenuItem::Slider(text, value, _) => {
-                let slider_len = width - text.width() - 2;
-                let slider = "█".repeat((slider_len as f32 * value).round() as usize);
-                let empty = " ".repeat(slider_len - slider.len());
-                format!("{} [{}{}]", text, slider, empty)
+            MenuItem::Slider(SliderDef {
+                text,
+                val,
+                as_num,
+                range,
+                ..
+            }) => {
+                if *as_num {
+                    format!("[{val}] {text}")
+                } else {
+                    // const FILLED: char = '█';
+                    const FILLED: char = '#';
+
+                    let count = range.end() - range.start();
+
+                    let filled = (*val - range.start()) as usize;
+                    let empty = count as usize - filled;
+
+                    let filled = FILLED.to_string().repeat(filled);
+                    let empty = " ".repeat(empty);
+
+                    format!("[{filled}{empty}] {text}")
+                }
             }
-            MenuItem::Separator => "-".repeat(width),
+            MenuItem::Separator => LineDir::Horizontal.round().to_string().repeat(width),
         }
+    }
+
+    fn map_options<'s, T>(
+        &'s self,
+        f: impl Fn(&'s MenuItem) -> T + 'static,
+    ) -> impl Iterator<Item = T> + 's {
+        self.options.iter().map(f)
     }
 }
 
@@ -190,7 +256,7 @@ impl Menu {
 }
 
 impl ActivityHandler for Menu {
-    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, app_data: &mut AppData) -> Option<Change> {
         let opt_count = self.config.options.len() as isize;
 
         if opt_count == 1 {
@@ -206,15 +272,39 @@ impl ActivityHandler for Menu {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
                         KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                            // negative numbers wrap around zero
-                            self.selected = (self.selected - 1).rem_euclid(opt_count);
+                            loop {
+                                // negative numbers wrap around zero
+                                self.selected = (self.selected - 1).rem_euclid(opt_count);
+                                if !matches!(
+                                    self.config.options[self.selected as usize],
+                                    MenuItem::Separator
+                                ) {
+                                    break;
+                                }
+                            }
                         }
                         KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                            self.selected = (self.selected + 1) % opt_count
+                            loop {
+                                // negative numbers wrap around zero
+                                self.selected = (self.selected + 1) % opt_count;
+                                if !matches!(
+                                    self.config.options[self.selected as usize],
+                                    MenuItem::Separator
+                                ) {
+                                    break;
+                                }
+                            }
                         }
                         KeyCode::Enter | KeyCode::Char(' ') => {
-                            // let selected_opt = &self.config.options[self.selected as usize];
-                            return Some(Change::pop_top_with(self.selected as usize));
+                            let selected_opt = &mut self.config.options[self.selected as usize];
+
+                            match selected_opt {
+                                MenuItem::Text(_) => {
+                                    return Some(Change::pop_top_with(self.selected as usize))
+                                }
+                                MenuItem::Option(OptionDef { val, fun, .. }) => fun(val, app_data),
+                                MenuItem::Slider(_) | MenuItem::Separator => {}
+                            }
                         }
                         KeyCode::Char('q') if !self.config.q_to_quit => {
                             return Some(Change::pop_top())
@@ -225,8 +315,26 @@ impl ActivityHandler for Menu {
                         KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
                             self.selected = (ch as isize - '1' as isize).clamp(0, opt_count - 1);
                         }
-                        KeyCode::Char(_) => {}
                         KeyCode::Esc => return Some(Change::pop_top()),
+                        KeyCode::Left => {
+                            if let MenuItem::Slider(SliderDef {
+                                val, range, fun, ..
+                            }) = &mut self.config.options[self.selected as usize]
+                            {
+                                fun(false, val, app_data);
+                                *val = (*val).clamp(*range.start(), *range.end());
+                            }
+                        }
+                        KeyCode::Right => {
+                            if let MenuItem::Slider(SliderDef {
+                                val, range, fun, ..
+                            }) = &mut self.config.options[self.selected as usize]
+                            {
+                                fun(true, val, app_data);
+                                *val = (*val).clamp(*range.start(), *range.end());
+                            }
+                        }
+                        KeyCode::Char(_) => {}
                         _ => {}
                     }
                 }
@@ -253,11 +361,11 @@ impl Screen for Menu {
         } = &self.config;
 
         let menu_size = {
+            let special = self.config.special_width();
+
             let items_width = self
                 .config
-                .options
-                .iter()
-                .map(|opt| self.config.option_width(opt).unwrap_or(0))
+                .map_options(move |opt| opt.width(special).unwrap_or(0))
                 .max()
                 .unwrap_or(0)
                 .max(title.width())
@@ -271,14 +379,16 @@ impl Screen for Menu {
             Dims(width as i32, height as i32)
         };
 
+        let max_item_width = menu_size.0 as usize - 2 - self.config.special_width();
+
         let options = self
             .config
             .options
             .iter()
-            .map(|opt| self.config.render_option(opt, frame.size.0 as usize))
+            .map(|opt| self.config.render_option(opt, max_item_width))
             .collect::<Vec<_>>();
 
-        let pos = box_center_screen(menu_size);
+        let pos = center_box_in_screen(menu_size);
         let opt_count = options.len();
 
         let max_count = opt_count.to_string().len();
@@ -288,7 +398,10 @@ impl Screen for Menu {
         frame.draw_styled(pos + Dims(3, 1), title.as_str(), *text_style);
         frame.draw_styled(
             pos + Dims(1, 2),
-            "─".repeat(menu_size.0 as usize - 2),
+            LineDir::Horizontal
+                .round()
+                .to_string()
+                .repeat(menu_size.0 as usize - 2),
             *box_style,
         );
 
@@ -303,20 +416,23 @@ impl Screen for Menu {
             } else {
                 *text_style
             };
-            let item = format!(
-                "{} {}{}",
-                if i == self.selected as usize {
-                    ">"
-                } else {
-                    " "
-                },
-                value_if(*counted, || format!("{}.", i + 1)
-                    .pad_to_width((max_count as f64).log10().floor() as usize + 3)),
-                option,
-            )
-            .pad_to_width(menu_size.0 as usize - 2);
 
-            frame.draw_styled(pos + Dims(1, i as i32 + 3), item, style);
+            let mut buf = String::new();
+
+            if i == self.selected as usize {
+                write!(&mut buf, "> ").unwrap();
+            } else {
+                write!(&mut buf, "  ").unwrap();
+            }
+
+            if *counted {
+                write!(&mut buf, "{:width$}. ", i + 1, width = max_count).unwrap();
+            }
+            write!(&mut buf, "{}", option).unwrap();
+
+            let padded = buf.pad_to_width(menu_size.0 as usize - 2);
+
+            frame.draw_styled(pos + Dims(1, i as i32 + 3), padded, style);
         }
 
         Ok(())

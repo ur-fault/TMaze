@@ -145,14 +145,14 @@ impl<T: fmt::Debug> ToDebug for T {}
 
 pub enum MbyStaticStr {
     Static(&'static str),
-    Dynamic(String),
+    Owned(String),
 }
 
 impl fmt::Display for MbyStaticStr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Static(s) => write!(f, "{}", s),
-            Self::Dynamic(s) => write!(f, "{}", s),
+            Self::Owned(s) => write!(f, "{}", s),
         }
     }
 }
@@ -161,7 +161,7 @@ impl fmt::Debug for MbyStaticStr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Static(s) => write!(f, "{:?}", s),
-            Self::Dynamic(s) => write!(f, "{:?}", s),
+            Self::Owned(s) => write!(f, "{:?}", s),
         }
     }
 }
@@ -174,7 +174,7 @@ impl From<&'static str> for MbyStaticStr {
 
 impl From<String> for MbyStaticStr {
     fn from(s: String) -> Self {
-        Self::Dynamic(s)
+        Self::Owned(s)
     }
 }
 
@@ -184,7 +184,7 @@ impl Deref for MbyStaticStr {
     fn deref(&self) -> &Self::Target {
         match self {
             Self::Static(s) => s,
-            Self::Dynamic(s) => s,
+            Self::Owned(s) => s,
         }
     }
 }
