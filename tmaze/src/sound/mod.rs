@@ -2,16 +2,19 @@ pub mod track;
 
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
+use crate::settings::Settings;
+
 use self::track::Track;
 
 pub struct SoundPlayer {
     _stream: OutputStream,
     handle: OutputStreamHandle,
     sink: Sink,
+    settings: Settings,
 }
 
 impl SoundPlayer {
-    pub fn new() -> Self {
+    pub fn new(settings: Settings) -> Self {
         let (stream, handle) =
             rodio::OutputStream::try_default().expect("Failed to create output stream");
 
@@ -21,6 +24,7 @@ impl SoundPlayer {
             _stream: stream,
             handle,
             sink,
+            settings,
         }
     }
 
@@ -39,6 +43,7 @@ impl SoundPlayer {
     #[allow(dead_code)]
     pub fn play_sound(&self, track: Track) {
         let sink = Sink::try_new(&self.handle).expect("Failed to create sink");
+        sink.set_volume(self.settings.get_audio_volume());
         sink.append(track);
         sink.play();
         sink.detach();
@@ -52,10 +57,8 @@ impl SoundPlayer {
     pub fn sink(&self) -> &Sink {
         &self.sink
     }
-}
 
-impl Default for SoundPlayer {
-    fn default() -> Self {
-        Self::new()
+    pub fn set_volume(&self, volume: f32) {
+        self.sink.set_volume(volume);
     }
 }

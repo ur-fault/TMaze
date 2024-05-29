@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, Mutex, MutexGuard, OnceLock},
+    sync::{Arc, Mutex, MutexGuard, OnceLock, RwLock},
     time::Duration,
 };
 
@@ -78,7 +78,7 @@ impl<'a> Iterator for LogsIter<'a> {
 }
 
 pub struct AppLogger {
-    pub min_level: log::Level,
+    pub min_level: Arc<RwLock<log::Level>>,
     pub decay: Duration,
     pub max_visible: usize,
     logs: Arc<Mutex<Logs>>,
@@ -87,13 +87,17 @@ pub struct AppLogger {
 impl AppLogger {
     fn new(min_level: log::Level, decay: Duration, max_visible: usize) -> Self {
         Self {
-            min_level,
+            min_level: Arc::new(RwLock::new(min_level)),
             decay,
             max_visible,
             logs: Arc::new(Mutex::new(Logs {
                 logs: Default::default(),
             })),
         }
+    }
+
+    pub fn min_level(&self) -> log::Level {
+        *self.min_level.read().unwrap()
     }
 
     fn borrow_mut_logs(&self) -> MutexGuard<Logs> {
@@ -114,11 +118,19 @@ impl AppLogger {
             index: 0,
         }
     }
+
+    pub fn switch_debug(&self) {
+        if self.min_level() == log::Level::Debug {
+            *self.min_level.write().unwrap() = log::Level::Warn;
+        } else {
+            *self.min_level.write().unwrap() = log::Level::Debug;
+        }
+    }
 }
 
 impl Log for AppLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= self.min_level
+        metadata.level() <= self.min_level()
     }
 
     fn log(&self, record: &Record) {

@@ -37,7 +37,7 @@ pub struct AppData {
     app_start: Instant,
 
     #[cfg(feature = "sound")]
-    sound_player: SoundPlayer,
+    pub sound_player: SoundPlayer,
     #[cfg(feature = "sound")]
     bgm_track: Option<MusicTrack>,
 }
@@ -88,7 +88,7 @@ impl App {
         logging::init();
 
         #[cfg(feature = "sound")]
-        let sound_player = SoundPlayer::new();
+        let sound_player = SoundPlayer::new(settings.clone());
 
         Self {
             renderer,
