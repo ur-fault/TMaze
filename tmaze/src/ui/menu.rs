@@ -82,6 +82,49 @@ impl MenuItem {
         }
         .map(|w| w + special)
     }
+
+    fn render(&self, width: usize) -> String {
+        match self {
+            MenuItem::Text(text) => text.to_string(),
+            MenuItem::Option(OptionDef { text, val, .. }) => {
+                let prefix = if *val { "[▪]" } else { "[ ]" };
+                let text_w = text.width();
+                format!("{text} {prefix:>width$}", width = width - text_w - 1)
+            }
+            MenuItem::Slider(SliderDef {
+                text,
+                val,
+                as_num,
+                range,
+                ..
+            }) => {
+                if *as_num {
+                    format!("[{val}] {text}")
+                } else {
+                    // TODO: find the best character to use
+                    // const FILLED: char = '█';
+                    const FILLED: char = '#';
+                    // const FILLED: char = '-';
+
+                    let count = (range.end() - range.start()) as usize;
+
+                    let filled = (*val - range.start()) as usize;
+                    let empty = count - filled;
+
+                    let filled = FILLED.to_string().repeat(filled);
+                    let empty = " ".repeat(empty);
+
+                    let progress = filled + &empty;
+                    let text_width = text.width();
+
+                    let indicator = format!(" [{progress}]");
+
+                    format!("{text}{indicator:>width$}", width = width - text_width)
+                }
+            }
+            MenuItem::Separator => LineDir::Horizontal.round().to_string().repeat(width),
+        }
+    }
 }
 
 impl From<String> for MenuItem {
@@ -186,49 +229,6 @@ impl MenuConfig {
         special
     }
 
-    fn render_option(&self, option: &MenuItem, width: usize) -> String {
-        match option {
-            MenuItem::Text(text) => text.to_string(),
-            MenuItem::Option(OptionDef { text, val, .. }) => {
-                let prefix = if *val { "[▪]" } else { "[ ]" };
-                let text_w = text.width();
-                format!("{text} {prefix:>width$}", width = width - text_w - 1)
-            }
-            MenuItem::Slider(SliderDef {
-                text,
-                val,
-                as_num,
-                range,
-                ..
-            }) => {
-                if *as_num {
-                    format!("[{val}] {text}")
-                } else {
-                    // TODO: find the best character to use
-                    // const FILLED: char = '█';
-                    const FILLED: char = '#';
-                    // const FILLED: char = '-';
-
-                    let count = (range.end() - range.start()) as usize;
-
-                    let filled = (*val - range.start()) as usize;
-                    let empty = count - filled;
-
-                    let filled = FILLED.to_string().repeat(filled);
-                    let empty = " ".repeat(empty);
-
-                    let progress = filled + &empty;
-                    let text_width = text.width();
-
-                    let indicator = format!(" [{progress}]");
-
-                    format!("{text}{indicator:>width$}", width = width - text_width)
-                }
-            }
-            MenuItem::Separator => LineDir::Horizontal.round().to_string().repeat(width),
-        }
-    }
-
     fn map_options<'s, T>(
         &'s self,
         f: impl Fn(&'s MenuItem) -> T + 'static,
@@ -278,6 +278,46 @@ impl Menu {
 
         Dims(width as i32, height as i32)
     }
+
+    fn select(&mut self, down: bool) {
+        let opt_count = self.config.options.len() as isize;
+        loop {
+            // negative numbers wrap around zero
+            if down {
+                self.selected = (self.selected + 1) % opt_count;
+            } else {
+                self.selected = (self.selected - 1).rem_euclid(opt_count);
+            }
+            if !matches!(
+                self.config.options[self.selected as usize],
+                MenuItem::Separator
+            ) {
+                break;
+            }
+        }
+    }
+
+    fn switch(&mut self, data: &mut AppData) -> Option<Change> {
+        let selected_opt = &mut self.config.options[self.selected as usize];
+
+        match selected_opt {
+            MenuItem::Text(_) => return Some(Change::pop_top_with(self.selected as usize)),
+            MenuItem::Option(OptionDef { val, fun, .. }) => fun(val, data),
+            MenuItem::Slider(_) | MenuItem::Separator => {}
+        }
+
+        None
+    }
+
+    fn update_slider(&mut self, right: bool, data: &mut AppData) {
+        if let MenuItem::Slider(SliderDef {
+            val, range, fun, ..
+        }) = &mut self.config.options[self.selected as usize]
+        {
+            fun(right, val, data);
+            *val = (*val).clamp(*range.start(), *range.end());
+        }
+    }
 }
 
 impl ActivityHandler for Menu {
@@ -296,44 +336,26 @@ impl ActivityHandler for Menu {
             return Some(Change::pop_top());
         }
 
+        macro_rules! return_if_some {
+            ($change:expr) => {
+                if let Some(change) = $change {
+                    return Some(change);
+                }
+            };
+        }
+
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
-                        KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                            loop {
-                                // negative numbers wrap around zero
-                                self.selected = (self.selected - 1).rem_euclid(opt_count);
-                                if !matches!(
-                                    self.config.options[self.selected as usize],
-                                    MenuItem::Separator
-                                ) {
-                                    break;
-                                }
-                            }
+                        KeyCode::Up | KeyCode::Char('w') => {
+                            self.select(false);
                         }
-                        KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                            loop {
-                                // negative numbers wrap around zero
-                                self.selected = (self.selected + 1) % opt_count;
-                                if !matches!(
-                                    self.config.options[self.selected as usize],
-                                    MenuItem::Separator
-                                ) {
-                                    break;
-                                }
-                            }
+                        KeyCode::Down | KeyCode::Char('s') => {
+                            self.select(true);
                         }
                         KeyCode::Enter | KeyCode::Char(' ') => {
-                            let selected_opt = &mut self.config.options[self.selected as usize];
-
-                            match selected_opt {
-                                MenuItem::Text(_) => {
-                                    return Some(Change::pop_top_with(self.selected as usize))
-                                }
-                                MenuItem::Option(OptionDef { val, fun, .. }) => fun(val, app_data),
-                                MenuItem::Slider(_) | MenuItem::Separator => {}
-                            }
+                            return_if_some!(self.switch(app_data));
                         }
                         KeyCode::Char('q') if !self.config.q_to_quit => {
                             return Some(Change::pop_top())
@@ -342,26 +364,18 @@ impl ActivityHandler for Menu {
                             return Some(Change::pop_all())
                         }
                         KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
+                            let old_sel = self.selected;
                             self.selected = (ch as isize - '1' as isize).clamp(0, opt_count - 1);
+                            if old_sel == self.selected {
+                                return_if_some!(self.switch(app_data));
+                            }
                         }
                         KeyCode::Esc => return Some(Change::pop_top()),
                         KeyCode::Left => {
-                            if let MenuItem::Slider(SliderDef {
-                                val, range, fun, ..
-                            }) = &mut self.config.options[self.selected as usize]
-                            {
-                                fun(false, val, app_data);
-                                *val = (*val).clamp(*range.start(), *range.end());
-                            }
+                            self.update_slider(false, app_data);
                         }
                         KeyCode::Right => {
-                            if let MenuItem::Slider(SliderDef {
-                                val, range, fun, ..
-                            }) = &mut self.config.options[self.selected as usize]
-                            {
-                                fun(true, val, app_data);
-                                *val = (*val).clamp(*range.start(), *range.end());
-                            }
+                            self.update_slider(true, app_data);
                         }
                         KeyCode::Char(_) => {}
                         _ => {}
@@ -397,7 +411,7 @@ impl Screen for Menu {
             .config
             .options
             .iter()
-            .map(|opt| self.config.render_option(opt, max_item_width))
+            .map(|opt| opt.render(max_item_width))
             .collect::<Vec<_>>();
 
         let pos = center_box_in_screen(menu_size);
