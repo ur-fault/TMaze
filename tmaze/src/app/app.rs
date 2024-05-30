@@ -1,5 +1,6 @@
 use std::time::{Duration, Instant};
 
+use chrono::Duration;
 use cmaze::core::Dims;
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
@@ -115,8 +116,8 @@ impl App {
         let rem_events = 'mainloop: loop {
             let mut events = vec![];
 
-            let mut delay = 45;
-            while let Ok(true) = crossterm::event::poll(Duration::from_millis(delay)) {
+            let mut delay = Duration::from_millis(45);
+            while let Ok(true) = crossterm::event::poll(delay) {
                 let event = read().unwrap();
 
                 self.renderer.on_event(&event);
@@ -132,7 +133,7 @@ impl App {
                 }
 
                 // just so we read all events in the frame
-                delay = 1;
+                delay = Duration::from_nanos(1);
             }
 
             while let Some(change) = match self.activities.active_mut() {
