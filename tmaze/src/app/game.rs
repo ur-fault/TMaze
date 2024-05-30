@@ -82,8 +82,8 @@ impl MainMenu {
                     vec![
                         "New Game".to_string(),
                         "Settings".to_string(),
-                        "Controls".to_string(),
                         "Audio".to_string(),
+                        "Controls".to_string(),
                         "About".to_string(),
                         "Quit".to_string(),
                     ],
@@ -173,8 +173,8 @@ impl ActivityHandler for MainMenu {
                 match index {
                     0 /* new game */ => Some(self.start_new_game(&data.settings, &data.use_data)),
                     1 /* settings */ => Some(self.show_settings_screen(&data.settings)),
-                    2 /* controls */ => Some(self.show_controls_popup()),
-                    3 /* audio    */ => Some(Change::push(create_audio_settings(data))),
+                    2 /* audio    */ => Some(Change::push(create_audio_settings(data))),
+                    3 /* controls */ => Some(self.show_controls_popup()),
                     4 /* about    */ => Some(self.show_about_popup()),
                     5 /* quit     */ => Some(Change::pop_top()),
                     _ => panic!("main menu should only return valid index between 0 and 4"),
