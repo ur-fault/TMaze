@@ -69,6 +69,16 @@ impl SoundPlayer {
 }
 
 pub fn create_audio_settings(data: &mut AppData) -> Activity {
+    fn update_vol(data: &mut AppData) {
+        if data.settings.get_enable_audio() && data.settings.get_enable_music() {
+            data.sound_player
+                .sink()
+                .set_volume(data.settings.get_audio_volume() * data.settings.get_music_volume());
+        } else {
+            data.sound_player.sink().set_volume(0.0);
+        }
+    }
+
     let menu_config = menu::MenuConfig::new(
         "Audio settings",
         [
@@ -118,14 +128,4 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
     );
 
     Activity::new_base("audio settings", Box::new(menu::Menu::new(menu_config)))
-}
-
-fn update_vol(data: &mut AppData) {
-    if data.settings.get_enable_audio() && data.settings.get_enable_music() {
-        data.sound_player
-            .sink()
-            .set_volume(data.settings.get_audio_volume() * data.settings.get_music_volume());
-    } else {
-        data.sound_player.sink().set_volume(0.0);
-    }
 }
