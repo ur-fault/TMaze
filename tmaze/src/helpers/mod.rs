@@ -195,3 +195,35 @@ macro_rules! lerp {
         $a + ($b - $a) * $t
     };
 }
+
+pub fn yes_no(b: bool, capitalized: bool) -> &'static str {
+    if b {
+        if capitalized {
+            "Yes"
+        } else {
+            "yes"
+        }
+    } else {
+        if capitalized {
+            "No"
+        } else {
+            "no"
+        }
+    }
+}
+
+pub fn on_off(b: bool, capitalized: bool) -> &'static str {
+    if b {
+        if capitalized {
+            "On"
+        } else {
+            "on"
+        }
+    } else {
+        if capitalized {
+            "Off"
+        } else {
+            "off"
+        }
+    }
+}
