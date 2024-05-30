@@ -6,7 +6,8 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
     data::SaveData,
-    logging,
+    helpers::on_off,
+    logging::{self, get_logger},
     renderer::{drawable::Drawable, Renderer},
     settings::Settings,
 };
@@ -126,7 +127,7 @@ impl App {
                         code: KeyCode::F(3),
                         kind: KeyEventKind::Press,
                         ..
-                    }) => self.data.use_data.show_debug = !self.data.use_data.show_debug,
+                    }) => self.switch_debug(),
                     event => events.push(Event::Term(event)),
                 }
 
@@ -190,6 +191,15 @@ impl App {
             Event::ActiveAfterPop(Some(res)) => Some(res),
             _ => None,
         })
+    }
+
+    fn switch_debug(&mut self) {
+        self.data.use_data.show_debug = !self.data.use_data.show_debug;
+        get_logger().switch_debug();
+        log::warn!(
+            "Debug mode: {}",
+            on_off(self.data.use_data.show_debug, false)
+        );
     }
 
     pub fn activity_count(&self) -> usize {
