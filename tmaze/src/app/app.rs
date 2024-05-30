@@ -1,6 +1,5 @@
 use std::time::{Duration, Instant};
 
-use chrono::Duration;
 use cmaze::core::Dims;
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
@@ -133,7 +132,7 @@ impl App {
                 }
 
                 // just so we read all events in the frame
-                delay = Duration::from_nanos(1);
+                delay = Duration::from_nanos(1)
             }
 
             while let Some(change) = match self.activities.active_mut() {
