@@ -64,7 +64,7 @@ impl MenuItem {
             }) => {
                 assert!(range.start() <= range.end());
                 assert!(
-                    !(!*show_as_number && *range.start() < 0),
+                    (*show_as_number || *range.start() >= 0),
                     "if range is not shown as number, it must be positive"
                 );
 
@@ -272,8 +272,10 @@ impl Menu {
             .max(self.config.title.width())
             // .max(10) // why copilot, i didn't ask for it
             .min(frame.size.0 as usize);
+
         let width = items_width + 2;
         let height = self.config.options.len() + 4;
+
         Dims(width as i32, height as i32)
     }
 }
@@ -281,11 +283,15 @@ impl Menu {
 impl ActivityHandler for Menu {
     fn update(&mut self, events: Vec<Event>, app_data: &mut AppData) -> Option<Change> {
         let opt_count = self.config.options.len() as isize;
+        let non_sep_count = self
+            .config
+            .map_options(|opt| !matches!(opt, MenuItem::Separator))
+            .count() as isize;
 
-        if opt_count == 1 {
+        if non_sep_count == 1 {
             log::warn!("Menu with only one option, returning that");
             return Some(Change::pop_top_with::<usize>(0));
-        } else if opt_count == 0 {
+        } else if non_sep_count == 0 {
             log::warn!("Empty menu, returning `None`");
             return Some(Change::pop_top());
         }
