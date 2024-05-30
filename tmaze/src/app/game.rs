@@ -16,6 +16,7 @@ use crate::{
     lerp,
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Offset, Settings},
+    sound::create_audio_settings,
     ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
 };
 
@@ -82,6 +83,7 @@ impl MainMenu {
                         "New Game".to_string(),
                         "Settings".to_string(),
                         "Controls".to_string(),
+                        "Audio".to_string(),
                         "About".to_string(),
                         "Quit".to_string(),
                     ],
@@ -172,8 +174,9 @@ impl ActivityHandler for MainMenu {
                     0 /* new game */ => Some(self.start_new_game(&data.settings, &data.use_data)),
                     1 /* settings */ => Some(self.show_settings_screen(&data.settings)),
                     2 /* controls */ => Some(self.show_controls_popup()),
-                    3 /* about    */ => Some(self.show_about_popup()),
-                    4 /* quit     */ => Some(Change::pop_top()),
+                    3 /* audio    */ => Some(Change::push(create_audio_settings(data))),
+                    4 /* about    */ => Some(self.show_about_popup()),
+                    5 /* quit     */ => Some(Change::pop_top()),
                     _ => panic!("main menu should only return valid index between 0 and 4"),
                 }
             }
@@ -464,6 +467,7 @@ impl PauseMenu {
                     "Resume".to_string(),
                     "Main Menu".to_string(),
                     "Controls".to_string(),
+                    "Audio".to_string(),
                     "Quit".to_string(),
                 ],
             )
@@ -486,7 +490,8 @@ impl ActivityHandler for PauseMenu {
                         0 /* resume    */ => Some(Change::pop_top()),
                         1 /* main menu */ => Some(Change::pop_until("main menu")),
                         2 /* controls  */ => Some(Change::push(create_controls_popup())),
-                        3 /* quit      */ => Some(Change::pop_all()),
+                        3 /* audio     */ => Some(Change::push(create_audio_settings(data))),
+                        4 /* quit      */ => Some(Change::pop_all()),
                         _ => panic!(),
                     }
                 }
