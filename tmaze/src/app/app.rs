@@ -6,7 +6,8 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
     data::SaveData,
-    logging,
+    helpers::on_off,
+    logging::{self, get_logger},
     renderer::{drawable::Drawable, Renderer},
     settings::Settings,
 };
@@ -37,7 +38,7 @@ pub struct AppData {
     app_start: Instant,
 
     #[cfg(feature = "sound")]
-    sound_player: SoundPlayer,
+    pub sound_player: SoundPlayer,
     #[cfg(feature = "sound")]
     bgm_track: Option<MusicTrack>,
 }
@@ -55,11 +56,11 @@ impl AppData {
             }
         }
 
-        if !self.settings.get_enable_audio() || !self.settings.get_enable_music() {
-            return;
-        }
-
-        let volume = self.settings.get_audio_volume() * self.settings.get_music_volume();
+        let volume = if self.settings.get_enable_audio() && self.settings.get_enable_music() {
+            self.settings.get_audio_volume() * self.settings.get_music_volume()
+        } else {
+            0.0
+        };
         self.sound_player.sink().set_volume(volume);
 
         self.bgm_track = Some(track);
@@ -88,7 +89,7 @@ impl App {
         logging::init();
 
         #[cfg(feature = "sound")]
-        let sound_player = SoundPlayer::new();
+        let sound_player = SoundPlayer::new(settings.clone());
 
         Self {
             renderer,
@@ -114,8 +115,8 @@ impl App {
         let rem_events = 'mainloop: loop {
             let mut events = vec![];
 
-            let mut delay = 45;
-            while let Ok(true) = crossterm::event::poll(Duration::from_millis(delay)) {
+            let mut delay = Duration::from_millis(45);
+            while let Ok(true) = crossterm::event::poll(delay) {
                 let event = read().unwrap();
 
                 self.renderer.on_event(&event);
@@ -126,12 +127,12 @@ impl App {
                         code: KeyCode::F(3),
                         kind: KeyEventKind::Press,
                         ..
-                    }) => self.data.use_data.show_debug = !self.data.use_data.show_debug,
+                    }) => self.switch_debug(),
                     event => events.push(Event::Term(event)),
                 }
 
                 // just so we read all events in the frame
-                delay = 1;
+                delay = Duration::from_nanos(1)
             }
 
             while let Some(change) = match self.activities.active_mut() {
@@ -190,6 +191,15 @@ impl App {
             Event::ActiveAfterPop(Some(res)) => Some(res),
             _ => None,
         })
+    }
+
+    fn switch_debug(&mut self) {
+        self.data.use_data.show_debug = !self.data.use_data.show_debug;
+        get_logger().switch_debug();
+        log::warn!(
+            "Debug mode: {}",
+            on_off(self.data.use_data.show_debug, false)
+        );
     }
 
     pub fn activity_count(&self) -> usize {

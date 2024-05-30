@@ -16,6 +16,7 @@ use crate::{
     lerp,
     renderer::Frame,
     settings::{CameraMode, ColorScheme, Offset, Settings},
+    sound::create_audio_settings,
     ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
 };
 
@@ -50,7 +51,7 @@ pub fn create_controls_popup() -> Activity {
             " With SHIFT move at the end in single dir",
             " Escape: pause menu",
             "",
-            "~ In game end popup",
+            "~ In end game popup",
             " Enter or space: main menu",
             " Q: quit TMaze",
             " R: restart game",
@@ -76,11 +77,12 @@ impl MainMenu {
 
         Self {
             menu: Menu::new(
-                ui::MenuConfig::new(
+                ui::MenuConfig::new_from_strings(
                     "TMaze".to_string(),
                     vec![
                         "New Game".to_string(),
                         "Settings".to_string(),
+                        "Audio".to_string(),
                         "Controls".to_string(),
                         "About".to_string(),
                         "Quit".to_string(),
@@ -171,9 +173,10 @@ impl ActivityHandler for MainMenu {
                 match index {
                     0 /* new game */ => Some(self.start_new_game(&data.settings, &data.use_data)),
                     1 /* settings */ => Some(self.show_settings_screen(&data.settings)),
-                    2 /* controls */ => Some(self.show_controls_popup()),
-                    3 /* about    */ => Some(self.show_about_popup()),
-                    4 /* quit     */ => Some(Change::pop_top()),
+                    2 /* audio    */ => Some(Change::push(create_audio_settings(data))),
+                    3 /* controls */ => Some(self.show_controls_popup()),
+                    4 /* about    */ => Some(self.show_about_popup()),
+                    5 /* quit     */ => Some(Change::pop_top()),
                     _ => panic!("main menu should only return valid index between 0 and 4"),
                 }
             }
@@ -194,7 +197,7 @@ pub struct MazeSizeMenu {
 impl MazeSizeMenu {
     pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
         let color_scheme = settings.get_color_scheme();
-        let mut menu_config = ui::MenuConfig::new(
+        let mut menu_config = ui::MenuConfig::new_from_strings(
             "Maze size".to_string(),
             settings
                 .get_mazes()
@@ -267,7 +270,7 @@ pub struct MazeAlgorithmMenu {
 impl MazeAlgorithmMenu {
     pub fn new(preset: GameMode, settings: &Settings) -> Self {
         let color_scheme = settings.get_color_scheme();
-        let menu_config = ui::MenuConfig::new(
+        let menu_config = ui::MenuConfig::new_from_strings(
             "Maze generation algorithm".to_string(),
             vec![
                 "Randomized Kruskal's".to_string(),
@@ -458,12 +461,13 @@ impl PauseMenu {
     pub fn new(settings: &Settings) -> Self {
         let color_scheme = settings.get_color_scheme();
         let menu = Menu::new(
-            ui::MenuConfig::new(
+            ui::MenuConfig::new_from_strings(
                 "Paused".to_string(),
                 vec![
                     "Resume".to_string(),
                     "Main Menu".to_string(),
                     "Controls".to_string(),
+                    "Audio".to_string(),
                     "Quit".to_string(),
                 ],
             )
@@ -486,7 +490,8 @@ impl ActivityHandler for PauseMenu {
                         0 /* resume    */ => Some(Change::pop_top()),
                         1 /* main menu */ => Some(Change::pop_until("main menu")),
                         2 /* controls  */ => Some(Change::push(create_controls_popup())),
-                        3 /* quit      */ => Some(Change::pop_all()),
+                        3 /* audio     */ => Some(Change::push(create_audio_settings(data))),
+                        4 /* quit      */ => Some(Change::pop_all()),
                         _ => panic!(),
                     }
                 }

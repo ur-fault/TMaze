@@ -27,10 +27,11 @@ fn main() -> Result<(), GameError> {
     }
 
     if _args.show_config_path {
-        if let Some(s) = settings::Settings::default_path().to_str() {
+        let settings_path = crate::settings::Settings::default_path();
+        if let Some(s) = settings_path.to_str() {
             println!("{}", s);
         } else {
-            println!("{:?}", settings::Settings::default_path());
+            println!("{:?}", settings_path);
         }
         return Ok(());
     }

@@ -257,13 +257,8 @@ impl Settings {
         self.read().color_scheme.clone().unwrap_or_default()
     }
 
-    pub fn set_color_scheme(mut self, value: ColorScheme) -> Self {
+    pub fn set_color_scheme(&mut self, value: ColorScheme) -> &mut Self {
         self.write().color_scheme = Some(value);
-        self
-    }
-
-    pub fn set_slow(mut self, value: bool) -> Self {
-        self.write().slow = Some(value);
         self
     }
 
@@ -271,8 +266,8 @@ impl Settings {
         self.read().slow.unwrap_or_default()
     }
 
-    pub fn set_disable_tower_auto_up(mut self, value: bool) -> Self {
-        self.write().disable_tower_auto_up = Some(value);
+    pub fn set_slow(&mut self, value: bool) -> &mut Self {
+        self.write().slow = Some(value);
         self
     }
 
@@ -280,8 +275,8 @@ impl Settings {
         self.read().disable_tower_auto_up.unwrap_or_default()
     }
 
-    pub fn set_camera_mode(mut self, value: CameraMode) -> Self {
-        self.write().camera_mode = Some(value);
+    pub fn set_disable_tower_auto_up(&mut self, value: bool) -> &mut Self {
+        self.write().disable_tower_auto_up = Some(value);
         self
     }
 
@@ -289,8 +284,8 @@ impl Settings {
         self.read().camera_mode.unwrap_or_default()
     }
 
-    pub fn set_camera_smoothing(mut self, value: f32) -> Self {
-        self.write().camera_smoothing = Some(value.clamp(0.5, 1.0));
+    pub fn set_camera_mode(&mut self, value: CameraMode) -> &mut Self {
+        self.write().camera_mode = Some(value);
         self
     }
 
@@ -298,8 +293,8 @@ impl Settings {
         self.read().camera_smoothing.unwrap_or(0.5).clamp(0.5, 1.0)
     }
 
-    pub fn set_player_smoothing(mut self, value: f32) -> Self {
-        self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
+    pub fn set_camera_smoothing(&mut self, value: f32) -> &mut Self {
+        self.write().camera_smoothing = Some(value.clamp(0.5, 1.0));
         self
     }
 
@@ -307,7 +302,12 @@ impl Settings {
         self.read().player_smoothing.unwrap_or(0.8).clamp(0.5, 1.0)
     }
 
-    pub fn set_default_maze_gen_algo(mut self, value: MazeGenAlgo) -> Self {
+    pub fn set_player_smoothing(&mut self, value: f32) -> &mut Self {
+        self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
+        self
+    }
+
+    pub fn set_default_maze_gen_algo(&mut self, value: MazeGenAlgo) -> &mut Self {
         self.write().default_maze_gen_algo = Some(value);
         self
     }
@@ -316,7 +316,7 @@ impl Settings {
         self.read().default_maze_gen_algo.unwrap_or_default()
     }
 
-    pub fn set_dont_ask_for_maze_algo(mut self, value: bool) -> Self {
+    pub fn set_dont_ask_for_maze_algo(&mut self, value: bool) -> &mut Self {
         self.write().dont_ask_for_maze_algo = Some(value);
         self
     }
@@ -325,7 +325,7 @@ impl Settings {
         self.read().dont_ask_for_maze_algo.unwrap_or_default()
     }
 
-    pub fn set_check_interval(mut self, value: UpdateCheckInterval) -> Self {
+    pub fn set_check_interval(&mut self, value: UpdateCheckInterval) -> &mut Self {
         self.write().update_check_interval = Some(value);
         self
     }
@@ -338,7 +338,7 @@ impl Settings {
         self.read().display_update_check_errors.unwrap_or(true)
     }
 
-    pub fn set_display_update_check_errors(mut self, value: bool) -> Self {
+    pub fn set_display_update_check_errors(&mut self, value: bool) -> &mut Self {
         self.write().display_update_check_errors = Some(value);
         self
     }
@@ -347,7 +347,7 @@ impl Settings {
         self.read().enable_audio.unwrap_or_default()
     }
 
-    pub fn set_enable_audio(mut self, value: bool) -> Self {
+    pub fn set_enable_audio(&mut self, value: bool) -> &mut Self {
         self.write().enable_audio = Some(value);
         self
     }
@@ -356,7 +356,7 @@ impl Settings {
         self.read().audio_volume.unwrap_or_default().clamp(0., 1.)
     }
 
-    pub fn set_audio_volume(mut self, value: f32) -> Self {
+    pub fn set_audio_volume(&mut self, value: f32) -> &mut Self {
         self.write().audio_volume = Some(value.clamp(0., 1.));
         self
     }
@@ -365,7 +365,7 @@ impl Settings {
         self.read().enable_music.unwrap_or_default()
     }
 
-    pub fn set_enable_music(mut self, value: bool) -> Self {
+    pub fn set_enable_music(&mut self, value: bool) -> &mut Self {
         self.write().enable_music = Some(value);
         self
     }
@@ -374,12 +374,12 @@ impl Settings {
         self.read().music_volume.unwrap_or_default().clamp(0., 1.)
     }
 
-    pub fn set_music_volume(mut self, value: f32) -> Self {
+    pub fn set_music_volume(&mut self, value: f32) -> &mut Self {
         self.write().music_volume = Some(value.clamp(0., 1.));
         self
     }
 
-    pub fn set_mazes(mut self, value: Vec<MazePreset>) -> Self {
+    pub fn set_mazes(&mut self, value: Vec<MazePreset>) -> &mut Self {
         self.write().mazes = Some(value);
         self
     }
