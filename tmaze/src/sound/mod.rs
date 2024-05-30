@@ -1,8 +1,13 @@
 pub mod track;
 
+use menu::OptionDef;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
-use crate::settings::Settings;
+use crate::{
+    app::{app::AppData, Activity},
+    settings::Settings,
+    ui::{menu, MenuItem, SliderDef},
+};
 
 use self::track::Track;
 
@@ -60,5 +65,67 @@ impl SoundPlayer {
 
     pub fn set_volume(&self, volume: f32) {
         self.sink.set_volume(volume);
+    }
+}
+
+pub fn create_audio_settings(data: &mut AppData) -> Activity {
+    let menu_config = menu::MenuConfig::new(
+        "Audio settings",
+        [
+            MenuItem::Option(OptionDef {
+                text: "Global mute".into(),
+                val: !data.settings.get_enable_audio(),
+                fun: Box::new(|mute, data| {
+                    *mute = !*mute;
+                    data.settings.set_enable_audio(!*mute);
+                    update_vol(data);
+                }),
+            }),
+            MenuItem::Slider(SliderDef {
+                text: "Global volume".into(),
+                val: (data.settings.get_audio_volume() * 5.0) as i32,
+                range: 0..=5,
+                as_num: false,
+                fun: Box::new(|up, vol, data| {
+                    *vol += if up { 1 } else { -1 };
+                    data.settings.set_audio_volume(*vol as f32 / 5.0);
+                    update_vol(data);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Music mute".into(),
+                val: !data.settings.get_enable_music(),
+                fun: Box::new(|mute, data| {
+                    *mute = !*mute;
+                    data.settings.set_enable_music(!*mute);
+                    update_vol(data);
+                }),
+            }),
+            MenuItem::Slider(SliderDef {
+                text: "Music volume".into(),
+                val: (data.settings.get_music_volume() * 5.0) as i32,
+                range: 0..=5,
+                as_num: false,
+                fun: Box::new(|up, vol, data| {
+                    *vol += if up { 1 } else { -1 };
+                    data.settings.set_music_volume(*vol as f32 / 5.0);
+                    update_vol(data);
+                }),
+            }),
+            MenuItem::Separator,
+            MenuItem::Text("Exit".into()),
+        ],
+    );
+
+    Activity::new_base("audio settings", Box::new(menu::Menu::new(menu_config)))
+}
+
+fn update_vol(data: &mut AppData) {
+    if data.settings.get_enable_audio() && data.settings.get_enable_music() {
+        data.sound_player
+            .sink()
+            .set_volume(data.settings.get_audio_volume() * data.settings.get_music_volume());
+    } else {
+        data.sound_player.sink().set_volume(0.0);
     }
 }

@@ -40,8 +40,6 @@ impl Display for GameViewMode {
     }
 }
 
-pub struct ShowPauseMenu;
-
 pub struct GameData {
     pub game: RunningGame,
     pub camera_pos: Dims3D,
