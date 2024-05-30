@@ -75,7 +75,7 @@ impl MenuItem {
                     Some(text_width + min.max(max) + 3)
                 } else {
                     let boxes = range.end() - range.start();
-                    Some(text_width + boxes as usize + 3)
+                    Some(text_width + boxes as usize + 4)
                 }
             }
             MenuItem::Separator => None,
@@ -191,7 +191,8 @@ impl MenuConfig {
             MenuItem::Text(text) => text.to_string(),
             MenuItem::Option(OptionDef { text, val, .. }) => {
                 let prefix = if *val { "[▪]" } else { "[ ]" };
-                format!("{prefix} {text}")
+                let text_w = text.width();
+                format!("{text} {prefix:>width$}", width = width - text_w - 1)
             }
             MenuItem::Slider(SliderDef {
                 text,
@@ -203,18 +204,25 @@ impl MenuConfig {
                 if *as_num {
                     format!("[{val}] {text}")
                 } else {
+                    // TODO: find the best character to use
                     // const FILLED: char = '█';
                     const FILLED: char = '#';
+                    // const FILLED: char = '-';
 
-                    let count = range.end() - range.start();
+                    let count = (range.end() - range.start()) as usize;
 
                     let filled = (*val - range.start()) as usize;
-                    let empty = count as usize - filled;
+                    let empty = count - filled;
 
                     let filled = FILLED.to_string().repeat(filled);
                     let empty = " ".repeat(empty);
 
-                    format!("[{filled}{empty}] {text}")
+                    let progress = filled + &empty;
+                    let text_width = text.width();
+
+                    let indicator = format!(" [{progress}]");
+
+                    format!("{text}{indicator:>width$}", width = width - text_width)
                 }
             }
             MenuItem::Separator => LineDir::Horizontal.round().to_string().repeat(width),
@@ -252,6 +260,21 @@ impl Menu {
 
     pub fn into_activity(self) -> Activity {
         Activity::new("tmaze", "menu", Box::new(self))
+    }
+
+    fn menu_size(&self, frame: &mut Frame) -> Dims {
+        let special = self.config.special_width();
+        let items_width = self
+            .config
+            .map_options(move |opt| opt.width(special).unwrap_or(0))
+            .max()
+            .unwrap_or(0)
+            .max(self.config.title.width())
+            // .max(10) // why copilot, i didn't ask for it
+            .min(frame.size.0 as usize);
+        let width = items_width + 2;
+        let height = self.config.options.len() + 4;
+        Dims(width as i32, height as i32)
     }
 }
 
@@ -360,24 +383,7 @@ impl Screen for Menu {
             ..
         } = &self.config;
 
-        let menu_size = {
-            let special = self.config.special_width();
-
-            let items_width = self
-                .config
-                .map_options(move |opt| opt.width(special).unwrap_or(0))
-                .max()
-                .unwrap_or(0)
-                .max(title.width())
-                // .max(10) // why copilot, i didn't ask for it
-                .min(frame.size.0 as usize);
-
-            let width = items_width + 2;
-
-            let height = self.config.options.len() + 4;
-
-            Dims(width as i32, height as i32)
-        };
+        let menu_size = self.menu_size(frame);
 
         let max_item_width = menu_size.0 as usize - 2 - self.config.special_width();
 

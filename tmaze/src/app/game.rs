@@ -50,7 +50,7 @@ pub fn create_controls_popup() -> Activity {
             " With SHIFT move at the end in single dir",
             " Escape: pause menu",
             "",
-            "~ In game end popup",
+            "~ In end game popup",
             " Enter or space: main menu",
             " Q: quit TMaze",
             " R: restart game",
