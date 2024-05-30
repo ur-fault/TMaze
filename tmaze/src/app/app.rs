@@ -55,11 +55,11 @@ impl AppData {
             }
         }
 
-        if !self.settings.get_enable_audio() || !self.settings.get_enable_music() {
-            return;
-        }
-
-        let volume = self.settings.get_audio_volume() * self.settings.get_music_volume();
+        let volume = if self.settings.get_enable_audio() && self.settings.get_enable_music() {
+            self.settings.get_audio_volume() * self.settings.get_music_volume()
+        } else {
+            0.0
+        };
         self.sound_player.sink().set_volume(volume);
 
         self.bgm_track = Some(track);
