@@ -1,3 +1,4 @@
+#[cfg(feature = "sound")]
 use tmaze::{
     app::app::{App, AppData},
     logging,
@@ -5,6 +6,7 @@ use tmaze::{
     ui::{menu, MenuItem, OptionDef, SliderDef},
 };
 
+#[cfg(feature = "sound")]
 fn main() {
     logging::get_logger().switch_debug();
 
@@ -66,6 +68,7 @@ fn main() {
     app.run();
 }
 
+#[cfg(feature = "sound")]
 fn update_vol(data: &mut AppData) {
     if data.settings.get_enable_audio() && data.settings.get_enable_music() {
         data.sound_player
@@ -74,4 +77,9 @@ fn update_vol(data: &mut AppData) {
     } else {
         data.sound_player.sink().set_volume(0.0);
     }
+}
+
+#[cfg(not(feature = "sound"))]
+fn main() {
+    panic!("Cannot run `sound` example without the `sound` feature");
 }
