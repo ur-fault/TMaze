@@ -451,9 +451,9 @@ impl Screen for Menu {
             ..
         } = &self.config;
 
-        let title_style = title_style.and(*text_style).unwrap_or(color_scheme.texts());
+        let title_style = title_style.or(*text_style).unwrap_or(color_scheme.texts());
         let subtitle_style = subtitle_style
-            .and(*text_style)
+            .or(*text_style)
             .unwrap_or(color_scheme.texts());
 
         let box_style = box_style.unwrap_or(color_scheme.normals());
