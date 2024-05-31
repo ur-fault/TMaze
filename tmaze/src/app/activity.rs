@@ -174,6 +174,21 @@ impl Activity {
         Self::new("tmaze".to_string(), name.into(), handler)
     }
 
+    pub fn new_boxed(
+        source: impl Into<String>,
+        name: impl Into<String>,
+        handler: impl ActivityHandler + 'static,
+    ) -> Self {
+        Self::new(source, name, Box::new(handler))
+    }
+
+    pub fn new_base_boxed(
+        name: impl Into<String>,
+        handler: impl ActivityHandler + 'static,
+    ) -> Self {
+        Self::new_base(name, Box::new(handler))
+    }
+
     pub fn source(&self) -> &str {
         &self.source
     }
