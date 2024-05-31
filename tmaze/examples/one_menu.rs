@@ -29,9 +29,10 @@ impl ActivityHandler for MyActivity {
         if !self.0 {
             self.0 = true;
 
-            let menu_config = menu::MenuConfig::new_from_strings("Menu", vec!["Option 1".to_string()])
-                .counted()
-                .default(1);
+            let menu_config =
+                menu::MenuConfig::new_from_strings("Menu", vec!["Option 1".to_string()])
+                    .counted()
+                    .default(1);
 
             let menu = menu::Menu::new(menu_config).into_activity();
             return Some(tmaze::app::Change::Push(menu));

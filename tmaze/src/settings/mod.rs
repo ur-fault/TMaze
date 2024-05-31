@@ -9,7 +9,12 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::constants::base_path;
+use crate::{
+    app::{self, app::AppData, Activity, ActivityHandler, Change},
+    constants::base_path,
+    sound::create_audio_settings,
+    ui::{style_with_attribute, Menu, MenuConfig, Popup, Screen},
+};
 
 const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
 
@@ -424,5 +429,76 @@ impl Settings {
     pub fn reset_config(path: PathBuf) {
         let default_settings_string = DEFAULT_SETTINGS;
         fs::write(path, default_settings_string).unwrap();
+    }
+}
+
+pub struct SettingsActivity(Menu);
+
+impl SettingsActivity {
+    fn other_settings_popup(settings: &Settings) -> Activity {
+        let popup = Popup::new(
+            "Other settings".to_string(),
+            vec![
+                "Path to the current settings:".to_string(),
+                format!(" {}", settings.path().to_string_lossy().to_string()),
+                "".to_string(),
+                "Other settings are not implemented in UI yet.".to_string(),
+                "Please edit the settings file directly.".to_string(),
+            ],
+        )
+        .styles_from_settings(settings);
+
+        Activity::new_base("settings".to_string(), Box::new(popup))
+    }
+}
+
+impl SettingsActivity {
+    pub fn new(settings: &Settings) -> Self {
+        let menu_config = MenuConfig::new_from_strings(
+            "Settings",
+            vec![
+                "Audio".to_string(),
+                "Other settings".to_string(),
+                "Back".to_string(),
+            ],
+        )
+        .styles_from_settings(settings)
+        .subtitle("Changes are not saved")
+        .subtitle_style(style_with_attribute(
+            settings.get_color_scheme().texts(),
+            crossterm::style::Attribute::Dim,
+        ));
+
+        Self(Menu::new(menu_config))
+    }
+
+    pub fn new_activity(settings: &Settings) -> Activity {
+        Activity::new_base("settings".to_string(), Box::new(Self::new(settings)))
+    }
+}
+
+impl ActivityHandler for SettingsActivity {
+    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
+        match self.0.update(events, data)? {
+            Change::Pop {
+                res: Some(sub_activity),
+                ..
+            } => {
+                let index = *sub_activity
+                    .downcast::<usize>()
+                    .expect("menu should return index");
+                match index {
+                    0 /* audio */ => Some(Change::push(create_audio_settings(data))),
+                    1 /* other */ => Some(Change::push(Self::other_settings_popup(&data.settings))),
+                    2 /* back  */ => Some(Change::pop_top()),
+                    _ => panic!("main menu should only return valid index between 0 and 2"),
+                }
+            }
+            res => Some(res),
+        }
+    }
+
+    fn screen(&self) -> &dyn Screen {
+        &self.0
     }
 }

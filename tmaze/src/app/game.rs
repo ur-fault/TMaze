@@ -15,8 +15,7 @@ use crate::{
     helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
     lerp,
     renderer::Frame,
-    settings::{CameraMode, ColorScheme, Offset, Settings},
-    sound::create_audio_settings,
+    settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
     ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
 };
 
@@ -39,7 +38,7 @@ use super::{
     Activity, ActivityHandler, Change, Event,
 };
 
-pub fn create_controls_popup() -> Activity {
+pub fn create_controls_popup(settings: &Settings) -> Activity {
     let popup = Popup::new(
         "Controls".to_string(),
         [
@@ -58,8 +57,9 @@ pub fn create_controls_popup() -> Activity {
         ]
         .into_iter()
         .map(String::from)
-        .collect(),
-    );
+        .collect::<Vec<_>>(),
+    )
+    .styles_from_settings(settings);
 
     Activity::new_base("controls".to_string(), Box::new(popup))
 }
@@ -73,8 +73,6 @@ pub struct MainMenu {
 
 impl MainMenu {
     pub fn new(settings: &Settings) -> Self {
-        let color_scheme = settings.get_color_scheme();
-
         Self {
             menu: Menu::new(
                 ui::MenuConfig::new_from_strings(
@@ -82,15 +80,13 @@ impl MainMenu {
                     vec![
                         "New Game".to_string(),
                         "Settings".to_string(),
-                        "Audio".to_string(),
                         "Controls".to_string(),
                         "About".to_string(),
                         "Quit".to_string(),
                     ],
                 )
                 .counted()
-                .box_style(color_scheme.normals())
-                .text_style(color_scheme.texts()),
+                .styles_from_settings(settings),
             ),
 
             #[cfg(feature = "updates")]
@@ -99,22 +95,17 @@ impl MainMenu {
     }
 
     fn show_settings_screen(&mut self, settings: &Settings) -> Change {
-        let popup = Popup::new(
-            "Settings".to_string(),
-            vec![
-                "Path to the current settings:".to_string(),
-                format!(" {}", settings.path().to_string_lossy().to_string()),
-            ],
-        );
-
-        Change::push(Activity::new_base("settings".to_string(), Box::new(popup)))
+        Change::push(Activity::new_base(
+            "settings".to_string(),
+            Box::new(settings::SettingsActivity::new(settings)),
+        ))
     }
 
-    fn show_controls_popup(&mut self) -> Change {
-        Change::push(create_controls_popup())
+    fn show_controls_popup(&mut self, settings: &Settings) -> Change {
+        Change::push(create_controls_popup(settings))
     }
 
-    fn show_about_popup(&mut self) -> Change {
+    fn show_about_popup(&mut self, settings: &Settings) -> Change {
         let popup = Popup::new(
             "About".to_string(),
             vec![
@@ -130,7 +121,8 @@ impl MainMenu {
                 "Version:".to_string(),
                 format!("    {}", env!("CARGO_PKG_VERSION")),
             ],
-        );
+        )
+        .styles_from_settings(settings);
 
         Change::push(Activity::new_base("about".to_string(), Box::new(popup)))
     }
@@ -173,10 +165,9 @@ impl ActivityHandler for MainMenu {
                 match index {
                     0 /* new game */ => Some(self.start_new_game(&data.settings, &data.use_data)),
                     1 /* settings */ => Some(self.show_settings_screen(&data.settings)),
-                    2 /* audio    */ => Some(Change::push(create_audio_settings(data))),
-                    3 /* controls */ => Some(self.show_controls_popup()),
-                    4 /* about    */ => Some(self.show_about_popup()),
-                    5 /* quit     */ => Some(Change::pop_top()),
+                    2 /* controls */ => Some(self.show_controls_popup(&data.settings)),
+                    3 /* about    */ => Some(self.show_about_popup(&data.settings)),
+                    4 /* quit     */ => Some(Change::pop_top()),
                     _ => panic!("main menu should only return valid index between 0 and 4"),
                 }
             }
@@ -467,7 +458,7 @@ impl PauseMenu {
                     "Resume".to_string(),
                     "Main Menu".to_string(),
                     "Controls".to_string(),
-                    "Audio".to_string(),
+                    "Settings".to_string(),
                     "Quit".to_string(),
                 ],
             )
@@ -489,8 +480,8 @@ impl ActivityHandler for PauseMenu {
                     match index {
                         0 /* resume    */ => Some(Change::pop_top()),
                         1 /* main menu */ => Some(Change::pop_until("main menu")),
-                        2 /* controls  */ => Some(Change::push(create_controls_popup())),
-                        3 /* audio     */ => Some(Change::push(create_audio_settings(data))),
+                        2 /* controls  */ => Some(Change::push(create_controls_popup(&data.settings))),
+                        3 /* settings  */ => Some(Change::push(SettingsActivity::new_activity(&data.settings))),
                         4 /* quit      */ => Some(Change::pop_all()),
                         _ => panic!(),
                     }
@@ -513,7 +504,7 @@ pub struct EndGamePopup {
 }
 
 impl EndGamePopup {
-    pub fn new(game: &RunningGame, color_scheme: ColorScheme) -> Self {
+    pub fn new(game: &RunningGame, settings: &Settings) -> Self {
         let maze_size = game.get_maze().size();
         let texts = vec![
             format!(
@@ -524,10 +515,7 @@ impl EndGamePopup {
             format!("Size:  {}x{}x{}", maze_size.0, maze_size.1, maze_size.2,),
         ];
 
-        let popup = Popup::new("You won".to_string(), texts)
-            .box_style(color_scheme.normals())
-            .text_style(color_scheme.texts())
-            .title_style(color_scheme.texts());
+        let popup = Popup::new("You won".to_string(), texts).styles_from_settings(settings);
 
         let game_mode = game.get_game_mode();
         let gen_fn = game.get_gen_fn();
@@ -573,7 +561,6 @@ impl ActivityHandler for EndGamePopup {
 
 pub struct GameActivity {
     camera_mode: CameraMode,
-    color_scheme: ColorScheme,
     game: GameData,
     maze_board: MazeBoard,
     show_debug: bool,
@@ -587,7 +574,6 @@ impl GameActivity {
     pub fn new(game: GameData, app_data: &mut AppData) -> Self {
         let settings = &app_data.settings;
         let camera_mode = settings.get_camera_mode();
-        let color_scheme = settings.get_color_scheme();
         let maze_board = MazeBoard::new(&game.game, settings);
 
         #[cfg(feature = "sound")]
@@ -598,7 +584,6 @@ impl GameActivity {
 
         Self {
             camera_mode,
-            color_scheme,
             game,
             maze_board,
             show_debug: false,
@@ -684,7 +669,12 @@ impl GameActivity {
         draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
     }
 
-    pub fn render_visited_places(&self, frame: &mut Frame, maze_pos: Dims) {
+    pub fn render_visited_places(
+        &self,
+        frame: &mut Frame,
+        maze_pos: Dims,
+        color_scheme: &ColorScheme,
+    ) {
         use CellWall::{Down, Up};
 
         let game = &self.game.game;
@@ -692,7 +682,7 @@ impl GameActivity {
             let cell = game.get_maze().get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
                 let real_pos = maze2screen(*move_pos) + maze_pos;
-                frame.draw_styled(real_pos, '.', self.color_scheme.normals());
+                frame.draw_styled(real_pos, '.', color_scheme.normals());
             }
         }
     }
@@ -760,10 +750,7 @@ impl ActivityHandler for GameActivity {
                 1,
                 Activity::new_base(
                     "won".to_string(),
-                    Box::new(EndGamePopup::new(
-                        &self.game.game,
-                        self.color_scheme.clone(),
-                    )),
+                    Box::new(EndGamePopup::new(&self.game.game, &data.settings)),
                 ),
             ));
         };
@@ -777,9 +764,8 @@ impl ActivityHandler for GameActivity {
 }
 
 impl Screen for GameActivity {
-    fn draw(&self, frame: &mut crate::renderer::Frame) -> std::io::Result<()> {
+    fn draw(&self, frame: &mut Frame, color_scheme: &ColorScheme) -> std::io::Result<()> {
         let maze_frame = self.current_floor_frame();
-        let color_scheme = &self.color_scheme;
         let game = &self.game.game;
 
         let (vp_size, does_fit) = self.viewport_size(frame.size);
@@ -796,7 +782,7 @@ impl Screen for GameActivity {
 
         // maze
         viewport.draw(maze_pos, maze_frame);
-        self.render_visited_places(&mut viewport, maze_pos);
+        self.render_visited_places(&mut viewport, maze_pos, color_scheme);
 
         // player
         if (self.game.game.get_player_pos().2) == self.sm_camera_pos.2 {

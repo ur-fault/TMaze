@@ -1,7 +1,7 @@
 use std::io;
 pub use std::time::Duration;
 
-use crate::{core::*, renderer::Frame};
+use crate::{core::*, renderer::Frame, settings::ColorScheme};
 
 pub mod draw;
 pub mod helpers;
@@ -16,5 +16,5 @@ pub use popup::*;
 pub use progressbar::*;
 
 pub trait Screen {
-    fn draw(&self, frame: &mut Frame) -> io::Result<()>;
+    fn draw(&self, frame: &mut Frame, color_scheme: &ColorScheme) -> io::Result<()>;
 }
