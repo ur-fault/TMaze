@@ -22,6 +22,7 @@ use crate::{
     },
     helpers::{is_release, LineDir, MbyStaticStr},
     renderer::Frame,
+    settings::{ColorScheme, Settings},
 };
 
 use super::{center_box_in_screen, draw_box, Screen};
@@ -153,9 +154,12 @@ impl fmt::Debug for MenuItem {
 }
 
 pub struct MenuConfig {
-    pub box_style: ContentStyle,
-    pub text_style: ContentStyle,
+    pub box_style: Option<ContentStyle>,
+    pub text_style: Option<ContentStyle>,
+    pub title_style: Option<ContentStyle>,
+    pub subtitle_style: Option<ContentStyle>,
     pub title: String,
+    pub subtitles: Vec<String>,
     pub options: Vec<MenuItem>,
     pub default: Option<usize>,
     pub counted: bool,
@@ -174,14 +178,24 @@ impl MenuConfig {
 
     pub fn new(title: impl Into<String>, options: impl Into<Vec<MenuItem>>) -> Self {
         Self {
-            box_style: ContentStyle::default(),
-            text_style: ContentStyle::default(),
+            box_style: None,
+            text_style: None,
+            title_style: None,
+            subtitle_style: None,
             title: title.into(),
+            subtitles: vec![],
             options: options.into(),
             default: None,
             counted: false,
             q_to_quit: true,
         }
+    }
+
+    pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
+        let colorscheme = settings.get_color_scheme();
+        self.box_style = Some(colorscheme.normals());
+        self.text_style = Some(colorscheme.texts());
+        self
     }
 
     pub fn counted(mut self) -> Self {
@@ -200,17 +214,37 @@ impl MenuConfig {
     }
 
     pub fn box_style(mut self, style: ContentStyle) -> Self {
-        self.box_style = style;
+        self.box_style = Some(style);
         self
     }
 
     pub fn text_style(mut self, style: ContentStyle) -> Self {
-        self.text_style = style;
+        self.text_style = Some(style);
+        self
+    }
+
+    pub fn title_style(mut self, style: ContentStyle) -> Self {
+        self.title_style = Some(style);
+        self
+    }
+
+    pub fn subtitle_style(mut self, style: ContentStyle) -> Self {
+        self.subtitle_style = Some(style);
         self
     }
 
     pub fn no_q(mut self) -> Self {
         self.q_to_quit = false;
+        self
+    }
+
+    pub fn subtitle(mut self, subtitle: impl Into<String>) -> Self {
+        self.subtitles.push(subtitle.into());
+        self
+    }
+
+    pub fn subtitles(mut self, subtitles: impl Into<Vec<String>>) -> Self {
+        self.subtitles.extend(subtitles.into());
         self
     }
 
@@ -264,17 +298,29 @@ impl Menu {
 
     fn menu_size(&self, frame: &mut Frame) -> Dims {
         let special = self.config.special_width();
+
+        let subtitles_width = self
+            .config
+            .subtitles
+            .iter()
+            .map(|s| s.width())
+            .max()
+            .unwrap_or(0);
+
         let items_width = self
             .config
             .map_options(move |opt| opt.width(special).unwrap_or(0))
             .max()
             .unwrap_or(0)
-            .max(self.config.title.width())
-            // .max(10) // why copilot, i didn't ask for it
             .min(frame.size.0 as usize);
 
-        let width = items_width + 2;
-        let height = self.config.options.len() + 4;
+        let width = subtitles_width
+            .max(items_width)
+            .max(self.config.title.width() + 2) // title is offseted by 2
+            + 2;
+
+        let width = width + 2;
+        let height = self.config.options.len() + 4 + self.config.subtitles.len();
 
         Dims(width as i32, height as i32)
     }
@@ -394,14 +440,24 @@ impl ActivityHandler for Menu {
 }
 
 impl Screen for Menu {
-    fn draw(&self, frame: &mut Frame) -> Result<(), io::Error> {
+    fn draw(&self, frame: &mut Frame, color_scheme: &ColorScheme) -> Result<(), io::Error> {
         let MenuConfig {
             box_style,
             text_style,
+            title_style,
+            subtitle_style,
             title,
             counted,
             ..
         } = &self.config;
+
+        let title_style = title_style.and(*text_style).unwrap_or(color_scheme.texts());
+        let subtitle_style = subtitle_style
+            .and(*text_style)
+            .unwrap_or(color_scheme.texts());
+
+        let box_style = box_style.unwrap_or(color_scheme.normals());
+        let text_style = text_style.unwrap_or(color_scheme.texts());
 
         let menu_size = self.menu_size(frame);
 
@@ -419,16 +475,30 @@ impl Screen for Menu {
 
         let max_count = opt_count.to_string().len();
 
-        draw_box(frame, pos, menu_size, *box_style);
+        draw_box(frame, pos, menu_size, box_style);
 
-        frame.draw_styled(pos + Dims(3, 1), title.as_str(), *text_style);
+        frame.draw_styled(pos + Dims(3, 1), title.as_str(), title_style);
+
+        let mut items_y = pos.1 + 2;
+
+        for (i, subtitle) in self.config.subtitles.iter().enumerate() {
+            frame.draw_styled(
+                pos + Dims(2, i as i32 + 2),
+                subtitle.as_str(),
+                subtitle_style,
+            );
+            items_y += 1;
+        }
+
+        let items_pos = Dims(pos.0 + 1, items_y);
+
         frame.draw_styled(
-            pos + Dims(1, 2),
+            items_pos,
             LineDir::Horizontal
                 .round()
                 .to_string()
                 .repeat(menu_size.0 as usize - 2),
-            *box_style,
+            box_style,
         );
 
         for (i, option) in options.iter().enumerate() {
@@ -440,7 +510,7 @@ impl Screen for Menu {
                     attributes: Default::default(),
                 }
             } else {
-                *text_style
+                text_style
             };
 
             let mut buf = String::new();
@@ -458,7 +528,8 @@ impl Screen for Menu {
 
             let padded = buf.pad_to_width(menu_size.0 as usize - 2);
 
-            frame.draw_styled(pos + Dims(1, i as i32 + 3), padded, style);
+            // frame.draw_styled(pos + Dims(1, i as i32 + 3), padded, style);
+            frame.draw_styled(items_pos + Dims(0, i as i32 + 1), padded, style);
         }
 
         Ok(())

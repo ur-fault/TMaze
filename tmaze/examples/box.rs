@@ -5,6 +5,7 @@ use tmaze::{
     app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
     renderer::{Cell, Frame},
+    settings::ColorScheme,
     ui::Screen,
 };
 
@@ -40,7 +41,7 @@ impl ActivityHandler for MyActivity {
 }
 
 impl Screen for MyActivity {
-    fn draw(&self, frame: &mut Frame) -> io::Result<()> {
+    fn draw(&self, frame: &mut Frame, _: &ColorScheme) -> io::Result<()> {
         for y in 0..5 {
             for x in 0..5 {
                 frame.set(Dims(x, y), Cell::new('█'));

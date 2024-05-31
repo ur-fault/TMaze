@@ -174,7 +174,10 @@ impl App {
                 .active()
                 .expect("No active active")
                 .screen()
-                .draw(self.renderer.frame())
+                .draw(
+                    self.renderer.frame(),
+                    &self.data.settings.get_color_scheme(),
+                )
                 .unwrap();
 
             logging::get_logger().draw(Dims(0, 0), self.renderer.frame());

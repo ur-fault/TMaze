@@ -4,6 +4,7 @@ use tmaze::{
     app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
     renderer::Frame,
+    settings::ColorScheme,
     ui::Screen,
 };
 
@@ -51,7 +52,7 @@ impl ActivityHandler for MyActivity {
 }
 
 impl Screen for MyActivity {
-    fn draw(&self, _: &mut Frame) -> io::Result<()> {
+    fn draw(&self, _: &mut Frame, _: &ColorScheme) -> io::Result<()> {
         Ok(())
     }
 }

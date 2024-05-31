@@ -8,11 +8,11 @@ use crossterm::event::KeyEventKind;
 use crate::core::*;
 use crate::gameboard::Maze;
 
-pub fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
+pub const fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
     (container_end - container_start - item_width) / 2 + container_start
 }
 
-pub fn box_center(container_start: Dims, container_end: Dims, box_dims: Dims) -> Dims {
+pub const fn box_center(container_start: Dims, container_end: Dims, box_dims: Dims) -> Dims {
     Dims(
         line_center(container_start.0, container_end.0, box_dims.0),
         line_center(container_start.1, container_end.1, box_dims.1),
@@ -196,34 +196,20 @@ macro_rules! lerp {
     };
 }
 
-pub fn yes_no(b: bool, capitalized: bool) -> &'static str {
-    if b {
-        if capitalized {
-            "Yes"
-        } else {
-            "yes"
-        }
-    } else {
-        if capitalized {
-            "No"
-        } else {
-            "no"
-        }
+pub const fn yes_no(b: bool, capitalized: bool) -> &'static str {
+    match (b, capitalized) {
+        (true, true) => "Yes",
+        (true, false) => "yes",
+        (false, true) => "No",
+        (false, false) => "no",
     }
 }
 
-pub fn on_off(b: bool, capitalized: bool) -> &'static str {
-    if b {
-        if capitalized {
-            "On"
-        } else {
-            "on"
-        }
-    } else {
-        if capitalized {
-            "Off"
-        } else {
-            "off"
-        }
+pub const fn on_off(val: bool, capitalized: bool) -> &'static str {
+    match (val, capitalized) {
+        (true, true) => "On",
+        (true, false) => "on",
+        (false, true) => "Off",
+        (false, false) => "off",
     }
 }
