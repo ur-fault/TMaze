@@ -376,7 +376,13 @@ impl ActivityHandler for Menu {
 
         if non_sep_count == 1 {
             log::warn!("Menu with only one option, returning that");
-            return Some(Change::pop_top_with::<usize>(0));
+            let first_non_separator = self
+                .config
+                .options
+                .iter()
+                .position(|opt| !matches!(opt, MenuItem::Separator))
+                .unwrap();
+            return Some(Change::pop_top_with::<usize>(first_non_separator));
         } else if non_sep_count == 0 {
             log::warn!("Empty menu, returning `None`");
             return Some(Change::pop_top());
