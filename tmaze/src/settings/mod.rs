@@ -12,9 +12,11 @@ use std::{
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
-    sound::create_audio_settings,
     ui::{style_with_attribute, Menu, MenuConfig, Popup, Screen},
 };
+
+#[cfg(feature = "sound")]
+use crate::sound::create_audio_settings;
 
 const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
 
@@ -457,7 +459,10 @@ impl SettingsActivity {
         let menu_config = MenuConfig::new_from_strings(
             "Settings",
             vec![
-                "Audio".to_string(),
+                #[cfg(feature = "sound")]
+                {
+                    "Audio".to_string()
+                },
                 "Other settings".to_string(),
                 "Back".to_string(),
             ],
@@ -487,10 +492,17 @@ impl ActivityHandler for SettingsActivity {
                 let index = *sub_activity
                     .downcast::<usize>()
                     .expect("menu should return index");
+                #[cfg(feature = "sound")]
                 match index {
                     0 /* audio */ => Some(Change::push(create_audio_settings(data))),
                     1 /* other */ => Some(Change::push(Self::other_settings_popup(&data.settings))),
                     2 /* back  */ => Some(Change::pop_top()),
+                    _ => panic!("main menu should only return valid index between 0 and 2"),
+                }
+                #[cfg(not(feature = "sound"))]
+                match index {
+                    0 /* other */ => Some(Change::push(Self::other_settings_popup(&data.settings))),
+                    1 /* back  */ => Some(Change::pop_top()),
                     _ => panic!("main menu should only return valid index between 0 and 2"),
                 }
             }
