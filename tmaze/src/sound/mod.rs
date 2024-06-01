@@ -127,5 +127,5 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
         ],
     );
 
-    Activity::new_base("audio settings", Box::new(menu::Menu::new(menu_config)))
+    Activity::new_base_boxed("audio settings", menu::Menu::new(menu_config))
 }

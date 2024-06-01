@@ -7,16 +7,16 @@ use tmaze::{
 };
 
 fn main() -> io::Result<()> {
-    let mut app = App::new(Activity::new_base(
+    let mut app = App::new(Activity::new_base_boxed(
         "popup",
-        Box::new(popup::Popup::new(
+        popup::Popup::new(
             "Title".to_string(),
             vec![
                 "Line 1".to_string(),
                 "Line 2".to_string(),
                 "Line 3".to_string(),
             ],
-        )),
+        ),
     ));
 
     let res = app.run();

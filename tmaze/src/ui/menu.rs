@@ -382,7 +382,7 @@ impl ActivityHandler for Menu {
                 .iter()
                 .position(|opt| !matches!(opt, MenuItem::Separator))
                 .unwrap();
-            return Some(Change::pop_top_with::<usize>(first_non_separator));
+            return Some(Change::pop_top_with(first_non_separator));
         } else if non_sep_count == 0 {
             log::warn!("Empty menu, returning `None`");
             return Some(Change::pop_top());

@@ -454,7 +454,7 @@ impl SettingsActivity {
         )
         .styles_from_settings(settings);
 
-        Activity::new_base("settings".to_string(), Box::new(popup))
+        Activity::new_base_boxed("settings".to_string(), popup)
     }
 }
 
@@ -483,7 +483,7 @@ impl SettingsActivity {
     }
 
     pub fn new_activity(settings: &Settings) -> Activity {
-        Activity::new_base("settings".to_string(), Box::new(Self::new(settings)))
+        Activity::new_base_boxed("settings".to_string(), Self::new(settings))
     }
 }
 
