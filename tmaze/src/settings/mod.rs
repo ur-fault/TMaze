@@ -13,7 +13,7 @@ use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
     menu_actions,
-    ui::{style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
+    ui::{split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
 };
 
 #[cfg(feature = "sound")]
@@ -466,21 +466,15 @@ impl SettingsActivity {
             "Back" -> _ => Change::pop_top(),
         );
 
-        let menu_config = MenuConfig::new_from_strings(
-            "Settings",
-            options
-                .iter()
-                .map(|(name, _)| String::from(*name))
-                .collect::<Vec<_>>(),
-        )
-        .styles_from_settings(settings)
-        .subtitle("Changes are not saved")
-        .subtitle_style(style_with_attribute(
-            settings.get_color_scheme().texts(),
-            crossterm::style::Attribute::Dim,
-        ));
+        let (options, actions) = split_menu_actions(options);
 
-        let actions = options.into_iter().map(|(_, action)| action).collect();
+        let menu_config = MenuConfig::new_from_strings("Settings", options)
+            .styles_from_settings(settings)
+            .subtitle("Changes are not saved")
+            .subtitle_style(style_with_attribute(
+                settings.get_color_scheme().texts(),
+                crossterm::style::Attribute::Dim,
+            ));
 
         Self {
             actions,

@@ -534,7 +534,6 @@ impl Screen for Menu {
 
             let padded = buf.pad_to_width(menu_size.0 as usize - 2);
 
-            // frame.draw_styled(pos + Dims(1, i as i32 + 3), padded, style);
             frame.draw_styled(items_pos + Dims(0, i as i32 + 1), padded, style);
         }
 
@@ -557,4 +556,15 @@ macro_rules! menu_actions {
             opts
         }
     };
+}
+
+pub fn split_menu_actions<R>(
+    actions: Vec<(&str, MenuAction<R>)>,
+) -> (Vec<String>, Vec<MenuAction<R>>) {
+    let (names, actions) = actions
+        .into_iter()
+        .map(|(title, action)| (String::from(title), action))
+        .unzip();
+
+    (names, actions)
 }
