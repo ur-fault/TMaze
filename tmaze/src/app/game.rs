@@ -13,10 +13,13 @@ use cmaze::{
 use crate::{
     app::{game_state::GameData, GameViewMode},
     helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
-    lerp,
+    lerp, menu_actions,
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
-    ui::{self, draw_box, multisize_string, Menu, Popup, ProgressBar, Screen},
+    ui::{
+        self, draw_box, multisize_string, split_menu_actions, Menu, MenuAction, MenuConfig, Popup,
+        ProgressBar, Screen,
+    },
 };
 
 #[cfg(feature = "sound")]
@@ -66,6 +69,7 @@ pub fn create_controls_popup(settings: &Settings) -> Activity {
 
 pub struct MainMenu {
     menu: Menu,
+    actions: Vec<MenuAction<Change>>,
 
     #[cfg(feature = "updates")]
     update_checked: bool,
@@ -73,39 +77,41 @@ pub struct MainMenu {
 
 impl MainMenu {
     pub fn new(settings: &Settings) -> Self {
+        let options = menu_actions!(
+            "New Game" -> data => Self::start_new_game(&data.settings, &data.use_data),
+            "Settings" -> data => Self::show_settings_screen(&data.settings),
+            "Controls" -> data => Self::show_controls_popup(&data.settings),
+            "About" -> data => Self::show_about_popup(&data.settings),
+            "Quit" -> _ => Change::pop_top(),
+        );
+
+        let (options, actions) = split_menu_actions(options);
+
         Self {
             menu: Menu::new(
-                ui::MenuConfig::new_from_strings(
-                    "TMaze".to_string(),
-                    vec![
-                        "New Game".to_string(),
-                        "Settings".to_string(),
-                        "Controls".to_string(),
-                        "About".to_string(),
-                        "Quit".to_string(),
-                    ],
-                )
-                .counted()
-                .styles_from_settings(settings),
+                MenuConfig::new_from_strings("TMaze", options)
+                    .counted()
+                    .styles_from_settings(settings),
             ),
+            actions,
 
             #[cfg(feature = "updates")]
             update_checked: false,
         }
     }
 
-    fn show_settings_screen(&mut self, settings: &Settings) -> Change {
+    fn show_settings_screen(settings: &Settings) -> Change {
         Change::push(Activity::new_base(
             "settings".to_string(),
             Box::new(settings::SettingsActivity::new(settings)),
         ))
     }
 
-    fn show_controls_popup(&mut self, settings: &Settings) -> Change {
+    fn show_controls_popup(settings: &Settings) -> Change {
         Change::push(create_controls_popup(settings))
     }
 
-    fn show_about_popup(&mut self, settings: &Settings) -> Change {
+    fn show_about_popup(settings: &Settings) -> Change {
         let popup = Popup::new(
             "About".to_string(),
             vec![
@@ -127,7 +133,7 @@ impl MainMenu {
         Change::push(Activity::new_base("about".to_string(), Box::new(popup)))
     }
 
-    fn start_new_game(&mut self, settings: &Settings, use_data: &AppStateData) -> Change {
+    fn start_new_game(settings: &Settings, use_data: &AppStateData) -> Change {
         Change::push(Activity::new_base(
             "maze size",
             Box::new(MazeSizeMenu::new(settings, use_data)),
@@ -162,14 +168,7 @@ impl ActivityHandler for MainMenu {
                 let index = *sub_activity
                     .downcast::<usize>()
                     .expect("menu should return index");
-                match index {
-                    0 /* new game */ => Some(self.start_new_game(&data.settings, &data.use_data)),
-                    1 /* settings */ => Some(self.show_settings_screen(&data.settings)),
-                    2 /* controls */ => Some(self.show_controls_popup(&data.settings)),
-                    3 /* about    */ => Some(self.show_about_popup(&data.settings)),
-                    4 /* quit     */ => Some(Change::pop_top()),
-                    _ => panic!("main menu should only return valid index between 0 and 4"),
-                }
+                Some(self.actions[index](data))
             }
             res => Some(res),
         }
@@ -188,7 +187,7 @@ pub struct MazeSizeMenu {
 impl MazeSizeMenu {
     pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
         let color_scheme = settings.get_color_scheme();
-        let mut menu_config = ui::MenuConfig::new_from_strings(
+        let mut menu_config = MenuConfig::new_from_strings(
             "Maze size".to_string(),
             settings
                 .get_mazes()
@@ -256,26 +255,31 @@ impl ActivityHandler for MazeSizeMenu {
 pub struct MazeAlgorithmMenu {
     preset: GameMode,
     menu: Menu,
+    functions: Vec<MenuAction<GeneratorFn>>,
 }
 
 impl MazeAlgorithmMenu {
     pub fn new(preset: GameMode, settings: &Settings) -> Self {
-        let color_scheme = settings.get_color_scheme();
-        let menu_config = ui::MenuConfig::new_from_strings(
-            "Maze generation algorithm".to_string(),
-            vec![
-                "Randomized Kruskal's".to_string(),
-                "Depth-first search".to_string(),
-            ],
-        )
-        .counted()
-        .box_style(color_scheme.normals())
-        .text_style(color_scheme.texts())
-        .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
+        let options = menu_actions!(
+            "Randomized Kruskal's" -> _ => RndKruskals::generate as GeneratorFn,
+            "Depth-first search" -> _ => DepthFirstSearch::generate,
+        );
+
+        let (options, functions) = split_menu_actions(options);
+
+        let menu_config =
+            MenuConfig::new_from_strings("Maze generation algorithm".to_string(), options)
+                .counted()
+                .styles_from_settings(settings)
+                .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
 
         let menu = Menu::new(menu_config);
 
-        Self { menu, preset }
+        Self {
+            menu,
+            preset,
+            functions,
+        }
     }
 }
 
@@ -299,11 +303,7 @@ impl ActivityHandler for MazeAlgorithmMenu {
                 } => {
                     let index = *algo.downcast::<usize>().expect("menu should return index");
 
-                    let gen = match index {
-                        0 => RndKruskals::generate,
-                        1 => DepthFirstSearch::generate,
-                        _ => panic!(),
-                    };
+                    let gen = self.functions[index](data);
 
                     Some(Change::push(Activity::new_base(
                         "maze_gen".to_string(),
@@ -446,27 +446,26 @@ impl ActivityHandler for MazeGenerationActivity {
 
 pub struct PauseMenu {
     menu: Menu,
+    actions: Vec<MenuAction<Change>>,
 }
 
 impl PauseMenu {
     pub fn new(settings: &Settings) -> Self {
-        let color_scheme = settings.get_color_scheme();
-        let menu = Menu::new(
-            ui::MenuConfig::new_from_strings(
-                "Paused".to_string(),
-                vec![
-                    "Resume".to_string(),
-                    "Main Menu".to_string(),
-                    "Controls".to_string(),
-                    "Settings".to_string(),
-                    "Quit".to_string(),
-                ],
-            )
-            .box_style(color_scheme.normals())
-            .text_style(color_scheme.texts()),
+        let options = menu_actions!(
+            "Resume" -> _ => Change::pop_top(),
+            "Main Menu" -> _ => Change::pop_until("main menu"),
+            "Controls" -> data => Change::push(create_controls_popup(&data.settings)),
+            "Settings" -> data => Change::push(SettingsActivity::new_activity(&data.settings)),
+            "Quit" -> _ => Change::pop_all(),
         );
 
-        Self { menu }
+        let (options, actions) = split_menu_actions(options);
+
+        let menu = Menu::new(
+            MenuConfig::new_from_strings("Paused", options).styles_from_settings(settings),
+        );
+
+        Self { menu, actions }
     }
 }
 
@@ -477,14 +476,7 @@ impl ActivityHandler for PauseMenu {
                 Change::Pop { res: Some(res), .. } => {
                     let index = *res.downcast::<usize>().expect("menu should return index");
 
-                    match index {
-                        0 /* resume    */ => Some(Change::pop_top()),
-                        1 /* main menu */ => Some(Change::pop_until("main menu")),
-                        2 /* controls  */ => Some(Change::push(create_controls_popup(&data.settings))),
-                        3 /* settings  */ => Some(Change::push(SettingsActivity::new_activity(&data.settings))),
-                        4 /* quit      */ => Some(Change::pop_all()),
-                        _ => panic!(),
-                    }
+                    Some((self.actions[index])(data))
                 }
                 res => Some(res),
             },

@@ -4,11 +4,14 @@ use std::{
 };
 
 use cmaze::core::Dims;
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::{Attribute, Color, ContentStyle};
 use log::{Log, Metadata, Record};
 use unicode_width::UnicodeWidthStr;
 
-use crate::renderer::{self, drawable::Drawable};
+use crate::{
+    renderer::{self, drawable::Drawable},
+    ui::style_with_attribute,
+};
 
 static LOGGER: OnceLock<AppLogger> = OnceLock::new();
 
@@ -169,10 +172,7 @@ impl Drawable for AppLogger {
                 ..style
             };
 
-            let source_style = ContentStyle {
-                attributes: style.attributes | crossterm::style::Attribute::Dim,
-                ..style
-            };
+            let source_style = style_with_attribute(style, Attribute::Dim);
 
             let y = pos.1 + i as i32;
             let len = log.source.width() + 4 + log.message.width();
