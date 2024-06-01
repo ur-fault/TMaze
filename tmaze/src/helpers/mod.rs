@@ -191,7 +191,7 @@ impl Deref for MbyStaticStr {
 
 #[macro_export]
 macro_rules! lerp {
-    (($a:expr) -> ($b:expr) : $t:expr) => {
+    (($a:expr) -> ($b:expr) at $t:expr) => {
         $a + ($b - $a) * $t
     };
 }

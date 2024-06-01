@@ -710,30 +710,32 @@ impl ActivityHandler for GameActivity {
                 CameraMode::CloseFollow => {
                     self.game.camera_pos = maze2screen_3d(self.game.game.get_player_pos());
                 }
-                CameraMode::EdgeFollow(xoff, yoff) => {
+                CameraMode::EdgeFollow(xoff, yoff) => 'b: {
                     let (vp_size, does_fit) = self.viewport_size(data.screen_size);
-                    if !does_fit {
-                        let xoff = xoff.to_abs(vp_size.0);
-                        let yoff = yoff.to_abs(vp_size.1);
+                    if does_fit {
+                        break 'b;
+                    }
 
-                        let player_pos = maze2screen(self.game.game.get_player_pos());
-                        let player_pos_in_vp =
-                            player_pos - self.game.camera_pos.into() + vp_size / 2 + Dims(1, 1);
+                    let xoff = xoff.to_abs(vp_size.0);
+                    let yoff = yoff.to_abs(vp_size.1);
 
-                        if player_pos_in_vp.0 < xoff || player_pos_in_vp.0 > vp_size.0 - xoff {
-                            self.game.camera_pos.0 = player_pos.0;
-                        }
+                    let player_pos = maze2screen(self.game.game.get_player_pos());
+                    let player_pos_in_vp =
+                        player_pos - self.game.camera_pos.into() + vp_size / 2 + Dims(1, 1);
 
-                        if player_pos_in_vp.1 < yoff || player_pos_in_vp.1 > vp_size.1 - yoff {
-                            self.game.camera_pos.1 = player_pos.1;
-                        }
+                    if player_pos_in_vp.0 < xoff || player_pos_in_vp.0 > vp_size.0 - xoff {
+                        self.game.camera_pos.0 = player_pos.0;
+                    }
+
+                    if player_pos_in_vp.1 < yoff || player_pos_in_vp.1 > vp_size.1 - yoff {
+                        self.game.camera_pos.1 = player_pos.1;
                     }
                 }
             }
         }
 
-        self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.game.game.get_player_pos())) : data.settings.get_player_smoothing());
-        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.game.camera_pos) : data.settings.get_camera_smoothing());
+        self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.game.game.get_player_pos())) at data.settings.get_player_smoothing());
+        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.game.camera_pos) at data.settings.get_camera_smoothing());
 
         self.show_debug = data.use_data.show_debug;
 
