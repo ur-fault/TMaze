@@ -541,3 +541,20 @@ impl Screen for Menu {
         Ok(())
     }
 }
+
+pub type MenuAction<R> = Box<dyn Fn(&mut AppData) -> R>;
+
+#[macro_export]
+macro_rules! menu_actions {
+    ($($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
+        {
+            let opts: Vec<(_, Box<dyn Fn(&mut AppData) -> _>)> = vec![
+                $(
+                    $(#[cfg(feature = $feature)])? { ($name, Box::new(|$data: &mut AppData| $action)) },
+                )*
+            ];
+
+            opts
+        }
+    };
+}

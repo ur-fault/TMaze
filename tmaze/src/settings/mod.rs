@@ -12,7 +12,8 @@ use std::{
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
-    ui::{style_with_attribute, Menu, MenuConfig, Popup, Screen},
+    menu_actions,
+    ui::{style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
 };
 
 #[cfg(feature = "sound")]
@@ -434,7 +435,10 @@ impl Settings {
     }
 }
 
-pub struct SettingsActivity(Menu);
+pub struct SettingsActivity {
+    actions: Vec<MenuAction<Change>>,
+    menu: Menu,
+}
 
 impl SettingsActivity {
     fn other_settings_popup(settings: &Settings) -> Activity {
@@ -456,16 +460,18 @@ impl SettingsActivity {
 
 impl SettingsActivity {
     pub fn new(settings: &Settings) -> Self {
+        let options = menu_actions!(
+            "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
+            "Other settings" -> data => Change::push(SettingsActivity::other_settings_popup(&data.settings)),
+            "Back" -> _ => Change::pop_top(),
+        );
+
         let menu_config = MenuConfig::new_from_strings(
             "Settings",
-            vec![
-                #[cfg(feature = "sound")]
-                {
-                    "Audio".to_string()
-                },
-                "Other settings".to_string(),
-                "Back".to_string(),
-            ],
+            options
+                .iter()
+                .map(|(name, _)| String::from(*name))
+                .collect::<Vec<_>>(),
         )
         .styles_from_settings(settings)
         .subtitle("Changes are not saved")
@@ -474,7 +480,12 @@ impl SettingsActivity {
             crossterm::style::Attribute::Dim,
         ));
 
-        Self(Menu::new(menu_config))
+        let actions = options.into_iter().map(|(_, action)| action).collect();
+
+        Self {
+            actions,
+            menu: Menu::new(menu_config),
+        }
     }
 
     pub fn new_activity(settings: &Settings) -> Activity {
@@ -484,7 +495,7 @@ impl SettingsActivity {
 
 impl ActivityHandler for SettingsActivity {
     fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
-        match self.0.update(events, data)? {
+        match self.menu.update(events, data)? {
             Change::Pop {
                 res: Some(sub_activity),
                 ..
@@ -492,25 +503,13 @@ impl ActivityHandler for SettingsActivity {
                 let index = *sub_activity
                     .downcast::<usize>()
                     .expect("menu should return index");
-                #[cfg(feature = "sound")]
-                match index {
-                    0 /* audio */ => Some(Change::push(create_audio_settings(data))),
-                    1 /* other */ => Some(Change::push(Self::other_settings_popup(&data.settings))),
-                    2 /* back  */ => Some(Change::pop_top()),
-                    _ => panic!("main menu should only return valid index between 0 and 2"),
-                }
-                #[cfg(not(feature = "sound"))]
-                match index {
-                    0 /* other */ => Some(Change::push(Self::other_settings_popup(&data.settings))),
-                    1 /* back  */ => Some(Change::pop_top()),
-                    _ => panic!("main menu should only return valid index between 0 and 2"),
-                }
+                Some((self.actions[index])(data))
             }
             res => Some(res),
         }
     }
 
     fn screen(&self) -> &dyn Screen {
-        &self.0
+        &self.menu
     }
 }
