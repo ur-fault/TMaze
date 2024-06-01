@@ -49,7 +49,7 @@ fn main() -> Result<(), GameError> {
     let mut app = App::empty();
     let menu = MainMenu::new(&app.data().settings);
     app.activities_mut()
-        .push(Activity::new_base("main menu", Box::new(menu)));
+        .push(Activity::new_base_boxed("main menu", menu));
 
     app.run();
 

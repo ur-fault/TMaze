@@ -64,7 +64,7 @@ pub fn create_controls_popup(settings: &Settings) -> Activity {
     )
     .styles_from_settings(settings);
 
-    Activity::new_base("controls".to_string(), Box::new(popup))
+    Activity::new_base_boxed("controls".to_string(), popup)
 }
 
 pub struct MainMenu {
@@ -101,9 +101,9 @@ impl MainMenu {
     }
 
     fn show_settings_screen(settings: &Settings) -> Change {
-        Change::push(Activity::new_base(
+        Change::push(Activity::new_base_boxed(
             "settings".to_string(),
-            Box::new(settings::SettingsActivity::new(settings)),
+            settings::SettingsActivity::new(settings),
         ))
     }
 
@@ -130,13 +130,13 @@ impl MainMenu {
         )
         .styles_from_settings(settings);
 
-        Change::push(Activity::new_base("about".to_string(), Box::new(popup)))
+        Change::push(Activity::new_base_boxed("about".to_string(), popup))
     }
 
     fn start_new_game(settings: &Settings, use_data: &AppStateData) -> Change {
-        Change::push(Activity::new_base(
+        Change::push(Activity::new_base_boxed(
             "maze size",
-            Box::new(MazeSizeMenu::new(settings, use_data)),
+            MazeSizeMenu::new(settings, use_data),
         ))
     }
 
@@ -154,9 +154,9 @@ impl ActivityHandler for MainMenu {
         #[cfg(feature = "updates")]
         if !self.update_checked {
             self.update_checked = true;
-            return Some(Change::push(Activity::new_base(
+            return Some(Change::push(Activity::new_base_boxed(
                 "update check",
-                Box::new(UpdateCheckerActivity::new(&data.settings, &data.save)),
+                UpdateCheckerActivity::new(&data.settings, &data.save),
             )));
         }
 
@@ -236,9 +236,9 @@ impl ActivityHandler for MazeSizeMenu {
 
                     let preset = self.presets[index];
 
-                    Some(Change::push(Activity::new_base(
+                    Some(Change::push(Activity::new_base_boxed(
                         "maze_gen".to_string(),
-                        Box::new(MazeAlgorithmMenu::new(preset, &data.settings)),
+                        MazeAlgorithmMenu::new(preset, &data.settings),
                     )))
                 }
                 res => Some(res),
@@ -286,13 +286,13 @@ impl MazeAlgorithmMenu {
 impl ActivityHandler for MazeAlgorithmMenu {
     fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         if data.settings.get_dont_ask_for_maze_algo() {
-            return Some(Change::push(Activity::new_base(
+            return Some(Change::push(Activity::new_base_boxed(
                 "maze_gen".to_string(),
-                Box::new(MazeGenerationActivity::new(
+                MazeGenerationActivity::new(
                     self.preset,
                     data.settings.get_default_maze_gen_algo().to_fn(),
                     &data.settings,
-                )),
+                ),
             )));
         }
 
@@ -305,13 +305,9 @@ impl ActivityHandler for MazeAlgorithmMenu {
 
                     let gen = self.functions[index](data);
 
-                    Some(Change::push(Activity::new_base(
+                    Some(Change::push(Activity::new_base_boxed(
                         "maze_gen".to_string(),
-                        Box::new(MazeGenerationActivity::new(
-                            self.preset,
-                            gen,
-                            &data.settings,
-                        )),
+                        MazeGenerationActivity::new(self.preset, gen, &data.settings),
                     )))
                 }
                 res => Some(res),
@@ -386,9 +382,9 @@ impl ActivityHandler for MazeGenerationActivity {
                             vec![format!("Size: {:?}", size)],
                         );
 
-                        Some(Change::replace(Activity::new_base(
+                        Some(Change::replace(Activity::new_base_boxed(
                             "invalid size".to_string(),
-                            Box::new(popup),
+                            popup,
                         )))
                     }
                 },
@@ -411,9 +407,9 @@ impl ActivityHandler for MazeGenerationActivity {
                             view_mode: GameViewMode::Adventure,
                             player_char: constants::get_random_player_char(),
                         };
-                        Some(Change::replace(Activity::new_base(
+                        Some(Change::replace(Activity::new_base_boxed(
                             "game".to_string(),
-                            Box::new(GameActivity::new(game_data, data)),
+                            GameActivity::new(game_data, data),
                         )))
                     }
                     Err(err) => match err {
@@ -528,13 +524,9 @@ impl ActivityHandler for EndGamePopup {
                 res: Some(code),
             }) => match code.downcast::<KeyCode>() {
                 Ok(b) => match *b {
-                    KeyCode::Char('r') => Some(Change::replace(Activity::new_base(
+                    KeyCode::Char('r') => Some(Change::replace(Activity::new_base_boxed(
                         "game",
-                        Box::new(MazeGenerationActivity::new(
-                            self.game_mode,
-                            self.gen_fn,
-                            &data.settings,
-                        )),
+                        MazeGenerationActivity::new(self.game_mode, self.gen_fn, &data.settings),
                     ))),
                     KeyCode::Char('q') => Some(Change::pop_all()),
                     KeyCode::Enter | KeyCode::Char(' ') => Some(Change::pop_top()),
@@ -694,9 +686,9 @@ impl ActivityHandler for GameActivity {
                     Err(false) => {
                         self.game.game.pause().unwrap();
 
-                        return Some(Change::push(Activity::new_base(
+                        return Some(Change::push(Activity::new_base_boxed(
                             "pause".to_string(),
-                            Box::new(PauseMenu::new(&data.settings)),
+                            PauseMenu::new(&data.settings),
                         )));
                     }
                     Err(true) => return Some(Change::pop_until("main menu")),
@@ -742,9 +734,9 @@ impl ActivityHandler for GameActivity {
         if self.game.game.get_state() == RunningGameState::Finished {
             return Some(Change::replace_at(
                 1,
-                Activity::new_base(
+                Activity::new_base_boxed(
                     "won".to_string(),
-                    Box::new(EndGamePopup::new(&self.game.game, &data.settings)),
+                    EndGamePopup::new(&self.game.game, &data.settings),
                 ),
             ));
         };

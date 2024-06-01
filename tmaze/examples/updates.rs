@@ -11,12 +11,12 @@ use tmaze::updates::UpdateCheckerActivity;
 
 #[cfg(feature = "updates")]
 fn main() {
-    let mut app = App::new(Activity::new_base(
+    let mut app = App::new(Activity::new_base_boxed(
         "activity",
-        Box::new(MyActivity(
+        MyActivity(
             false,
             Popup::new("Press any key to quit".to_string(), vec![]),
-        )),
+        ),
     ));
 
     app.run();
@@ -40,9 +40,9 @@ impl ActivityHandler for MyActivity {
         if !self.0 {
             self.0 = true;
 
-            let update_act = Activity::new_base(
+            let update_act = Activity::new_base_boxed(
                 "update",
-                Box::new(UpdateCheckerActivity::new(&data.settings, &data.save)),
+                UpdateCheckerActivity::new(&data.settings, &data.save),
             );
 
             return Some(tmaze::app::Change::Push(update_act));
