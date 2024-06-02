@@ -1,6 +1,6 @@
 [package]
 name = "tmaze"
-version = "1.15.1"
+version = "1.15.2"
 edition = "2021"
 authors = ["ur-fault"]
 description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
