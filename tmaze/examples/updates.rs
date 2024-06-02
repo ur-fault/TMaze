@@ -7,16 +7,16 @@ use tmaze::{
 };
 
 #[cfg(feature = "updates")]
-use tmaze::updates::UpdateCheckerActivity;
-
-#[cfg(feature = "updates")]
 fn main() {
     let mut app = App::new(Activity::new_base_boxed(
         "activity",
-        MyActivity(
-            false,
-            Popup::new("Press any key to quit".to_string(), vec![]),
-        ),
+        MyActivity(Popup::new(
+            "Checking for updates in the background".to_string(),
+            vec![
+                "Please wait...".to_string(),
+                "Result will be shown in the notification area".to_string(),
+            ],
+        )),
     ));
 
     app.run();
@@ -28,7 +28,7 @@ fn main() {
 }
 
 #[cfg(feature = "updates")]
-struct MyActivity(bool, Popup);
+struct MyActivity(Popup);
 
 #[cfg(feature = "updates")]
 impl ActivityHandler for MyActivity {
@@ -37,21 +37,10 @@ impl ActivityHandler for MyActivity {
         events: Vec<tmaze::app::Event>,
         data: &mut AppData,
     ) -> Option<tmaze::app::Change> {
-        if !self.0 {
-            self.0 = true;
-
-            let update_act = Activity::new_base_boxed(
-                "update",
-                UpdateCheckerActivity::new(&data.settings, &data.save),
-            );
-
-            return Some(tmaze::app::Change::Push(update_act));
-        }
-
-        self.1.update(events, data)
+        self.0.update(events, data)
     }
 
     fn screen(&self) -> &dyn tmaze::ui::Screen {
-        &self.1
+        &self.0
     }
 }

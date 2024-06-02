@@ -21,6 +21,8 @@ use rodio::Source;
 use super::{
     activity::{Activities, Activity, ActivityResult, Change},
     event::Event,
+    jobs::Qer,
+    Jobs,
 };
 
 #[allow(dead_code)]
@@ -35,6 +37,7 @@ pub struct AppData {
     pub save: SaveData,
     pub use_data: AppStateData,
     pub screen_size: Dims,
+    jobs: Jobs,
     app_start: Instant,
 
     #[cfg(feature = "sound")]
@@ -67,6 +70,10 @@ impl AppData {
         let track = track.get_track().repeat_infinite();
         self.sound_player.play_track(Box::new(track));
     }
+
+    pub fn queuer(&self) -> Qer {
+        self.jobs.queuer()
+    }
 }
 
 impl App {
@@ -83,6 +90,7 @@ impl App {
         let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
         let save = SaveData::load().expect("Failed to load save data");
         let use_data = AppStateData::default();
+        let jobs = Jobs::new();
         let app_start = Instant::now();
         let frame_size = renderer.frame_size();
 
@@ -100,6 +108,7 @@ impl App {
                 save,
                 use_data,
                 screen_size: frame_size,
+                jobs,
 
                 #[cfg(feature = "sound")]
                 sound_player,
@@ -113,6 +122,10 @@ impl App {
         log::trace!("Starting main loop");
 
         let rem_events = 'mainloop: loop {
+            while let Some(job) = self.data.jobs.pop() {
+                job.call(&mut self.data);
+            }
+
             let mut events = vec![];
 
             let mut delay = Duration::from_millis(45);
