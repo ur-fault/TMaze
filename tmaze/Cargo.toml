@@ -12,7 +12,7 @@ exclude = [
 ]
 
 [dependencies]
-cmaze = { path = "../cmaze", version = "0.7.0" }
+cmaze = { path = "../cmaze", version = "0.7.0", features = ["hashbrown"] }
 colored = "^2"
 crossterm = { version = "^0.27.0", features = ["serde"] }
 substring = "^1.4.5"
@@ -46,8 +46,7 @@ dunce = "1.0.4"
 mp3lame-encoder = "0.1.4"
 
 [features]
-default = ["hashbrown", "updates", "sound"]
-hashbrown = ["cmaze/hashbrown"]
+default = ["updates", "sound"]
 updates = ["dep:crates_io_api", "dep:semver", "dep:tokio"]
 sound = ["dep:rodio"]
 
