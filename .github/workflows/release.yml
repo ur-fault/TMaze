@@ -37,9 +37,7 @@ jobs:
         run: |
           echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
           echo "DRY_RUN=${{ github.event.inputs.dry-run }}" >> $GITHUB_ENV
-          echo "DO_SMT=${{ github.event.inputs.dry-run != 'yes' }}" >> $GITHUB_ENV
           echo "VERSION: ${{ github.event.inputs.version }}"
-          echo "DRY_RUN: ${{ github.event.inputs.dry-run }}"
 
       - uses: actions/checkout@v4
 
@@ -60,13 +58,13 @@ jobs:
           fi
 
       - name: Create GitHub release
-        if: ${{ env.DO_SMT }}
+        if: env.DRY_RUN != 'yes'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create $VERSION --draft --verify-tag --title $VERSION
     outputs:
       version: ${{ env.VERSION }}
-      do_smt: ${{ env.DO_SMT }}
+      dry_run: ${{ env.DRY_RUN }}
 
   build-release:
     name: build-release
@@ -207,7 +205,7 @@ jobs:
         cp "$BIN" "$NEW_BIN"
 
     - name: Upload release archive
-      if: ${{ fromJSON(needs.create-release.outputs.do_smt) == true }}
+      if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -276,7 +274,7 @@ jobs:
         mv $DEB_DIR/$DEB_BUILD_NAME $DEB_NAME
 
     - name: Upload release archive
-      if: ${{ fromJSON(needs.create-release.outputs.do_smt) == true }}
+      if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -305,7 +303,7 @@ jobs:
         - run: sudo apt update && sudo apt install libasound2-dev
 
         - name: publish cmaze
-          if: ${{ fromJSON(needs.create-release.outputs.do_smt) == true }}
+          if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
           uses: katyo/publish-crates@v2
           with:
               path: ./cmaze
@@ -313,9 +311,10 @@ jobs:
               ignore-unpublished-changes: true
 
         - name: publish tmaze
-          if: ${{ fromJSON(needs.create-release.outputs.do_smt) == true }}
+          if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
           uses: katyo/publish-crates@v2
           with:
               path: ./tmaze
               registry-token: ${{ secrets.CRATES_IO }}
               ignore-unpublished-changes: true
+
