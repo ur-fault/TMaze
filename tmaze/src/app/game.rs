@@ -26,10 +26,6 @@ use crate::{
 #[allow(unused_imports)]
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
-#[cfg(feature = "updates")]
-#[allow(unused_imports)]
-use crate::updates::UpdateCheckerActivity;
-
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 
 #[cfg(feature = "sound")]
@@ -70,9 +66,6 @@ pub fn create_controls_popup(settings: &Settings) -> Activity {
 pub struct MainMenu {
     menu: Menu,
     actions: Vec<MenuAction<Change>>,
-
-    #[cfg(feature = "updates")]
-    update_checked: bool,
 }
 
 impl MainMenu {
@@ -94,9 +87,6 @@ impl MainMenu {
                     .styles_from_settings(settings),
             ),
             actions,
-
-            #[cfg(feature = "updates")]
-            update_checked: false,
         }
     }
 
@@ -150,15 +140,6 @@ impl ActivityHandler for MainMenu {
     fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         #[cfg(feature = "sound")]
         Self::play_menu_bgm(data);
-
-        #[cfg(feature = "updates")]
-        if !self.update_checked {
-            self.update_checked = true;
-            return Some(Change::push(Activity::new_base_boxed(
-                "update check",
-                UpdateCheckerActivity::new(&data.settings, &data.save),
-            )));
-        }
 
         match self.menu.update(events, data)? {
             Change::Pop {

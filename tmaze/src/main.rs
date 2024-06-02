@@ -1,9 +1,10 @@
 use tmaze::{
-    app::{game::MainMenu, Activity, App},
-    *,
+    app::{game::MainMenu, Activity, App, GameError},
+    settings::Settings,
 };
 
-use app::GameError;
+#[cfg(feature = "updates")]
+use tmaze::updates;
 
 use clap::Parser;
 
@@ -16,18 +17,20 @@ struct Args {
     show_config_path: bool,
     #[clap(long, help = "Show config in debug format and quit")]
     debug_config: bool,
+    #[clap(short, long, action, help = "Delete all saved data and quit")]
+    delete_data: bool,
 }
 
 fn main() -> Result<(), GameError> {
     let _args = Args::parse();
 
     if _args.reset_config {
-        settings::Settings::reset_config(settings::Settings::default_path());
+        Settings::reset_config(Settings::default_path());
         return Ok(());
     }
 
     if _args.show_config_path {
-        let settings_path = crate::settings::Settings::default_path();
+        let settings_path = Settings::default_path();
         if let Some(s) = settings_path.to_str() {
             println!("{}", s);
         } else {
@@ -37,10 +40,12 @@ fn main() -> Result<(), GameError> {
     }
 
     if _args.debug_config {
-        println!(
-            "{:#?}",
-            settings::Settings::load(settings::Settings::default_path())
-        );
+        println!("{:#?}", Settings::load(Settings::default_path()));
+        return Ok(());
+    }
+
+    if _args.delete_data {
+        let _ = std::fs::remove_file(tmaze::data::SaveData::default_path());
         return Ok(());
     }
 
@@ -50,6 +55,9 @@ fn main() -> Result<(), GameError> {
     let menu = MainMenu::new(&app.data().settings);
     app.activities_mut()
         .push(Activity::new_base_boxed("main menu", menu));
+
+    #[cfg(feature = "updates")]
+    updates::check(&mut app.data_mut());
 
     app.run();
 
