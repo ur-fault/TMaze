@@ -102,23 +102,54 @@ impl MainMenu {
     }
 
     fn show_about_popup(settings: &Settings) -> Change {
-        let popup = Popup::new(
-            "About".to_string(),
-            vec![
-                "This is simple maze solving game".to_string(),
-                "Supported algorithms:".to_string(),
-                "    - Depth-first search".to_string(),
-                "    - Kruskal's algorithm".to_string(),
-                "Supports 3D mazes".to_string(),
-                "".to_string(),
-                "Created by:".to_string(),
-                format!("    - {}", env!("CARGO_PKG_AUTHORS")),
-                "".to_string(),
-                "Version:".to_string(),
-                format!("    {}", env!("CARGO_PKG_VERSION")),
-            ],
-        )
-        .styles_from_settings(settings);
+        const FEATURE_LIST: [(&str, bool); 2] = [
+            ("updates", cfg!(feature = "updates")),
+            ("sound", cfg!(feature = "sound")),
+        ];
+
+        let mut lines = vec![
+            "This is simple maze solving game".to_string(),
+            "Supported algorithms:".to_string(),
+            "    - Depth-first search".to_string(),
+            "    - Kruskal's algorithm".to_string(),
+            "Supports 3D mazes".to_string(),
+            "".to_string(),
+            "Created by:".to_string(),
+            format!("    - {}", env!("CARGO_PKG_AUTHORS")),
+            "".to_string(),
+            "Version:".to_string(),
+            format!("    {}", env!("CARGO_PKG_VERSION")),
+        ];
+
+        {
+            let (enabled, disabled) = FEATURE_LIST
+                .into_iter()
+                .partition::<Vec<_>, _>(|(_, enabled)| *enabled);
+
+            let enabled = enabled
+                .into_iter()
+                .map(|(name, _)| format!("    - {}", name))
+                .collect::<Vec<_>>();
+
+            let disabled = disabled
+                .into_iter()
+                .map(|(name, _)| format!("    - {}", name))
+                .collect::<Vec<_>>();
+
+            if !enabled.is_empty() {
+                lines.push("".to_string());
+                lines.push("Enabled features:".to_string());
+                lines.extend(enabled);
+            }
+
+            if !disabled.is_empty() {
+                lines.push("".to_string());
+                lines.push("Disabled features:".to_string());
+                lines.extend(disabled);
+            }
+        }
+
+        let popup = Popup::new("About".to_string(), lines).styles_from_settings(settings);
 
         Change::push(Activity::new_base_boxed("about".to_string(), popup))
     }

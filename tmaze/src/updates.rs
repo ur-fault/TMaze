@@ -28,7 +28,9 @@ pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
         }],
     };
 
-    Ok(version_req.matches(&latest_version).then(|| latest_version))
+    Ok(version_req
+        .matches(&latest_version)
+        .then_some(latest_version))
 }
 
 pub fn check(app_data: &mut AppData) {

@@ -57,7 +57,7 @@ fn main() -> Result<(), GameError> {
         .push(Activity::new_base_boxed("main menu", menu));
 
     #[cfg(feature = "updates")]
-    updates::check(&mut app.data_mut());
+    updates::check(app.data_mut());
 
     app.run();
 
