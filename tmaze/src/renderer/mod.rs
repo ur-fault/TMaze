@@ -46,6 +46,7 @@ impl Renderer {
             stdout(),
             crossterm::cursor::Hide,
             crossterm::terminal::EnterAlternateScreen,
+            crossterm::event::EnableMouseCapture,
         )?;
 
         self.on_resize(None);
@@ -60,6 +61,7 @@ impl Renderer {
             stdout(),
             crossterm::cursor::Show,
             crossterm::terminal::LeaveAlternateScreen,
+            crossterm::event::DisableMouseCapture,
         )?;
         crossterm::terminal::disable_raw_mode()?;
         Ok(())

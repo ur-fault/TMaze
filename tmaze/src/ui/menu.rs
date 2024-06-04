@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{Event as TermEvent, KeyCode, KeyEvent},
+    event::{Event as TermEvent, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     style::{Color, ContentStyle},
 };
 
@@ -7,6 +7,7 @@ use pad::PadStr;
 use unicode_width::UnicodeWidthStr;
 
 use std::{
+    cell::RefCell,
     fmt::{self, Write},
     io,
     ops::RangeInclusive,
@@ -271,24 +272,27 @@ impl MenuConfig {
     }
 }
 
+struct MenuItemsPos {
+    pos: Dims,
+    size: Dims,
+}
+
 pub struct Menu {
     config: MenuConfig,
-    selected: isize, // isize for more readable code
+    selected: usize, // isize for more readable code
+    items_pos: RefCell<Option<MenuItemsPos>>,
 }
 
 impl Menu {
     pub fn new(config: MenuConfig) -> Self {
         let MenuConfig { options, .. } = &config;
 
-        let default = config
-            .default
-            .map(|d| d as isize)
-            .unwrap_or(0)
-            .clamp(0, options.len() as isize - 1);
+        let default = config.default.unwrap_or(0).clamp(0, options.len() - 1);
 
         Self {
             selected: default,
             config,
+            items_pos: RefCell::new(None),
         }
     }
 
@@ -326,14 +330,17 @@ impl Menu {
     }
 
     fn select(&mut self, down: bool) {
-        let opt_count = self.config.options.len() as isize;
+        let opt_count = self.config.options.len();
         loop {
             // negative numbers wrap around zero
             if down {
                 self.selected = (self.selected + 1) % opt_count;
             } else {
-                self.selected = (self.selected - 1).rem_euclid(opt_count);
+                self.selected =
+                    (self.selected as isize - 1).rem_euclid(opt_count as isize) as usize;
             }
+
+            // skip separators
             if !matches!(
                 self.config.options[self.selected as usize],
                 MenuItem::Separator
@@ -417,7 +424,10 @@ impl ActivityHandler for Menu {
                         }
                         KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
                             let old_sel = self.selected;
-                            self.selected = (ch as isize - '1' as isize).clamp(0, opt_count - 1);
+                            self.selected = (ch as isize - '1' as isize)
+                                .clamp(0, opt_count as isize - 1)
+                                as usize;
+
                             if old_sel == self.selected {
                                 return_if_some!(self.switch(app_data));
                             }
@@ -429,10 +439,43 @@ impl ActivityHandler for Menu {
                         KeyCode::Right => {
                             self.update_slider(true, app_data);
                         }
-                        KeyCode::Char(_) => {}
                         _ => {}
                     }
                 }
+                Event::Term(TermEvent::Mouse(MouseEvent {
+                    kind, column, row, ..
+                })) => match kind {
+                    MouseEventKind::Moved => {
+                        if let Some(items_pos) = self.items_pos.borrow().as_ref() {
+                            let MenuItemsPos { pos, size } = *items_pos;
+                            let Dims(c, r) = (column, row).into();
+
+                            if r < pos.1 || r >= pos.1 + size.1 || c < pos.0 || c >= pos.0 + size.0
+                            {
+                                continue;
+                            }
+
+                            let selected = (r - pos.1) as usize;
+                            if selected < self.config.options.len() {
+                                self.selected = selected;
+                            }
+                        }
+                    }
+                    MouseEventKind::ScrollDown => {
+                        self.select(true);
+                    }
+                    MouseEventKind::ScrollUp => {
+                        self.select(false);
+                    }
+                    MouseEventKind::Up(MouseButton::Left) => {
+                        return_if_some!(self.switch(app_data));
+                    }
+
+                    // TODO: Implement these
+                    // MouseEventKind::ScrollLeft => todo!(),
+                    // MouseEventKind::ScrollRight => todo!(),
+                    _ => {}
+                },
                 _ => {}
             }
         }
@@ -485,7 +528,7 @@ impl Screen for Menu {
 
         frame.draw_styled(pos + Dims(3, 1), title.as_str(), title_style);
 
-        let mut items_y = pos.1 + 2;
+        let mut items_y = pos.1 + 3;
 
         for (i, subtitle) in self.config.subtitles.iter().enumerate() {
             frame.draw_styled(
@@ -499,13 +542,21 @@ impl Screen for Menu {
         let items_pos = Dims(pos.0 + 1, items_y);
 
         frame.draw_styled(
-            items_pos,
+            items_pos - Dims(0, 1),
             LineDir::Horizontal
                 .round()
                 .to_string()
                 .repeat(menu_size.0 as usize - 2),
             box_style,
         );
+
+        self.items_pos.borrow_mut().replace(MenuItemsPos {
+            pos: items_pos,
+            size: Dims(
+                menu_size.0 - 2,
+                menu_size.1 - 4 - self.config.subtitles.len() as i32,
+            ),
+        });
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == self.selected as usize {
@@ -534,7 +585,7 @@ impl Screen for Menu {
 
             let padded = buf.pad_to_width(menu_size.0 as usize - 2);
 
-            frame.draw_styled(items_pos + Dims(0, i as i32 + 1), padded, style);
+            frame.draw_styled(items_pos + Dims(0, i as i32), padded, style);
         }
 
         Ok(())
@@ -547,9 +598,10 @@ pub type MenuAction<R> = Box<dyn Fn(&mut AppData) -> R>;
 macro_rules! menu_actions {
     ($($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
         {
-            let opts: Vec<(_, Box<dyn Fn(&mut AppData) -> _>)> = vec![
+            let opts: Vec<(_, MenuAction<_>)> = vec![
                 $(
-                    $(#[cfg(feature = $feature)])? { ($name, Box::new(|$data: &mut AppData| $action)) },
+                    $(#[cfg(feature = $feature)])?
+                    { ($name, Box::new(|$data: &mut AppData| $action)) },
                 )*
             ];
 
