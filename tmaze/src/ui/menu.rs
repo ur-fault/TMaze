@@ -26,7 +26,7 @@ use crate::{
     settings::{ColorScheme, Settings},
 };
 
-use super::{center_box_in_screen, draw_box, swap_fg_bg, Screen};
+use super::{center_box_in_screen, draw_box, invert_style, Screen};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
@@ -559,7 +559,7 @@ impl Screen for Menu {
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == self.selected {
-                swap_fg_bg(text_style)
+                invert_style(text_style)
             } else {
                 text_style
             };

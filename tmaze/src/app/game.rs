@@ -17,8 +17,8 @@ use crate::{
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
     ui::{
-        self, draw_box, multisize_string, split_menu_actions, Menu, MenuAction, MenuConfig, Popup,
-        ProgressBar, Screen,
+        self, draw_box, invert_style, merge_styles, multisize_string, split_menu_actions, Menu,
+        MenuAction, MenuConfig, Popup, ProgressBar, Screen,
     },
 };
 
@@ -679,6 +679,78 @@ impl GameActivity {
             }
         }
     }
+
+    fn render_player(
+        &self,
+        maze_pos: Dims,
+        game: &RunningGame,
+        viewport: &mut Frame,
+        color_scheme: &ColorScheme,
+    ) {
+        let player = self.sm_player_pos;
+        let player_draw_pos = maze_pos + player.into();
+        let cell = game
+            .get_maze()
+            .get_cell(self.game.game.get_player_pos())
+            .unwrap();
+        if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
+            viewport[player_draw_pos]
+                .content_mut()
+                .unwrap()
+                .style
+                .foreground_color = Some(color_scheme.player);
+        } else {
+            viewport.draw_styled(
+                player_draw_pos,
+                self.game.player_char,
+                color_scheme.players(),
+            );
+        }
+    }
+
+    fn render_touch_controls(&self, frame: &mut Frame, color_scheme: &ColorScheme) {
+        const OPENING: char = '';
+        const CLOSING: char = '';
+        const UP: char = '↑';
+        const DOWN: char = '↓';
+        const LEFT: char = '←';
+        const RIGHT: char = '→';
+
+        fn draw_button(
+            frame: &mut Frame,
+            pos: Dims,
+            arrow: char,
+            color_scheme: &ColorScheme,
+            set: bool,
+        ) {
+            frame.draw_styled(
+                pos,
+                format!("{}   {}", OPENING, CLOSING),
+                if set {
+                    color_scheme.players()
+                } else {
+                    color_scheme.normals()
+                },
+            );
+
+            frame.draw_styled(
+                pos + Dims(1, 0),
+                format!(" {} ", arrow),
+                if set {
+                    merge_styles(invert_style(color_scheme.players()), color_scheme.normals())
+                } else {
+                    merge_styles(invert_style(color_scheme.normals()), color_scheme.players())
+                },
+            );
+        }
+
+        let pos = Dims(0, 0);
+
+        draw_button(frame, pos + Dims(0, 1), LEFT, color_scheme, true);
+        draw_button(frame, pos + Dims(3, 0), UP, color_scheme, true);
+        draw_button(frame, pos + Dims(6, 1), RIGHT, color_scheme, true);
+        draw_button(frame, pos + Dims(3, 2), DOWN, color_scheme, true);
+    }
 }
 
 impl ActivityHandler for GameActivity {
@@ -781,27 +853,10 @@ impl Screen for GameActivity {
 
         // player
         if (self.game.game.get_player_pos().2) == self.sm_camera_pos.2 {
-            let player = self.sm_player_pos;
-            let player_draw_pos = maze_pos + player.into();
-            let cell = game
-                .get_maze()
-                .get_cell(self.game.game.get_player_pos())
-                .unwrap();
-            if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
-                viewport[player_draw_pos]
-                    .content_mut()
-                    .unwrap()
-                    .style
-                    .foreground_color = Some(color_scheme.player);
-            } else {
-                viewport.draw_styled(
-                    player_draw_pos,
-                    self.game.player_char,
-                    color_scheme.players(),
-                );
-            }
+            self.render_player(maze_pos, game, &mut viewport, color_scheme);
         }
 
+        // show viewport
         let vp_pos = (frame.size - vp_size) / 2;
         draw_box(
             frame,
@@ -809,6 +864,9 @@ impl Screen for GameActivity {
             vp_size + Dims(2, 2),
             color_scheme.normals(),
         );
+
+        // touch controls
+        self.render_touch_controls(frame, color_scheme);
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
             if !does_fit && self.show_debug {
