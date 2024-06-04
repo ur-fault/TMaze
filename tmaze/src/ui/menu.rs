@@ -452,9 +452,12 @@ impl ActivityHandler for Menu {
                             }
 
                             let selected = (r - pos.1) as usize;
-                            if selected < self.config.options.len() {
-                                self.selected = selected;
+
+                            if matches!(self.config.options[selected], MenuItem::Separator) {
+                                continue;
                             }
+
+                            self.selected = selected;
                         }
                     }
                     MouseEventKind::ScrollDown => {
