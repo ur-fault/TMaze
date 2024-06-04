@@ -468,7 +468,7 @@ impl SettingsActivity {
 
         let (options, actions) = split_menu_actions(options);
 
-        let menu_config = MenuConfig::new_from_strings("Settings", options)
+        let menu_config = MenuConfig::new("Settings", options)
             .styles_from_settings(settings)
             .subtitle("Changes are not saved")
             .subtitle_style(style_with_attribute(
