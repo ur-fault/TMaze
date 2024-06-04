@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use cmaze::{
     core::{Dims, Dims3D, GameMode},
     game::{GameProperities, GeneratorFn, ProgressComm, RunningGame, RunningGameState},
@@ -18,7 +20,7 @@ use crate::{
     settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
     ui::{
         self, draw_box, invert_style, merge_styles, multisize_string, split_menu_actions, Menu,
-        MenuAction, MenuConfig, Popup, ProgressBar, Screen,
+        MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
 
@@ -26,7 +28,9 @@ use crate::{
 #[allow(unused_imports)]
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
-use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
+use crossterm::event::{
+    Event as TermEvent, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind,
+};
 
 #[cfg(feature = "sound")]
 #[allow(unused_imports)]
@@ -561,6 +565,9 @@ pub struct GameActivity {
     // smooth
     sm_camera_pos: Dims3D,
     sm_player_pos: Dims3D,
+
+    // touch
+    touch_start: RefCell<Option<Dims>>,
 }
 
 impl GameActivity {
@@ -583,6 +590,8 @@ impl GameActivity {
 
             sm_camera_pos,
             sm_player_pos,
+
+            touch_start: RefCell::new(None),
         }
     }
 
@@ -709,6 +718,10 @@ impl GameActivity {
     }
 
     fn render_touch_controls(&self, frame: &mut Frame, color_scheme: &ColorScheme) {
+        let Some(pos) = *self.touch_start.borrow() else {
+            return;
+        };
+
         const OPENING: char = '';
         const CLOSING: char = '';
         const UP: char = '↑';
@@ -723,33 +736,68 @@ impl GameActivity {
             color_scheme: &ColorScheme,
             set: bool,
         ) {
+            let normal = color_scheme.normals();
+            let highlight = color_scheme.players();
+
             frame.draw_styled(
                 pos,
                 format!("{}   {}", OPENING, CLOSING),
-                if set {
-                    color_scheme.players()
-                } else {
-                    color_scheme.normals()
-                },
+                if set { highlight } else { normal },
             );
 
             frame.draw_styled(
                 pos + Dims(1, 0),
                 format!(" {} ", arrow),
                 if set {
-                    merge_styles(invert_style(color_scheme.players()), color_scheme.normals())
+                    merge_styles(invert_style(highlight), normal)
                 } else {
-                    merge_styles(invert_style(color_scheme.normals()), color_scheme.players())
+                    merge_styles(invert_style(normal), highlight)
                 },
             );
         }
-
-        let pos = Dims(0, 0);
 
         draw_button(frame, pos + Dims(0, 1), LEFT, color_scheme, true);
         draw_button(frame, pos + Dims(3, 0), UP, color_scheme, true);
         draw_button(frame, pos + Dims(6, 1), RIGHT, color_scheme, true);
         draw_button(frame, pos + Dims(3, 2), DOWN, color_scheme, true);
+    }
+
+    fn touch_controls_update(&mut self, event: MouseEvent, settings: &Settings) {
+        let Some(touch_pos) = *self.touch_start.borrow() else {
+            return;
+        };
+
+        match event.kind {
+            MouseEventKind::Up(MouseButton::Left) => {}
+            _ => {
+                self.touch_start.replace(None);
+                return;
+            }
+        }
+
+        const BTN_SIZE: Dims = Dims(5, 0); // one is implicit
+
+        let rects = [
+            Rect::sized(touch_pos + Dims(0, 1), BTN_SIZE),
+            Rect::sized(touch_pos + Dims(3, 0), BTN_SIZE),
+            Rect::sized(touch_pos + Dims(6, 1), BTN_SIZE),
+            Rect::sized(touch_pos + Dims(3, 2), BTN_SIZE),
+        ];
+
+        let touch_pos = (event.column, event.row).into();
+        for (i, rect) in rects.iter().enumerate() {
+            if rect.contains(touch_pos) {
+                let dir = match i {
+                    0 => CellWall::Left,
+                    1 => CellWall::Top,
+                    2 => CellWall::Right,
+                    3 => CellWall::Bottom,
+                    _ => unreachable!(),
+                };
+
+                self.game.apply_move(settings, dir, false);
+            }
+        }
     }
 }
 
@@ -762,19 +810,26 @@ impl ActivityHandler for GameActivity {
         }
 
         for event in events {
-            if let Event::Term(TermEvent::Key(key_event)) = event {
-                match self.game.handle_event(&data.settings, key_event) {
-                    Err(false) => {
-                        self.game.game.pause().unwrap();
+            match event {
+                Event::Term(event) => match event {
+                    TermEvent::Key(key_event) => {
+                        match self.game.handle_event(&data.settings, key_event) {
+                            Err(false) => {
+                                self.game.game.pause().unwrap();
 
-                        return Some(Change::push(Activity::new_base_boxed(
-                            "pause".to_string(),
-                            PauseMenu::new(&data.settings),
-                        )));
+                                return Some(Change::push(Activity::new_base_boxed(
+                                    "pause".to_string(),
+                                    PauseMenu::new(&data.settings),
+                                )));
+                            }
+                            Err(true) => return Some(Change::pop_until("main menu")),
+                            Ok(_) => {}
+                        }
                     }
-                    Err(true) => return Some(Change::pop_until("main menu")),
-                    Ok(_) => {}
-                }
+                    TermEvent::Mouse(event) => self.touch_controls_update(event, &data.settings),
+                    _ => {}
+                },
+                _ => (),
             }
         }
 
@@ -835,7 +890,12 @@ impl Screen for GameActivity {
         let maze_frame = self.current_floor_frame();
         let game = &self.game.game;
 
-        let (vp_size, does_fit) = self.viewport_size(frame.size);
+        let game_view_size = Dims(frame.size.0, frame.size.1 * 2 / 3);
+        // let dpad_view_size = Dims(frame.size.0, frame.size.1 / 3);
+        let dpad_pos = Dims(0, game_view_size.1);
+        self.touch_start.borrow_mut().replace(dpad_pos);
+
+        let (vp_size, does_fit) = self.viewport_size(game_view_size);
         let maze_pos = match does_fit {
             true => match self.game.view_mode {
                 GameViewMode::Adventure => Dims(0, 0),

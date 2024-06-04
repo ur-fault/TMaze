@@ -74,7 +74,7 @@ impl Rect {
         Self { start, end }
     }
 
-    pub fn new_sized(start: Dims, size: Dims) -> Self {
+    pub fn sized(start: Dims, size: Dims) -> Self {
         Self::new(start, Dims(start.0 + size.0, start.1 + size.1))
     }
 
@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn frame_trim_absolute() {
-        let frame = Rect::new_sized(Dims(0, 0), Dims(3, 1));
+        let frame = Rect::sized(Dims(0, 0), Dims(3, 1));
         let (text, ..) = frame.trim_absolute(&"123456", Dims(0, 0));
         assert_eq!(text, "123");
 
