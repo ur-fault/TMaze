@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{Event as TermEvent, KeyEvent},
+    event::{Event as TermEvent, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     style::ContentStyle,
 };
 use unicode_width::UnicodeWidthStr;
@@ -57,10 +57,23 @@ impl Popup {
 impl ActivityHandler for Popup {
     fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
         for event in events {
-            if let Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) = event {
-                if !is_release(kind) {
-                    return Some(Change::pop_top_with(code));
-                }
+            #[allow(clippy::single_match)] // for more events to come
+            match event {
+                Event::Term(event) => match event {
+                    TermEvent::Key(KeyEvent { code, kind, .. }) => {
+                        if !is_release(kind) {
+                            return Some(Change::pop_top_with(code));
+                        }
+                    }
+                    TermEvent::Mouse(MouseEvent {
+                        kind: MouseEventKind::Up(MouseButton::Left),
+                        ..
+                    }) => {
+                        return Some(Change::pop_top());
+                    }
+                    _ => {}
+                },
+                _ => {}
             }
         }
 
