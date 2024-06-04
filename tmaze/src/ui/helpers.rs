@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use cmaze::core::Dims;
-use crossterm::style::{Attribute, ContentStyle};
+use crossterm::style::{Attribute, Color, ContentStyle};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{helpers, renderer::helpers::term_size};
@@ -67,6 +67,14 @@ pub fn multisize_string(strings: impl IntoIterator<Item = String>, max_size: usi
 pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyle {
     ContentStyle {
         attributes: style.attributes | attr,
+        ..style
+    }
+}
+
+pub fn swap_fg_bg(style: ContentStyle) -> ContentStyle {
+    ContentStyle {
+        background_color: Some(style.foreground_color.unwrap_or(Color::White)),
+        foreground_color: Some(style.background_color.unwrap_or(Color::Black)),
         ..style
     }
 }
