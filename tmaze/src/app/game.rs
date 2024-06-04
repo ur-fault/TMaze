@@ -82,7 +82,7 @@ impl MainMenu {
 
         Self {
             menu: Menu::new(
-                MenuConfig::new_from_strings("TMaze", options)
+                MenuConfig::new("TMaze", options)
                     .counted()
                     .styles_from_settings(settings),
             ),
@@ -279,11 +279,10 @@ impl MazeAlgorithmMenu {
 
         let (options, functions) = split_menu_actions(options);
 
-        let menu_config =
-            MenuConfig::new_from_strings("Maze generation algorithm".to_string(), options)
-                .counted()
-                .styles_from_settings(settings)
-                .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
+        let menu_config = MenuConfig::new("Maze generation algorithm".to_string(), options)
+            .counted()
+            .styles_from_settings(settings)
+            .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
 
         let menu = Menu::new(menu_config);
 
@@ -469,9 +468,7 @@ impl PauseMenu {
 
         let (options, actions) = split_menu_actions(options);
 
-        let menu = Menu::new(
-            MenuConfig::new_from_strings("Paused", options).styles_from_settings(settings),
-        );
+        let menu = Menu::new(MenuConfig::new("Paused", options).styles_from_settings(settings));
 
         Self { menu, actions }
     }

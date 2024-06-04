@@ -595,7 +595,7 @@ macro_rules! menu_actions {
             let opts: Vec<(_, MenuAction<_>)> = vec![
                 $(
                     $(#[cfg(feature = $feature)])?
-                    { ($name, Box::new(|$data: &mut AppData| $action)) },
+                    { ($crate::ui::menu::MenuItem::from($name), Box::new(|$data: &mut AppData| $action)) },
                 )*
             ];
 
@@ -605,12 +605,9 @@ macro_rules! menu_actions {
 }
 
 pub fn split_menu_actions<R>(
-    actions: Vec<(&str, MenuAction<R>)>,
-) -> (Vec<String>, Vec<MenuAction<R>>) {
-    let (names, actions) = actions
-        .into_iter()
-        .map(|(title, action)| (String::from(title), action))
-        .unzip();
+    actions: Vec<(MenuItem, MenuAction<R>)>,
+) -> (Vec<MenuItem>, Vec<MenuAction<R>>) {
+    let (names, actions) = actions.into_iter().unzip();
 
     (names, actions)
 }
