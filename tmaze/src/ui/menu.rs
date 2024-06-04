@@ -341,20 +341,17 @@ impl Menu {
             }
 
             // skip separators
-            if !matches!(
-                self.config.options[self.selected as usize],
-                MenuItem::Separator
-            ) {
+            if !matches!(self.config.options[self.selected], MenuItem::Separator) {
                 break;
             }
         }
     }
 
     fn switch(&mut self, data: &mut AppData) -> Option<Change> {
-        let selected_opt = &mut self.config.options[self.selected as usize];
+        let selected_opt = &mut self.config.options[self.selected];
 
         match selected_opt {
-            MenuItem::Text(_) => return Some(Change::pop_top_with(self.selected as usize)),
+            MenuItem::Text(_) => return Some(Change::pop_top_with(self.selected)),
             MenuItem::Option(OptionDef { val, fun, .. }) => fun(val, data),
             MenuItem::Slider(_) | MenuItem::Separator => {}
         }
@@ -365,7 +362,7 @@ impl Menu {
     fn update_slider(&mut self, right: bool, data: &mut AppData) {
         if let MenuItem::Slider(SliderDef {
             val, range, fun, ..
-        }) = &mut self.config.options[self.selected as usize]
+        }) = &mut self.config.options[self.selected]
         {
             fun(right, val, data);
             *val = (*val).clamp(*range.start(), *range.end());
@@ -424,9 +421,8 @@ impl ActivityHandler for Menu {
                         }
                         KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
                             let old_sel = self.selected;
-                            self.selected = (ch as isize - '1' as isize)
-                                .clamp(0, opt_count as isize - 1)
-                                as usize;
+                            self.selected =
+                                (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
 
                             if old_sel == self.selected {
                                 return_if_some!(self.switch(app_data));
@@ -559,7 +555,7 @@ impl Screen for Menu {
         });
 
         for (i, option) in options.iter().enumerate() {
-            let style = if i == self.selected as usize {
+            let style = if i == self.selected {
                 ContentStyle {
                     background_color: Some(text_style.foreground_color.unwrap_or(Color::White)),
                     foreground_color: Some(text_style.background_color.unwrap_or(Color::Black)),
@@ -572,7 +568,7 @@ impl Screen for Menu {
 
             let mut buf = String::new();
 
-            if i == self.selected as usize {
+            if i == self.selected {
                 write!(&mut buf, "> ").unwrap();
             } else {
                 write!(&mut buf, "  ").unwrap();
