@@ -13,6 +13,7 @@ use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
     menu_actions,
+    renderer::MouseGuard,
     ui::{split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
 };
 
@@ -448,13 +449,10 @@ impl Settings {
     }
 }
 
-pub struct SettingsActivity {
-    actions: Vec<MenuAction<Change>>,
-    menu: Menu,
-}
+struct OtherSettingsPopup(Popup, MouseGuard);
 
-impl SettingsActivity {
-    fn other_settings_popup(settings: &Settings) -> Activity {
+impl OtherSettingsPopup {
+    fn new(settings: &Settings) -> Self {
         let popup = Popup::new(
             "Other settings".to_string(),
             vec![
@@ -467,7 +465,28 @@ impl SettingsActivity {
         )
         .styles_from_settings(settings);
 
-        Activity::new_base_boxed("settings".to_string(), popup)
+        Self(popup, MouseGuard::new().unwrap())
+    }
+}
+
+impl ActivityHandler for OtherSettingsPopup {
+    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
+        self.0.update(events, data)
+    }
+
+    fn screen(&self) -> &dyn Screen {
+        &self.0
+    }
+}
+
+pub struct SettingsActivity {
+    actions: Vec<MenuAction<Change>>,
+    menu: Menu,
+}
+
+impl SettingsActivity {
+    fn other_settings_popup(settings: &Settings) -> Activity {
+        Activity::new_base_boxed("settings".to_string(), OtherSettingsPopup::new(settings))
     }
 }
 

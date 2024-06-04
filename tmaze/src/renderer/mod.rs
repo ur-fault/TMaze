@@ -75,7 +75,8 @@ impl Renderer {
             execute!(
                 stdout,
                 crossterm::terminal::LeaveAlternateScreen,
-                crossterm::cursor::Show
+                crossterm::cursor::Show,
+                crossterm::event::DisableMouseCapture,
             )
             .unwrap();
 
@@ -185,6 +186,21 @@ impl Renderer {
 impl Drop for Renderer {
     fn drop(&mut self) {
         let _ = self.turn_off();
+    }
+}
+
+pub struct MouseGuard;
+
+impl MouseGuard {
+    pub fn new() -> io::Result<Self> {
+        crossterm::execute!(stdout(), crossterm::event::DisableMouseCapture)?;
+        Ok(MouseGuard)
+    }
+}
+
+impl Drop for MouseGuard {
+    fn drop(&mut self) {
+        let _ = crossterm::execute!(stdout(), crossterm::event::EnableMouseCapture);
     }
 }
 
