@@ -1,6 +1,6 @@
 use crossterm::{
     event::{Event as TermEvent, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
-    style::{Color, ContentStyle},
+    style::ContentStyle,
 };
 
 use pad::PadStr;
@@ -26,7 +26,7 @@ use crate::{
     settings::{ColorScheme, Settings},
 };
 
-use super::{center_box_in_screen, draw_box, Screen};
+use super::{center_box_in_screen, draw_box, swap_fg_bg, Screen};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
@@ -556,12 +556,7 @@ impl Screen for Menu {
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == self.selected {
-                ContentStyle {
-                    background_color: Some(text_style.foreground_color.unwrap_or(Color::White)),
-                    foreground_color: Some(text_style.background_color.unwrap_or(Color::Black)),
-                    underline_color: None,
-                    attributes: Default::default(),
-                }
+                swap_fg_bg(text_style)
             } else {
                 text_style
             };
