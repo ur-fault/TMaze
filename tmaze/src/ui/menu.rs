@@ -26,7 +26,7 @@ use crate::{
     settings::{ColorScheme, Settings},
 };
 
-use super::{center_box_in_screen, draw_box, invert_style, Screen};
+use super::{center_box_in_screen, draw_box, invert_style, Rect, Screen};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
@@ -272,15 +272,10 @@ impl MenuConfig {
     }
 }
 
-struct MenuItemsPos {
-    pos: Dims,
-    size: Dims,
-}
-
 pub struct Menu {
     config: MenuConfig,
     selected: usize, // isize for more readable code
-    items_pos: RefCell<Option<MenuItemsPos>>,
+    items_pos: RefCell<Option<Rect>>,
 }
 
 impl Menu {
@@ -368,6 +363,23 @@ impl Menu {
             *val = (*val).clamp(*range.start(), *range.end());
         }
     }
+
+    fn get_by_mouse(&self, Dims(x, y): Dims) -> Option<usize> {
+        let Rect { start, end } = *self.items_pos.borrow().as_ref()?;
+        let size = end - start;
+
+        if y < start.1 || y >= start.1 + size.1 || x < start.0 || x >= start.0 + size.0 {
+            return None;
+        }
+
+        let selected = (y - start.1) as usize;
+
+        if matches!(self.config.options[selected], MenuItem::Separator) {
+            return None;
+        }
+
+        Some(selected)
+    }
 }
 
 impl ActivityHandler for Menu {
@@ -438,25 +450,14 @@ impl ActivityHandler for Menu {
                         _ => {}
                     }
                 }
-                Event::Term(TermEvent::Mouse(MouseEvent {
-                    kind, column, row, ..
-                })) => match kind {
+                Event::Term(TermEvent::Mouse(
+                    event @ MouseEvent {
+                        kind, column, row, ..
+                    },
+                )) => match kind {
+                    // _ => log::debug!("Unhandled mouse event: {:?}", event),
                     MouseEventKind::Moved => {
-                        if let Some(items_pos) = self.items_pos.borrow().as_ref() {
-                            let MenuItemsPos { pos, size } = *items_pos;
-                            let Dims(c, r) = (column, row).into();
-
-                            if r < pos.1 || r >= pos.1 + size.1 || c < pos.0 || c >= pos.0 + size.0
-                            {
-                                continue;
-                            }
-
-                            let selected = (r - pos.1) as usize;
-
-                            if matches!(self.config.options[selected], MenuItem::Separator) {
-                                continue;
-                            }
-
+                        if let Some(selected) = self.get_by_mouse((column, row).into()) {
                             self.selected = selected;
                         }
                     }
@@ -467,6 +468,9 @@ impl ActivityHandler for Menu {
                         self.select(false);
                     }
                     MouseEventKind::Up(MouseButton::Left) => {
+                        if let Some(selected) = self.get_by_mouse((column, row).into()) {
+                            self.selected = selected;
+                        }
                         return_if_some!(self.switch(app_data));
                     }
 
@@ -549,12 +553,13 @@ impl Screen for Menu {
             box_style,
         );
 
-        self.items_pos.borrow_mut().replace(MenuItemsPos {
-            pos: items_pos,
-            size: Dims(
-                menu_size.0 - 2,
-                menu_size.1 - 4 - self.config.subtitles.len() as i32,
-            ),
+        self.items_pos.borrow_mut().replace(Rect {
+            start: items_pos,
+            end: items_pos
+                + Dims(
+                    menu_size.0 - 2,
+                    menu_size.1 - 4 - self.config.subtitles.len() as i32,
+                ),
         });
 
         for (i, option) in options.iter().enumerate() {
