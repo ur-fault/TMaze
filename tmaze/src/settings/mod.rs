@@ -193,6 +193,10 @@ pub struct SettingsInner {
     #[serde[default]]
     pub player_smoothing: Option<f32>,
 
+    // navigation
+    #[serde(default)]
+    pub enable_mouse: Option<bool>,
+
     // game config
     #[serde(default)]
     pub default_maze_gen_algo: Option<MazeGenAlgo>,
@@ -312,6 +316,15 @@ impl Settings {
 
     pub fn set_player_smoothing(&mut self, value: f32) -> &mut Self {
         self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
+        self
+    }
+
+    pub fn get_enable_mouse(&self) -> bool {
+        self.read().enable_mouse.unwrap_or(true)
+    }
+
+    pub fn set_enable_mouse(&mut self, value: bool) -> &mut Self {
+        self.write().enable_mouse = Some(value);
         self
     }
 
