@@ -1014,8 +1014,8 @@ struct TouchControls {
 
 impl TouchControls {
     fn render(&self, frame: &mut Frame, cs: &ColorScheme) {
-        const OPENING: char = '█';
-        const CLOSING: char = '█';
+        // const OPENING: char = '█';
+        // const CLOSING: char = '█';
         const UP: char = '↑';
         const DOWN: char = '↓';
         const LEFT: char = '←';
@@ -1039,13 +1039,7 @@ impl TouchControls {
 
             frame.draw_styled(
                 pos + Dims(1, 1),
-                format!("{}   {}", OPENING, CLOSING),
-                if set { highlight } else { normal },
-            );
-
-            frame.draw_styled(
-                pos + Dims(2, 1),
-                format!(" {} ", arrow),
+                format!("  {}  ", arrow),
                 if set {
                     merge_styles(invert_style(highlight), normal)
                 } else {
