@@ -881,6 +881,8 @@ fn render_edge_follow_rulers(
     let xo = rulers.0.to_abs(vps.0);
     let yo = rulers.1.to_abs(vps.1);
 
+    let frame_pos = vp_pos - Dims(1, 1);
+
     use LineDir::{Horizontal, Vertical};
     const V: char = Vertical.round();
     const H: char = Horizontal.round();
@@ -890,7 +892,7 @@ fn render_edge_follow_rulers(
             false => goals,
             true => players,
         };
-        frame.draw_styled((vp_pos - Dims(1, 1)) + pos, dir, style)
+        frame.draw_styled(frame_pos + pos, dir, style)
     };
 
     #[rustfmt::skip]
