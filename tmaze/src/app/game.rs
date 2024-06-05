@@ -904,14 +904,14 @@ fn render_edge_follow_rulers(
 
     #[rustfmt::skip]
     {
-        draw(Dims(xo        , 0)         , V, false);
-        draw(Dims(vps.0 - xo, 0)         , V, true);
-        draw(Dims(xo        , vps.1 + 1) , V, false);
-        draw(Dims(vps.0 - xo, vps.1 + 1) , V, true);
+        draw(Dims(xo        , 0        ), V, false);
+        draw(Dims(vps.0 - xo, 0        ), V, true);
+        draw(Dims(xo        , vps.1 + 1), V, false);
+        draw(Dims(vps.0 - xo, vps.1 + 1), V, true);
 
-        draw(Dims(0         , yo)        , H, false);
+        draw(Dims(0         , yo        ), H, false);
         draw(Dims(0         , vps.1 - yo), H, true);
-        draw(Dims(vps.0 + 1 , yo)        , H, false);
+        draw(Dims(vps.0 + 1 , yo        ), H, false);
         draw(Dims(vps.0 + 1 , vps.1 - yo), H, true);
     };
 }
