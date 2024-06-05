@@ -810,6 +810,7 @@ impl ActivityHandler for GameActivity {
         }
 
         for event in events {
+            #[allow(clippy::single_match)]
             match event {
                 Event::Term(event) => match event {
                     TermEvent::Key(key_event) => {

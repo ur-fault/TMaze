@@ -450,12 +450,9 @@ impl ActivityHandler for Menu {
                         _ => {}
                     }
                 }
-                Event::Term(TermEvent::Mouse(
-                    event @ MouseEvent {
-                        kind, column, row, ..
-                    },
-                )) => match kind {
-                    // _ => log::debug!("Unhandled mouse event: {:?}", event),
+                Event::Term(TermEvent::Mouse(MouseEvent {
+                    kind, column, row, ..
+                })) => match kind {
                     MouseEventKind::Moved => {
                         if let Some(selected) = self.get_by_mouse((column, row).into()) {
                             self.selected = selected;
@@ -474,9 +471,13 @@ impl ActivityHandler for Menu {
                         return_if_some!(self.switch(app_data));
                     }
 
-                    // TODO: Implement these
-                    // MouseEventKind::ScrollLeft => todo!(),
-                    // MouseEventKind::ScrollRight => todo!(),
+                    // TODO: Test these
+                    MouseEventKind::ScrollLeft => {
+                        self.update_slider(false, app_data);
+                    }
+                    MouseEventKind::ScrollRight => {
+                        self.update_slider(true, app_data);
+                    }
                     _ => {}
                 },
                 _ => {}
