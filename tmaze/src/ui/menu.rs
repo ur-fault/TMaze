@@ -486,15 +486,12 @@ impl Screen for Menu {
         let box_style = box_style.unwrap_or(color_scheme.normals());
         let text_style = text_style.unwrap_or(color_scheme.texts());
 
-        // let menu_size = self.menu_size();
-
         let MenuDimenstions {
             size,
             title_pos,
             items_pos,
-            items_size,
             subtitles_pos,
-            subtitles_size,
+            ..
         } = MenuDimenstions::calc(&self.config);
 
         let max_item_width = size.0 as usize - 2 - self.config.special_width();
@@ -567,7 +564,7 @@ struct MenuDimenstions {
     items_pos: Dims,
     items_size: Dims,
     subtitles_pos: Dims,
-    subtitles_size: Dims,
+    // subtitles_size: Dims,
 }
 
 impl MenuDimenstions {
@@ -608,7 +605,7 @@ impl MenuDimenstions {
             items_pos,
             items_size: Dims(menu_size.0 - 2, config.options.len() as i32),
             subtitles_pos: pos + Dims(2, 2),
-            subtitles_size: Dims(menu_size.0 - 2, config.subtitles.len() as i32),
+            // subtitles_size: Dims(menu_size.0 - 2, config.subtitles.len() as i32),
         }
     }
 }
