@@ -1,4 +1,6 @@
 use crate::core::*;
+use crate::helpers::box_center;
+use crate::renderer::drawable::Drawable;
 use crate::renderer::Frame;
 
 use crossterm::style::ContentStyle;
@@ -75,7 +77,7 @@ impl Rect {
     }
 
     pub fn sized(start: Dims, size: Dims) -> Self {
-        Self::new(start, Dims(start.0 + size.0, start.1 + size.1))
+        Self::new(start, Dims(start.0 + size.0, start.1 + size.1) - Dims(1, 1))
     }
 
     pub fn size(&self) -> Dims {
@@ -84,6 +86,11 @@ impl Rect {
 
     pub fn contains(&self, pos: Dims) -> bool {
         pos.0 >= self.start.0 && pos.0 <= self.end.0 && pos.1 >= self.start.1 && pos.1 <= self.end.1
+    }
+
+    pub fn centered(&self, inner: Dims) -> Self {
+        let pos = box_center(self.start, self.end, inner);
+        Self::sized(pos, inner)
     }
 
     pub fn trim_absolute<'a>(&'a self, text: &'a impl AsRef<str>, mut pos: Dims) -> (&str, Dims) {
@@ -120,6 +127,16 @@ impl Rect {
             start: self.start + margin,
             end: self.end - margin,
         }
+    }
+}
+
+impl Drawable for Rect {
+    fn draw(&self, pos: Dims, frame: &mut Frame) {
+        self.draw_with_style(pos, frame, ContentStyle::default());
+    }
+
+    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, style: ContentStyle) {
+        draw_box(frame, self.start + pos, self.size(), style);
     }
 }
 
