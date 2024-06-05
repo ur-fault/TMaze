@@ -1059,10 +1059,10 @@ impl TouchControls {
         }
 
         let p = self.pos;
-        draw_button(frame, p + Dims(5, 0), UP, cs, self.hover == 0);
+        draw_button(frame, p + Dims(6, 0), UP, cs, self.hover == 0);
         draw_button(frame, p + Dims(0, 2), LEFT, cs, self.hover == 1);
-        draw_button(frame, p + Dims(10, 2), RIGHT, cs, self.hover == 2);
-        draw_button(frame, p + Dims(5, 4), DOWN, cs, self.hover == 3);
+        draw_button(frame, p + Dims(12, 2), RIGHT, cs, self.hover == 2);
+        draw_button(frame, p + Dims(6, 4), DOWN, cs, self.hover == 3);
     }
 
     fn update(&mut self, event: MouseEvent) -> Option<CellWall> {
@@ -1109,6 +1109,6 @@ impl TouchControls {
     }
 
     fn size() -> Dims {
-        Dims(13, 3)
+        Dims(15, 3)
     }
 }
