@@ -2,6 +2,7 @@ use crate::core::*;
 use crate::helpers::box_center;
 use crate::renderer::drawable::Drawable;
 use crate::renderer::Frame;
+use crate::settings::Offset;
 
 use crossterm::style::ContentStyle;
 
@@ -87,12 +88,6 @@ impl Rect {
     pub fn contains(&self, pos: Dims) -> bool {
         pos.0 >= self.start.0 && pos.0 <= self.end.0 && pos.1 >= self.start.1 && pos.1 <= self.end.1
     }
-
-    pub fn centered(&self, inner: Dims) -> Self {
-        let pos = box_center(self.start, self.end, inner);
-        Self::sized(pos, inner)
-    }
-
     pub fn trim_absolute<'a>(&'a self, text: &'a impl AsRef<str>, mut pos: Dims) -> (&str, Dims) {
         let mut text = text.as_ref();
         let size = self.size();
@@ -120,6 +115,43 @@ impl Rect {
     pub fn trim_relative<'a>(&'a self, text: &'a impl AsRef<str>, pos: Dims) -> (&str, Dims) {
         let (text, pos) = self.trim_absolute(text, pos + self.start);
         (text, pos - self.start)
+    }
+}
+
+impl Rect {
+    pub fn centered(&self, inner: Dims) -> Self {
+        let pos = box_center(self.start, self.end, inner);
+        Self::sized(pos, inner)
+    }
+
+    pub fn centered_x(&self, inner: Dims) -> Self {
+        let pos = Dims(self.start.0 + (self.size().0 - inner.0) / 2, self.start.1);
+        Self::sized(pos, inner)
+    }
+
+    pub fn centered_y(&self, inner: Dims) -> Self {
+        let pos = Dims(self.start.0, self.start.1 + (self.size().1 - inner.1) / 2);
+        Self::sized(pos, inner)
+    }
+
+    pub fn split_x(&self, ratio: Offset) -> (Self, Self) {
+        let chars = ratio.to_abs(self.size().0);
+        let left = Rect::sized(self.start, Dims(chars, self.size().1));
+        let right = Rect::sized(
+            Dims(self.start.0 + chars, self.start.1),
+            Dims(self.size().0 - chars, self.size().1),
+        );
+        (left, right)
+    }
+
+    pub fn split_y(&self, ratio: Offset) -> (Self, Self) {
+        let chars = ratio.to_abs(self.size().1);
+        let top = Rect::sized(self.start, Dims(self.size().0, chars));
+        let bottom = Rect::sized(
+            Dims(self.start.0, self.start.1 + chars),
+            Dims(self.size().0, self.size().1 - chars),
+        );
+        (top, bottom)
     }
 
     pub fn with_margin(&self, margin: Dims) -> Self {

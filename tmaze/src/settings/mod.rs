@@ -32,7 +32,7 @@ pub enum Offset {
 impl Offset {
     pub fn to_abs(self, size: i32) -> i32 {
         match self {
-            Offset::Rel(ratio) => (size as f32 * ratio.clamp(0., 0.5)).round() as i32,
+            Offset::Rel(ratio) => (size as f32 * ratio).round() as i32,
             Offset::Abs(chars) => chars,
         }
     }
