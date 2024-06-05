@@ -725,8 +725,19 @@ impl ActivityHandler for GameActivity {
         }
 
         let game_view_size = Dims(data.screen_size.0, data.screen_size.1 * 2 / 3);
-        let dpad_pos = Dims(0, game_view_size.1);
-        self.touch_controls.replace(TouchControls { pos: dpad_pos });
+
+        let dpad_pos = Rect::new(
+            Dims(0, game_view_size.1),
+            Dims(game_view_size.0, data.screen_size.1),
+        )
+        .centered(TouchControls::size())
+        .start;
+
+        let dpad = self.touch_controls.get_or_insert(TouchControls {
+            pos: dpad_pos,
+            hover: u8::MAX,
+        });
+        dpad.pos = dpad_pos;
 
         for event in events {
             #[allow(clippy::single_match)]
@@ -1002,10 +1013,11 @@ impl MazeBoard {
 
 struct TouchControls {
     pos: Dims,
+    hover: u8,
 }
 
 impl TouchControls {
-    fn render(&self, frame: &mut Frame, color_scheme: &ColorScheme) {
+    fn render(&self, frame: &mut Frame, cs: &ColorScheme) {
         const OPENING: char = '';
         const CLOSING: char = '';
         const UP: char = '↑';
@@ -1025,12 +1037,18 @@ impl TouchControls {
 
             frame.draw_styled(
                 pos,
+                Rect::sized(Dims(0, 0), Dims(7, 3)),
+                if set { highlight } else { normal },
+            );
+
+            frame.draw_styled(
+                pos + Dims(1, 1),
                 format!("{}   {}", OPENING, CLOSING),
                 if set { highlight } else { normal },
             );
 
             frame.draw_styled(
-                pos + Dims(1, 0),
+                pos + Dims(2, 1),
                 format!(" {} ", arrow),
                 if set {
                     merge_styles(invert_style(highlight), normal)
@@ -1040,44 +1058,57 @@ impl TouchControls {
             );
         }
 
-        draw_button(frame, self.pos + Dims(0, 1), LEFT, color_scheme, true);
-        draw_button(frame, self.pos + Dims(3, 0), UP, color_scheme, true);
-        draw_button(frame, self.pos + Dims(6, 1), RIGHT, color_scheme, true);
-        draw_button(frame, self.pos + Dims(3, 2), DOWN, color_scheme, true);
+        let p = self.pos;
+        draw_button(frame, p + Dims(5, 0), UP, cs, self.hover == 0);
+        draw_button(frame, p + Dims(0, 2), LEFT, cs, self.hover == 1);
+        draw_button(frame, p + Dims(10, 2), RIGHT, cs, self.hover == 2);
+        draw_button(frame, p + Dims(5, 4), DOWN, cs, self.hover == 3);
     }
 
     fn update(&mut self, event: MouseEvent) -> Option<CellWall> {
-        match event.kind {
-            MouseEventKind::Up(MouseButton::Left) => {}
+        let pressed = match event.kind {
+            MouseEventKind::Up(MouseButton::Left) => true,
+            MouseEventKind::Moved => false,
             _ => {
                 return None;
             }
-        }
+        };
 
-        const BTN_SIZE: Dims = Dims(5, 0); // one is implicit
+        const BTN_SIZE: Dims = Dims(7, 3); // one is implicit
 
         let rects = [
-            Rect::sized(self.pos + Dims(0, 1), BTN_SIZE),
-            Rect::sized(self.pos + Dims(3, 0), BTN_SIZE),
-            Rect::sized(self.pos + Dims(6, 1), BTN_SIZE),
-            Rect::sized(self.pos + Dims(3, 2), BTN_SIZE),
+            Rect::sized(self.pos + Dims(5, 0), BTN_SIZE),
+            Rect::sized(self.pos + Dims(0, 2), BTN_SIZE),
+            Rect::sized(self.pos + Dims(10, 2), BTN_SIZE),
+            Rect::sized(self.pos + Dims(5, 4), BTN_SIZE),
         ];
 
         let touch_pos = (event.column, event.row).into();
         for (i, rect) in rects.iter().enumerate() {
             if rect.contains(touch_pos) {
-                let dir = match i {
-                    0 => CellWall::Left,
-                    1 => CellWall::Top,
-                    2 => CellWall::Right,
-                    3 => CellWall::Bottom,
-                    _ => unreachable!(),
-                };
+                self.hover = i as u8;
+                if pressed {
+                    let dir = match i {
+                        0 => CellWall::Top,
+                        1 => CellWall::Left,
+                        2 => CellWall::Right,
+                        3 => CellWall::Bottom,
+                        _ => unreachable!(),
+                    };
 
-                return Some(dir);
+                    return Some(dir);
+                } else {
+                    return None;
+                }
             }
         }
 
+        self.hover = u8::MAX;
+
         None
+    }
+
+    fn size() -> Dims {
+        Dims(13, 3)
     }
 }
