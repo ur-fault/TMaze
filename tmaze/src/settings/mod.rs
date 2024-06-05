@@ -13,6 +13,7 @@ use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
     menu_actions,
+    renderer::MouseGuard,
     ui::{split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
 };
 
@@ -31,7 +32,7 @@ pub enum Offset {
 impl Offset {
     pub fn to_abs(self, size: i32) -> i32 {
         match self {
-            Offset::Rel(ratio) => (size as f32 * ratio.clamp(0., 0.5)).round() as i32,
+            Offset::Rel(ratio) => (size as f32 * ratio).round() as i32,
             Offset::Abs(chars) => chars,
         }
     }
@@ -193,6 +194,10 @@ pub struct SettingsInner {
     #[serde[default]]
     pub player_smoothing: Option<f32>,
 
+    // navigation
+    #[serde(default)]
+    pub enable_mouse: Option<bool>,
+
     // game config
     #[serde(default)]
     pub default_maze_gen_algo: Option<MazeGenAlgo>,
@@ -312,6 +317,15 @@ impl Settings {
 
     pub fn set_player_smoothing(&mut self, value: f32) -> &mut Self {
         self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
+        self
+    }
+
+    pub fn get_enable_mouse(&self) -> bool {
+        self.read().enable_mouse.unwrap_or(true)
+    }
+
+    pub fn set_enable_mouse(&mut self, value: bool) -> &mut Self {
+        self.write().enable_mouse = Some(value);
         self
     }
 
@@ -435,13 +449,10 @@ impl Settings {
     }
 }
 
-pub struct SettingsActivity {
-    actions: Vec<MenuAction<Change>>,
-    menu: Menu,
-}
+struct OtherSettingsPopup(Popup, MouseGuard);
 
-impl SettingsActivity {
-    fn other_settings_popup(settings: &Settings) -> Activity {
+impl OtherSettingsPopup {
+    fn new(settings: &Settings) -> Self {
         let popup = Popup::new(
             "Other settings".to_string(),
             vec![
@@ -454,7 +465,28 @@ impl SettingsActivity {
         )
         .styles_from_settings(settings);
 
-        Activity::new_base_boxed("settings".to_string(), popup)
+        Self(popup, MouseGuard::new().unwrap())
+    }
+}
+
+impl ActivityHandler for OtherSettingsPopup {
+    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
+        self.0.update(events, data)
+    }
+
+    fn screen(&self) -> &dyn Screen {
+        &self.0
+    }
+}
+
+pub struct SettingsActivity {
+    actions: Vec<MenuAction<Change>>,
+    menu: Menu,
+}
+
+impl SettingsActivity {
+    fn other_settings_popup(settings: &Settings) -> Activity {
+        Activity::new_base_boxed("settings".to_string(), OtherSettingsPopup::new(settings))
     }
 }
 
@@ -468,7 +500,7 @@ impl SettingsActivity {
 
         let (options, actions) = split_menu_actions(options);
 
-        let menu_config = MenuConfig::new_from_strings("Settings", options)
+        let menu_config = MenuConfig::new("Settings", options)
             .styles_from_settings(settings)
             .subtitle("Changes are not saved")
             .subtitle_style(style_with_attribute(
