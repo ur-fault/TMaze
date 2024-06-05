@@ -7,7 +7,6 @@ use pad::PadStr;
 use unicode_width::UnicodeWidthStr;
 
 use std::{
-    cell::RefCell,
     fmt::{self, Write},
     io,
     ops::RangeInclusive,
@@ -275,7 +274,7 @@ impl MenuConfig {
 pub struct Menu {
     config: MenuConfig,
     selected: usize, // isize for more readable code
-    items_pos: RefCell<Option<Rect>>,
+    items_pos: Option<Rect>,
 }
 
 impl Menu {
@@ -287,41 +286,12 @@ impl Menu {
         Self {
             selected: default,
             config,
-            items_pos: RefCell::new(None),
+            items_pos: None,
         }
     }
 
     pub fn into_activity(self) -> Activity {
         Activity::new("tmaze", "menu", Box::new(self))
-    }
-
-    fn menu_size(&self, frame: &mut Frame) -> Dims {
-        let special = self.config.special_width();
-
-        let subtitles_width = self
-            .config
-            .subtitles
-            .iter()
-            .map(|s| s.width())
-            .max()
-            .unwrap_or(0);
-
-        let items_width = self
-            .config
-            .map_options(move |opt| opt.width(special).unwrap_or(0))
-            .max()
-            .unwrap_or(0)
-            .min(frame.size.0 as usize);
-
-        let width = subtitles_width
-            .max(items_width)
-            .max(self.config.title.width() + 2) // title is offseted by 2
-            + 2;
-
-        let width = width + 2;
-        let height = self.config.options.len() + 4 + self.config.subtitles.len();
-
-        Dims(width as i32, height as i32)
     }
 
     fn select(&mut self, down: bool) {
@@ -365,9 +335,10 @@ impl Menu {
     }
 
     fn get_by_mouse(&self, Dims(x, y): Dims) -> Option<usize> {
-        let Rect { start, end } = *self.items_pos.borrow().as_ref()?;
+        let Rect { start, end } = self.items_pos?;
         let size = end - start;
 
+        // TODO: check using ranges instead
         if y < start.1 || y >= start.1 + size.1 || x < start.0 || x >= start.0 + size.0 {
             return None;
         }
@@ -411,6 +382,9 @@ impl ActivityHandler for Menu {
                 }
             };
         }
+
+        let dims = MenuDimenstions::calc(&self.config);
+        self.items_pos = Some(Rect::sized(dims.items_pos, dims.items_size));
 
         for event in events {
             match event {
@@ -512,9 +486,18 @@ impl Screen for Menu {
         let box_style = box_style.unwrap_or(color_scheme.normals());
         let text_style = text_style.unwrap_or(color_scheme.texts());
 
-        let menu_size = self.menu_size(frame);
+        // let menu_size = self.menu_size();
 
-        let max_item_width = menu_size.0 as usize - 2 - self.config.special_width();
+        let MenuDimenstions {
+            size,
+            title_pos,
+            items_pos,
+            items_size,
+            subtitles_pos,
+            subtitles_size,
+        } = MenuDimenstions::calc(&self.config);
+
+        let max_item_width = size.0 as usize - 2 - self.config.special_width();
 
         let options = self
             .config
@@ -523,45 +506,31 @@ impl Screen for Menu {
             .map(|opt| opt.render(max_item_width))
             .collect::<Vec<_>>();
 
-        let pos = center_box_in_screen(menu_size);
+        let pos = center_box_in_screen(size);
         let opt_count = options.len();
 
         let max_count = opt_count.to_string().len();
 
-        draw_box(frame, pos, menu_size, box_style);
+        draw_box(frame, pos, size, box_style);
 
-        frame.draw_styled(pos + Dims(3, 1), title.as_str(), title_style);
-
-        let mut items_y = pos.1 + 3;
+        frame.draw_styled(title_pos, title.as_str(), title_style);
 
         for (i, subtitle) in self.config.subtitles.iter().enumerate() {
             frame.draw_styled(
-                pos + Dims(2, i as i32 + 2),
+                subtitles_pos + Dims(0, i as i32),
                 subtitle.as_str(),
                 subtitle_style,
             );
-            items_y += 1;
         }
-
-        let items_pos = Dims(pos.0 + 1, items_y);
 
         frame.draw_styled(
             items_pos - Dims(0, 1),
             LineDir::Horizontal
                 .round()
                 .to_string()
-                .repeat(menu_size.0 as usize - 2),
+                .repeat(size.0 as usize - 2),
             box_style,
         );
-
-        self.items_pos.borrow_mut().replace(Rect {
-            start: items_pos,
-            end: items_pos
-                + Dims(
-                    menu_size.0 - 2,
-                    menu_size.1 - 4 - self.config.subtitles.len() as i32,
-                ),
-        });
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == self.selected {
@@ -583,12 +552,64 @@ impl Screen for Menu {
             }
             write!(&mut buf, "{}", option).unwrap();
 
-            let padded = buf.pad_to_width(menu_size.0 as usize - 2);
+            let padded = buf.pad_to_width(size.0 as usize - 2);
 
             frame.draw_styled(items_pos + Dims(0, i as i32), padded, style);
         }
 
         Ok(())
+    }
+}
+
+struct MenuDimenstions {
+    size: Dims,
+    title_pos: Dims,
+    items_pos: Dims,
+    items_size: Dims,
+    subtitles_pos: Dims,
+    subtitles_size: Dims,
+}
+
+impl MenuDimenstions {
+    fn calc(config: &MenuConfig) -> Self {
+        let menu_size = {
+            let special = config.special_width();
+
+            let subtitles_width = config
+                .subtitles
+                .iter()
+                .map(|s| s.width())
+                .max()
+                .unwrap_or(0);
+
+            let items_width = config
+                .map_options(move |opt| opt.width(special).unwrap_or(0))
+                .max()
+                .unwrap_or(0);
+
+            let width = subtitles_width
+                .max(items_width)
+                .max(config.title.width() + 2) // title is offseted by 2
+                + 2;
+
+            let width = width + 2;
+            let height = config.options.len() + 4 + config.subtitles.len();
+
+            Dims(width as i32, height as i32)
+        };
+
+        let pos = center_box_in_screen(menu_size);
+
+        let items_pos = Dims(pos.0 + 1, pos.1 + config.subtitles.len() as i32 + 3);
+
+        Self {
+            size: menu_size,
+            title_pos: pos + Dims(3, 1),
+            items_pos,
+            items_size: Dims(menu_size.0 - 2, config.options.len() as i32),
+            subtitles_pos: pos + Dims(2, 2),
+            subtitles_size: Dims(menu_size.0 - 2, config.subtitles.len() as i32),
+        }
     }
 }
 
