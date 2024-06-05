@@ -1014,8 +1014,8 @@ struct TouchControls {
 
 impl TouchControls {
     fn render(&self, frame: &mut Frame, cs: &ColorScheme) {
-        const OPENING: char = '';
-        const CLOSING: char = '';
+        const OPENING: char = '█';
+        const CLOSING: char = '█';
         const UP: char = '↑';
         const DOWN: char = '↓';
         const LEFT: char = '←';
