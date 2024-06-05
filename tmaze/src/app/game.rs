@@ -724,14 +724,9 @@ impl ActivityHandler for GameActivity {
             _ => {}
         }
 
-        let game_view_size = Dims(data.screen_size.0, data.screen_size.1 * 2 / 3);
-
-        let dpad_pos = Rect::new(
-            Dims(0, game_view_size.1),
-            Dims(game_view_size.0, data.screen_size.1),
-        )
-        .centered(TouchControls::size())
-        .start;
+        let (_, dpad_rect) =
+            Rect::sized(Dims(0, 0), data.screen_size).split_y(Offset::Rel(2. / 3.));
+        let dpad_pos = dpad_rect.centered_x(TouchControls::size()).start;
 
         let dpad = self.touch_controls.get_or_insert(TouchControls {
             pos: dpad_pos,
@@ -827,7 +822,8 @@ impl Screen for GameActivity {
         let maze_frame = self.current_floor_frame();
         let game = &self.game.game;
 
-        let game_view_size = Dims(frame.size.0, frame.size.1 * 2 / 3);
+        let (game_view_rect, _) = Rect::sized(Dims(0, 0), frame.size).split_y(Offset::Rel(2. / 3.));
+        let game_view_size = game_view_rect.size();
 
         let (vp_size, does_fit) = self.viewport_size(game_view_size);
         let maze_pos = match does_fit {
@@ -851,7 +847,7 @@ impl Screen for GameActivity {
         }
 
         // show viewport
-        let vp_pos = (frame.size - vp_size) / 2;
+        let vp_pos = (game_view_size - vp_size) / 2;
         draw_box(
             frame,
             vp_pos - Dims(1, 1),
@@ -1109,6 +1105,6 @@ impl TouchControls {
     }
 
     fn size() -> Dims {
-        Dims(15, 3)
+        Dims(19, 3)
     }
 }
