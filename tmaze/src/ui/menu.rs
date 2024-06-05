@@ -339,7 +339,7 @@ impl Menu {
         let size = end - start;
 
         // TODO: check using ranges instead
-        if y < start.1 || y >= start.1 + size.1 || x < start.0 || x >= start.0 + size.0 {
+        if y < start.1 || y > start.1 + size.1 || x < start.0 || x > start.0 + size.0 {
             return None;
         }
 
