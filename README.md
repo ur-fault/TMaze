@@ -12,81 +12,63 @@ Simple multiplatform maze solving game for terminal, written entirely in Rust
 
 ![Screenshot of in-game](https://github.com/ur-fault/tmaze/blob/master/readme_assets/screenshot_ingame.png?raw=true)
 
-## What's this
+# Features
 
-### Features
-- Responsive to terminal size
-- Fire banger OST from [step](https://github.com/StepGamesOfficial)
-- Configurable maze sizes through config file
-- Configurable colors
-- Various maze generation algorithms: Randomized Kruskal's, Depth-First Search
-- Timer and move counter
-- Show visited places
-- Spectator mode, where you can fly and see the gameboard
-- Floors and 3D mazes (that's what spectator mode is mainly for)
+- Random mazes using powered by several algorithms
+- Configurable - colors, features and maze presets
+- Sound and OST
+- Multiplatform - Windows, Linux, MacOS and Termux\*, even more untested
+- 3D mazes (yes, it's unplayable) and towers
+- Binaries using CI
+- Playable on most screens, ie. terminal windows, even mobile
 
 
-### Rationale
-Since I'm a student, I've got to attend classes, but even when I'm listening I wanted to do something more than sit there. Also at the time this project came to life, I started to learn Rust, so it seemed to make sense to make some kind of game, but since my notebook is not the newest and I wanted to make it as lightweight as possible, I decided to make it for a terminal. It's also pretty cool.
-
-Another requirement was that it would be multiplatform so that I could play it anywhere. A bonus was that I could play it on the server.
-
-And it ended up as maze solving game because I just couldn't find any other.
-
-
-### Credits and thanks
+# Credits and thanks
 - Music and OST - [step](https://github.com/StepGamesOfficial)
-- Marketing - [PhntD](https://github.com/PhntD)
-- Marketing - Inženýr
-- Random stuff - [filip2cz](https://github.com/filip2cz/)
+- Marketing - [PhntD](https://github.com/PhntD), Inženýr
+- Random but important stuff - [filip2cz](https://github.com/filip2cz/)
 - Playtest - everyone
-- Everything else - [me, ie. ur-fault](https://github.com/ur-fault)
+- Everything else - [ur-fault (me)](https://github.com/ur-fault)
 
-## How to run
-- You can either:
-- Download from [Github releases](https://github.com/ur-fault/TMaze/releases/latest), they are built automatically now, using GitHub Actions
-- Install it with your favorite package manager
-- Build from source (you need cargo installed on your system)
 
-### Using package managers
-#### Scoop - Scoop's official repository
+# How to run
+- There are several options:
+    - Download from binaries [Github releases](https://github.com/ur-fault/TMaze/releases/latest), these are built automatically, using GitHub CI
+    - Install it with your favorite package manager, see [Repology](https://repology.org/project/tmaze/packages)
+    - Build from source, `cargo` is needed for that, as for most Rust project
+        - You can even build and run it inside included `Dockerfile`
+
+## Scoop
+>TMaze is available on official `games` repository, but also on [henshouse-scoop](https://github.com/henshouse/henshouse-scoop), check that for instructions on how to add it
 1. Make sure you have the latest version of Scoop installed
 2. Add games bucket using `scoop bucket add games` if you did not before
 3. And finally, install tmaze with `scoop install games/tmaze`
 
-#### Scoop - Henshouse repository
-1. Make sure you have the latest version of Scoop installed
-2. Add games bucket using `scoop bucket add henshouse https://github.com/henshouse/henshouse-scoop` if you did not before
-3. And finally, install tmaze with `scoop install henshouse/tmaze`
+# Building from source
+Install [cargo](https://github.com/rust-lang/cargo), recommended way is installing `rustup`, which will install `cargo` too
 
-### Feature flags
-TMaze uses cargo features to enable/disable some features. In Github release binaries, they are all enabled. From version 1.14.0, all features are enabled by default and should be disabled manually. To disable them, use `--no-default-features` flag. After disabling them, enable specific ones you want with `--features <feature1>,<feature2>,...` flag.
+## Compile flags
+>Rust programs are typically flaged using `cargo features`, which are flags you can enable to add/remove specific functionality from programs and libraries. Enable them by adding `-F <features separated by comma>` to the build/install command. As said, all\* flags are enabled by default, so to specify only subset, add `--no-default-features` flag to disable them all
 
-The features are:
+### Features in TMaze
+TMaze has several of these flags and all of them are enabled by default. Note: this is not guaranteed to be true in the future, for example when we add debug flag or something similar
 
-- hashbrown - uses hashbrown instead of std hashmap, which is faster
-- updates - enables checking for updates, which is done on startup, can be disabled (this **doesn't** install new version)
+- updates - TMaze can check [crates.io](https://crates.io) and notify you about new version
+- sound - background music and in the future other sound effects, note: you need alsa developement headers during build, on Debian its `libasound2-dev`
 
-### How to build from source
-#### Enabling/disabling features
-After `cargo` command add `--features` to enable features, such as `updates`. To disable default features, such as `hashbrown`, add `--no-default-features`. To enable all featueres add `--all-features`.
+## From crates.io
+[crates.io](https://crates.io) is package/library registry for Rust and TMaze is there too
+1. Just run `cargo install tmaze`, optionally specify compile flags
+1. If you have `~/.cargo/bin/` in your path, simply run TMaze with `tmaze`
 
-#### Install it using cargo from crates.io
-1. Make sure you have [cargo](https://crates.io/) installed
-1. Run `cargo install tmaze`
-1. It's recommended that you have `~/.cargo/bin` in the PATH, so that you don't need full path to run it
-
-#### Or directly from Github
-1. Make sure you have [cargo](https://crates.io/) installed
-1. Clone GitHub repository or download it as zip, then extract it
-1. Go to that folder
-1. Run command `cargo run --release` to run (or you can just build it with `cargo build --release` without runing it)
-1. You can find compiled executable in the directory `./target/release/` with name `tmaze` or `tmaze.exe` , which you can move or link somewhere else
+## From Github
+1. Clone the repo using git with `git clone https://github.com/ur-fault/tmaze`
+1. `cargo install --path ./tmaze/tmaze^`
+1. If you have `~/.cargo/bin/` in your path, simply run TMaze with `tmaze`
 
 #### If you are Docker enjoyer, you may use it too
-1. Make sure you have [Docker](https://www.docker.com/) installed
 1. Build the image with `docker build -t tmaze . --tag tmaze` inside the repository folder, image is not published on Docker Hub yet
-1. Then you have multiple options of actually running it (and ofc more)
-    1. Run it one time only: `docker run --rm -it tmaze`
+1. Then there are mostly options
+    1. Run it one-time only: `docker run --rm -it tmaze`
     1. Run it with persistent storage for config and saved data: `docker run -it --rm -v tmaze_data:/root/.config/tmaze tmaze`
         - In this case you can edit config using somthing like `docker run --rm -it -v tmaze_data:/root thinca/vim:latest`
