@@ -323,6 +323,25 @@ impl Frame {
             }
         }
     }
+
+    pub fn fill(&mut self, cell: Cell) {
+        for row in self.buffer.iter_mut() {
+            for c in row.iter_mut() {
+                *c = cell;
+            }
+        }
+    }
+
+    pub fn fill_rect(&mut self, pos: Dims, size: Dims, cell: Cell) {
+        for y in pos.1..pos.1 + size.1 {
+            for x in pos.0..pos.0 + size.0 {
+                if x < 0 || x >= self.size.0 || y < 0 || y >= self.size.1 {
+                    continue;
+                }
+                self.buffer[y as usize][x as usize] = cell;
+            }
+        }
+    }
 }
 
 impl std::ops::Index<Dims> for Frame {

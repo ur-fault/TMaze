@@ -14,8 +14,8 @@ pub const fn line_center(container_start: i32, container_end: i32, item_width: i
 
 pub const fn box_center(container_start: Dims, container_end: Dims, box_dims: Dims) -> Dims {
     Dims(
-        line_center(container_start.0, container_end.0, box_dims.0),
-        line_center(container_start.1, container_end.1, box_dims.1),
+        line_center(container_start.0, container_end.0 + 1, box_dims.0),
+        line_center(container_start.1, container_end.1 + 1, box_dims.1),
     )
 }
 
@@ -211,5 +211,21 @@ pub const fn on_off(val: bool, capitalized: bool) -> &'static str {
         (true, false) => "on",
         (false, true) => "Off",
         (false, false) => "off",
+    }
+}
+
+pub fn make_odd(val: i32) -> i32 {
+    if val % 2 == 0 {
+        val - 1
+    } else {
+        val
+    }
+}
+
+pub fn make_even(val: i32) -> i32 {
+    if val % 2 == 0 {
+        val
+    } else {
+        val - 1
     }
 }

@@ -12,13 +12,15 @@ use cmaze::{
 
 use crate::{
     app::{game_state::GameData, GameViewMode},
-    helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
+    helpers::{
+        constants, is_release, make_odd, maze2screen, maze2screen_3d, maze_render_size, LineDir,
+    },
     lerp, menu_actions,
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
     ui::{
-        self, draw_box, invert_style, merge_styles, multisize_string, split_menu_actions, Menu,
-        MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
+        self, draw_box, multisize_string, split_menu_actions, Button, Menu, MenuAction, MenuConfig,
+        Popup, ProgressBar, Rect, Screen,
     },
 };
 
@@ -608,6 +610,13 @@ impl GameActivity {
         }
     }
 
+    pub fn dpad_rect(&self, screen_size: Dims) -> Rect {
+        Rect::sized(Dims(0, 0), screen_size)
+            .split_y(Offset::Rel(2. / 3.))
+            .1
+            .with_margin(Dims(2, 0))
+    }
+
     fn current_floor_frame(&self) -> &Frame {
         &self.maze_board.frames[self.game.camera_pos.2 as usize]
     }
@@ -724,15 +733,16 @@ impl ActivityHandler for GameActivity {
             _ => {}
         }
 
-        let (_, dpad_rect) =
-            Rect::sized(Dims(0, 0), data.screen_size).split_y(Offset::Rel(2. / 3.));
-        let dpad_pos = dpad_rect.centered_x(TouchControls::size()).start;
+        let dpad_rect = self.dpad_rect(data.screen_size);
 
-        let dpad = self.touch_controls.get_or_insert(TouchControls {
-            pos: dpad_pos,
-            hover: u8::MAX,
-        });
-        dpad.pos = dpad_pos;
+        self.touch_controls
+            .get_or_insert_with(|| TouchControls::new(dpad_rect));
+
+        if let Some(ref mut tc) = self.touch_controls {
+            tc.update_spacing(dpad_rect);
+        } else {
+            panic!("Touch controls should be initialized");
+        }
 
         for event in events {
             #[allow(clippy::single_match)]
@@ -754,7 +764,7 @@ impl ActivityHandler for GameActivity {
                     }
                     TermEvent::Mouse(event) => {
                         if let Some(ref mut touch_controls) = self.touch_controls {
-                            if let Some(dir) = touch_controls.update(event) {
+                            if let Some(dir) = touch_controls.apply_mouse_event(event) {
                                 self.game.apply_move(&data.settings, dir, false);
                             }
                         }
@@ -857,7 +867,11 @@ impl Screen for GameActivity {
 
         // touch controls
         if let Some(ref touch_controls) = self.touch_controls {
-            touch_controls.render(frame, color_scheme);
+            let dpad_rect = self.dpad_rect(frame.size);
+            let mut dpad_frame = Frame::new(dpad_rect.size());
+
+            touch_controls.render(&mut dpad_frame);
+            frame.draw(dpad_rect.start, &dpad_frame);
         }
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
@@ -1008,54 +1022,62 @@ impl MazeBoard {
 }
 
 struct TouchControls {
-    pos: Dims,
+    buttons: [Button; 4],
+    abs_pos: Dims,
     hover: u8,
 }
 
 impl TouchControls {
-    fn render(&self, frame: &mut Frame, cs: &ColorScheme) {
-        // const OPENING: char = '█';
-        // const CLOSING: char = '█';
-        const UP: char = '↑';
-        const DOWN: char = '↓';
-        const LEFT: char = '←';
-        const RIGHT: char = '→';
+    fn new(rect: Rect) -> Self {
+        let space = rect.size();
+        let btn_size = Self::calc_button_size(space);
 
-        fn draw_button(
-            frame: &mut Frame,
-            pos: Dims,
-            arrow: char,
-            color_scheme: &ColorScheme,
-            set: bool,
-        ) {
-            let normal = color_scheme.normals();
-            let highlight = color_scheme.players();
+        const BTN_DEFINITIONS: [(char, CellWall); 4] = [
+            ('↑', CellWall::Up),
+            ('←', CellWall::Left),
+            ('→', CellWall::Right),
+            ('↓', CellWall::Down),
+        ];
 
-            frame.draw_styled(
-                pos,
-                Rect::sized(Dims(0, 0), Dims(7, 3)),
-                if set { highlight } else { normal },
-            );
+        let buttons = BTN_DEFINITIONS
+            .iter()
+            .enumerate()
+            .map(|(i, &(ch, _))| {
+                let btn_pos = Self::calc_button_pos(space, i);
+                Button::new(&ch.to_string(), btn_pos, btn_size)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
 
-            frame.draw_styled(
-                pos + Dims(1, 1),
-                format!("  {}  ", arrow),
-                if set {
-                    merge_styles(invert_style(highlight), normal)
-                } else {
-                    merge_styles(invert_style(normal), highlight)
-                },
-            );
+        Self {
+            buttons,
+            abs_pos: rect.start,
+            hover: u8::MAX,
         }
-
-        let p = self.pos;
-        draw_button(frame, p + Dims(6, 0), UP, cs, self.hover == 0);
-        draw_button(frame, p + Dims(0, 2), LEFT, cs, self.hover == 1);
-        draw_button(frame, p + Dims(12, 2), RIGHT, cs, self.hover == 2);
-        draw_button(frame, p + Dims(6, 4), DOWN, cs, self.hover == 3);
     }
 
-    fn update(&mut self, event: MouseEvent) -> Option<CellWall> {
+    fn render(&self, frame: &mut Frame) {
+        for button in self.buttons.iter() {
+            button.draw(frame);
+        }
+    }
+
+    fn update_spacing(&mut self, rect: Rect) {
+        let space = rect.size();
+        self.abs_pos = rect.start;
+
+        for (i, button) in self.buttons.iter_mut().enumerate() {
+            button.pos = Self::calc_button_pos(space, i);
+            button.size = Self::calc_button_size(space);
+            button.set = false;
+        }
+    }
+
+    fn apply_mouse_event(&mut self, event: MouseEvent) -> Option<CellWall> {
+        let mut touch_pos = (event.column, event.row).into();
+        touch_pos -= self.abs_pos;
+
         let pressed = match event.kind {
             MouseEventKind::Up(MouseButton::Left) => true,
             MouseEventKind::Moved => false,
@@ -1064,19 +1086,10 @@ impl TouchControls {
             }
         };
 
-        const BTN_SIZE: Dims = Dims(7, 3); // one is implicit
-
-        let rects = [
-            Rect::sized(self.pos + Dims(5, 0), BTN_SIZE),
-            Rect::sized(self.pos + Dims(0, 2), BTN_SIZE),
-            Rect::sized(self.pos + Dims(10, 2), BTN_SIZE),
-            Rect::sized(self.pos + Dims(5, 4), BTN_SIZE),
-        ];
-
-        let touch_pos = (event.column, event.row).into();
-        for (i, rect) in rects.iter().enumerate() {
-            if rect.contains(touch_pos) {
+        for (i, button) in self.buttons.iter_mut().enumerate() {
+            if button.detect_over(touch_pos) {
                 self.hover = i as u8;
+                button.set = true;
                 if pressed {
                     let dir = match i {
                         0 => CellWall::Top,
@@ -1098,7 +1111,32 @@ impl TouchControls {
         None
     }
 
-    fn size() -> Dims {
-        Dims(19, 3)
+    #[inline]
+    fn calc_button_size(space: Dims) -> Dims {
+        let x = make_odd((space.0 - 1) / 2);
+        let y = make_odd(space.1 / 3);
+
+        Dims(x, y)
+    }
+
+    #[inline]
+    fn calc_button_pos(space: Dims, i: usize) -> Dims {
+        let btn_size = Self::calc_button_size(space);
+
+        let x = match i {
+            0 | 3 => (space.0 - btn_size.0) / 2,
+            1 => 0,
+            2 => space.0 - btn_size.0,
+            _ => panic!("invalid dpad index"),
+        };
+
+        let y = match i {
+            0 => 0,
+            1 | 2 => btn_size.1,
+            3 => btn_size.1 * 2,
+            _ => panic!("invalid dpad index"),
+        };
+
+        Dims(x, y)
     }
 }
