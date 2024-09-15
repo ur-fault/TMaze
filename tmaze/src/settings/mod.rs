@@ -12,6 +12,7 @@ use std::{
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
+    helpers::constants::colors,
     menu_actions,
     renderer::MouseGuard,
     ui::{split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
@@ -70,10 +71,16 @@ fn default_depth() -> u16 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorScheme {
+    #[serde(default = "colors::fun::white")]
     pub normal: Color,
+    #[serde(default = "colors::fun::white")]
     pub player: Color,
+    #[serde(default = "colors::fun::white")]
     pub goal: Color,
+    #[serde(default = "colors::fun::white")]
     pub text: Color,
+    #[serde(default = "colors::fun::white")]
+    pub highlight: Color,
 }
 
 #[allow(dead_code)]
@@ -99,6 +106,11 @@ impl ColorScheme {
 
     pub fn text(mut self, value: Color) -> Self {
         self.text = value;
+        self
+    }
+
+    pub fn highlight(mut self, value: Color) -> Self {
+        self.highlight = value;
         self
     }
 
@@ -133,6 +145,14 @@ impl ColorScheme {
             ..Default::default()
         }
     }
+
+    pub fn highlights(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.highlight),
+            background_color: None,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for ColorScheme {
@@ -142,6 +162,7 @@ impl Default for ColorScheme {
             player: Color::White,
             goal: Color::White,
             text: Color::White,
+            highlight: Color::White,
         }
     }
 }
