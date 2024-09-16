@@ -9,18 +9,16 @@ use cmaze::{
         Cell, CellWall,
     },
 };
+use tap::Tap;
 
 use crate::{
     app::{game_state::GameData, GameViewMode},
-    helpers::{
-        constants::{self, colors},
-        is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir,
-    },
+    helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
     lerp, make_odd, menu_actions,
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
     ui::{
-        self, draw_box, foreground_style, multisize_string, split_menu_actions, Button, Menu,
+        self, draw_box, multisize_string, multisize_string_fast, split_menu_actions, Button, Menu,
         MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
@@ -665,7 +663,7 @@ impl GameActivity {
         };
 
         let view_mode = self.game.view_mode;
-        let view_mode = multisize_string(view_mode.to_multisize_strings(), max_width);
+        let view_mode = multisize_string_fast(view_mode.to_multisize_strings(), max_width);
 
         let tl = vp_pos - Dims(1, 2);
         let br = vp_pos + vp_size + Dims(1, 1);
@@ -736,8 +734,9 @@ impl ActivityHandler for GameActivity {
 
         let dpad_rect = self.dpad_rect(data.screen_size);
 
-        self.touch_controls
-            .get_or_insert_with(|| TouchControls::new(dpad_rect));
+        self.touch_controls.get_or_insert_with(|| {
+            TouchControls::new(dpad_rect).tap_mut(|dpad| dpad.styles_from_settings(&data.settings))
+        });
 
         if let Some(ref mut tc) = self.touch_controls {
             tc.update_spacing(dpad_rect);
@@ -1047,7 +1046,6 @@ impl TouchControls {
                 let btn_pos = Self::calc_button_pos(space, i);
 
                 Button::new(&ch.to_string(), btn_pos, btn_size)
-                    .highlight_style(foreground_style(colors::fun::red()))
             })
             .collect::<Vec<_>>()
             .try_into()
