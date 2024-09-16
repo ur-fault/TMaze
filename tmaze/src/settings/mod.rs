@@ -79,7 +79,7 @@ pub struct ColorScheme {
     pub goal: Color,
     #[serde(default = "colors::fun::white")]
     pub text: Color,
-    #[serde(default = "colors::fun::white")]
+    #[serde(default = "colors::fun::red")]
     pub highlight: Color,
 }
 

@@ -13,14 +13,15 @@ use cmaze::{
 use crate::{
     app::{game_state::GameData, GameViewMode},
     helpers::{
-        constants, is_release, make_odd, maze2screen, maze2screen_3d, maze_render_size, LineDir,
+        constants::{self, colors},
+        is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir,
     },
-    lerp, menu_actions,
+    lerp, make_odd, menu_actions,
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
     ui::{
-        self, draw_box, multisize_string, split_menu_actions, Button, Menu, MenuAction, MenuConfig,
-        Popup, ProgressBar, Rect, Screen,
+        self, draw_box, foreground_style, multisize_string, split_menu_actions, Button, Menu,
+        MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
 
@@ -1014,10 +1015,10 @@ impl MazeBoard {
     }
 
     fn render_special(frames: &mut [Frame], game: &RunningGame, scheme: ColorScheme) {
-        let goals = scheme.goals();
-
+        let goal_style = scheme.goals();
         let goal_pos = game.get_goal_pos();
-        frames[goal_pos.2 as usize].draw_styled(maze2screen(goal_pos), '$', goals);
+
+        frames[goal_pos.2 as usize].draw_styled(maze2screen(goal_pos), '$', goal_style);
     }
 }
 
@@ -1044,7 +1045,9 @@ impl TouchControls {
             .enumerate()
             .map(|(i, &(ch, _))| {
                 let btn_pos = Self::calc_button_pos(space, i);
+
                 Button::new(&ch.to_string(), btn_pos, btn_size)
+                    .highlight_style(foreground_style(colors::fun::red()))
             })
             .collect::<Vec<_>>()
             .try_into()
@@ -1057,10 +1060,12 @@ impl TouchControls {
         }
     }
 
+    fn styles_from_settings(&mut self, settings: &Settings) {
+        self.for_buttons_mut(|button| button.load_styles_from_settings(settings));
+    }
+
     fn render(&self, frame: &mut Frame) {
-        for button in self.buttons.iter() {
-            button.draw(frame);
-        }
+        self.for_buttons(|button| button.draw(frame));
     }
 
     fn update_spacing(&mut self, rect: Rect) {
@@ -1070,7 +1075,6 @@ impl TouchControls {
         for (i, button) in self.buttons.iter_mut().enumerate() {
             button.pos = Self::calc_button_pos(space, i);
             button.size = Self::calc_button_size(space);
-            button.set = false;
         }
     }
 
@@ -1085,6 +1089,8 @@ impl TouchControls {
                 return None;
             }
         };
+
+        self.for_buttons_mut(|button| button.set = false);
 
         for (i, button) in self.buttons.iter_mut().enumerate() {
             if button.detect_over(touch_pos) {
@@ -1113,8 +1119,8 @@ impl TouchControls {
 
     #[inline]
     fn calc_button_size(space: Dims) -> Dims {
-        let x = make_odd((space.0 - 1) / 2);
-        let y = make_odd(space.1 / 3);
+        let x = make_odd!((space.0 - 1) / 2);
+        let y = make_odd!(space.1 / 3);
 
         Dims(x, y)
     }
@@ -1138,5 +1144,19 @@ impl TouchControls {
         };
 
         Dims(x, y)
+    }
+
+    #[inline]
+    fn for_buttons(&self, mut f: impl FnMut(&Button)) {
+        for button in self.buttons.iter() {
+            f(button);
+        }
+    }
+
+    #[inline]
+    fn for_buttons_mut(&mut self, mut f: impl FnMut(&mut Button)) {
+        for button in self.buttons.iter_mut() {
+            f(button);
+        }
     }
 }
