@@ -64,6 +64,20 @@ pub fn multisize_string(strings: impl IntoIterator<Item = String>, max_size: usi
     current
 }
 
+pub fn foreground_style(color: Color) -> ContentStyle {
+    ContentStyle {
+        foreground_color: Some(color),
+        ..ContentStyle::default()
+    }
+}
+
+pub fn background_style(color: Color) -> ContentStyle {
+    ContentStyle {
+        background_color: Some(color),
+        ..ContentStyle::default()
+    }
+}
+
 pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyle {
     ContentStyle {
         attributes: style.attributes | attr,

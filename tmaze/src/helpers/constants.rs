@@ -15,5 +15,9 @@ pub mod colors {
         pub fn white() -> Color {
             Color::White
         }
+
+        pub fn red() -> Color {
+            Color::Red
+        }
     }
 }

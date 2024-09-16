@@ -334,7 +334,7 @@ impl Menu {
         }
     }
 
-    fn get_by_mouse(&self, Dims(x, y): Dims) -> Option<usize> {
+    fn get_opt_by_mouse_pos(&self, Dims(x, y): Dims) -> Option<usize> {
         let Rect { start, end } = self.items_pos?;
         let size = end - start;
 
@@ -375,6 +375,8 @@ impl ActivityHandler for Menu {
             return Some(Change::pop_top());
         }
 
+        /// Return if the expression is `Some`, otherwise do nothing.
+        /// Can be thought of as a `?` or `try` for `Some` instead of `None`.
         macro_rules! return_if_some {
             ($change:expr) => {
                 if let Some(change) = $change {
@@ -426,34 +428,37 @@ impl ActivityHandler for Menu {
                 }
                 Event::Term(TermEvent::Mouse(MouseEvent {
                     kind, column, row, ..
-                })) => match kind {
-                    MouseEventKind::Moved => {
-                        if let Some(selected) = self.get_by_mouse((column, row).into()) {
-                            self.selected = selected;
+                })) => {
+                    let mouse_pos = (column, row).into();
+                    match kind {
+                        MouseEventKind::Moved => {
+                            if let Some(selected) = self.get_opt_by_mouse_pos(mouse_pos) {
+                                self.selected = selected;
+                            }
                         }
-                    }
-                    MouseEventKind::ScrollDown => {
-                        self.select(true);
-                    }
-                    MouseEventKind::ScrollUp => {
-                        self.select(false);
-                    }
-                    MouseEventKind::Up(MouseButton::Left) => {
-                        if let Some(selected) = self.get_by_mouse((column, row).into()) {
-                            self.selected = selected;
+                        MouseEventKind::ScrollDown => {
+                            self.select(true);
                         }
-                        return_if_some!(self.switch(app_data));
-                    }
+                        MouseEventKind::ScrollUp => {
+                            self.select(false);
+                        }
+                        MouseEventKind::Up(MouseButton::Left) => {
+                            if let Some(selected) = self.get_opt_by_mouse_pos(mouse_pos) {
+                                self.selected = selected;
+                            }
+                            return_if_some!(self.switch(app_data));
+                        }
 
-                    // TODO: Test these
-                    MouseEventKind::ScrollLeft => {
-                        self.update_slider(false, app_data);
+                        // TODO: Test these
+                        MouseEventKind::ScrollLeft => {
+                            self.update_slider(false, app_data);
+                        }
+                        MouseEventKind::ScrollRight => {
+                            self.update_slider(true, app_data);
+                        }
+                        _ => {}
                     }
-                    MouseEventKind::ScrollRight => {
-                        self.update_slider(true, app_data);
-                    }
-                    _ => {}
-                },
+                }
                 _ => {}
             }
         }
