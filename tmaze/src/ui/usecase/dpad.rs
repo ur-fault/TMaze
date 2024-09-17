@@ -94,6 +94,12 @@ impl DPad {
         }
     }
 
+    pub fn update_available_moves(&mut self, available_moves: [bool; 6]) {
+        for (button, &is_available) in self.buttons.iter_mut().zip(available_moves.iter()) {
+            button.disabled = !is_available;
+        }
+    }
+
     pub fn apply_mouse_event(&mut self, event: MouseEvent) -> Option<CellWall> {
         let mut touch_pos = (event.column, event.row).into();
         touch_pos -= self.abs_pos;

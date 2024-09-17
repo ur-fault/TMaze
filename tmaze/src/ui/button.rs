@@ -3,7 +3,9 @@ use crossterm::style::ContentStyle;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
-    helpers::strings, renderer::{Cell, Frame}, settings::{ColorScheme, Settings}
+    helpers::strings,
+    renderer::{Cell, Frame},
+    settings::{ColorScheme, Settings},
 };
 
 use super::{invert_style, merge_styles, Rect};
@@ -17,6 +19,7 @@ pub struct Button {
     pub content_style: Option<ContentStyle>,
     pub highlight_style: Option<ContentStyle>,
     pub set: bool,
+    pub disabled: bool,
 }
 
 impl Button {
@@ -33,6 +36,7 @@ impl Button {
             content_style: None,
             highlight_style: None,
             set: false,
+            disabled: false,
         }
     }
 
@@ -62,35 +66,51 @@ impl Button {
         self.load_styles_from_settings(settings);
         self
     }
+
+    pub fn set(mut self, set: bool) -> Self {
+        self.set = set;
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
 }
 
 impl Button {
     pub fn draw_colored(&self, frame: &mut Frame, color_scheme: &ColorScheme) {
-        let normal = self.normal_style.unwrap_or(color_scheme.normals());
-        let content = self.content_style.unwrap_or(color_scheme.normals());
-        let highlight = self.highlight_style.unwrap_or(color_scheme.highlights());
+        let set = self.set && !self.disabled;
 
-        let inverted_bg = invert_style(if self.set { highlight } else { normal });
+        let normal = self.normal_style.unwrap_or(color_scheme.normals());
+        let highlight = self.highlight_style.unwrap_or(color_scheme.highlights());
+        let content = if !self.disabled {
+            self.content_style.unwrap_or(color_scheme.texts())
+        } else {
+            normal
+        };
+
+        let inverted_bg = invert_style(if set { highlight } else { normal });
 
         // Box
         frame.draw_styled(
             self.pos,
             Rect::sized(Dims(0, 0), self.size),
-            if self.set { highlight } else { normal },
+            if set { highlight } else { normal },
         );
 
         // Background
         frame.fill_rect(
             self.pos + Dims(1, 1),
             self.size - Dims(2, 2),
-            Cell::styled(' ', if self.set { inverted_bg } else { content }),
+            Cell::styled(' ', if set { inverted_bg } else { content }),
         );
 
         // Text (content)
         let text_rect = Rect::sized(self.pos + Dims(1, 1), self.size - Dims(2, 2))
             .centered(Dims(self.text.width() as i32, 1));
         let text = self.text.as_str();
-        let style = if self.set {
+        let style = if set {
             merge_styles(invert_style(highlight), normal)
         } else {
             content
