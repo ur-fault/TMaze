@@ -266,7 +266,9 @@ impl Settings {
     pub fn write(&mut self) -> std::sync::RwLockWriteGuard<SettingsInner> {
         self.0.write().unwrap()
     }
+}
 
+impl Settings {
     pub fn get_color_scheme(&self) -> ColorScheme {
         self.read().color_scheme.clone().unwrap_or_default()
     }
