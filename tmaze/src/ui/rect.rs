@@ -1,70 +1,13 @@
-use crate::core::*;
-use crate::helpers::box_center;
-use crate::helpers::dim::Offset;
-use crate::renderer::drawable::Drawable;
-use crate::renderer::Frame;
-
+use cmaze::core::Dims;
 use crossterm::style::ContentStyle;
+use substring::Substring as _;
 
-pub use substring::Substring;
+use crate::{
+    helpers::{box_center, dim::Offset},
+    renderer::{drawable::Drawable, Frame},
+};
 
-pub fn draw_box(frame: &mut Frame, pos: Dims, size: Dims, style: ContentStyle) {
-    draw_str(
-        frame,
-        pos.0,
-        pos.1,
-        &format!("╭{}╮", "─".repeat(size.0 as usize - 2)),
-        style,
-    );
-
-    for y in pos.1 + 1..pos.1 + size.1 - 1 {
-        draw_char(frame, pos.0, y, '│', style);
-        draw_char(frame, pos.0 + size.0 - 1, y, '│', style);
-    }
-
-    draw_str(
-        frame,
-        pos.0,
-        pos.1 + size.1 - 1,
-        &format!("╰{}╯", "─".repeat(size.0 as usize - 2)),
-        style,
-    );
-}
-
-pub fn draw_line(frame: &mut Frame, pos: Dims, vertical: bool, len: usize, style: ContentStyle) {
-    if vertical {
-        for y in 0..len {
-            draw_char(frame, pos.0, pos.1 + y as i32, '│', style);
-        }
-    } else {
-        draw_str(frame, pos.0, pos.1, &"─".repeat(len), style);
-    }
-}
-
-pub fn draw_str(frame: &mut Frame, mut x: i32, y: i32, mut text: &str, style: ContentStyle) {
-    if y < 0 {
-        return;
-    }
-
-    if x < 0 && text.len() as i32 > -x + 1 {
-        text = text.substring(-x as usize, text.len() - 1);
-        x = 0;
-    }
-
-    if x > u16::MAX as i32 || y > u16::MAX as i32 {
-        return;
-    }
-
-    frame.draw(Dims(x, y), (text, style));
-}
-
-pub fn draw_char(frame: &mut Frame, x: i32, y: i32, text: char, style: ContentStyle) {
-    if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32 {
-        return;
-    }
-
-    frame.draw(Dims(x, y), (text, style));
-}
+use super::{draw_box, draw_char, draw_line, draw_str};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -111,7 +54,6 @@ impl Rect {
         (text, pos)
     }
 
-    #[allow(dead_code)]
     pub fn trim_relative<'a>(&'a self, text: &'a impl AsRef<str>, pos: Dims) -> (&str, Dims) {
         let (text, pos) = self.trim_absolute(text, pos + self.start);
         (text, pos - self.start)
@@ -198,7 +140,34 @@ impl Drawable for Rect {
     }
 
     fn draw_with_style(&self, pos: Dims, frame: &mut Frame, style: ContentStyle) {
-        draw_box(frame, self.start + pos, self.size(), style);
+        let pos = self.start + pos;
+        let size = self.size();
+
+        if size.1 == 1 {
+            draw_line(frame, pos, false, size.0 as usize, style);
+            return;
+        }
+
+        draw_str(
+            frame,
+            pos.0,
+            pos.1,
+            &format!("╭{}╮", "─".repeat(size.0 as usize - 2)),
+            style,
+        );
+
+        for y in pos.1 + 1..pos.1 + size.1 - 1 {
+            draw_char(frame, pos.0, y, '│', style);
+            draw_char(frame, pos.0 + size.0 - 1, y, '│', style);
+        }
+
+        draw_str(
+            frame,
+            pos.0,
+            pos.1 + size.1 - 1,
+            &format!("╰{}╯", "─".repeat(size.0 as usize - 2)),
+            style,
+        );
     }
 }
 
