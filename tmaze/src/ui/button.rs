@@ -3,8 +3,7 @@ use crossterm::style::ContentStyle;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
-    renderer::{Cell, Frame},
-    settings::{ColorScheme, Settings},
+    helpers::strings, renderer::{Cell, Frame}, settings::{ColorScheme, Settings}
 };
 
 use super::{invert_style, merge_styles, Rect};
@@ -22,8 +21,9 @@ pub struct Button {
 
 impl Button {
     pub fn new(text: &str, pos: Dims, size: Dims) -> Self {
-        assert!(size.0 >= text.width() as i32 + 2);
-        assert!(size.1 >= 3);
+        assert!(size.1 >= 1);
+
+        let text = strings::trim_center(text, size.0 as usize - 2);
 
         Self {
             text: text.to_string(),
