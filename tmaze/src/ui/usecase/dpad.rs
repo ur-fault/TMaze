@@ -16,7 +16,8 @@ pub struct DPad {
 }
 
 impl DPad {
-    pub fn new(rect: Rect) -> Self {
+    pub fn new(rect: Option<Rect>) -> Self {
+        let rect = rect.unwrap_or_else(|| Rect::sized(Dims(11, 3)));
         let space = rect.size();
 
         const BTN_DEFINITIONS: [(char, CellWall); 4] = [

@@ -726,14 +726,31 @@ impl GameActivity {
     }
 
     fn init_dpad(&mut self, data: &AppData) {
-        let (viewport_rect, dpad_rect) = DPad::split_screen(data);
-        self.viewport_rect = viewport_rect;
-        let dpad_rect = dpad_rect.with_margin(self.margins);
-        self.dpad_rect = Some(dpad_rect);
+        self.touch_controls = Some(Box::new(
+            DPad::new(None).tap_mut(|dpad| dpad.styles_from_settings(&data.settings)),
+        ));
+    }
 
-        self.touch_controls.get_or_insert_with(|| {
-            Box::new(DPad::new(dpad_rect).tap_mut(|dpad| dpad.styles_from_settings(&data.settings)))
-        });
+    fn update_dpad(&mut self, data: &AppData) {
+        if (data.settings.get_enable_dpad() && data.settings.get_enable_mouse())
+            != self.touch_controls.is_some()
+        {
+            if data.settings.get_enable_dpad() {
+                log::info!("Enabling dpad");
+                self.init_dpad(data);
+            } else {
+                log::info!("Disabling dpad");
+                self.deinit_dpad(data);
+            }
+        }
+
+        if self.touch_controls.is_some() {
+            let (viewport_rect, dpad_rect) = DPad::split_screen(data);
+            let dpad_rect = dpad_rect.with_margin(self.margins);
+
+            self.viewport_rect = viewport_rect;
+            self.dpad_rect = Some(dpad_rect);
+        }
     }
 
     fn deinit_dpad(&mut self, data: &AppData) {
@@ -752,7 +769,7 @@ impl ActivityHandler for GameActivity {
             _ => {}
         }
 
-        self.init_dpad(data);
+        self.update_dpad(data);
 
         if let Some(ref mut tc) = self.touch_controls {
             tc.update_space(self.dpad_rect.expect("dpad rect not set"));

@@ -15,7 +15,10 @@ use crate::{
     helpers::{constants::colors, dim::Offset},
     menu_actions,
     renderer::MouseGuard,
-    ui::{split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
+    ui::{
+        split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, MenuItem,
+        OptionDef, Popup, Screen,
+    },
 };
 
 #[cfg(feature = "sound")]
@@ -198,6 +201,8 @@ pub struct SettingsInner {
     // navigation
     #[serde(default)]
     pub enable_mouse: Option<bool>,
+    #[serde(default)]
+    pub enable_dpad: Option<bool>,
 
     // game config
     #[serde(default)]
@@ -341,6 +346,15 @@ impl Settings {
 
     pub fn set_enable_mouse(&mut self, value: bool) -> &mut Self {
         self.write().enable_mouse = Some(value);
+        self
+    }
+
+    pub fn get_enable_dpad(&self) -> bool {
+        self.read().enable_dpad.unwrap_or(false)
+    }
+
+    pub fn set_enable_dpad(&mut self, value: bool) -> &mut Self {
+        self.write().enable_dpad = Some(value);
         self
     }
 
@@ -509,6 +523,7 @@ impl SettingsActivity {
     pub fn new(settings: &Settings) -> Self {
         let options = menu_actions!(
             "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
+            "Controls" -> data => Change::push(create_controls_settings(data)),
             "Other settings" -> data => Change::push(SettingsActivity::other_settings_popup(&data.settings)),
             "Back" -> _ => Change::pop_top(),
         );
@@ -553,4 +568,32 @@ impl ActivityHandler for SettingsActivity {
     fn screen(&self) -> &dyn Screen {
         &self.menu
     }
+}
+
+pub fn create_controls_settings(data: &mut AppData) -> Activity {
+    let menu_config = MenuConfig::new(
+        "Controls settings",
+        [
+            MenuItem::Option(OptionDef {
+                text: "Enable mouse input".into(),
+                val: data.settings.get_enable_mouse(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_enable_mouse(*enabled);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Enable dpad".into(),
+                val: data.settings.get_enable_dpad(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_enable_dpad(*enabled);
+                }),
+            }),
+            MenuItem::Separator,
+            MenuItem::Text("Exit".into()),
+        ],
+    );
+
+    Activity::new_base_boxed("controls settings", Menu::new(menu_config))
 }
