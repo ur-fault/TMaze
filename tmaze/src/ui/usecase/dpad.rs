@@ -59,7 +59,7 @@ impl DPad {
     pub fn split_screen(data: &AppData) -> (Rect, Rect) {
         let screen_size = data.screen_size;
         let screen_ratio = (screen_size.0 as f32 / 2.0) / screen_size.1 as f32;
-        let screen_rect = Rect::sized(Dims(0, 0), screen_size);
+        let screen_rect = Rect::sized(screen_size);
 
         let (side, is_vertical) = match screen_ratio {
             r if r > 1.0 => (screen_size.0, false),
@@ -117,7 +117,7 @@ impl DPad {
         for (i, button) in self.buttons.iter_mut().enumerate() {
             if button.detect_over(touch_pos) {
                 button.set = true;
-                if pressed {
+                if pressed && !button.disabled {
                     let dir = match i {
                         0 => CellWall::Top,
                         1 => CellWall::Left,

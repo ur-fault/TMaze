@@ -95,7 +95,7 @@ impl Button {
         // Box
         frame.draw_styled(
             self.pos,
-            Rect::sized(Dims(0, 0), self.size),
+            Rect::sized(self.size),
             if set { highlight } else { normal },
         );
 
@@ -107,7 +107,7 @@ impl Button {
         );
 
         // Text (content)
-        let text_rect = Rect::sized(self.pos + Dims(1, 1), self.size - Dims(2, 2))
+        let text_rect = Rect::sized_at(self.pos + Dims(1, 1), self.size - Dims(2, 2))
             .centered(Dims(self.text.width() as i32, 1));
         let text = self.text.as_str();
         let style = if set {
