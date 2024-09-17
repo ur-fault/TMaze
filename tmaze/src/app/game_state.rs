@@ -21,12 +21,8 @@ pub enum GameViewMode {
 impl GameViewMode {
     pub fn to_multisize_strings(&self) -> [&'static str; 3] {
         match self {
-            GameViewMode::Adventure => {
-                ["Adventure", "Adv", "A"]
-            }
-            GameViewMode::Spectator => {
-                ["Spectator", "Spec", "S"]
-            }
+            GameViewMode::Adventure => ["Adventure", "Adv", "A"],
+            GameViewMode::Spectator => ["Spectator", "Spec", "S"],
         }
     }
 }

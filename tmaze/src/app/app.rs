@@ -25,7 +25,6 @@ use super::{
     Jobs,
 };
 
-#[allow(dead_code)]
 pub struct App {
     renderer: Renderer,
     activities: Activities,

@@ -9,6 +9,7 @@ pub mod helpers;
 pub mod menu;
 pub mod popup;
 pub mod progressbar;
+pub mod usecase;
 
 pub use button::*;
 pub use draw::*;

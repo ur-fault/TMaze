@@ -1,4 +1,5 @@
 pub mod constants;
+pub mod dim;
 
 use core::fmt;
 use std::ops::Deref;
