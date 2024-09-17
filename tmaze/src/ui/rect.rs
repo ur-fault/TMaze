@@ -20,8 +20,12 @@ impl Rect {
         Self { start, end }
     }
 
-    pub fn sized(start: Dims, size: Dims) -> Self {
+    pub fn sized_at(start: Dims, size: Dims) -> Self {
         Self::new(start, Dims(start.0 + size.0, start.1 + size.1) - Dims(1, 1))
+    }
+    
+    pub fn sized(size: Dims) -> Self {
+        Self::sized_at(Dims(0, 0), size)
     }
 
     pub fn size(&self) -> Dims {
@@ -63,17 +67,17 @@ impl Rect {
 impl Rect {
     pub fn centered(&self, inner: Dims) -> Self {
         let pos = box_center(self.start, self.end, inner);
-        Self::sized(pos, inner)
+        Self::sized_at(pos, inner)
     }
 
     pub fn centered_x(&self, inner: Dims) -> Self {
         let pos = Dims(self.start.0 + (self.size().0 - inner.0) / 2, self.start.1);
-        Self::sized(pos, inner)
+        Self::sized_at(pos, inner)
     }
 
     pub fn centered_y(&self, inner: Dims) -> Self {
         let pos = Dims(self.start.0, self.start.1 + (self.size().1 - inner.1) / 2);
-        Self::sized(pos, inner)
+        Self::sized_at(pos, inner)
     }
 
     pub fn with_margin(&self, margin: Dims) -> Self {
@@ -87,8 +91,8 @@ impl Rect {
 impl Rect {
     pub fn split_x(&self, ratio: Offset) -> (Self, Self) {
         let chars = ratio.to_abs(self.size().0);
-        let left = Rect::sized(self.start, Dims(chars, self.size().1));
-        let right = Rect::sized(
+        let left = Rect::sized_at(self.start, Dims(chars, self.size().1));
+        let right = Rect::sized_at(
             Dims(self.start.0 + chars, self.start.1),
             Dims(self.size().0 - chars, self.size().1),
         );
@@ -97,8 +101,8 @@ impl Rect {
 
     pub fn split_x_end(&self, ratio: Offset) -> (Self, Self) {
         let chars = self.size().0 - ratio.to_abs(self.size().0);
-        let left = Rect::sized(self.start, Dims(chars, self.size().1));
-        let right = Rect::sized(
+        let left = Rect::sized_at(self.start, Dims(chars, self.size().1));
+        let right = Rect::sized_at(
             Dims(self.start.0 + chars, self.start.1),
             Dims(self.size().0 - chars, self.size().1),
         );
@@ -107,8 +111,8 @@ impl Rect {
 
     pub fn split_y(&self, ratio: Offset) -> (Self, Self) {
         let chars = ratio.to_abs(self.size().1);
-        let top = Rect::sized(self.start, Dims(self.size().0, chars));
-        let bottom = Rect::sized(
+        let top = Rect::sized_at(self.start, Dims(self.size().0, chars));
+        let bottom = Rect::sized_at(
             Dims(self.start.0, self.start.1 + chars),
             Dims(self.size().0, self.size().1 - chars),
         );
@@ -119,8 +123,8 @@ impl Rect {
         let Dims(width, height) = self.size();
         let chars = height - ratio.to_abs(height);
 
-        let top = Rect::sized(self.start, Dims(width, chars));
-        let bottom = Rect::sized(
+        let top = Rect::sized_at(self.start, Dims(width, chars));
+        let bottom = Rect::sized_at(
             Dims(self.start.0, self.start.1 + chars),
             Dims(width, height - chars),
         );
@@ -177,7 +181,7 @@ mod tests {
 
     #[test]
     fn frame_trim_absolute() {
-        let frame = Rect::sized(Dims(0, 0), Dims(3, 1));
+        let frame = Rect::sized(Dims(3, 1));
         let (text, ..) = frame.trim_absolute(&"123456", Dims(0, 0));
         assert_eq!(text, "123");
 

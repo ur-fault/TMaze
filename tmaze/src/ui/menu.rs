@@ -386,7 +386,7 @@ impl ActivityHandler for Menu {
         }
 
         let dims = MenuDimenstions::calc(&self.config);
-        self.items_pos = Some(Rect::sized(dims.items_pos, dims.items_size));
+        self.items_pos = Some(Rect::sized_at(dims.items_pos, dims.items_size));
 
         for event in events {
             match event {

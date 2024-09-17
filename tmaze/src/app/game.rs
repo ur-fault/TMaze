@@ -596,7 +596,7 @@ impl GameActivity {
             show_debug: false,
 
             margins,
-            viewport_rect: Rect::sized(Dims(0, 0), app_data.screen_size),
+            viewport_rect: Rect::sized(app_data.screen_size),
             dpad_rect: None,
 
             sm_camera_pos,
@@ -790,7 +790,11 @@ impl ActivityHandler for GameActivity {
         }
 
         if let Some(ref mut tc) = self.touch_controls {
-            tc.update_available_moves(self.game.game.get_available_moves());
+            tc.update_available_moves(if self.game.view_mode == GameViewMode::Adventure {
+                self.game.game.get_available_moves()
+            } else {
+                [true; 6] // enable all
+            });
         }
 
         if self.game.view_mode == GameViewMode::Adventure {
