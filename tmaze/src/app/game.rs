@@ -789,6 +789,10 @@ impl ActivityHandler for GameActivity {
             }
         }
 
+        if let Some(ref mut tc) = self.touch_controls {
+            tc.update_available_moves(self.game.game.get_available_moves());
+        }
+
         if self.game.view_mode == GameViewMode::Adventure {
             match self.camera_mode {
                 CameraMode::CloseFollow => {

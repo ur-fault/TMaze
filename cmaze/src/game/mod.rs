@@ -145,6 +145,16 @@ impl RunningGame {
         self.gen_fn
     }
 
+    pub fn get_available_moves(&self) -> [bool; 6] {
+        let cell = &self.maze.get_cell(self.player_pos).unwrap();
+        CellWall::get_in_order()
+            .into_iter()
+            .map(|wall| !cell.get_wall(wall))
+            .collect::<Vec<_>>()
+            .try_into()
+            .expect("failed to map [bool; 6] from [bool; 6]")
+    }
+
     pub fn start(&mut self) -> Result<(), GameAlreadyRunningError> {
         if let RunningGameState::NotStarted = self.get_state() {
             self.state = RunningGameState::Running;
