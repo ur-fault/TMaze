@@ -1,8 +1,8 @@
 use crate::core::*;
 use crate::helpers::box_center;
+use crate::helpers::dim::Offset;
 use crate::renderer::drawable::Drawable;
 use crate::renderer::Frame;
-use crate::settings::Offset;
 
 use crossterm::style::ContentStyle;
 
@@ -134,8 +134,27 @@ impl Rect {
         Self::sized(pos, inner)
     }
 
+    pub fn with_margin(&self, margin: Dims) -> Self {
+        Self {
+            start: self.start + margin,
+            end: self.end - margin,
+        }
+    }
+}
+
+impl Rect {
     pub fn split_x(&self, ratio: Offset) -> (Self, Self) {
         let chars = ratio.to_abs(self.size().0);
+        let left = Rect::sized(self.start, Dims(chars, self.size().1));
+        let right = Rect::sized(
+            Dims(self.start.0 + chars, self.start.1),
+            Dims(self.size().0 - chars, self.size().1),
+        );
+        (left, right)
+    }
+
+    pub fn split_x_end(&self, ratio: Offset) -> (Self, Self) {
+        let chars = self.size().0 - ratio.to_abs(self.size().0);
         let left = Rect::sized(self.start, Dims(chars, self.size().1));
         let right = Rect::sized(
             Dims(self.start.0 + chars, self.start.1),
@@ -154,11 +173,22 @@ impl Rect {
         (top, bottom)
     }
 
-    pub fn with_margin(&self, margin: Dims) -> Self {
-        Self {
-            start: self.start + margin,
-            end: self.end - margin,
-        }
+    pub fn split_y_end(&self, ratio: Offset) -> (Self, Self) {
+        let Dims(width, height) = self.size();
+        let chars = height - ratio.to_abs(height);
+
+        let top = Rect::sized(self.start, Dims(width, chars));
+        let bottom = Rect::sized(
+            Dims(self.start.0, self.start.1 + chars),
+            Dims(width, height - chars),
+        );
+        (top, bottom)
+    }
+}
+
+impl Rect {
+    pub fn render(&self, frame: &mut Frame, style: ContentStyle) {
+        draw_box(frame, self.start, self.size(), style);
     }
 }
 

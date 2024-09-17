@@ -9,17 +9,19 @@ use cmaze::{
         Cell, CellWall,
     },
 };
-use tap::Tap;
+use tap::Tap as _;
 
 use crate::{
     app::{game_state::GameData, GameViewMode},
-    helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
-    lerp, make_odd, menu_actions,
+    helpers::{
+        constants, dim::Offset, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir,
+    },
+    lerp, menu_actions,
     renderer::Frame,
-    settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
+    settings::{self, CameraMode, ColorScheme, Settings, SettingsActivity},
     ui::{
-        self, draw_box, multisize_string, multisize_string_fast, split_menu_actions, Button, Menu,
-        MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
+        self, draw_box, multisize_string, multisize_string_fast, split_menu_actions,
+        usecase::dpad::DPad, Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
 
@@ -27,9 +29,7 @@ use crate::{
 #[allow(unused_imports)]
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
-use crossterm::event::{
-    Event as TermEvent, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind,
-};
+use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 
 #[cfg(feature = "sound")]
 #[allow(unused_imports)]
@@ -364,6 +364,7 @@ impl MazeGenerationActivity {
 impl ActivityHandler for MazeGenerationActivity {
     fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         for event in events {
+            #[allow(clippy::collapsible_match)]
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
@@ -561,19 +562,26 @@ pub struct GameActivity {
     maze_board: MazeBoard,
     show_debug: bool,
 
+    // spacing
+    margins: Dims,
+    viewport_rect: Rect,
+    dpad_rect: Option<Rect>,
+
     // smooth
     sm_camera_pos: Dims3D,
     sm_player_pos: Dims3D,
 
     // touch
-    touch_controls: Option<TouchControls>,
+    touch_controls: Option<Box<DPad>>,
 }
 
 impl GameActivity {
     pub fn new(game: GameData, app_data: &mut AppData) -> Self {
         let settings = &app_data.settings;
+
         let camera_mode = settings.get_camera_mode();
         let maze_board = MazeBoard::new(&game.game, settings);
+        let margins = settings.get_viewport_margin();
 
         #[cfg(feature = "sound")]
         app_data.play_bgm(MusicTrack::choose_for_maze(game.game.get_maze()));
@@ -587,6 +595,10 @@ impl GameActivity {
             maze_board,
             show_debug: false,
 
+            margins,
+            viewport_rect: Rect::sized(Dims(0, 0), app_data.screen_size),
+            dpad_rect: None,
+
             sm_camera_pos,
             sm_player_pos,
 
@@ -596,24 +608,14 @@ impl GameActivity {
 
     /// Returns the size of the viewport and whether the floor fits in the viewport
     pub fn viewport_size(&self, screen_size: Dims) -> (Dims, bool) {
-        let vp_size = screen_size - Dims(8, 6);
+        let vp_size = screen_size - self.margins * 2;
 
         let maze_frame = &self.maze_board.frames[self.game.game.get_player_pos().2 as usize];
         let floor_size = maze_frame.size;
 
         let does_fit = floor_size.0 <= vp_size.0 && floor_size.1 <= vp_size.1;
-        if does_fit {
-            (floor_size, does_fit)
-        } else {
-            (vp_size, does_fit)
-        }
-    }
 
-    pub fn dpad_rect(&self, screen_size: Dims) -> Rect {
-        Rect::sized(Dims(0, 0), screen_size)
-            .split_y(Offset::Rel(2. / 3.))
-            .1
-            .with_margin(Dims(2, 0))
+        (if does_fit { floor_size } else { vp_size }, does_fit)
     }
 
     fn current_floor_frame(&self) -> &Frame {
@@ -672,7 +674,7 @@ impl GameActivity {
         let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
 
         draw(&pos_text, tl);
-        draw(&view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
+        draw(view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
         draw(&move_count, Dims(tl.0, br.1));
         draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
     }
@@ -722,6 +724,24 @@ impl GameActivity {
             );
         }
     }
+
+    fn init_dpad(&mut self, data: &AppData) {
+        let (viewport_rect, dpad_rect) = DPad::split_screen(data);
+        self.viewport_rect = viewport_rect;
+        let dpad_rect = dpad_rect.with_margin(self.margins);
+        self.dpad_rect = Some(dpad_rect);
+
+        self.touch_controls.get_or_insert_with(|| {
+            Box::new(DPad::new(dpad_rect).tap_mut(|dpad| dpad.styles_from_settings(&data.settings)))
+        });
+    }
+
+    fn deinit_dpad(&mut self, data: &AppData) {
+        self.touch_controls = None;
+
+        self.viewport_rect = Rect::new(Dims(0, 0), data.screen_size);
+        self.dpad_rect = None;
+    }
 }
 
 impl ActivityHandler for GameActivity {
@@ -732,16 +752,10 @@ impl ActivityHandler for GameActivity {
             _ => {}
         }
 
-        let dpad_rect = self.dpad_rect(data.screen_size);
-
-        self.touch_controls.get_or_insert_with(|| {
-            TouchControls::new(dpad_rect).tap_mut(|dpad| dpad.styles_from_settings(&data.settings))
-        });
+        self.init_dpad(data);
 
         if let Some(ref mut tc) = self.touch_controls {
-            tc.update_spacing(dpad_rect);
-        } else {
-            panic!("Touch controls should be initialized");
+            tc.update_space(self.dpad_rect.expect("dpad rect not set"));
         }
 
         for event in events {
@@ -832,7 +846,7 @@ impl Screen for GameActivity {
         let maze_frame = self.current_floor_frame();
         let game = &self.game.game;
 
-        let (game_view_rect, _) = Rect::sized(Dims(0, 0), frame.size).split_y(Offset::Rel(2. / 3.));
+        let game_view_rect = self.viewport_rect;
         let game_view_size = game_view_rect.size();
 
         let (vp_size, does_fit) = self.viewport_size(game_view_size);
@@ -857,22 +871,13 @@ impl Screen for GameActivity {
         }
 
         // show viewport
-        let vp_pos = (game_view_size - vp_size) / 2;
+        let vp_pos = (game_view_size - vp_size) / 2 + self.viewport_rect.start;
         draw_box(
             frame,
             vp_pos - Dims(1, 1),
             vp_size + Dims(2, 2),
             color_scheme.normals(),
         );
-
-        // touch controls
-        if let Some(ref touch_controls) = self.touch_controls {
-            let dpad_rect = self.dpad_rect(frame.size);
-            let mut dpad_frame = Frame::new(dpad_rect.size());
-
-            touch_controls.render(&mut dpad_frame);
-            frame.draw(dpad_rect.start, &dpad_frame);
-        }
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
             if !does_fit && self.show_debug {
@@ -883,6 +888,20 @@ impl Screen for GameActivity {
         self.render_meta_texts(frame, color_scheme, vp_pos, vp_size);
 
         frame.draw(vp_pos, &viewport);
+
+        // touch controls
+        if let Some(ref touch_controls) = self.touch_controls {
+            let mut dpad_frame = Frame::new(self.dpad_rect.unwrap().size());
+
+            touch_controls.render(&mut dpad_frame);
+            frame.draw(self.dpad_rect.unwrap().start, &dpad_frame);
+        }
+
+        if false {
+            if let Some(dpad_rect) = self.dpad_rect {
+                dpad_rect.render(frame, color_scheme.normals());
+            }
+        }
 
         Ok(())
     }
@@ -1018,143 +1037,5 @@ impl MazeBoard {
         let goal_pos = game.get_goal_pos();
 
         frames[goal_pos.2 as usize].draw_styled(maze2screen(goal_pos), '$', goal_style);
-    }
-}
-
-struct TouchControls {
-    buttons: [Button; 4],
-    abs_pos: Dims,
-    hover: u8,
-}
-
-impl TouchControls {
-    fn new(rect: Rect) -> Self {
-        let space = rect.size();
-        let btn_size = Self::calc_button_size(space);
-
-        const BTN_DEFINITIONS: [(char, CellWall); 4] = [
-            ('↑', CellWall::Up),
-            ('←', CellWall::Left),
-            ('→', CellWall::Right),
-            ('↓', CellWall::Down),
-        ];
-
-        let buttons = BTN_DEFINITIONS
-            .iter()
-            .enumerate()
-            .map(|(i, &(ch, _))| {
-                let btn_pos = Self::calc_button_pos(space, i);
-
-                Button::new(&ch.to_string(), btn_pos, btn_size)
-            })
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-
-        Self {
-            buttons,
-            abs_pos: rect.start,
-            hover: u8::MAX,
-        }
-    }
-
-    fn styles_from_settings(&mut self, settings: &Settings) {
-        self.for_buttons_mut(|button| button.load_styles_from_settings(settings));
-    }
-
-    fn render(&self, frame: &mut Frame) {
-        self.for_buttons(|button| button.draw(frame));
-    }
-
-    fn update_spacing(&mut self, rect: Rect) {
-        let space = rect.size();
-        self.abs_pos = rect.start;
-
-        for (i, button) in self.buttons.iter_mut().enumerate() {
-            button.pos = Self::calc_button_pos(space, i);
-            button.size = Self::calc_button_size(space);
-        }
-    }
-
-    fn apply_mouse_event(&mut self, event: MouseEvent) -> Option<CellWall> {
-        let mut touch_pos = (event.column, event.row).into();
-        touch_pos -= self.abs_pos;
-
-        let pressed = match event.kind {
-            MouseEventKind::Up(MouseButton::Left) => true,
-            MouseEventKind::Moved => false,
-            _ => {
-                return None;
-            }
-        };
-
-        self.for_buttons_mut(|button| button.set = false);
-
-        for (i, button) in self.buttons.iter_mut().enumerate() {
-            if button.detect_over(touch_pos) {
-                self.hover = i as u8;
-                button.set = true;
-                if pressed {
-                    let dir = match i {
-                        0 => CellWall::Top,
-                        1 => CellWall::Left,
-                        2 => CellWall::Right,
-                        3 => CellWall::Bottom,
-                        _ => unreachable!(),
-                    };
-
-                    return Some(dir);
-                } else {
-                    return None;
-                }
-            }
-        }
-
-        self.hover = u8::MAX;
-
-        None
-    }
-
-    #[inline]
-    fn calc_button_size(space: Dims) -> Dims {
-        let x = make_odd!((space.0 - 1) / 2);
-        let y = make_odd!(space.1 / 3);
-
-        Dims(x, y)
-    }
-
-    #[inline]
-    fn calc_button_pos(space: Dims, i: usize) -> Dims {
-        let btn_size = Self::calc_button_size(space);
-
-        let x = match i {
-            0 | 3 => (space.0 - btn_size.0) / 2,
-            1 => 0,
-            2 => space.0 - btn_size.0,
-            _ => panic!("invalid dpad index"),
-        };
-
-        let y = match i {
-            0 => 0,
-            1 | 2 => btn_size.1,
-            3 => btn_size.1 * 2,
-            _ => panic!("invalid dpad index"),
-        };
-
-        Dims(x, y)
-    }
-
-    #[inline]
-    fn for_buttons(&self, mut f: impl FnMut(&Button)) {
-        for button in self.buttons.iter() {
-            f(button);
-        }
-    }
-
-    #[inline]
-    fn for_buttons_mut(&mut self, mut f: impl FnMut(&mut Button)) {
-        for button in self.buttons.iter_mut() {
-            f(button);
-        }
     }
 }

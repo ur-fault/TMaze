@@ -54,7 +54,10 @@ pub fn multisize_duration_format(dur: Duration, max_size: usize) -> String {
     )
 }
 
-pub fn multisize_string_fast<'a>(strings: impl IntoIterator<Item = &'a str>, max_size: usize) -> &'a str {
+pub fn multisize_string_fast<'a>(
+    strings: impl IntoIterator<Item = &'a str>,
+    max_size: usize,
+) -> &'a str {
     let strings = &mut strings.into_iter();
     let mut current = strings.next().unwrap();
     while current.width() > max_size {

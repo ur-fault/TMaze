@@ -1,4 +1,4 @@
-use cmaze::{game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
+use cmaze::{core::Dims, game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
 use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
@@ -12,7 +12,7 @@ use std::{
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
-    helpers::constants::colors,
+    helpers::{constants::colors, dim::Offset},
     menu_actions,
     renderer::MouseGuard,
     ui::{split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
@@ -22,28 +22,6 @@ use crate::{
 use crate::sound::create_audio_settings;
 
 const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Offset {
-    Abs(i32),
-    Rel(f32),
-}
-
-impl Offset {
-    pub fn to_abs(self, size: i32) -> i32 {
-        match self {
-            Offset::Rel(ratio) => (size as f32 * ratio).round() as i32,
-            Offset::Abs(chars) => chars,
-        }
-    }
-}
-
-impl Default for Offset {
-    fn default() -> Self {
-        Offset::Rel(0.25)
-    }
-}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum CameraMode {
@@ -204,7 +182,7 @@ pub struct SettingsInner {
     #[serde(default)]
     pub color_scheme: Option<ColorScheme>,
     #[serde(default)]
-    // motion
+    // viewport
     pub slow: Option<bool>,
     #[serde(default)]
     pub disable_tower_auto_up: Option<bool>,
@@ -214,6 +192,8 @@ pub struct SettingsInner {
     pub camera_smoothing: Option<f32>,
     #[serde[default]]
     pub player_smoothing: Option<f32>,
+    #[serde(default)]
+    pub viewport_margin: Option<(i32, i32)>,
 
     // navigation
     #[serde(default)]
@@ -338,6 +318,18 @@ impl Settings {
 
     pub fn set_player_smoothing(&mut self, value: f32) -> &mut Self {
         self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
+        self
+    }
+
+    pub fn get_viewport_margin(&self) -> Dims {
+        self.read()
+            .viewport_margin
+            .map(Dims::from)
+            .unwrap_or(Dims(4, 3))
+    }
+
+    pub fn set_viewport_margin(&mut self, value: Dims) -> &mut Self {
+        self.write().viewport_margin = Some(value.into());
         self
     }
 

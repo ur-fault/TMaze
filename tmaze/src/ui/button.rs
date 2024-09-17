@@ -89,7 +89,7 @@ impl Button {
         // Text (content)
         let text_rect = Rect::sized(self.pos + Dims(1, 1), self.size - Dims(2, 2))
             .centered(Dims(self.text.width() as i32, 1));
-        let text = format!("{}", self.text);
+        let text = self.text.as_str();
         let style = if self.set {
             merge_styles(invert_style(highlight), normal)
         } else {
@@ -104,15 +104,10 @@ impl Button {
     }
 
     pub fn detect_over(&self, pos: Dims) -> bool {
-        if pos.0 >= self.pos.0
+        pos.0 >= self.pos.0
             && pos.0 < self.pos.0 + self.size.0
             && pos.1 >= self.pos.1
             && pos.1 < self.pos.1 + self.size.1
-        {
-            true
-        } else {
-            false
-        }
     }
 
     pub fn size(&self) -> Dims {
