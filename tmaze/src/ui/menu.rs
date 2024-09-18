@@ -7,6 +7,7 @@ use pad::PadStr;
 use unicode_width::UnicodeWidthStr;
 
 use std::{
+    borrow::Cow,
     fmt::{self, Write},
     io,
     ops::RangeInclusive,
@@ -20,7 +21,7 @@ use crate::{
         app::AppData,
         event::Event,
     },
-    helpers::{is_release, LineDir, MbyStaticStr},
+    helpers::{is_release, strings::MbyStaticStr, LineDir},
     renderer::Frame,
     settings::{ColorScheme, Settings},
 };
@@ -35,6 +36,7 @@ pub struct SliderDef {
     pub text: MbyStaticStr,
     pub val: i32,
     pub range: RangeInclusive<i32>,
+    #[allow(clippy::type_complexity)]
     pub fun: Box<dyn FnMut(bool, &mut i32, &mut AppData)>,
     pub as_num: bool,
 }
@@ -42,6 +44,7 @@ pub struct SliderDef {
 pub struct OptionDef {
     pub text: MbyStaticStr,
     pub val: bool,
+    #[allow(clippy::type_complexity)]
     pub fun: Box<dyn FnMut(&mut bool, &mut AppData)>,
 }
 
@@ -84,13 +87,15 @@ impl MenuItem {
         .map(|w| w + special)
     }
 
-    fn render(&self, width: usize) -> String {
+    // TODO: same as Display, make it get a buffer and write to it,
+    // so we don't allocate a new string every time
+    fn render(&self, width: usize) -> Cow<str> {
         match self {
-            MenuItem::Text(text) => text.to_string(),
+            MenuItem::Text(text) => text.as_ref_cow(),
             MenuItem::Option(OptionDef { text, val, .. }) => {
                 let prefix = if *val { "[▪]" } else { "[ ]" };
                 let text_w = text.width();
-                format!("{text} {prefix:>width$}", width = width - text_w - 1)
+                format!("{text} {prefix:>width$}", width = width - text_w - 1).into()
             }
             MenuItem::Slider(SliderDef {
                 text,
@@ -100,7 +105,7 @@ impl MenuItem {
                 ..
             }) => {
                 if *as_num {
-                    format!("[{val}] {text}")
+                    format!("[{val}] {text}").into()
                 } else {
                     // TODO: find the best character to use
                     // const FILLED: char = '█';
@@ -120,10 +125,10 @@ impl MenuItem {
 
                     let indicator = format!(" [{progress}]");
 
-                    format!("{text}{indicator:>width$}", width = width - text_width)
+                    format!("{text}{indicator:>width$}", width = width - text_width).into()
                 }
             }
-            MenuItem::Separator => LineDir::Horizontal.round().to_string().repeat(width),
+            MenuItem::Separator => LineDir::Horizontal.round().to_string().repeat(width).into(),
         }
     }
 }

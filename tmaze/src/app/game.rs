@@ -14,13 +14,14 @@ use tap::Tap as _;
 use crate::{
     app::{game_state::GameData, GameViewMode},
     helpers::{
-        constants, dim::Offset, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir,
+        constants, dim::Offset, is_release, maze2screen, maze2screen_3d, maze_render_size, strings,
+        LineDir,
     },
     lerp, menu_actions,
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Settings, SettingsActivity},
     ui::{
-        self, draw_box, multisize_string, multisize_string_fast, split_menu_actions,
+        self, draw_box, helpers::format_duration, multisize_duration_format, split_menu_actions,
         usecase::dpad::DPad, Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
@@ -508,10 +509,7 @@ impl EndGamePopup {
     pub fn new(game: &RunningGame, settings: &Settings) -> Self {
         let maze_size = game.get_maze().size();
         let texts = vec![
-            format!(
-                "Time:  {}",
-                ui::format_duration(game.get_elapsed().unwrap())
-            ),
+            format!("Time:  {}", format_duration(game.get_elapsed().unwrap())),
             format!("Moves: {}", game.get_move_count()),
             format!("Size:  {}x{}x{}", maze_size.0, maze_size.1, maze_size.2,),
         ];
@@ -635,8 +633,8 @@ impl GameActivity {
 
         // texts
         let from_start =
-            ui::multisize_duration_format(self.game.game.get_elapsed().unwrap(), max_width);
-        let move_count = ui::multisize_string(
+            multisize_duration_format(self.game.game.get_elapsed().unwrap(), max_width);
+        let move_count = strings::multisize_string(
             [
                 format!("{} moves", self.game.game.get_move_count()),
                 format!("{}m", self.game.game.get_move_count()),
@@ -645,7 +643,7 @@ impl GameActivity {
         );
 
         let pos_text = if self.game.game.get_maze().size().2 > 1 {
-            multisize_string(
+            strings::multisize_string(
                 [
                     format!("x:{} y:{} floor:{}", pl_pos.0, pl_pos.1, pl_pos.2),
                     format!("x:{} y:{} f:{}", pl_pos.0, pl_pos.1, pl_pos.2),
@@ -654,7 +652,7 @@ impl GameActivity {
                 max_width,
             )
         } else {
-            multisize_string(
+            strings::multisize_string(
                 [
                     format!("x:{} y:{}", pl_pos.0, pl_pos.1),
                     format!("x:{} y:{}", pl_pos.0, pl_pos.1),
@@ -665,7 +663,7 @@ impl GameActivity {
         };
 
         let view_mode = self.game.view_mode;
-        let view_mode = multisize_string_fast(view_mode.to_multisize_strings(), max_width);
+        let view_mode = strings::multisize_string_fast(view_mode.to_multisize_strings(), max_width);
 
         let tl = vp_pos - Dims(1, 2);
         let br = vp_pos + vp_size + Dims(1, 1);
