@@ -663,7 +663,7 @@ impl GameActivity {
         };
 
         let view_mode = self.game.view_mode;
-        let view_mode = strings::multisize_string_fast(view_mode.to_multisize_strings(), max_width);
+        let view_mode = strings::multisize_string(view_mode.to_multisize_strings(), max_width);
 
         let tl = vp_pos - Dims(1, 2);
         let br = vp_pos + vp_size + Dims(1, 1);

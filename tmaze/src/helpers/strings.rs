@@ -1,6 +1,11 @@
-use std::{borrow::Cow, fmt, ops::Deref};
+use std::{
+    borrow::{Borrow, Cow},
+    fmt,
+    ops::Deref,
+};
 
 use cmaze::core::Dims;
+
 use substring::Substring;
 use unicode_width::UnicodeWidthStr as _;
 
@@ -16,24 +21,24 @@ pub fn trim_center(text: &str, width: usize) -> &str {
     text.substring(offset, offset + width)
 }
 
-
-pub fn multisize_string_fast<'a>(
-    strings: impl IntoIterator<Item = &'a str>,
-    max_size: usize,
-) -> &'a str {
+/// Returns the first string that fits within `max_size` width.
+///
+/// Returns the last string if none fits. So it's *NOT* guaranteed that the returned string fits.
+/// It's up to the caller to handle this case. Perhaps by truncating the string ([`trim_center`]).
+///
+/// # Panics
+///
+/// Panics if the iterator is empty.
+pub fn multisize_string<S>(strings: impl IntoIterator<Item = S>, max_size: usize) -> S
+where
+    S: Borrow<str>,
+{
     let strings = &mut strings.into_iter();
-    let mut current = strings.next().unwrap();
-    while current.width() > max_size {
-        current = strings.next().unwrap();
-    }
 
-    current
-}
-
-pub fn multisize_string(strings: impl IntoIterator<Item = String>, max_size: usize) -> String {
-    let strings = &mut strings.into_iter();
+    // NOTE: we cannot use `Iterator::find` because we need at least the last element,
+    // if none fits
     let mut current = strings.next().unwrap();
-    while current.width() > max_size {
+    while current.borrow().width() > max_size {
         current = strings.next().unwrap();
     }
 
