@@ -641,7 +641,5 @@ macro_rules! menu_actions {
 pub fn split_menu_actions<R>(
     actions: Vec<(MenuItem, MenuAction<R>)>,
 ) -> (Vec<MenuItem>, Vec<MenuAction<R>>) {
-    let (names, actions) = actions.into_iter().unzip();
-
-    (names, actions)
+    actions.into_iter().unzip()
 }
