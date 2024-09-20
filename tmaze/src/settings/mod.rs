@@ -203,6 +203,8 @@ pub struct SettingsInner {
     pub enable_mouse: Option<bool>,
     #[serde(default)]
     pub enable_dpad: Option<bool>,
+    #[serde(default)]
+    pub landscape_dpad_on_left: Option<bool>,
 
     // game config
     #[serde(default)]
@@ -355,6 +357,15 @@ impl Settings {
 
     pub fn set_enable_dpad(&mut self, value: bool) -> &mut Self {
         self.write().enable_dpad = Some(value);
+        self
+    }
+
+    pub fn get_landscape_dpad_on_left(&self) -> bool {
+        self.read().landscape_dpad_on_left.unwrap_or(false)
+    }
+
+    pub fn set_landscape_dpad_on_left(&mut self, value: bool) -> &mut Self {
+        self.write().landscape_dpad_on_left = Some(value);
         self
     }
 
@@ -588,6 +599,14 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 fun: Box::new(|enabled, data| {
                     *enabled = !*enabled;
                     data.settings.set_enable_dpad(*enabled);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Landscape dpad on left".into(),
+                val: data.settings.get_landscape_dpad_on_left(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_landscape_dpad_on_left(*enabled);
                 }),
             }),
             MenuItem::Separator,
