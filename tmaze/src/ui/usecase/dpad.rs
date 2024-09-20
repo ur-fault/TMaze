@@ -77,11 +77,12 @@ impl DPad {
         if is_vertical {
             screen_rect.split_y_end(Offset::Abs(dpad_size))
         } else {
-            let on_right = true; // TODO: add to the settings
+            let on_right = !data.settings.get_landscape_dpad_on_left();
             let offset = Offset::Abs(dpad_size);
 
             if !on_right {
-                screen_rect.split_x(offset)
+                let (dpad, vp) = screen_rect.split_x(offset);
+                (vp, dpad)
             } else {
                 screen_rect.split_x_end(offset)
             }
