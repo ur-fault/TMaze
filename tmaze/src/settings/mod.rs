@@ -207,6 +207,8 @@ pub struct SettingsInner {
     pub landscape_dpad_on_left: Option<bool>,
     #[serde(default)]
     pub dpad_swap_up_down: Option<bool>,
+    #[serde(default)]
+    pub enable_margin_around_dpad: Option<bool>,
 
     // game config
     #[serde(default)]
@@ -377,6 +379,15 @@ impl Settings {
 
     pub fn set_dpad_swap_up_down(&mut self, value: bool) -> &mut Self {
         self.write().dpad_swap_up_down = Some(value);
+        self
+    }
+
+    pub fn get_enable_margin_around_dpad(&self) -> bool {
+        self.read().enable_margin_around_dpad.unwrap_or(false)
+    }
+
+    pub fn set_enable_margin_around_dpad(&mut self, value: bool) -> &mut Self {
+        self.write().enable_margin_around_dpad = Some(value);
         self
     }
 
@@ -626,6 +637,14 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 fun: Box::new(|do_swap, data| {
                     *do_swap = !*do_swap;
                     data.settings.set_dpad_swap_up_down(*do_swap);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Enable margin around dpad".into(),
+                val: data.settings.get_enable_margin_around_dpad(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_enable_margin_around_dpad(*enabled);
                 }),
             }),
             MenuItem::Separator,
