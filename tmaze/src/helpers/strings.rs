@@ -24,7 +24,7 @@ pub fn trim_center(text: &str, width: usize) -> &str {
 /// Returns the first string that fits within `max_size` width.
 ///
 /// Returns the last string if none fits. So it's *NOT* guaranteed that the returned string fits.
-/// It's up to the caller to handle this case. Perhaps by truncating the string ([`trim_center`]).
+/// It's up to the caller to handle this case. Perhaps by trimming the string ([`trim_center`]).
 ///
 /// # Panics
 ///

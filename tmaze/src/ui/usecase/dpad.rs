@@ -4,14 +4,14 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use crate::{
     app::app::AppData,
     helpers::dim::Offset,
-    make_odd,
+    make_even, make_odd,
     renderer::Frame,
     settings::Settings,
     ui::{Button, Rect},
 };
 
 pub struct DPad {
-    buttons: [Button; 4],
+    buttons: [Button; 6],
     abs_pos: Dims,
 }
 
@@ -20,21 +20,24 @@ impl DPad {
         let rect = rect.unwrap_or_else(|| Rect::sized(Dims(11, 3)));
         let space = rect.size();
 
-        const BTN_DEFINITIONS: [(char, CellWall); 4] = [
-            ('↑', CellWall::Up),
-            ('←', CellWall::Left),
-            ('→', CellWall::Right),
-            ('↓', CellWall::Down),
-        ];
-
-        let buttons = BTN_DEFINITIONS
-            .iter()
+        let buttons = CellWall::get_in_order()
+            .into_iter()
             .enumerate()
-            .map(|(i, &(ch, _))| {
+            .map(|(i, wall)| {
                 let pos = Self::calc_button_pos(space, i);
                 let size = Self::calc_button_size(space, i);
 
-                Button::new(&ch.to_string(), pos, size)
+                use CellWall::*;
+                let chr = match wall {
+                    Top => "↑",
+                    Left => "←",
+                    Right => "→",
+                    Bottom => "↓",
+                    Up => "Up",
+                    Down => "Down",
+                };
+
+                Button::new(chr.to_string(), pos, size)
             })
             .collect::<Vec<_>>()
             .try_into()
@@ -86,7 +89,8 @@ impl DPad {
     }
 
     pub fn update_space(&mut self, rect: Rect) {
-        let space = rect.size();
+        let Dims(x, y) = rect.size();
+        let space = Dims(make_odd!(x), make_odd!(y));
         self.abs_pos = rect.start;
 
         for (i, button) in self.buttons.iter_mut().enumerate() {
@@ -115,18 +119,14 @@ impl DPad {
 
         self.for_mut_buttons(|button| button.set = false);
 
-        for (i, button) in self.buttons.iter_mut().enumerate() {
+        for (button, dir) in self
+            .buttons
+            .iter_mut()
+            .zip(CellWall::get_in_order().into_iter())
+        {
             if button.detect_over(touch_pos) {
                 button.set = true;
                 if pressed && !button.disabled {
-                    let dir = match i {
-                        0 => CellWall::Top,
-                        1 => CellWall::Left,
-                        2 => CellWall::Right,
-                        3 => CellWall::Bottom,
-                        _ => unreachable!(),
-                    };
-
                     return Some(dir);
                 } else {
                     return None;
@@ -139,10 +139,14 @@ impl DPad {
 
     #[inline]
     fn calc_button_size(space: Dims, i: usize) -> Dims {
-        let x = make_odd!((space.0 - 1) / 2);
+        let x = match i {
+            0..=3 => make_odd!((space.0 - 1) / 2),
+            4 | 5 => make_even!((space.0 - Self::calc_button_size(space, 0).0) / 2),
+            _ => panic!("invalid dpad index"),
+        };
 
         let y = match i {
-            0 | 3 => make_odd!(space.1 / 3),
+            0 | 3 | 4 | 5 => make_odd!(space.1 / 3),
             1 | 2 => make_odd!(space.1 - (2 * Self::calc_button_size(space, 0).1)),
             _ => panic!("invalid dpad index"),
         };
@@ -157,7 +161,8 @@ impl DPad {
         let x = match i {
             0 | 3 => (space.0 - btn_size.0) / 2,
             1 => 0,
-            2 => space.0 - btn_size.0,
+            2 | 5 => space.0 - btn_size.0,
+            4 => 0,
             _ => panic!("invalid dpad index"),
         };
 
@@ -165,6 +170,7 @@ impl DPad {
             0 => 0,
             1 | 2 => Self::calc_button_size(space, 0).1,
             3 => btn_size.1 + Self::calc_button_size(space, 1).1,
+            4 | 5 => 0,
             _ => panic!("invalid dpad index"),
         };
 

@@ -21,7 +21,7 @@ use crate::{
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Settings, SettingsActivity},
     ui::{
-        self, draw_box, helpers::format_duration, multisize_duration_format, split_menu_actions,
+        self, helpers::format_duration, multisize_duration_format, split_menu_actions,
         usecase::dpad::DPad, Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
@@ -620,14 +620,8 @@ impl GameActivity {
         &self.maze_board.frames[self.game.camera_pos.2 as usize]
     }
 
-    fn render_meta_texts(
-        &self,
-        frame: &mut Frame,
-        color_scheme: &ColorScheme,
-        vp_pos: Dims,
-        vp_size: Dims,
-    ) {
-        let max_width = (vp_size.0 / 2 + 1) as usize;
+    fn render_meta_texts(&self, frame: &mut Frame, color_scheme: &ColorScheme, vp: Rect) {
+        let max_width = (vp.size().0 / 2 + 1) as usize;
 
         let pl_pos = self.game.game.get_player_pos() + Dims3D(1, 1, 1);
 
@@ -665,8 +659,8 @@ impl GameActivity {
         let view_mode = self.game.view_mode;
         let view_mode = strings::multisize_string(view_mode.to_multisize_strings(), max_width);
 
-        let tl = vp_pos - Dims(1, 2);
-        let br = vp_pos + vp_size + Dims(1, 1);
+        let tl = vp.start - Dims(0, 1);
+        let br = vp.start + vp.size();
 
         // draw them
         let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
@@ -744,7 +738,7 @@ impl GameActivity {
 
         if self.touch_controls.is_some() {
             let (viewport_rect, dpad_rect) = DPad::split_screen(data);
-            let dpad_rect = dpad_rect.with_margin(self.margins);
+            let dpad_rect = dpad_rect.margin(self.margins);
 
             self.viewport_rect = viewport_rect;
             self.dpad_rect = Some(dpad_rect);
@@ -893,22 +887,18 @@ impl Screen for GameActivity {
             self.render_player(maze_pos, game, &mut viewport, color_scheme);
         }
 
-        // show viewport
+        // show viewport box
         let vp_pos = (game_view_size - vp_size) / 2 + self.viewport_rect.start;
-        draw_box(
-            frame,
-            vp_pos - Dims(1, 1),
-            vp_size + Dims(2, 2),
-            color_scheme.normals(),
-        );
+        let vp_rect = Rect::sized_at(vp_pos, vp_size).margin(Dims(-1, -1));
+        vp_rect.render(frame, color_scheme.normals());
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
             if !does_fit && self.show_debug {
-                render_edge_follow_rulers((xoff, yoff), frame, vp_size, vp_pos, color_scheme);
+                render_edge_follow_rulers((xoff, yoff), frame, vp_rect, color_scheme);
             }
         }
 
-        self.render_meta_texts(frame, color_scheme, vp_pos, vp_size);
+        self.render_meta_texts(frame, color_scheme, vp_rect);
 
         frame.draw(vp_pos, &viewport);
 
@@ -934,17 +924,18 @@ impl Screen for GameActivity {
 fn render_edge_follow_rulers(
     rulers: (Offset, Offset),
     frame: &mut Frame,
-    vps: Dims,
-    vp_pos: Dims,
+    vp: Rect,
     color_scheme: &ColorScheme,
 ) {
     let goals = color_scheme.goals();
     let players = color_scheme.players();
 
+    let vps = vp.size();
+
     let xo = rulers.0.to_abs(vps.0);
     let yo = rulers.1.to_abs(vps.1);
 
-    let frame_pos = vp_pos - Dims(1, 1);
+    let frame_pos = vp.start;
 
     use LineDir::{Horizontal, Vertical};
     const V: char = Vertical.round();
@@ -1034,6 +1025,7 @@ impl MazeBoard {
     }
 
     fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, scheme: ColorScheme) {
+        // FIXME: only upwards stairs should have goal style
         let style = if tower {
             scheme.goals()
         } else {

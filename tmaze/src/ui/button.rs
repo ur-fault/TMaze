@@ -23,13 +23,11 @@ pub struct Button {
 }
 
 impl Button {
-    pub fn new(text: &str, pos: Dims, size: Dims) -> Self {
+    pub fn new(text: String, pos: Dims, size: Dims) -> Self {
         assert!(size.1 >= 1);
 
-        let text = strings::trim_center(text, size.0 as usize - 2);
-
         Self {
-            text: text.to_string(),
+            text,
             pos,
             size,
             normal_style: None,
@@ -109,7 +107,7 @@ impl Button {
         // Text (content)
         let text_rect = Rect::sized_at(self.pos + Dims(1, 1), self.size - Dims(2, 2))
             .centered(Dims(self.text.width() as i32, 1));
-        let text = self.text.as_str();
+        let text = strings::trim_center(self.text.as_str(), text_rect.size().0 as usize);
         let style = if set {
             merge_styles(invert_style(highlight), normal)
         } else {
