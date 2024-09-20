@@ -1,4 +1,7 @@
-use cmaze::{core::Dims, gameboard::CellWall};
+use cmaze::{
+    core::Dims,
+    gameboard::{CellWall, Maze},
+};
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::{
@@ -10,20 +13,51 @@ use crate::{
     ui::{Button, Rect},
 };
 
+pub enum DPadType {
+    _2D,
+    _3D,
+}
+
+impl DPadType {
+    pub fn from_maze(maze: &Maze) -> Self {
+        if maze.size().2 > 1 {
+            Self::_3D
+        } else {
+            Self::_2D
+        }
+    }
+
+    pub fn is_2d(&self) -> bool {
+        matches!(self, Self::_2D)
+    }
+
+    pub fn is_3d(&self) -> bool {
+        matches!(self, Self::_3D)
+    }
+
+    pub fn button_count(&self) -> usize {
+        match self {
+            Self::_2D => 4,
+            Self::_3D => 6,
+        }
+    }
+}
+
 pub struct DPad {
-    buttons: [Button; 6],
+    buttons: smallvec::SmallVec<[Button; 6]>,
     abs_pos: Dims,
     pub swap_up_down: bool,
 }
 
 impl DPad {
-    pub fn new(rect: Option<Rect>, swap_up_down: bool) -> Self {
+    pub fn new(rect: Option<Rect>, swap_up_down: bool, type_: DPadType) -> Self {
         let rect = rect.unwrap_or_else(|| Rect::sized(Dims(11, 3)));
         let space = rect.size();
 
         let buttons = CellWall::get_in_order()
             .into_iter()
             .enumerate()
+            .take(type_.button_count())
             .map(|(i, wall)| {
                 let pos = Self::calc_button_pos(space, i, swap_up_down);
                 let size = Self::calc_button_size(space, i);
@@ -40,9 +74,7 @@ impl DPad {
 
                 Button::new(chr.to_string(), pos, size)
             })
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+            .collect();
 
         Self {
             buttons,

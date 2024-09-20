@@ -9,7 +9,6 @@ use cmaze::{
         Cell, CellWall,
     },
 };
-use tap::Tap as _;
 
 use crate::{
     app::{game_state::GameData, GameViewMode},
@@ -21,8 +20,11 @@ use crate::{
     renderer::Frame,
     settings::{self, CameraMode, ColorScheme, Settings, SettingsActivity},
     ui::{
-        self, helpers::format_duration, multisize_duration_format, split_menu_actions,
-        usecase::dpad::DPad, Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
+        self,
+        helpers::format_duration,
+        multisize_duration_format, split_menu_actions,
+        usecase::dpad::{DPad, DPadType},
+        Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
 
@@ -735,10 +737,12 @@ impl GameActivity {
     }
 
     fn init_dpad(&mut self, data: &AppData) {
-        self.touch_controls = Some(Box::new(
-            DPad::new(None, data.settings.get_dpad_swap_up_down())
-                .tap_mut(|dpad| dpad.styles_from_settings(&data.settings)),
-        ));
+        let dpad_type = DPadType::from_maze(self.game.game.get_maze());
+        let swap_up_down = data.settings.get_dpad_swap_up_down();
+
+        let mut touch_controls = DPad::new(None, swap_up_down, dpad_type);
+        touch_controls.styles_from_settings(&data.settings);
+        self.touch_controls = Some(Box::new(touch_controls));
     }
 
     fn update_dpad(&mut self, data: &AppData) {
