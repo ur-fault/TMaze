@@ -3,7 +3,7 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::{
     app::app::AppData,
-    helpers::dim::Offset,
+    helpers::{dim::Offset, line_center},
     make_even, make_odd,
     renderer::Frame,
     settings::Settings,
@@ -66,8 +66,8 @@ impl DPad {
         let screen_rect = Rect::sized(screen_size);
 
         let (side, is_vertical) = match screen_ratio {
-            r if r > 1.0 => (screen_size.0, false),
-            r if r <= 1.0 => (screen_size.1, true),
+            1.0.. => (screen_size.0, false),
+            ..=1.0 => (screen_size.1, true),
             _ => unreachable!(),
         };
 
@@ -146,11 +146,7 @@ impl DPad {
             _ => panic!("invalid dpad index"),
         };
 
-        let y = match i {
-            0 | 3 | 4 | 5 => make_odd!(space.1 / 3),
-            1 | 2 => make_odd!(space.1 - (2 * Self::calc_button_size(space, 0).1)),
-            _ => panic!("invalid dpad index"),
-        };
+        let y = make_odd!(space.1 / 3);
 
         Dims(x, y)
     }
@@ -161,17 +157,15 @@ impl DPad {
 
         let x = match i {
             0 | 3 => (space.0 - btn_size.0) / 2,
-            1 => 0,
+            1 | 4 => 0,
             2 | 5 => space.0 - btn_size.0,
-            4 => 0,
             _ => panic!("invalid dpad index"),
         };
 
         let y = match i {
-            0 => 0,
-            1 | 2 => Self::calc_button_size(space, 0).1,
-            3 => btn_size.1 + Self::calc_button_size(space, 1).1,
-            4 | 5 => 0,
+            0 | 4 | 5 => 0,
+            1 | 2 => line_center(0, space.1, btn_size.1),
+            3 => space.1 - btn_size.1,
             _ => panic!("invalid dpad index"),
         };
 
