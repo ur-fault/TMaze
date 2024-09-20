@@ -7,7 +7,7 @@ use crate::{
     renderer::{drawable::Drawable, Frame},
 };
 
-use super::{draw_box, draw_char, draw_line, draw_str};
+use super::draw_box;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -23,7 +23,7 @@ impl Rect {
     pub fn sized_at(start: Dims, size: Dims) -> Self {
         Self::new(start, Dims(start.0 + size.0, start.1 + size.1) - Dims(1, 1))
     }
-    
+
     pub fn sized(size: Dims) -> Self {
         Self::sized_at(Dims(0, 0), size)
     }
@@ -35,6 +35,8 @@ impl Rect {
     pub fn contains(&self, pos: Dims) -> bool {
         pos.0 >= self.start.0 && pos.0 <= self.end.0 && pos.1 >= self.start.1 && pos.1 <= self.end.1
     }
+
+    // TODO: make it generic over `Borrow`
     pub fn trim_absolute<'a>(&'a self, text: &'a impl AsRef<str>, mut pos: Dims) -> (&str, Dims) {
         let mut text = text.as_ref();
         let size = self.size();
@@ -80,10 +82,17 @@ impl Rect {
         Self::sized_at(pos, inner)
     }
 
-    pub fn with_margin(&self, margin: Dims) -> Self {
+    pub fn margin(&self, margin: Dims) -> Self {
         Self {
             start: self.start + margin,
             end: self.end - margin,
+        }
+    }
+
+    pub fn offset(&self, offset: Dims) -> Self {
+        Self {
+            start: self.start + offset,
+            end: self.end + offset,
         }
     }
 }
@@ -144,34 +153,7 @@ impl Drawable for Rect {
     }
 
     fn draw_with_style(&self, pos: Dims, frame: &mut Frame, style: ContentStyle) {
-        let pos = self.start + pos;
-        let size = self.size();
-
-        if size.1 == 1 {
-            draw_line(frame, pos, false, size.0 as usize, style);
-            return;
-        }
-
-        draw_str(
-            frame,
-            pos.0,
-            pos.1,
-            &format!("╭{}╮", "─".repeat(size.0 as usize - 2)),
-            style,
-        );
-
-        for y in pos.1 + 1..pos.1 + size.1 - 1 {
-            draw_char(frame, pos.0, y, '│', style);
-            draw_char(frame, pos.0 + size.0 - 1, y, '│', style);
-        }
-
-        draw_str(
-            frame,
-            pos.0,
-            pos.1 + size.1 - 1,
-            &format!("╰{}╯", "─".repeat(size.0 as usize - 2)),
-            style,
-        );
+        draw_box(frame, pos + self.start, self.size(), style);
     }
 }
 

@@ -198,7 +198,7 @@ macro_rules! make_even {
         if $val % 2 == 0 {
             $val
         } else {
-            $val + 1
+            $val - 1
         }
     };
 }
