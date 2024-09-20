@@ -13,10 +13,11 @@ use crate::{
 pub struct DPad {
     buttons: [Button; 6],
     abs_pos: Dims,
+    pub swap_up_down: bool,
 }
 
 impl DPad {
-    pub fn new(rect: Option<Rect>) -> Self {
+    pub fn new(rect: Option<Rect>, swap_up_down: bool) -> Self {
         let rect = rect.unwrap_or_else(|| Rect::sized(Dims(11, 3)));
         let space = rect.size();
 
@@ -24,7 +25,7 @@ impl DPad {
             .into_iter()
             .enumerate()
             .map(|(i, wall)| {
-                let pos = Self::calc_button_pos(space, i);
+                let pos = Self::calc_button_pos(space, i, swap_up_down);
                 let size = Self::calc_button_size(space, i);
 
                 use CellWall::*;
@@ -46,6 +47,7 @@ impl DPad {
         Self {
             buttons,
             abs_pos: rect.start,
+            swap_up_down,
         }
     }
 
@@ -95,7 +97,7 @@ impl DPad {
         self.abs_pos = rect.start;
 
         for (i, button) in self.buttons.iter_mut().enumerate() {
-            button.pos = Self::calc_button_pos(space, i);
+            button.pos = Self::calc_button_pos(space, i, self.swap_up_down);
             button.size = Self::calc_button_size(space, i);
         }
     }
@@ -152,13 +154,18 @@ impl DPad {
     }
 
     #[inline]
-    fn calc_button_pos(space: Dims, i: usize) -> Dims {
+    fn calc_button_pos(space: Dims, i: usize, swap_up_down: bool) -> Dims {
         let btn_size = Self::calc_button_size(space, i);
+
+        let i = match (i, swap_up_down) {
+            (4 | 5, true) => 9 - i,
+            _ => i,
+        };
 
         let x = match i {
             0 | 3 => (space.0 - btn_size.0) / 2,
-            1 | 4 => 0,
-            2 | 5 => space.0 - btn_size.0,
+            1 | 5 => 0,
+            2 | 4 => space.0 - btn_size.0,
             _ => panic!("invalid dpad index"),
         };
 

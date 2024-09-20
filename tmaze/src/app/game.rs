@@ -718,7 +718,7 @@ impl GameActivity {
     }
 
     fn update_viewport(&mut self, data: &AppData) {
-        if self.touch_controls.is_some() {
+        if self.is_dpad_enabled() {
             let (viewport_rect, dpad_rect) = DPad::split_screen(data);
             let dpad_rect = dpad_rect.margin(self.margins);
 
@@ -728,16 +728,22 @@ impl GameActivity {
             self.viewport_rect = Rect::sized(data.screen_size);
         }
     }
+}
+impl GameActivity {
+    fn is_dpad_enabled(&self) -> bool {
+        self.touch_controls.is_some()
+    }
 
     fn init_dpad(&mut self, data: &AppData) {
         self.touch_controls = Some(Box::new(
-            DPad::new(None).tap_mut(|dpad| dpad.styles_from_settings(&data.settings)),
+            DPad::new(None, data.settings.get_dpad_swap_up_down())
+                .tap_mut(|dpad| dpad.styles_from_settings(&data.settings)),
         ));
     }
 
     fn update_dpad(&mut self, data: &AppData) {
         if (data.settings.get_enable_dpad() && data.settings.get_enable_mouse())
-            != self.touch_controls.is_some()
+            != self.is_dpad_enabled()
         {
             if data.settings.get_enable_dpad() {
                 log::info!("Enabling dpad");
@@ -746,6 +752,13 @@ impl GameActivity {
                 log::info!("Disabling dpad");
                 self.deinit_dpad(data);
             }
+        }
+
+        if self.is_dpad_enabled() {
+            self.touch_controls
+                .as_mut()
+                .expect("dpad not set")
+                .swap_up_down = data.settings.get_dpad_swap_up_down();
         }
     }
 

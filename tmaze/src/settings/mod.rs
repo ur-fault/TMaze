@@ -205,6 +205,8 @@ pub struct SettingsInner {
     pub enable_dpad: Option<bool>,
     #[serde(default)]
     pub landscape_dpad_on_left: Option<bool>,
+    #[serde(default)]
+    pub dpad_swap_up_down: Option<bool>,
 
     // game config
     #[serde(default)]
@@ -366,6 +368,15 @@ impl Settings {
 
     pub fn set_landscape_dpad_on_left(&mut self, value: bool) -> &mut Self {
         self.write().landscape_dpad_on_left = Some(value);
+        self
+    }
+
+    pub fn get_dpad_swap_up_down(&self) -> bool {
+        self.read().dpad_swap_up_down.unwrap_or(false)
+    }
+
+    pub fn set_dpad_swap_up_down(&mut self, value: bool) -> &mut Self {
+        self.write().dpad_swap_up_down = Some(value);
         self
     }
 
@@ -602,11 +613,19 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 }),
             }),
             MenuItem::Option(OptionDef {
-                text: "Landscape dpad on left".into(),
+                text: "Landscape dpad on the left".into(),
                 val: data.settings.get_landscape_dpad_on_left(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_landscape_dpad_on_left(*enabled);
+                fun: Box::new(|is_on_left, data| {
+                    *is_on_left = !*is_on_left;
+                    data.settings.set_landscape_dpad_on_left(*is_on_left);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Swap Up and Down buttons".into(),
+                val: data.settings.get_dpad_swap_up_down(),
+                fun: Box::new(|do_swap, data| {
+                    *do_swap = !*do_swap;
+                    data.settings.set_dpad_swap_up_down(*do_swap);
                 }),
             }),
             MenuItem::Separator,
