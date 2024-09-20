@@ -50,8 +50,8 @@ pub struct DPad {
 }
 
 impl DPad {
-    pub fn new(rect: Option<Rect>, swap_up_down: bool, type_: DPadType) -> Self {
-        let rect = rect.unwrap_or_else(|| Rect::sized(Dims(11, 3)));
+    pub fn new(expected_space: Option<Rect>, swap_up_down: bool, type_: DPadType) -> Self {
+        let rect = expected_space.unwrap_or_else(|| Rect::sized(Dims(11, 3)));
         let space = rect.size();
 
         let buttons = CellWall::get_in_order()

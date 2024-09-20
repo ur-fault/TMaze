@@ -722,7 +722,10 @@ impl GameActivity {
     fn update_viewport(&mut self, data: &AppData) {
         if self.is_dpad_enabled() {
             let (viewport_rect, dpad_rect) = DPad::split_screen(data);
-            let dpad_rect = dpad_rect.margin(self.margins);
+            let mut dpad_rect = dpad_rect;
+            if data.settings.get_enable_margin_around_dpad() {
+                dpad_rect = dpad_rect.margin(self.margins);
+            }
 
             self.viewport_rect = viewport_rect;
             self.dpad_rect = Some(dpad_rect);
@@ -932,10 +935,12 @@ impl Screen for GameActivity {
             frame.draw(self.dpad_rect.unwrap().start, &dpad_frame);
         }
 
-        if false {
+        if self.show_debug {
             if let Some(dpad_rect) = self.dpad_rect {
                 dpad_rect.render(frame, color_scheme.normals());
             }
+
+            self.viewport_rect.render(frame, color_scheme.normals());
         }
 
         Ok(())
