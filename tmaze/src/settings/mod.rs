@@ -635,7 +635,7 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 }),
             }),
             MenuItem::Option(OptionDef {
-                text: "Landscape dpad on the left".into(),
+                text: "Left-handed dpad".into(),
                 val: data.settings.get_landscape_dpad_on_left(),
                 fun: Box::new(|is_on_left, data| {
                     *is_on_left = !*is_on_left;
