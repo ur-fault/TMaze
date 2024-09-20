@@ -18,6 +18,7 @@ pub struct Button {
     pub normal_style: Option<ContentStyle>,
     pub content_style: Option<ContentStyle>,
     pub highlight_style: Option<ContentStyle>,
+    pub disable_highlight: bool,
     pub set: bool,
     pub disabled: bool,
 }
@@ -33,6 +34,7 @@ impl Button {
             normal_style: None,
             content_style: None,
             highlight_style: None,
+            disable_highlight: false,
             set: false,
             disabled: false,
         }
@@ -50,6 +52,11 @@ impl Button {
 
     pub fn highlight_style(mut self, style: ContentStyle) -> Self {
         self.highlight_style = Some(style);
+        self
+    }
+
+    pub fn disable_highlight(mut self, disable_highlight: bool) -> Self {
+        self.disable_highlight = disable_highlight;
         self
     }
 
@@ -78,7 +85,7 @@ impl Button {
 
 impl Button {
     pub fn draw_colored(&self, frame: &mut Frame, color_scheme: &ColorScheme) {
-        let set = self.set && !self.disabled;
+        let set = self.set && !self.disabled && !self.disable_highlight;
 
         let normal = self.normal_style.unwrap_or(color_scheme.normals());
         let highlight = self.highlight_style.unwrap_or(color_scheme.highlights());

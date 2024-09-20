@@ -762,10 +762,10 @@ impl GameActivity {
         }
 
         if self.is_dpad_enabled() {
-            self.touch_controls
-                .as_mut()
-                .expect("dpad not set")
-                .swap_up_down = data.settings.get_dpad_swap_up_down();
+            let dpad = self.touch_controls.as_mut().expect("dpad not set");
+
+            dpad.swap_up_down = data.settings.get_dpad_swap_up_down();
+            dpad.disable_highlight(!data.settings.get_enable_dpad_highlight());
         }
     }
 
