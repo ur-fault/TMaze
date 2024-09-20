@@ -717,6 +717,18 @@ impl GameActivity {
         }
     }
 
+    fn update_viewport(&mut self, data: &AppData) {
+        if self.touch_controls.is_some() {
+            let (viewport_rect, dpad_rect) = DPad::split_screen(data);
+            let dpad_rect = dpad_rect.margin(self.margins);
+
+            self.viewport_rect = viewport_rect;
+            self.dpad_rect = Some(dpad_rect);
+        } else {
+            self.viewport_rect = Rect::sized(data.screen_size);
+        }
+    }
+
     fn init_dpad(&mut self, data: &AppData) {
         self.touch_controls = Some(Box::new(
             DPad::new(None).tap_mut(|dpad| dpad.styles_from_settings(&data.settings)),
@@ -735,20 +747,12 @@ impl GameActivity {
                 self.deinit_dpad(data);
             }
         }
-
-        if self.touch_controls.is_some() {
-            let (viewport_rect, dpad_rect) = DPad::split_screen(data);
-            let dpad_rect = dpad_rect.margin(self.margins);
-
-            self.viewport_rect = viewport_rect;
-            self.dpad_rect = Some(dpad_rect);
-        }
     }
 
     fn deinit_dpad(&mut self, data: &AppData) {
         self.touch_controls = None;
 
-        self.viewport_rect = Rect::new(Dims(0, 0), data.screen_size);
+        self.viewport_rect = Rect::sized(data.screen_size);
         self.dpad_rect = None;
     }
 }
@@ -762,6 +766,7 @@ impl ActivityHandler for GameActivity {
         }
 
         self.update_dpad(data);
+        self.update_viewport(data);
 
         if let Some(ref mut tc) = self.touch_controls {
             tc.update_space(self.dpad_rect.expect("dpad rect not set"));
