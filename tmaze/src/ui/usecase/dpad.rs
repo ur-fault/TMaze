@@ -87,6 +87,10 @@ impl DPad {
         self.for_mut_buttons(|button| button.load_styles_from_settings(settings));
     }
 
+    pub fn disable_highlight(&mut self, disable_highlight: bool) {
+        self.for_mut_buttons(|button| button.disable_highlight = disable_highlight);
+    }
+
     pub fn render(&self, frame: &mut Frame) {
         self.for_buttons(|button| button.draw(frame));
     }
