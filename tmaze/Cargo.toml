@@ -14,7 +14,6 @@ exclude = [
 [dependencies]
 better-panic = "0.3.0"
 cmaze = { path = "../cmaze", version = "0.7.0", features = ["hashbrown"] }
-colored = "^2"
 crossterm = { version = "^0.27.0", features = ["serde"] }
 substring = "^1.4.5"
 serde = { version = "^1.0.136", features = ["derive"] }
@@ -26,9 +25,7 @@ pad = "0.1.6"
 rand = "^0.8.1"
 derivative = "2.2.0"
 unicode-width = "0.1.10"
-tap = "1.0.1"
 thiserror = "1.0.48"
-humantime = "2.1.0"
 chrono = { version = "0.4.30", features = ["serde"] }
 log = "0.4"
 smallvec = { version = "1.13.2", features = ["const_generics"] }
