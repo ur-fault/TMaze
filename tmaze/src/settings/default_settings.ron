@@ -115,37 +115,37 @@ Settings (
             height: 5,
             default: true,
         ), MazePreset (
-            title: "30x10",
-            width: 30,
+            title: "20x10",
+            width: 20,
             height: 10,
         ), MazePreset (
-            title: "60x20",
+            title: "60x30",
             width: 60,
-            height: 20,
+            height: 30,
         ), MazePreset (
-            title: "300x100",
-            width: 300,
+            title: "200x100",
+            width: 200,
             height: 100,
         ), MazePreset (
-            title: "5x5x5",
-            width: 5,
+            title: "6x3x3",
+            width: 6,
+            height: 3,
+            depth: 3,
+        ), MazePreset (
+            title: "10x5x5",
+            width: 10,
             height: 5,
             depth: 5,
         ), MazePreset (
-            title: "10x10x10",
-            width: 10,
-            height: 10,
-            depth: 10,
-        ), MazePreset (
             title: "10x10x5 Tower",
-            width: 10,
+            width: 20,
             height: 10,
             depth: 5,
             tower: true,
         ), MazePreset (
             title: "40x15x10 Tower",
             width: 40,
-            height: 15,
+            height: 20,
             depth: 10,
             tower: true,
         )
