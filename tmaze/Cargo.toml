@@ -14,9 +14,9 @@ exclude = [
 [dependencies]
 better-panic = "0.3.0"
 cmaze = { path = "../cmaze", version = "0.7.0", features = ["hashbrown"] }
-crossterm = { version = "^0.27.0", features = ["serde"] }
+crossterm = { version = "^0.28.1", features = ["serde"] }
 substring = "^1.4.5"
-serde = { version = "^1.0.136", features = ["derive"] }
+serde = { version = "^1", features = ["derive"] }
 pausable_clock = "^1.0.1"
 dirs = "^5.0.0"
 ron = "0.8.0"
