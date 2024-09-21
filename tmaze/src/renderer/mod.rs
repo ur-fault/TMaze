@@ -46,6 +46,7 @@ impl Renderer {
             stdout(),
             crossterm::cursor::Hide,
             crossterm::terminal::EnterAlternateScreen,
+            crossterm::event::EnableMouseCapture,
         )?;
 
         self.on_resize(None);
@@ -60,6 +61,7 @@ impl Renderer {
             stdout(),
             crossterm::cursor::Show,
             crossterm::terminal::LeaveAlternateScreen,
+            crossterm::event::DisableMouseCapture,
         )?;
         crossterm::terminal::disable_raw_mode()?;
         Ok(())
@@ -73,7 +75,8 @@ impl Renderer {
             execute!(
                 stdout,
                 crossterm::terminal::LeaveAlternateScreen,
-                crossterm::cursor::Show
+                crossterm::cursor::Show,
+                crossterm::event::DisableMouseCapture,
             )
             .unwrap();
 
@@ -183,6 +186,21 @@ impl Renderer {
 impl Drop for Renderer {
     fn drop(&mut self) {
         let _ = self.turn_off();
+    }
+}
+
+pub struct MouseGuard;
+
+impl MouseGuard {
+    pub fn new() -> io::Result<Self> {
+        crossterm::execute!(stdout(), crossterm::event::DisableMouseCapture)?;
+        Ok(MouseGuard)
+    }
+}
+
+impl Drop for MouseGuard {
+    fn drop(&mut self) {
+        let _ = crossterm::execute!(stdout(), crossterm::event::EnableMouseCapture);
     }
 }
 
@@ -302,6 +320,25 @@ impl Frame {
         for row in self.buffer.iter_mut() {
             for cell in row.iter_mut() {
                 *cell = Cell::new(' ');
+            }
+        }
+    }
+
+    pub fn fill(&mut self, cell: Cell) {
+        for row in self.buffer.iter_mut() {
+            for c in row.iter_mut() {
+                *c = cell;
+            }
+        }
+    }
+
+    pub fn fill_rect(&mut self, pos: Dims, size: Dims, cell: Cell) {
+        for y in pos.1..pos.1 + size.1 {
+            for x in pos.0..pos.0 + size.0 {
+                if x < 0 || x >= self.size.0 || y < 0 || y >= self.size.1 {
+                    continue;
+                }
+                self.buffer[y as usize][x as usize] = cell;
             }
         }
     }

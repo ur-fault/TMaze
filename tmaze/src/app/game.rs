@@ -12,13 +12,19 @@ use cmaze::{
 
 use crate::{
     app::{game_state::GameData, GameViewMode},
-    helpers::{constants, is_release, maze2screen, maze2screen_3d, maze_render_size, LineDir},
+    helpers::{
+        constants, dim::Offset, is_release, maze2screen, maze2screen_3d, maze_render_size, strings,
+        LineDir,
+    },
     lerp, menu_actions,
     renderer::Frame,
-    settings::{self, CameraMode, ColorScheme, Offset, Settings, SettingsActivity},
+    settings::{self, CameraMode, ColorScheme, Settings, SettingsActivity},
     ui::{
-        self, draw_box, multisize_string, split_menu_actions, Menu, MenuAction, MenuConfig, Popup,
-        ProgressBar, Screen,
+        self,
+        helpers::format_duration,
+        multisize_duration_format, split_menu_actions,
+        usecase::dpad::{DPad, DPadType},
+        Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
     },
 };
 
@@ -82,7 +88,7 @@ impl MainMenu {
 
         Self {
             menu: Menu::new(
-                MenuConfig::new_from_strings("TMaze", options)
+                MenuConfig::new("TMaze", options)
                     .counted()
                     .styles_from_settings(settings),
             ),
@@ -279,11 +285,10 @@ impl MazeAlgorithmMenu {
 
         let (options, functions) = split_menu_actions(options);
 
-        let menu_config =
-            MenuConfig::new_from_strings("Maze generation algorithm".to_string(), options)
-                .counted()
-                .styles_from_settings(settings)
-                .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
+        let menu_config = MenuConfig::new("Maze generation algorithm".to_string(), options)
+            .counted()
+            .styles_from_settings(settings)
+            .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
 
         let menu = Menu::new(menu_config);
 
@@ -362,6 +367,7 @@ impl MazeGenerationActivity {
 impl ActivityHandler for MazeGenerationActivity {
     fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         for event in events {
+            #[allow(clippy::collapsible_match)]
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
@@ -469,9 +475,7 @@ impl PauseMenu {
 
         let (options, actions) = split_menu_actions(options);
 
-        let menu = Menu::new(
-            MenuConfig::new_from_strings("Paused", options).styles_from_settings(settings),
-        );
+        let menu = Menu::new(MenuConfig::new("Paused", options).styles_from_settings(settings));
 
         Self { menu, actions }
     }
@@ -507,10 +511,7 @@ impl EndGamePopup {
     pub fn new(game: &RunningGame, settings: &Settings) -> Self {
         let maze_size = game.get_maze().size();
         let texts = vec![
-            format!(
-                "Time:  {}",
-                ui::format_duration(game.get_elapsed().unwrap())
-            ),
+            format!("Time:  {}", format_duration(game.get_elapsed().unwrap())),
             format!("Moves: {}", game.get_move_count()),
             format!("Size:  {}x{}x{}", maze_size.0, maze_size.1, maze_size.2,),
         ];
@@ -561,16 +562,26 @@ pub struct GameActivity {
     maze_board: MazeBoard,
     show_debug: bool,
 
+    // spacing
+    margins: Dims,
+    viewport_rect: Rect,
+    dpad_rect: Option<Rect>,
+
     // smooth
     sm_camera_pos: Dims3D,
     sm_player_pos: Dims3D,
+
+    // touch
+    touch_controls: Option<Box<DPad>>,
 }
 
 impl GameActivity {
     pub fn new(game: GameData, app_data: &mut AppData) -> Self {
         let settings = &app_data.settings;
+
         let camera_mode = settings.get_camera_mode();
         let maze_board = MazeBoard::new(&game.game, settings);
+        let margins = settings.get_viewport_margin();
 
         #[cfg(feature = "sound")]
         app_data.play_bgm(MusicTrack::choose_for_maze(game.game.get_maze()));
@@ -584,45 +595,42 @@ impl GameActivity {
             maze_board,
             show_debug: false,
 
+            margins,
+            viewport_rect: Rect::sized(app_data.screen_size),
+            dpad_rect: None,
+
             sm_camera_pos,
             sm_player_pos,
+
+            touch_controls: None,
         }
     }
 
     /// Returns the size of the viewport and whether the floor fits in the viewport
     pub fn viewport_size(&self, screen_size: Dims) -> (Dims, bool) {
-        let vp_size = screen_size - Dims(8, 6);
+        let vp_size = screen_size - self.margins * 2;
 
         let maze_frame = &self.maze_board.frames[self.game.game.get_player_pos().2 as usize];
         let floor_size = maze_frame.size;
 
         let does_fit = floor_size.0 <= vp_size.0 && floor_size.1 <= vp_size.1;
-        if does_fit {
-            (floor_size, does_fit)
-        } else {
-            (vp_size, does_fit)
-        }
+
+        (if does_fit { floor_size } else { vp_size }, does_fit)
     }
 
     fn current_floor_frame(&self) -> &Frame {
         &self.maze_board.frames[self.game.camera_pos.2 as usize]
     }
 
-    fn render_meta_texts(
-        &self,
-        frame: &mut Frame,
-        color_scheme: &ColorScheme,
-        vp_pos: Dims,
-        vp_size: Dims,
-    ) {
-        let max_width = (vp_size.0 / 2 + 1) as usize;
+    fn render_meta_texts(&self, frame: &mut Frame, color_scheme: &ColorScheme, vp: Rect) {
+        let max_width = (vp.size().0 / 2 + 1) as usize;
 
         let pl_pos = self.game.game.get_player_pos() + Dims3D(1, 1, 1);
 
         // texts
         let from_start =
-            ui::multisize_duration_format(self.game.game.get_elapsed().unwrap(), max_width);
-        let move_count = ui::multisize_string(
+            multisize_duration_format(self.game.game.get_elapsed().unwrap(), max_width);
+        let move_count = strings::multisize_string(
             [
                 format!("{} moves", self.game.game.get_move_count()),
                 format!("{}m", self.game.game.get_move_count()),
@@ -631,7 +639,7 @@ impl GameActivity {
         );
 
         let pos_text = if self.game.game.get_maze().size().2 > 1 {
-            multisize_string(
+            strings::multisize_string(
                 [
                     format!("x:{} y:{} floor:{}", pl_pos.0, pl_pos.1, pl_pos.2),
                     format!("x:{} y:{} f:{}", pl_pos.0, pl_pos.1, pl_pos.2),
@@ -640,7 +648,7 @@ impl GameActivity {
                 max_width,
             )
         } else {
-            multisize_string(
+            strings::multisize_string(
                 [
                     format!("x:{} y:{}", pl_pos.0, pl_pos.1),
                     format!("x:{} y:{}", pl_pos.0, pl_pos.1),
@@ -651,16 +659,16 @@ impl GameActivity {
         };
 
         let view_mode = self.game.view_mode;
-        let view_mode = multisize_string(view_mode.to_multisize_strings(), max_width);
+        let view_mode = strings::multisize_string(view_mode.to_multisize_strings(), max_width);
 
-        let tl = vp_pos - Dims(1, 2);
-        let br = vp_pos + vp_size + Dims(1, 1);
+        let tl = vp.start - Dims(0, 1);
+        let br = vp.start + vp.size();
 
         // draw them
         let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
 
         draw(&pos_text, tl);
-        draw(&view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
+        draw(view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
         draw(&move_count, Dims(tl.0, br.1));
         draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
     }
@@ -682,6 +690,91 @@ impl GameActivity {
             }
         }
     }
+
+    fn render_player(
+        &self,
+        maze_pos: Dims,
+        game: &RunningGame,
+        viewport: &mut Frame,
+        color_scheme: &ColorScheme,
+    ) {
+        let player = self.sm_player_pos;
+        let player_draw_pos = maze_pos + player.into();
+        let cell = game
+            .get_maze()
+            .get_cell(self.game.game.get_player_pos())
+            .unwrap();
+        if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
+            viewport[player_draw_pos]
+                .content_mut()
+                .unwrap()
+                .style
+                .foreground_color = Some(color_scheme.player);
+        } else {
+            viewport.draw_styled(
+                player_draw_pos,
+                self.game.player_char,
+                color_scheme.players(),
+            );
+        }
+    }
+
+    fn update_viewport(&mut self, data: &AppData) {
+        if self.is_dpad_enabled() {
+            let (viewport_rect, dpad_rect) = DPad::split_screen(data);
+            let mut dpad_rect = dpad_rect;
+            if data.settings.get_enable_margin_around_dpad() {
+                dpad_rect = dpad_rect.margin(self.margins);
+            }
+
+            self.viewport_rect = viewport_rect;
+            self.dpad_rect = Some(dpad_rect);
+        } else {
+            self.viewport_rect = Rect::sized(data.screen_size);
+        }
+    }
+}
+impl GameActivity {
+    fn is_dpad_enabled(&self) -> bool {
+        self.touch_controls.is_some()
+    }
+
+    fn init_dpad(&mut self, data: &AppData) {
+        let dpad_type = DPadType::from_maze(self.game.game.get_maze());
+        let swap_up_down = data.settings.get_dpad_swap_up_down();
+
+        let mut touch_controls = DPad::new(None, swap_up_down, dpad_type);
+        touch_controls.styles_from_settings(&data.settings);
+        self.touch_controls = Some(Box::new(touch_controls));
+    }
+
+    fn update_dpad(&mut self, data: &AppData) {
+        if (data.settings.get_enable_dpad() && data.settings.get_enable_mouse())
+            != self.is_dpad_enabled()
+        {
+            if data.settings.get_enable_dpad() {
+                log::info!("Enabling dpad");
+                self.init_dpad(data);
+            } else {
+                log::info!("Disabling dpad");
+                self.deinit_dpad(data);
+            }
+        }
+
+        if self.is_dpad_enabled() {
+            let dpad = self.touch_controls.as_mut().expect("dpad not set");
+
+            dpad.swap_up_down = data.settings.get_dpad_swap_up_down();
+            dpad.disable_highlight(!data.settings.get_enable_dpad_highlight());
+        }
+    }
+
+    fn deinit_dpad(&mut self, data: &AppData) {
+        self.touch_controls = None;
+
+        self.viewport_rect = Rect::sized(data.screen_size);
+        self.dpad_rect = None;
+    }
 }
 
 impl ActivityHandler for GameActivity {
@@ -692,21 +785,50 @@ impl ActivityHandler for GameActivity {
             _ => {}
         }
 
-        for event in events {
-            if let Event::Term(TermEvent::Key(key_event)) = event {
-                match self.game.handle_event(&data.settings, key_event) {
-                    Err(false) => {
-                        self.game.game.pause().unwrap();
+        self.update_dpad(data);
+        self.update_viewport(data);
 
-                        return Some(Change::push(Activity::new_base_boxed(
-                            "pause".to_string(),
-                            PauseMenu::new(&data.settings),
-                        )));
+        if let Some(ref mut tc) = self.touch_controls {
+            tc.update_space(self.dpad_rect.expect("dpad rect not set"));
+        }
+
+        for event in events {
+            #[allow(clippy::single_match)]
+            match event {
+                Event::Term(event) => match event {
+                    TermEvent::Key(key_event) => {
+                        match self.game.handle_event(&data.settings, key_event) {
+                            Err(false) => {
+                                self.game.game.pause().unwrap();
+
+                                return Some(Change::push(Activity::new_base_boxed(
+                                    "pause".to_string(),
+                                    PauseMenu::new(&data.settings),
+                                )));
+                            }
+                            Err(true) => return Some(Change::pop_until("main menu")),
+                            Ok(_) => {}
+                        }
                     }
-                    Err(true) => return Some(Change::pop_until("main menu")),
-                    Ok(_) => {}
-                }
+                    TermEvent::Mouse(event) => {
+                        if let Some(ref mut touch_controls) = self.touch_controls {
+                            if let Some(dir) = touch_controls.apply_mouse_event(event) {
+                                self.game.apply_move(&data.settings, dir, false);
+                            }
+                        }
+                    }
+                    _ => {}
+                },
+                _ => (),
             }
+        }
+
+        if let Some(ref mut tc) = self.touch_controls {
+            tc.update_available_moves(if self.game.view_mode == GameViewMode::Adventure {
+                self.game.game.get_available_moves()
+            } else {
+                [true; 6] // enable all
+            });
         }
 
         if self.game.view_mode == GameViewMode::Adventure {
@@ -766,7 +888,10 @@ impl Screen for GameActivity {
         let maze_frame = self.current_floor_frame();
         let game = &self.game.game;
 
-        let (vp_size, does_fit) = self.viewport_size(frame.size);
+        let game_view_rect = self.viewport_rect;
+        let game_view_size = game_view_rect.size();
+
+        let (vp_size, does_fit) = self.viewport_size(game_view_size);
         let maze_pos = match does_fit {
             true => match self.game.view_mode {
                 GameViewMode::Adventure => Dims(0, 0),
@@ -784,44 +909,39 @@ impl Screen for GameActivity {
 
         // player
         if (self.game.game.get_player_pos().2) == self.sm_camera_pos.2 {
-            let player = self.sm_player_pos;
-            let player_draw_pos = maze_pos + player.into();
-            let cell = game
-                .get_maze()
-                .get_cell(self.game.game.get_player_pos())
-                .unwrap();
-            if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
-                viewport[player_draw_pos]
-                    .content_mut()
-                    .unwrap()
-                    .style
-                    .foreground_color = Some(color_scheme.player);
-            } else {
-                viewport.draw_styled(
-                    player_draw_pos,
-                    self.game.player_char,
-                    color_scheme.players(),
-                );
-            }
+            self.render_player(maze_pos, game, &mut viewport, color_scheme);
         }
 
-        let vp_pos = (frame.size - vp_size) / 2;
-        draw_box(
-            frame,
-            vp_pos - Dims(1, 1),
-            vp_size + Dims(2, 2),
-            color_scheme.normals(),
-        );
+        // show viewport box
+        let vp_pos = (game_view_size - vp_size) / 2 + self.viewport_rect.start;
+        let vp_rect = Rect::sized_at(vp_pos, vp_size).margin(Dims(-1, -1));
+        vp_rect.render(frame, color_scheme.normals());
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
             if !does_fit && self.show_debug {
-                render_edge_follow_rulers((xoff, yoff), frame, vp_size, vp_pos, color_scheme);
+                render_edge_follow_rulers((xoff, yoff), frame, vp_rect, color_scheme);
             }
         }
 
-        self.render_meta_texts(frame, color_scheme, vp_pos, vp_size);
+        self.render_meta_texts(frame, color_scheme, vp_rect);
 
         frame.draw(vp_pos, &viewport);
+
+        // touch controls
+        if let Some(ref touch_controls) = self.touch_controls {
+            let mut dpad_frame = Frame::new(self.dpad_rect.unwrap().size());
+
+            touch_controls.render(&mut dpad_frame);
+            frame.draw(self.dpad_rect.unwrap().start, &dpad_frame);
+        }
+
+        if self.show_debug {
+            if let Some(dpad_rect) = self.dpad_rect {
+                dpad_rect.render(frame, color_scheme.normals());
+            }
+
+            self.viewport_rect.render(frame, color_scheme.normals());
+        }
 
         Ok(())
     }
@@ -831,43 +951,41 @@ impl Screen for GameActivity {
 fn render_edge_follow_rulers(
     rulers: (Offset, Offset),
     frame: &mut Frame,
-    vps: Dims,
-    vp_pos: Dims,
+    vp: Rect,
     color_scheme: &ColorScheme,
 ) {
-    // for future use: ['↑', '↓', '←, '→']
-
     let goals = color_scheme.goals();
     let players = color_scheme.players();
 
+    let vps = vp.size();
+
     let xo = rulers.0.to_abs(vps.0);
     let yo = rulers.1.to_abs(vps.1);
+
+    let frame_pos = vp.start;
 
     use LineDir::{Horizontal, Vertical};
     const V: char = Vertical.round();
     const H: char = Horizontal.round();
 
     let mut draw = |pos, dir, end| {
-        frame.draw_styled(
-            (vp_pos - Dims(1, 1)) + pos,
-            dir,
-            match end {
-                false => goals,
-                true => players,
-            },
-        )
+        let style = match end {
+            false => goals,
+            true => players,
+        };
+        frame.draw_styled(frame_pos + pos, dir, style)
     };
 
     #[rustfmt::skip]
     {
-        draw(Dims(xo        , 0)         , V, false);
-        draw(Dims(vps.0 - xo, 0)         , V, true);
-        draw(Dims(xo        , vps.1 + 1) , V, false);
-        draw(Dims(vps.0 - xo, vps.1 + 1) , V, true);
+        draw(Dims(xo        , 0        ), V, false);
+        draw(Dims(vps.0 - xo, 0        ), V, true);
+        draw(Dims(xo        , vps.1 + 1), V, false);
+        draw(Dims(vps.0 - xo, vps.1 + 1), V, true);
 
-        draw(Dims(0         , yo)        , H, false);
+        draw(Dims(0         , yo        ), H, false);
         draw(Dims(0         , vps.1 - yo), H, true);
-        draw(Dims(vps.0 + 1 , yo)        , H, false);
+        draw(Dims(vps.0 + 1 , yo        ), H, false);
         draw(Dims(vps.0 + 1 , vps.1 - yo), H, true);
     };
 }
@@ -934,6 +1052,7 @@ impl MazeBoard {
     }
 
     fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, scheme: ColorScheme) {
+        // FIXME: only upwards stairs should have goal style
         let style = if tower {
             scheme.goals()
         } else {
@@ -956,9 +1075,9 @@ impl MazeBoard {
     }
 
     fn render_special(frames: &mut [Frame], game: &RunningGame, scheme: ColorScheme) {
-        let goals = scheme.goals();
-
+        let goal_style = scheme.goals();
         let goal_pos = game.get_goal_pos();
-        frames[goal_pos.2 as usize].draw_styled(maze2screen(goal_pos), '$', goals);
+
+        frames[goal_pos.2 as usize].draw_styled(maze2screen(goal_pos), '$', goal_style);
     }
 }

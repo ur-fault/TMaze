@@ -34,7 +34,7 @@ pub fn init() {
 #[derive(Clone)]
 pub struct Message {
     pub level: log::Level,
-    pub pushed: std::time::Instant,
+    pub pushed: std::time::Instant, // TODO: rename to `timestamp`
     pub message: String,
     pub source: String,
 }

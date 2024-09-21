@@ -101,4 +101,8 @@ impl CellWall {
             Up | Down => (Top, Bottom, Left, Right),
         }
     }
+
+    pub fn get_in_order() -> [CellWall; 6] {
+        [Top, Left, Right, Bottom, Up, Down]
+    }
 }

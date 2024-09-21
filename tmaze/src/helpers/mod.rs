@@ -1,29 +1,34 @@
 pub mod constants;
+pub mod dim;
+pub mod strings;
 
 use core::fmt;
-use std::ops::Deref;
 
 use crossterm::event::KeyEventKind;
 
 use crate::core::*;
 use crate::gameboard::Maze;
 
+#[inline]
 pub const fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {
     (container_end - container_start - item_width) / 2 + container_start
 }
 
+#[inline]
 pub const fn box_center(container_start: Dims, container_end: Dims, box_dims: Dims) -> Dims {
     Dims(
-        line_center(container_start.0, container_end.0, box_dims.0),
-        line_center(container_start.1, container_end.1, box_dims.1),
+        line_center(container_start.0, container_end.0 + 1, box_dims.0),
+        line_center(container_start.1, container_end.1 + 1, box_dims.1),
     )
 }
 
+#[inline]
 pub fn maze_render_size(maze: &Maze) -> Dims {
     let msize = maze.size();
     Dims(msize.0, msize.1) * 2 + Dims(1, 1)
 }
 
+#[inline]
 pub fn value_if<T: Default>(cond: bool, fun: impl FnOnce() -> T) -> T {
     if cond {
         fun()
@@ -32,6 +37,7 @@ pub fn value_if<T: Default>(cond: bool, fun: impl FnOnce() -> T) -> T {
     }
 }
 
+#[inline]
 pub fn value_if_else<T>(cond: bool, fun: impl FnOnce() -> T, else_fun: impl FnOnce() -> T) -> T {
     if cond {
         fun()
@@ -143,52 +149,6 @@ pub trait ToDebug: fmt::Debug {
 
 impl<T: fmt::Debug> ToDebug for T {}
 
-pub enum MbyStaticStr {
-    Static(&'static str),
-    Owned(String),
-}
-
-impl fmt::Display for MbyStaticStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Static(s) => write!(f, "{}", s),
-            Self::Owned(s) => write!(f, "{}", s),
-        }
-    }
-}
-
-impl fmt::Debug for MbyStaticStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Static(s) => write!(f, "{:?}", s),
-            Self::Owned(s) => write!(f, "{:?}", s),
-        }
-    }
-}
-
-impl From<&'static str> for MbyStaticStr {
-    fn from(s: &'static str) -> Self {
-        Self::Static(s)
-    }
-}
-
-impl From<String> for MbyStaticStr {
-    fn from(s: String) -> Self {
-        Self::Owned(s)
-    }
-}
-
-impl Deref for MbyStaticStr {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Static(s) => s,
-            Self::Owned(s) => s,
-        }
-    }
-}
-
 #[macro_export]
 macro_rules! lerp {
     (($a:expr) -> ($b:expr) at $t:expr) => {
@@ -196,6 +156,7 @@ macro_rules! lerp {
     };
 }
 
+#[inline]
 pub const fn yes_no(b: bool, capitalized: bool) -> &'static str {
     match (b, capitalized) {
         (true, true) => "Yes",
@@ -205,6 +166,7 @@ pub const fn yes_no(b: bool, capitalized: bool) -> &'static str {
     }
 }
 
+#[inline]
 pub const fn on_off(val: bool, capitalized: bool) -> &'static str {
     match (val, capitalized) {
         (true, true) => "On",
@@ -212,4 +174,31 @@ pub const fn on_off(val: bool, capitalized: bool) -> &'static str {
         (false, true) => "Off",
         (false, false) => "off",
     }
+}
+
+/// Returns the value if it is odd, otherwise returns the value decremented by 1.
+///
+/// This function is useful for ensuring that a box is always an odd number of characters wide or
+/// tall. So that stuff looks centered.
+#[macro_export]
+macro_rules! make_odd {
+    ($val:expr) => {
+        if $val % 2 == 0 {
+            $val - 1
+        } else {
+            $val
+        }
+    };
+}
+
+/// Returns the value if it is even, otherwise returns the value incremented by 1.
+#[macro_export]
+macro_rules! make_even {
+    ($val:expr) => {
+        if $val % 2 == 0 {
+            $val
+        } else {
+            $val - 1
+        }
+    };
 }

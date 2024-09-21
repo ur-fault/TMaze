@@ -2295,6 +2295,7 @@ dependencies = [
  "ron",
  "semver",
  "serde",
+ "smallvec",
  "substring",
  "tap",
  "thiserror",

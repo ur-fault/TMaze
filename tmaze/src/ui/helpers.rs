@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use cmaze::core::Dims;
-use crossterm::style::{Attribute, ContentStyle};
-use unicode_width::UnicodeWidthStr;
+use crossterm::style::{Attribute, Color, ContentStyle};
 
-use crate::{helpers, renderer::helpers::term_size};
+use crate::{helpers::{self, strings::multisize_string}, renderer::helpers::term_size};
 
 pub fn center_box_in_screen(box_dims: Dims) -> Dims {
     let size_u16 = term_size();
@@ -12,6 +11,16 @@ pub fn center_box_in_screen(box_dims: Dims) -> Dims {
         Dims(0, 0),
         Dims(size_u16.0 as i32, size_u16.1 as i32),
         box_dims,
+    )
+}
+
+pub fn multisize_duration_format(dur: Duration, max_size: usize) -> String {
+    multisize_string(
+        [
+            smart_format_duration(dur, true),
+            smart_format_duration(dur, false),
+        ],
+        max_size,
     )
 }
 
@@ -44,29 +53,40 @@ pub fn smart_format_duration(dur: Duration, fract: bool) -> String {
     }
 }
 
-pub fn multisize_duration_format(dur: Duration, max_size: usize) -> String {
-    multisize_string(
-        [
-            smart_format_duration(dur, true),
-            smart_format_duration(dur, false),
-        ],
-        max_size,
-    )
+pub fn foreground_style(color: Color) -> ContentStyle {
+    ContentStyle {
+        foreground_color: Some(color),
+        ..ContentStyle::default()
+    }
 }
 
-pub fn multisize_string(strings: impl IntoIterator<Item = String>, max_size: usize) -> String {
-    let strings = &mut strings.into_iter();
-    let mut current = strings.next().unwrap();
-    while current.width() > max_size {
-        current = strings.next().unwrap();
+pub fn background_style(color: Color) -> ContentStyle {
+    ContentStyle {
+        background_color: Some(color),
+        ..ContentStyle::default()
     }
-
-    current
 }
 
 pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyle {
     ContentStyle {
         attributes: style.attributes | attr,
         ..style
+    }
+}
+
+pub fn invert_style(style: ContentStyle) -> ContentStyle {
+    ContentStyle {
+        background_color: Some(style.foreground_color.unwrap_or(Color::White)),
+        foreground_color: Some(style.background_color.unwrap_or(Color::Black)),
+        ..style
+    }
+}
+
+pub fn merge_styles(a: ContentStyle, b: ContentStyle) -> ContentStyle {
+    ContentStyle {
+        foreground_color: a.foreground_color.or(b.foreground_color),
+        background_color: a.background_color.or(b.background_color),
+        attributes: a.attributes | b.attributes,
+        underline_color: a.underline_color.or(b.underline_color),
     }
 }

@@ -25,7 +25,6 @@ use super::{
     Jobs,
 };
 
-#[allow(dead_code)]
 pub struct App {
     renderer: Renderer,
     activities: Activities,
@@ -141,6 +140,11 @@ impl App {
                         kind: KeyEventKind::Press,
                         ..
                     }) => self.switch_debug(),
+                    event @ crossterm::event::Event::Mouse(_) => {
+                        if self.data.settings.get_enable_mouse() {
+                            events.push(Event::Term(event));
+                        }
+                    }
                     event => events.push(Event::Term(event)),
                 }
 

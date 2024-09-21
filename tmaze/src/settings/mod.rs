@@ -1,4 +1,4 @@
-use cmaze::{game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
+use cmaze::{core::Dims, game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
 use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
@@ -12,36 +12,19 @@ use std::{
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
+    helpers::{constants::colors, dim::Offset},
     menu_actions,
-    ui::{split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, Popup, Screen},
+    renderer::MouseGuard,
+    ui::{
+        split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, MenuItem,
+        OptionDef, Popup, Screen,
+    },
 };
 
 #[cfg(feature = "sound")]
 use crate::sound::create_audio_settings;
 
 const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Offset {
-    Abs(i32),
-    Rel(f32),
-}
-
-impl Offset {
-    pub fn to_abs(self, size: i32) -> i32 {
-        match self {
-            Offset::Rel(ratio) => (size as f32 * ratio.clamp(0., 0.5)).round() as i32,
-            Offset::Abs(chars) => chars,
-        }
-    }
-}
-
-impl Default for Offset {
-    fn default() -> Self {
-        Offset::Rel(0.25)
-    }
-}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum CameraMode {
@@ -69,10 +52,16 @@ fn default_depth() -> u16 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorScheme {
+    #[serde(default = "colors::fun::white")]
     pub normal: Color,
+    #[serde(default = "colors::fun::white")]
     pub player: Color,
+    #[serde(default = "colors::fun::white")]
     pub goal: Color,
+    #[serde(default = "colors::fun::white")]
     pub text: Color,
+    #[serde(default = "colors::fun::red")]
+    pub highlight: Color,
 }
 
 #[allow(dead_code)]
@@ -98,6 +87,11 @@ impl ColorScheme {
 
     pub fn text(mut self, value: Color) -> Self {
         self.text = value;
+        self
+    }
+
+    pub fn highlight(mut self, value: Color) -> Self {
+        self.highlight = value;
         self
     }
 
@@ -132,6 +126,14 @@ impl ColorScheme {
             ..Default::default()
         }
     }
+
+    pub fn highlights(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.highlight),
+            background_color: None,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for ColorScheme {
@@ -141,6 +143,7 @@ impl Default for ColorScheme {
             player: Color::White,
             goal: Color::White,
             text: Color::White,
+            highlight: Color::White,
         }
     }
 }
@@ -182,7 +185,7 @@ pub struct SettingsInner {
     #[serde(default)]
     pub color_scheme: Option<ColorScheme>,
     #[serde(default)]
-    // motion
+    // viewport
     pub slow: Option<bool>,
     #[serde(default)]
     pub disable_tower_auto_up: Option<bool>,
@@ -192,6 +195,22 @@ pub struct SettingsInner {
     pub camera_smoothing: Option<f32>,
     #[serde[default]]
     pub player_smoothing: Option<f32>,
+    #[serde(default)]
+    pub viewport_margin: Option<(i32, i32)>,
+
+    // navigation
+    #[serde(default)]
+    pub enable_mouse: Option<bool>,
+    #[serde(default)]
+    pub enable_dpad: Option<bool>,
+    #[serde(default)]
+    pub landscape_dpad_on_left: Option<bool>,
+    #[serde(default)]
+    pub dpad_swap_up_down: Option<bool>,
+    #[serde(default)]
+    pub enable_margin_around_dpad: Option<bool>,
+    #[serde(default)]
+    pub enable_dpad_highlight: Option<bool>,
 
     // game config
     #[serde(default)]
@@ -260,7 +279,9 @@ impl Settings {
     pub fn write(&mut self) -> std::sync::RwLockWriteGuard<SettingsInner> {
         self.0.write().unwrap()
     }
+}
 
+impl Settings {
     pub fn get_color_scheme(&self) -> ColorScheme {
         self.read().color_scheme.clone().unwrap_or_default()
     }
@@ -312,6 +333,72 @@ impl Settings {
 
     pub fn set_player_smoothing(&mut self, value: f32) -> &mut Self {
         self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
+        self
+    }
+
+    pub fn get_viewport_margin(&self) -> Dims {
+        self.read()
+            .viewport_margin
+            .map(Dims::from)
+            .unwrap_or(Dims(4, 3))
+    }
+
+    pub fn set_viewport_margin(&mut self, value: Dims) -> &mut Self {
+        self.write().viewport_margin = Some(value.into());
+        self
+    }
+
+    pub fn get_enable_mouse(&self) -> bool {
+        self.read().enable_mouse.unwrap_or(true)
+    }
+
+    pub fn set_enable_mouse(&mut self, value: bool) -> &mut Self {
+        self.write().enable_mouse = Some(value);
+        self
+    }
+
+    pub fn get_enable_dpad(&self) -> bool {
+        self.read().enable_dpad.unwrap_or(false)
+    }
+
+    pub fn set_enable_dpad(&mut self, value: bool) -> &mut Self {
+        self.write().enable_dpad = Some(value);
+        self
+    }
+
+    pub fn get_landscape_dpad_on_left(&self) -> bool {
+        self.read().landscape_dpad_on_left.unwrap_or(false)
+    }
+
+    pub fn set_landscape_dpad_on_left(&mut self, value: bool) -> &mut Self {
+        self.write().landscape_dpad_on_left = Some(value);
+        self
+    }
+
+    pub fn get_dpad_swap_up_down(&self) -> bool {
+        self.read().dpad_swap_up_down.unwrap_or(false)
+    }
+
+    pub fn set_dpad_swap_up_down(&mut self, value: bool) -> &mut Self {
+        self.write().dpad_swap_up_down = Some(value);
+        self
+    }
+
+    pub fn get_enable_margin_around_dpad(&self) -> bool {
+        self.read().enable_margin_around_dpad.unwrap_or(false)
+    }
+
+    pub fn set_enable_margin_around_dpad(&mut self, value: bool) -> &mut Self {
+        self.write().enable_margin_around_dpad = Some(value);
+        self
+    }
+
+    pub fn get_enable_dpad_highlight(&self) -> bool {
+        self.read().enable_dpad_highlight.unwrap_or(true)
+    }
+
+    pub fn set_enable_dpad_highlight(&mut self, value: bool) -> &mut Self {
+        self.write().enable_dpad_highlight = Some(value);
         self
     }
 
@@ -435,13 +522,10 @@ impl Settings {
     }
 }
 
-pub struct SettingsActivity {
-    actions: Vec<MenuAction<Change>>,
-    menu: Menu,
-}
+struct OtherSettingsPopup(Popup, MouseGuard);
 
-impl SettingsActivity {
-    fn other_settings_popup(settings: &Settings) -> Activity {
+impl OtherSettingsPopup {
+    fn new(settings: &Settings) -> Self {
         let popup = Popup::new(
             "Other settings".to_string(),
             vec![
@@ -454,7 +538,28 @@ impl SettingsActivity {
         )
         .styles_from_settings(settings);
 
-        Activity::new_base_boxed("settings".to_string(), popup)
+        Self(popup, MouseGuard::new().unwrap())
+    }
+}
+
+impl ActivityHandler for OtherSettingsPopup {
+    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
+        self.0.update(events, data)
+    }
+
+    fn screen(&self) -> &dyn Screen {
+        &self.0
+    }
+}
+
+pub struct SettingsActivity {
+    actions: Vec<MenuAction<Change>>,
+    menu: Menu,
+}
+
+impl SettingsActivity {
+    fn other_settings_popup(settings: &Settings) -> Activity {
+        Activity::new_base_boxed("settings".to_string(), OtherSettingsPopup::new(settings))
     }
 }
 
@@ -462,13 +567,14 @@ impl SettingsActivity {
     pub fn new(settings: &Settings) -> Self {
         let options = menu_actions!(
             "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
+            "Controls" -> data => Change::push(create_controls_settings(data)),
             "Other settings" -> data => Change::push(SettingsActivity::other_settings_popup(&data.settings)),
             "Back" -> _ => Change::pop_top(),
         );
 
         let (options, actions) = split_menu_actions(options);
 
-        let menu_config = MenuConfig::new_from_strings("Settings", options)
+        let menu_config = MenuConfig::new("Settings", options)
             .styles_from_settings(settings)
             .subtitle("Changes are not saved")
             .subtitle_style(style_with_attribute(
@@ -506,4 +612,64 @@ impl ActivityHandler for SettingsActivity {
     fn screen(&self) -> &dyn Screen {
         &self.menu
     }
+}
+
+pub fn create_controls_settings(data: &mut AppData) -> Activity {
+    let menu_config = MenuConfig::new(
+        "Controls settings",
+        [
+            MenuItem::Option(OptionDef {
+                text: "Enable mouse input".into(),
+                val: data.settings.get_enable_mouse(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_enable_mouse(*enabled);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Enable dpad".into(),
+                val: data.settings.get_enable_dpad(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_enable_dpad(*enabled);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Left-handed dpad".into(),
+                val: data.settings.get_landscape_dpad_on_left(),
+                fun: Box::new(|is_on_left, data| {
+                    *is_on_left = !*is_on_left;
+                    data.settings.set_landscape_dpad_on_left(*is_on_left);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Swap Up and Down buttons".into(),
+                val: data.settings.get_dpad_swap_up_down(),
+                fun: Box::new(|do_swap, data| {
+                    *do_swap = !*do_swap;
+                    data.settings.set_dpad_swap_up_down(*do_swap);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Enable margin around dpad".into(),
+                val: data.settings.get_enable_margin_around_dpad(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_enable_margin_around_dpad(*enabled);
+                }),
+            }),
+            MenuItem::Option(OptionDef {
+                text: "Enable dpad highlight".into(),
+                val: data.settings.get_enable_dpad_highlight(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_enable_dpad_highlight(*enabled);
+                }),
+            }),
+            MenuItem::Separator,
+            MenuItem::Text("Exit".into()),
+        ],
+    );
+
+    Activity::new_base_boxed("controls settings", Menu::new(menu_config))
 }

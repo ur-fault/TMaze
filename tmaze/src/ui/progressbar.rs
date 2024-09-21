@@ -3,7 +3,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::settings::Settings;
 
-use super::{draw::*, *};
+use super::{draw_fn::*, *};
 
 pub struct ProgressBar {
     title: String,

@@ -53,6 +53,16 @@ Settings (
     // player movement smoothing, values 0.5 - 1.0
     player_smoothing: 0.5,
 
+    // viewport margin, space between edges of the screen and maze/dpad
+    // value is a tuple of two integeres, horizontal and vertical margin
+    viewport_margin: (4, 3),
+
+    // enable mouse input
+    enable_mouse: true,
+
+    // enable dpad, it is virtual controller for mobile devices
+    enable_dpad: true,
+
     // default algorithm used for maze generation
     default_maze_gen_algo: RandomKruskals,
     // default_maze_gen_algo: DepthFirstSearch,
