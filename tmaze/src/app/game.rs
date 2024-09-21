@@ -1052,22 +1052,19 @@ impl MazeBoard {
     }
 
     fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, scheme: ColorScheme) {
-        // FIXME: only upwards stairs should have goal style
-        let style = if tower {
-            scheme.goals()
-        } else {
-            scheme.normals()
-        };
+        let (normal, goal) = (scheme.normals(), scheme.goals());
 
         for (y, row) in floors.iter().enumerate() {
             for (x, cell) in row.iter().enumerate() {
-                let ch = match (cell.get_wall(CellWall::Up), cell.get_wall(CellWall::Down)) {
-                    (false, false) => '⥮',
-                    (false, true) => '↑',
-                    (true, false) => '↓',
+                let (up, down) = (!cell.get_wall(CellWall::Up), !cell.get_wall(CellWall::Down));
+                let ch = match (up, down) {
+                    (true, true) => '⥮',
+                    (true, false) => '↑',
+                    (false, true) => '↓',
                     _ => continue,
                 };
 
+                let style = if tower && up { goal } else { normal };
                 let pos = maze2screen(Dims(x as i32, y as i32));
                 frame.draw_styled(pos, ch, style);
             }
