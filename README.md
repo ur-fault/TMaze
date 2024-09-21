@@ -40,7 +40,7 @@ And it ended up as maze solving game because I just couldn't find any other.
 - Marketing - Inženýr
 - Random stuff - [filip2cz](https://github.com/filip2cz/)
 - Playtest - everyone
-- Everything else - [me, ie. ur-fault](https://github.com/ur-fault)
+- Everything else - [ur-fault](https://github.com/ur-fault)
 
 ## How to run
 - You can either:
