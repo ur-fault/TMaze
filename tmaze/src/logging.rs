@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use cmaze::core::Dims;
+use cmaze::dims::Dims;
 use crossterm::style::{Attribute, Color, ContentStyle};
 use log::{Log, Metadata, Record};
 use unicode_width::UnicodeWidthStr;

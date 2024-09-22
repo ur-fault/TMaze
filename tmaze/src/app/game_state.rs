@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use cmaze::{
-    core::Dims3D,
+    dims::*,
     game::{MoveMode, RunningGame},
     gameboard::CellWall,
 };

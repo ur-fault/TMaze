@@ -1,12 +1,12 @@
 use cmaze::{
-    core::Dims,
+    dims::*,
     gameboard::{CellWall, Maze},
 };
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::{
     app::app::AppData,
-    helpers::{dim::Offset, line_center},
+    helpers::line_center,
     make_even, make_odd,
     renderer::Frame,
     settings::Settings,

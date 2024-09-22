@@ -421,6 +421,7 @@ dependencies = [
  "pausable_clock",
  "rand",
  "rayon",
+ "serde",
  "thiserror",
 ]
 

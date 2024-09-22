@@ -1,5 +1,4 @@
-use crate::core::*;
-use crate::gameboard::cell::CellWall::*;
+use crate::{dims::*, gameboard::cell::CellWall::*};
 
 #[derive(Clone)]
 pub struct Cell {

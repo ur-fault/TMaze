@@ -13,7 +13,7 @@ use std::{
     ops::RangeInclusive,
 };
 
-use cmaze::core::Dims;
+use cmaze::dims::Dims;
 
 use crate::{
     app::{

@@ -1,6 +1,8 @@
 use crossterm::style::ContentStyle;
 use unicode_width::UnicodeWidthStr;
 
+use cmaze::dims::Dims;
+
 use crate::settings::Settings;
 
 use super::{draw_fn::*, *};

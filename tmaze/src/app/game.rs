@@ -1,5 +1,5 @@
 use cmaze::{
-    core::{Dims, Dims3D, GameMode},
+    dims::*,
     game::{GameProperities, GeneratorFn, ProgressComm, RunningGame, RunningGameState},
     gameboard::{
         algorithms::{
@@ -13,8 +13,7 @@ use cmaze::{
 use crate::{
     app::{game_state::GameData, GameViewMode},
     helpers::{
-        constants, dim::Offset, is_release, maze2screen, maze2screen_3d, maze_render_size, strings,
-        LineDir,
+        constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
     lerp, menu_actions,
     renderer::Frame,

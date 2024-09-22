@@ -1,6 +1,6 @@
 use std::io;
 
-use cmaze::core::Dims;
+use cmaze::dims::Dims;
 use tmaze::{
     app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,

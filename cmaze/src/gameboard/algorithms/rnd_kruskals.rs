@@ -6,7 +6,8 @@ use super::{
     super::cell::{Cell, CellWall},
     GenErrorInstant, GenErrorThreaded, Maze, MazeAlgorithm, Progress, StopGenerationFlag,
 };
-use crate::core::*;
+use crate::dims::*;
+
 use CellWall::*;
 
 #[cfg(feature = "hashbrown")]

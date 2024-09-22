@@ -11,8 +11,7 @@ use std::{
 
 use super::{Cell, CellWall, Maze};
 
-pub use crate::core::*;
-use crate::game::ProgressComm;
+use crate::{dims::*, game::ProgressComm};
 pub use depth_first_search::DepthFirstSearch;
 pub use rnd_kruskals::RndKruskals;
 

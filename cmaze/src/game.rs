@@ -1,5 +1,5 @@
 use crate::{
-    core::*,
+    dims::*,
     gameboard::{
         algorithms::{GenErrorInstant, GenErrorThreaded, Progress, StopGenerationFlag},
         CellWall, Maze,

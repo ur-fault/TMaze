@@ -1,15 +1,17 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Dims(pub i32, pub i32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Dims3D(pub i32, pub i32, pub i32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DimsU(pub usize, pub usize);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GameMode {
     pub size: Dims3D,
     pub is_tower: bool,
@@ -268,5 +270,26 @@ impl From<(usize, usize)> for DimsU {
 impl From<DimsU> for (usize, usize) {
     fn from(val: DimsU) -> Self {
         (val.0, val.1)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum Offset {
+    Abs(i32),
+    Rel(f32),
+}
+
+impl Offset {
+    pub fn to_abs(self, size: i32) -> i32 {
+        match self {
+            Offset::Rel(ratio) => (size as f32 * ratio).round() as i32,
+            Offset::Abs(chars) => chars,
+        }
+    }
+}
+
+impl Default for Offset {
+    fn default() -> Self {
+        Offset::Rel(0.25)
     }
 }

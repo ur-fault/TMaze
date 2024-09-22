@@ -6,7 +6,7 @@ use std::{
     panic, thread,
 };
 
-use cmaze::core::Dims;
+use cmaze::dims::Dims;
 use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
 use unicode_width::UnicodeWidthChar;
 

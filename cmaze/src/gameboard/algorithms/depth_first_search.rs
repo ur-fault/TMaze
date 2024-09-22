@@ -6,7 +6,8 @@ use super::{
     super::cell::Cell, GenErrorInstant, GenErrorThreaded, Maze, MazeAlgorithm, Progress,
     StopGenerationFlag,
 };
-use crate::core::*;
+
+use crate::dims::*;
 
 pub struct DepthFirstSearch {}
 
