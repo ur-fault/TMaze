@@ -1,4 +1,8 @@
-use cmaze::{core::Dims, game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
+use cmaze::{
+    dims::{Dims, Offset},
+    game::GeneratorFn,
+    gameboard::algorithms::MazeAlgorithm,
+};
 use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
@@ -12,7 +16,7 @@ use std::{
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
     constants::base_path,
-    helpers::{constants::colors, dim::Offset},
+    helpers::constants::colors,
     menu_actions,
     renderer::MouseGuard,
     ui::{
@@ -26,7 +30,7 @@ use crate::sound::create_audio_settings;
 
 const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum CameraMode {
     #[default]
     CloseFollow,
@@ -177,7 +181,7 @@ pub enum UpdateCheckInterval {
     Always,
 }
 
-#[derive(Debug, Derivative, Clone, Serialize, Deserialize)]
+#[derive(Debug, Derivative, Serialize, Deserialize)]
 #[derivative(Default)]
 #[serde(rename = "Settings")]
 pub struct SettingsInner {

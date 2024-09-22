@@ -10,5 +10,3 @@ pub mod sound;
 pub mod ui;
 #[cfg(feature = "updates")]
 pub mod updates;
-
-use cmaze::{core, gameboard};

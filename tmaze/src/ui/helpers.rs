@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use cmaze::core::Dims;
+use cmaze::dims::Dims;
 use crossterm::style::{Attribute, Color, ContentStyle};
 
 use crate::{helpers::{self, strings::multisize_string}, renderer::helpers::term_size};

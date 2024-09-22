@@ -1,6 +1,5 @@
 use self::CellWall::*;
-use crate::core::*;
-use crate::gameboard::cell::{Cell, CellWall};
+use crate::{dims::*, gameboard::cell::{Cell, CellWall}};
 
 #[derive(Clone)]
 pub struct Maze {

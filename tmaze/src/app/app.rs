@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use cmaze::core::Dims;
+use cmaze::dims::*;
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 

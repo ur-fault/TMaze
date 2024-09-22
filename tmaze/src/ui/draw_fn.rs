@@ -1,4 +1,4 @@
-use crate::core::*;
+use cmaze::dims::*;
 use crate::renderer::Frame;
 
 use crossterm::style::ContentStyle;

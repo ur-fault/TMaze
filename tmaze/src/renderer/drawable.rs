@@ -1,4 +1,4 @@
-use cmaze::core::Dims;
+use cmaze::dims::Dims;
 use crossterm::style::ContentStyle;
 
 use super::{Cell, Frame};

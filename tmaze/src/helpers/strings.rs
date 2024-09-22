@@ -4,7 +4,7 @@ use std::{
     ops::Deref,
 };
 
-use cmaze::core::Dims;
+use cmaze::dims::Dims;
 
 use substring::Substring;
 use unicode_width::UnicodeWidthStr as _;

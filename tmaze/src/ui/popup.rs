@@ -4,11 +4,12 @@ use crossterm::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use super::draw_fn::*;
-use super::*;
-use crate::helpers::is_release;
+use cmaze::dims::Dims;
+
+use super::{draw_fn::*, *};
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
+    helpers::is_release,
     settings::Settings,
 };
 

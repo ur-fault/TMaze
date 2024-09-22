@@ -1,13 +1,11 @@
 pub mod constants;
-pub mod dim;
 pub mod strings;
 
 use core::fmt;
 
 use crossterm::event::KeyEventKind;
 
-use crate::core::*;
-use crate::gameboard::Maze;
+use cmaze::{dims::*, gameboard::Maze};
 
 #[inline]
 pub const fn line_center(container_start: i32, container_end: i32, item_width: i32) -> i32 {

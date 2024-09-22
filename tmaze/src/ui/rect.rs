@@ -1,9 +1,10 @@
-use cmaze::core::Dims;
+use cmaze::dims::*;
+
 use crossterm::style::ContentStyle;
 use substring::Substring as _;
 
 use crate::{
-    helpers::{box_center, dim::Offset},
+    helpers::box_center,
     renderer::{drawable::Drawable, Frame},
 };
 
