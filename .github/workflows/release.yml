@@ -304,17 +304,9 @@ jobs:
 
         - name: publish cmaze
           if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
-          uses: katyo/publish-crates@v2
-          with:
-              path: ./cmaze
-              registry-token: ${{ secrets.CRATES_IO }}
-              ignore-unpublished-changes: true
+          run: cargo publish -p cmaze --token ${{ secrets.CRATES_IO }}
 
         - name: publish tmaze
           if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
-          uses: katyo/publish-crates@v2
-          with:
-              path: ./tmaze
-              registry-token: ${{ secrets.CRATES_IO }}
-              ignore-unpublished-changes: true
+          run: cargo publish -p tmaze --token ${{ secrets.CRATES_IO }}
 
