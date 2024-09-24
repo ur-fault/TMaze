@@ -17,7 +17,11 @@ use crate::{
     },
     lerp, menu_actions,
     renderer::Frame,
-    settings::{self, CameraMode, ColorScheme, Settings, SettingsActivity},
+    settings::{
+        self,
+        theme::{Theme, ThemeResolver},
+        CameraMode, Settings, SettingsActivity,
+    },
     ui::{
         self,
         helpers::format_duration,
@@ -42,7 +46,7 @@ use super::{
     Activity, ActivityHandler, Change, Event,
 };
 
-pub fn create_controls_popup(settings: &Settings) -> Activity {
+pub fn create_controls_popup() -> Activity {
     let popup = Popup::new(
         "Controls".to_string(),
         [
@@ -62,8 +66,7 @@ pub fn create_controls_popup(settings: &Settings) -> Activity {
         .into_iter()
         .map(String::from)
         .collect::<Vec<_>>(),
-    )
-    .styles_from_settings(settings);
+    );
 
     Activity::new_base_boxed("controls".to_string(), popup)
 }
@@ -73,40 +76,37 @@ pub struct MainMenu {
     actions: Vec<MenuAction<Change>>,
 }
 
+#[allow(clippy::new_without_default)]
 impl MainMenu {
-    pub fn new(settings: &Settings) -> Self {
+    pub fn new() -> Self {
         let options = menu_actions!(
             "New Game" -> data => Self::start_new_game(&data.settings, &data.use_data),
-            "Settings" -> data => Self::show_settings_screen(&data.settings),
-            "Controls" -> data => Self::show_controls_popup(&data.settings),
-            "About" -> data => Self::show_about_popup(&data.settings),
+            "Settings" -> _ => Self::show_settings_screen(),
+            "Controls" -> _ => Self::show_controls_popup(),
+            "About" -> _ => Self::show_about_popup(),
             "Quit" -> _ => Change::pop_top(),
         );
 
         let (options, actions) = split_menu_actions(options);
 
         Self {
-            menu: Menu::new(
-                MenuConfig::new("TMaze", options)
-                    .counted()
-                    .styles_from_settings(settings),
-            ),
+            menu: Menu::new(MenuConfig::new("TMaze", options).counted()),
             actions,
         }
     }
 
-    fn show_settings_screen(settings: &Settings) -> Change {
+    fn show_settings_screen() -> Change {
         Change::push(Activity::new_base_boxed(
             "settings".to_string(),
-            settings::SettingsActivity::new(settings),
+            settings::SettingsActivity::new(),
         ))
     }
 
-    fn show_controls_popup(settings: &Settings) -> Change {
-        Change::push(create_controls_popup(settings))
+    fn show_controls_popup() -> Change {
+        Change::push(create_controls_popup())
     }
 
-    fn show_about_popup(settings: &Settings) -> Change {
+    fn show_about_popup() -> Change {
         const FEATURE_LIST: [(&str, bool); 2] = [
             ("updates", cfg!(feature = "updates")),
             ("sound", cfg!(feature = "sound")),
@@ -154,7 +154,7 @@ impl MainMenu {
             }
         }
 
-        let popup = Popup::new("About".to_string(), lines).styles_from_settings(settings);
+        let popup = Popup::new("About".to_string(), lines);
 
         Change::push(Activity::new_base_boxed("about".to_string(), popup))
     }
@@ -203,7 +203,7 @@ pub struct MazeSizeMenu {
 
 impl MazeSizeMenu {
     pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
-        let color_scheme = settings.get_color_scheme();
+        // let color_scheme = settings.get_color_scheme();
         let mut menu_config = MenuConfig::new_from_strings(
             "Maze size".to_string(),
             settings
@@ -211,9 +211,9 @@ impl MazeSizeMenu {
                 .iter()
                 .map(|maze| maze.title.clone())
                 .collect::<Vec<_>>(),
-        )
-        .box_style(color_scheme.normals())
-        .text_style(color_scheme.texts());
+        );
+        // .box_style(color_scheme.normals())
+        // .text_style(color_scheme.texts());
 
         let default = app_state_data
             .last_selected_preset
@@ -286,7 +286,6 @@ impl MazeAlgorithmMenu {
 
         let menu_config = MenuConfig::new("Maze generation algorithm".to_string(), options)
             .counted()
-            .styles_from_settings(settings)
             .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
 
         let menu = Menu::new(menu_config);
@@ -307,7 +306,6 @@ impl ActivityHandler for MazeAlgorithmMenu {
                 MazeGenerationActivity::new(
                     self.preset,
                     data.settings.get_default_maze_gen_algo().to_fn(),
-                    &data.settings,
                 ),
             )));
         }
@@ -323,7 +321,7 @@ impl ActivityHandler for MazeAlgorithmMenu {
 
                     Some(Change::push(Activity::new_base_boxed(
                         "maze_gen".to_string(),
-                        MazeGenerationActivity::new(self.preset, gen, &data.settings),
+                        MazeGenerationActivity::new(self.preset, gen),
                     )))
                 }
                 res => Some(res),
@@ -344,16 +342,13 @@ pub struct MazeGenerationActivity {
 }
 
 impl MazeGenerationActivity {
-    pub fn new(game_mode: GameMode, maze_gen: GeneratorFn, settings: &Settings) -> Self {
+    pub fn new(game_mode: GameMode, maze_gen: GeneratorFn) -> Self {
         let game_props = GameProperities {
             game_mode,
             generator: maze_gen,
         };
 
-        let color_scheme = settings.get_color_scheme();
-        let progress_bar = ProgressBar::new(format!("Generating maze: {:?}", game_mode.size))
-            .box_style(color_scheme.normals())
-            .text_style(color_scheme.texts());
+        let progress_bar = ProgressBar::new(format!("Generating maze: {:?}", game_mode.size));
 
         Self {
             comm: None,
@@ -462,19 +457,20 @@ pub struct PauseMenu {
     actions: Vec<MenuAction<Change>>,
 }
 
+#[allow(clippy::new_without_default)]
 impl PauseMenu {
-    pub fn new(settings: &Settings) -> Self {
+    pub fn new() -> Self {
         let options = menu_actions!(
             "Resume" -> _ => Change::pop_top(),
             "Main Menu" -> _ => Change::pop_until("main menu"),
-            "Controls" -> data => Change::push(create_controls_popup(&data.settings)),
-            "Settings" -> data => Change::push(SettingsActivity::new_activity(&data.settings)),
+            "Controls" -> _ => Change::push(create_controls_popup()),
+            "Settings" -> _ => Change::push(SettingsActivity::new_activity()),
             "Quit" -> _ => Change::pop_all(),
         );
 
         let (options, actions) = split_menu_actions(options);
 
-        let menu = Menu::new(MenuConfig::new("Paused", options).styles_from_settings(settings));
+        let menu = Menu::new(MenuConfig::new("Paused", options));
 
         Self { menu, actions }
     }
@@ -507,7 +503,7 @@ pub struct EndGamePopup {
 }
 
 impl EndGamePopup {
-    pub fn new(game: &RunningGame, settings: &Settings) -> Self {
+    pub fn new(game: &RunningGame) -> Self {
         let maze_size = game.get_maze().size();
         let texts = vec![
             format!("Time:  {}", format_duration(game.get_elapsed().unwrap())),
@@ -515,7 +511,7 @@ impl EndGamePopup {
             format!("Size:  {}x{}x{}", maze_size.0, maze_size.1, maze_size.2,),
         ];
 
-        let popup = Popup::new("You won".to_string(), texts).styles_from_settings(settings);
+        let popup = Popup::new("You won".to_string(), texts);
 
         let game_mode = game.get_game_mode();
         let gen_fn = game.get_gen_fn();
@@ -538,7 +534,7 @@ impl ActivityHandler for EndGamePopup {
                 Ok(b) => match *b {
                     KeyCode::Char('r') => Some(Change::replace(Activity::new_base_boxed(
                         "game",
-                        MazeGenerationActivity::new(self.game_mode, self.gen_fn, &data.settings),
+                        MazeGenerationActivity::new(self.game_mode, self.gen_fn),
                     ))),
                     KeyCode::Char('q') => Some(Change::pop_all()),
                     KeyCode::Enter | KeyCode::Char(' ') => Some(Change::pop_top()),
@@ -579,7 +575,7 @@ impl GameActivity {
         let settings = &app_data.settings;
 
         let camera_mode = settings.get_camera_mode();
-        let maze_board = MazeBoard::new(&game.game, settings);
+        let maze_board = MazeBoard::new(&game.game, &app_data.theme);
         let margins = settings.get_viewport_margin();
 
         #[cfg(feature = "sound")]
@@ -621,7 +617,7 @@ impl GameActivity {
         &self.maze_board.frames[self.game.camera_pos.2 as usize]
     }
 
-    fn render_meta_texts(&self, frame: &mut Frame, color_scheme: &ColorScheme, vp: Rect) {
+    fn render_meta_texts(&self, frame: &mut Frame, theme: &Theme, vp: Rect) {
         let max_width = (vp.size().0 / 2 + 1) as usize;
 
         let pl_pos = self.game.game.get_player_pos() + Dims3D(1, 1, 1);
@@ -664,7 +660,7 @@ impl GameActivity {
         let br = vp.start + vp.size();
 
         // draw them
-        let mut draw = |text: &str, pos| frame.draw_styled(pos, text, color_scheme.texts());
+        let mut draw = |text: &str, pos| frame.draw_styled(pos, text, theme.get("text"));
 
         draw(&pos_text, tl);
         draw(view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
@@ -672,12 +668,7 @@ impl GameActivity {
         draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
     }
 
-    pub fn render_visited_places(
-        &self,
-        frame: &mut Frame,
-        maze_pos: Dims,
-        color_scheme: &ColorScheme,
-    ) {
+    pub fn render_visited_places(&self, frame: &mut Frame, maze_pos: Dims, theme: &Theme) {
         use CellWall::{Down, Up};
 
         let game = &self.game.game;
@@ -685,7 +676,7 @@ impl GameActivity {
             let cell = game.get_maze().get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
                 let real_pos = maze2screen(*move_pos) + maze_pos;
-                frame.draw_styled(real_pos, '.', color_scheme.normals());
+                frame.draw_styled(real_pos, '.', theme.get("game_visited"));
             }
         }
     }
@@ -695,7 +686,7 @@ impl GameActivity {
         maze_pos: Dims,
         game: &RunningGame,
         viewport: &mut Frame,
-        color_scheme: &ColorScheme,
+        theme: &Theme,
     ) {
         let player = self.sm_player_pos;
         let player_draw_pos = maze_pos + player.into();
@@ -708,12 +699,12 @@ impl GameActivity {
                 .content_mut()
                 .unwrap()
                 .style
-                .foreground_color = Some(color_scheme.player);
+                .foreground_color = theme.get("game_player").to_cross().foreground_color;
         } else {
             viewport.draw_styled(
                 player_draw_pos,
                 self.game.player_char,
-                color_scheme.players(),
+                theme.get("game_player"),
             );
         }
     }
@@ -742,8 +733,8 @@ impl GameActivity {
         let dpad_type = DPadType::from_maze(self.game.game.get_maze());
         let swap_up_down = data.settings.get_dpad_swap_up_down();
 
-        let mut touch_controls = DPad::new(None, swap_up_down, dpad_type);
-        touch_controls.styles_from_settings(&data.settings);
+        let touch_controls = DPad::new(None, swap_up_down, dpad_type);
+        // touch_controls.styles_from_settings(&data.settings);
         self.touch_controls = Some(Box::new(touch_controls));
     }
 
@@ -802,7 +793,7 @@ impl ActivityHandler for GameActivity {
 
                                 return Some(Change::push(Activity::new_base_boxed(
                                     "pause".to_string(),
-                                    PauseMenu::new(&data.settings),
+                                    PauseMenu::new(),
                                 )));
                             }
                             Err(true) => return Some(Change::pop_until("main menu")),
@@ -867,10 +858,7 @@ impl ActivityHandler for GameActivity {
         if self.game.game.get_state() == RunningGameState::Finished {
             return Some(Change::replace_at(
                 1,
-                Activity::new_base_boxed(
-                    "won".to_string(),
-                    EndGamePopup::new(&self.game.game, &data.settings),
-                ),
+                Activity::new_base_boxed("won".to_string(), EndGamePopup::new(&self.game.game)),
             ));
         };
 
@@ -883,7 +871,7 @@ impl ActivityHandler for GameActivity {
 }
 
 impl Screen for GameActivity {
-    fn draw(&self, frame: &mut Frame, color_scheme: &ColorScheme) -> std::io::Result<()> {
+    fn draw(&self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
         let maze_frame = self.current_floor_frame();
         let game = &self.game.game;
 
@@ -904,25 +892,25 @@ impl Screen for GameActivity {
 
         // maze
         viewport.draw(maze_pos, maze_frame);
-        self.render_visited_places(&mut viewport, maze_pos, color_scheme);
+        self.render_visited_places(&mut viewport, maze_pos, theme);
 
         // player
         if (self.game.game.get_player_pos().2) == self.sm_camera_pos.2 {
-            self.render_player(maze_pos, game, &mut viewport, color_scheme);
+            self.render_player(maze_pos, game, &mut viewport, theme);
         }
 
         // show viewport box
         let vp_pos = (game_view_size - vp_size) / 2 + self.viewport_rect.start;
         let vp_rect = Rect::sized_at(vp_pos, vp_size).margin(Dims(-1, -1));
-        vp_rect.render(frame, color_scheme.normals());
+        vp_rect.render(frame, theme.get("game_viewport_border"));
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
             if !does_fit && self.show_debug {
-                render_edge_follow_rulers((xoff, yoff), frame, vp_rect, color_scheme);
+                render_edge_follow_rulers((xoff, yoff), frame, vp_rect, theme);
             }
         }
 
-        self.render_meta_texts(frame, color_scheme, vp_rect);
+        self.render_meta_texts(frame, theme, vp_rect);
 
         frame.draw(vp_pos, &viewport);
 
@@ -930,16 +918,16 @@ impl Screen for GameActivity {
         if let Some(ref touch_controls) = self.touch_controls {
             let mut dpad_frame = Frame::new(self.dpad_rect.unwrap().size());
 
-            touch_controls.render(&mut dpad_frame);
+            touch_controls.render(&mut dpad_frame, theme);
             frame.draw(self.dpad_rect.unwrap().start, &dpad_frame);
         }
 
         if self.show_debug {
             if let Some(dpad_rect) = self.dpad_rect {
-                dpad_rect.render(frame, color_scheme.normals());
+                dpad_rect.render(frame, theme.get("debug_border"));
             }
 
-            self.viewport_rect.render(frame, color_scheme.normals());
+            self.viewport_rect.render(frame, theme.get("debug_border"));
         }
 
         Ok(())
@@ -947,14 +935,9 @@ impl Screen for GameActivity {
 }
 
 #[inline]
-fn render_edge_follow_rulers(
-    rulers: (Offset, Offset),
-    frame: &mut Frame,
-    vp: Rect,
-    color_scheme: &ColorScheme,
-) {
-    let goals = color_scheme.goals();
-    let players = color_scheme.players();
+fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut Frame, vp: Rect, theme: &Theme) {
+    let goals = theme.get("game_goals");
+    let players = theme.get("game_player");
 
     let vps = vp.size();
 
@@ -994,22 +977,21 @@ pub struct MazeBoard {
 }
 
 impl MazeBoard {
-    pub fn new(game: &RunningGame, settings: &Settings) -> Self {
+    pub fn new(game: &RunningGame, theme: &Theme) -> Self {
         let maze = game.get_maze();
-        let scheme = settings.get_color_scheme();
 
         let mut frames: Vec<_> = (0..maze.size().2)
-            .map(|floor| Self::render_floor(game, floor, scheme.clone()))
+            .map(|floor| Self::render_floor(game, floor, theme))
             .collect();
 
-        Self::render_special(&mut frames, game, scheme.clone());
+        Self::render_special(&mut frames, game, theme);
 
         Self { frames }
     }
 
-    fn render_floor(game: &RunningGame, floor: i32, scheme: ColorScheme) -> Frame {
+    fn render_floor(game: &RunningGame, floor: i32, theme: &Theme) -> Frame {
         let maze = game.get_maze();
-        let normals = scheme.normals();
+        let normals = theme.get("game_walls");
 
         let size = maze_render_size(maze);
 
@@ -1045,13 +1027,14 @@ impl MazeBoard {
         }
 
         let cells = &maze.get_cells()[floor as usize];
-        Self::render_stairs(&mut frame, cells, maze.is_tower(), scheme);
+        Self::render_stairs(&mut frame, cells, maze.is_tower(), theme);
 
         frame
     }
 
-    fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, scheme: ColorScheme) {
-        let (normal, goal) = (scheme.normals(), scheme.goals());
+    fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, theme: &Theme) {
+        // let (normal, goal) = (scheme.normals(), scheme.goals());
+        let [normal, goal] = theme.extract(["game_stairs", "game_goals"]);
 
         for (y, row) in floors.iter().enumerate() {
             for (x, cell) in row.iter().enumerate() {
@@ -1070,10 +1053,24 @@ impl MazeBoard {
         }
     }
 
-    fn render_special(frames: &mut [Frame], game: &RunningGame, scheme: ColorScheme) {
-        let goal_style = scheme.goals();
+    fn render_special(frames: &mut [Frame], game: &RunningGame, theme: &Theme) {
+        let goal_style = theme.get("game_goals");
         let goal_pos = game.get_goal_pos();
 
         frames[goal_pos.2 as usize].draw_styled(maze2screen(goal_pos), '$', goal_style);
     }
+}
+
+pub fn game_theme_resolver() -> ThemeResolver {
+    let mut resolver = ThemeResolver::new();
+
+    resolver
+        .link("game_walls", "border")
+        .link("game_stairs", "game_walls")
+        .link("game_goals", "")
+        .link("game_player", "highlight")
+        .link("game_viewport_border", "border")
+        .link("game_visited", "dim");
+
+    resolver
 }

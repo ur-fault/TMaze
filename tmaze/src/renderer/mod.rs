@@ -10,6 +10,8 @@ use cmaze::dims::Dims;
 use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
 use unicode_width::UnicodeWidthChar;
 
+use crate::settings::theme::Style;
+
 use self::{drawable::Drawable, helpers::term_size};
 
 pub struct Renderer {
@@ -219,16 +221,16 @@ pub enum Cell {
 }
 
 impl Cell {
-    pub fn styled(c: char, s: ContentStyle) -> Self {
+    pub fn styled(c: char, s: Style) -> Self {
         Cell::Content(CellContent {
             character: c,
             width: c.width().unwrap_or(1) as u8,
-            style: s,
+            style: s.into(),
         })
     }
 
     pub fn new(c: char) -> Self {
-        Cell::styled(c, ContentStyle::default())
+        Cell::styled(c, Style::default())
     }
 
     pub fn content(&self) -> Option<&CellContent> {
@@ -260,7 +262,7 @@ impl Frame {
         Frame { buffer, size }
     }
 
-    pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: ContentStyle) {
+    pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: Style) {
         if x < 0 || self.size.0 <= x || y < 0 || self.size.1 <= y {
             return;
         }
@@ -280,7 +282,7 @@ impl Frame {
     }
 
     pub fn put_char(&mut self, pos: Dims, character: char) {
-        self.put_char_styled(pos, character, ContentStyle::default());
+        self.put_char_styled(pos, character, Style::default());
     }
 
     pub fn try_set(&mut self, pos: Dims, cell: Cell) -> bool {
@@ -300,7 +302,7 @@ impl Frame {
         content.draw(pos, self);
     }
 
-    pub fn draw_styled(&mut self, pos: Dims, content: impl Drawable, style: ContentStyle) {
+    pub fn draw_styled(&mut self, pos: Dims, content: impl Drawable, style: Style) {
         content.draw_with_style(pos, self, style);
     }
 
@@ -375,7 +377,7 @@ impl Drawable for &Frame {
         }
     }
 
-    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, _: ContentStyle) {
+    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, _: Style) {
         // we ignore the style
         self.draw(pos, frame);
     }

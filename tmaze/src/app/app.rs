@@ -9,7 +9,11 @@ use crate::{
     helpers::{constants::paths::settings_path, on_off},
     logging::{self, get_logger},
     renderer::{drawable::Drawable, Renderer},
-    settings::Settings,
+    settings::{
+        theme::{Theme, ThemeDefinition, ThemeResolver},
+        Settings,
+    },
+    ui,
 };
 
 #[cfg(feature = "sound")]
@@ -21,6 +25,7 @@ use rodio::Source;
 use super::{
     activity::{Activities, Activity, ActivityResult, Change},
     event::Event,
+    game,
     jobs::Qer,
     Jobs,
 };
@@ -36,6 +41,7 @@ pub struct AppData {
     pub save: SaveData,
     pub use_data: AppStateData,
     pub screen_size: Dims,
+    pub theme: Theme,
     jobs: Jobs,
     app_start: Instant,
 
@@ -76,12 +82,30 @@ impl AppData {
 }
 
 impl App {
+    /// Create a new app with a base activity
+    ///
+    /// This is a convenience method for creating an empty app and pushing
+    /// a base activity to it.
+    ///
+    /// For more information see [`App::empty`] and [`Activities::push`].
+    ///
+    /// # Arguments
+    /// * `base_activity` - The activity to push to the app
     pub fn new(base_activity: Activity) -> Self {
         let mut s = Self::empty();
         s.activities.push(base_activity);
         s
     }
 
+    /// Create a new app with no activities
+    ///
+    /// This method intializes all of the needed components of the app.
+    /// - Loads settings,
+    /// - loads save data,
+    /// - initializes the renderer,
+    /// - initializes the sound player (if the feature is enabled),
+    /// - initializes the logging system,
+    /// - initializes the job queue,
     pub fn empty() -> Self {
         let renderer = Renderer::new().expect("Failed to create renderer");
         let activities = Activities::empty();
@@ -92,6 +116,13 @@ impl App {
         let jobs = Jobs::new();
         let app_start = Instant::now();
         let frame_size = renderer.frame_size();
+
+        log::info!("Loading theme");
+        let resolver = init_theme_resolver();
+        let theme_def = ThemeDefinition::load_by_name("theme.json").expect("Failed to load theme");
+        let theme = resolver.resolve(&theme_def);
+
+        // panic!("theme: {:#?}", theme);
 
         logging::init();
 
@@ -108,6 +139,7 @@ impl App {
                 use_data,
                 screen_size: frame_size,
                 jobs,
+                theme,
 
                 #[cfg(feature = "sound")]
                 sound_player,
@@ -191,10 +223,7 @@ impl App {
                 .active()
                 .expect("No active active")
                 .screen()
-                .draw(
-                    self.renderer.frame(),
-                    &self.data.settings.get_color_scheme(),
-                )
+                .draw(self.renderer.frame(), &self.data.theme)
                 .unwrap();
 
             logging::get_logger().draw(Dims(0, 0), self.renderer.frame());
@@ -251,4 +280,16 @@ impl App {
 pub struct AppStateData {
     pub last_selected_preset: Option<usize>,
     pub show_debug: bool,
+}
+
+fn init_theme_resolver() -> ThemeResolver {
+    let mut resolver = ThemeResolver::new();
+
+    resolver.link("background", "").link("empty", "");
+
+    resolver
+        .extend(ui::theme_resolver())
+        .extend(game::game_theme_resolver());
+
+    resolver
 }

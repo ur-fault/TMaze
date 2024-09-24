@@ -1,7 +1,4 @@
-use crossterm::{
-    event::{Event as TermEvent, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
-    style::ContentStyle,
-};
+use crossterm::event::{Event as TermEvent, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use unicode_width::UnicodeWidthStr;
 
 use cmaze::dims::Dims;
@@ -10,15 +7,14 @@ use super::{draw_fn::*, *};
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::is_release,
-    settings::Settings,
 };
 
 pub struct Popup {
     title: String,
     texts: Vec<String>,
-    box_style: Option<ContentStyle>,
-    text_style: Option<ContentStyle>,
-    title_style: Option<ContentStyle>,
+    // box_style: Option<ContentStyle>,
+    // text_style: Option<ContentStyle>,
+    // title_style: Option<ContentStyle>,
 }
 
 impl Popup {
@@ -26,33 +22,33 @@ impl Popup {
         Self {
             title,
             texts: texts.into(),
-            box_style: None,
-            text_style: None,
-            title_style: None,
+            // box_style: None,
+            // text_style: None,
+            // title_style: None,
         }
     }
 
-    pub fn box_style(mut self, style: ContentStyle) -> Self {
-        self.box_style = Some(style);
-        self
-    }
-
-    pub fn text_style(mut self, style: ContentStyle) -> Self {
-        self.text_style = Some(style);
-        self
-    }
-
-    pub fn title_style(mut self, style: ContentStyle) -> Self {
-        self.title_style = Some(style);
-        self
-    }
-
-    pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
-        let colorscheme = settings.get_color_scheme();
-        self.box_style = Some(colorscheme.normals());
-        self.text_style = Some(colorscheme.texts());
-        self
-    }
+    // pub fn box_style(mut self, style: ContentStyle) -> Self {
+    //     self.box_style = Some(style);
+    //     self
+    // }
+    //
+    // pub fn text_style(mut self, style: ContentStyle) -> Self {
+    //     self.text_style = Some(style);
+    //     self
+    // }
+    //
+    // pub fn title_style(mut self, style: ContentStyle) -> Self {
+    //     self.title_style = Some(style);
+    //     self
+    // }
+    //
+    // pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
+    //     let colorscheme = settings.get_color_scheme();
+    //     self.box_style = Some(colorscheme.normals());
+    //     self.text_style = Some(colorscheme.texts());
+    //     self
+    // }
 }
 
 impl ActivityHandler for Popup {
@@ -87,14 +83,14 @@ impl ActivityHandler for Popup {
 }
 
 impl Screen for Popup {
-    fn draw(&self, frame: &mut Frame, color_scheme: &ColorScheme) -> io::Result<()> {
+    fn draw(&self, frame: &mut Frame, theme: &Theme) -> io::Result<()> {
         let box_size = popup_size(&self.title, &self.texts);
         let title_pos = center_box_in_screen(Dims(self.title.width() as i32, 1)).0;
         let pos = center_box_in_screen(box_size);
 
-        let box_style = self.box_style.unwrap_or(color_scheme.normals());
-        let text_style = self.text_style.unwrap_or(color_scheme.texts());
-        let title_style = self.title_style.or(self.text_style).unwrap_or(text_style);
+        let box_style = theme.get("ui_popup_border");
+        let text_style = theme.get("ui_popup_text");
+        let title_style = theme.get("ui_popup_title");
 
         draw_box(frame, pos, box_size, box_style);
         frame.draw_styled(Dims(title_pos, pos.1 + 1), self.title.as_str(), title_style);
@@ -123,4 +119,14 @@ pub fn popup_size(title: &str, texts: &[String]) -> Dims {
         ),
         None => Dims(4 + title.len() as i32, 3),
     }
+}
+
+pub fn popup_theme_resolver() -> ThemeResolver {
+    let mut resolver = ThemeResolver::new();
+
+    resolver.link("ui_popup_border", "border")
+        .link("ui_popup_text", "text")
+        .link("ui_popup_title", "title");
+
+    resolver
 }

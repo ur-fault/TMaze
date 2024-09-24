@@ -1,11 +1,9 @@
 use cmaze::dims::*;
-use crate::renderer::Frame;
-
-use crossterm::style::ContentStyle;
+use crate::{renderer::Frame, settings::theme::Style};
 
 pub use substring::Substring;
 
-pub fn draw_box(frame: &mut Frame, pos: Dims, size: Dims, style: ContentStyle) {
+pub fn draw_box(frame: &mut Frame, pos: Dims, size: Dims, style: Style) {
     draw_char(frame, pos.0, pos.1, '╭', style);
     draw_line(
         frame,
@@ -33,7 +31,7 @@ pub fn draw_box(frame: &mut Frame, pos: Dims, size: Dims, style: ContentStyle) {
     draw_char(frame, pos.0 + size.0 - 1, bottom, '╯', style);
 }
 
-pub fn draw_line(frame: &mut Frame, pos: Dims, vertical: bool, len: usize, style: ContentStyle) {
+pub fn draw_line(frame: &mut Frame, pos: Dims, vertical: bool, len: usize, style: Style) {
     let d = if vertical { Dims(0, 1) } else { Dims(1, 0) };
     let chr = if vertical { '│' } else { '─' };
 
@@ -43,7 +41,7 @@ pub fn draw_line(frame: &mut Frame, pos: Dims, vertical: bool, len: usize, style
     }
 }
 
-pub fn draw_str(frame: &mut Frame, mut x: i32, y: i32, mut text: &str, style: ContentStyle) {
+pub fn draw_str(frame: &mut Frame, mut x: i32, y: i32, mut text: &str, style: Style) {
     if y < 0 {
         return;
     }
@@ -60,7 +58,7 @@ pub fn draw_str(frame: &mut Frame, mut x: i32, y: i32, mut text: &str, style: Co
     frame.draw(Dims(x, y), (text, style));
 }
 
-pub fn draw_char(frame: &mut Frame, x: i32, y: i32, text: char, style: ContentStyle) {
+pub fn draw_char(frame: &mut Frame, x: i32, y: i32, text: char, style: Style) {
     if y < 0 || x < 0 || x > u16::MAX as i32 || y > u16::MAX as i32 {
         return;
     }

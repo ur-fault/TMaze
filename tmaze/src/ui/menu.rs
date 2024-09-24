@@ -1,6 +1,5 @@
-use crossterm::{
-    event::{Event as TermEvent, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
-    style::ContentStyle,
+use crossterm::event::{
+    Event as TermEvent, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind,
 };
 
 use pad::PadStr;
@@ -23,10 +22,10 @@ use crate::{
     },
     helpers::{is_release, strings::MbyStaticStr, LineDir},
     renderer::Frame,
-    settings::{ColorScheme, Settings},
+    settings::theme::{Theme, ThemeResolver},
 };
 
-use super::{center_box_in_screen, draw_box, invert_style, Rect, Screen};
+use super::{center_box_in_screen, draw_box, Rect, Screen};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
@@ -159,10 +158,10 @@ impl fmt::Debug for MenuItem {
 }
 
 pub struct MenuConfig {
-    pub box_style: Option<ContentStyle>,
-    pub text_style: Option<ContentStyle>,
-    pub title_style: Option<ContentStyle>,
-    pub subtitle_style: Option<ContentStyle>,
+    // pub box_style: Option<ContentStyle>,
+    // pub text_style: Option<ContentStyle>,
+    // pub title_style: Option<ContentStyle>,
+    // pub subtitle_style: Option<ContentStyle>,
     pub title: String,
     pub subtitles: Vec<String>,
     pub options: Vec<MenuItem>,
@@ -183,10 +182,10 @@ impl MenuConfig {
 
     pub fn new(title: impl Into<String>, options: impl Into<Vec<MenuItem>>) -> Self {
         Self {
-            box_style: None,
-            text_style: None,
-            title_style: None,
-            subtitle_style: None,
+            // box_style: None,
+            // text_style: None,
+            // title_style: None,
+            // subtitle_style: None,
             title: title.into(),
             subtitles: vec![],
             options: options.into(),
@@ -196,12 +195,12 @@ impl MenuConfig {
         }
     }
 
-    pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
-        let colorscheme = settings.get_color_scheme();
-        self.box_style = Some(colorscheme.normals());
-        self.text_style = Some(colorscheme.texts());
-        self
-    }
+    // pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
+    //     let colorscheme = settings.get_color_scheme();
+    //     self.box_style = Some(colorscheme.normals());
+    //     self.text_style = Some(colorscheme.texts());
+    //     self
+    // }
 
     pub fn counted(mut self) -> Self {
         self.counted = true;
@@ -218,25 +217,25 @@ impl MenuConfig {
         self
     }
 
-    pub fn box_style(mut self, style: ContentStyle) -> Self {
-        self.box_style = Some(style);
-        self
-    }
-
-    pub fn text_style(mut self, style: ContentStyle) -> Self {
-        self.text_style = Some(style);
-        self
-    }
-
-    pub fn title_style(mut self, style: ContentStyle) -> Self {
-        self.title_style = Some(style);
-        self
-    }
-
-    pub fn subtitle_style(mut self, style: ContentStyle) -> Self {
-        self.subtitle_style = Some(style);
-        self
-    }
+    // pub fn box_style(mut self, style: ContentStyle) -> Self {
+    //     self.box_style = Some(style);
+    //     self
+    // }
+    //
+    // pub fn text_style(mut self, style: ContentStyle) -> Self {
+    //     self.text_style = Some(style);
+    //     self
+    // }
+    //
+    // pub fn title_style(mut self, style: ContentStyle) -> Self {
+    //     self.title_style = Some(style);
+    //     self
+    // }
+    //
+    // pub fn subtitle_style(mut self, style: ContentStyle) -> Self {
+    //     self.subtitle_style = Some(style);
+    //     self
+    // }
 
     pub fn no_q(mut self) -> Self {
         self.q_to_quit = false;
@@ -477,24 +476,21 @@ impl ActivityHandler for Menu {
 }
 
 impl Screen for Menu {
-    fn draw(&self, frame: &mut Frame, color_scheme: &ColorScheme) -> Result<(), io::Error> {
+    fn draw(&self, frame: &mut Frame, theme: &Theme) -> Result<(), io::Error> {
         let MenuConfig {
-            box_style,
-            text_style,
-            title_style,
-            subtitle_style,
+            // box_style,
+            // text_style,
+            // title_style,
+            // subtitle_style,
             title,
             counted,
             ..
         } = &self.config;
 
-        let title_style = title_style.or(*text_style).unwrap_or(color_scheme.texts());
-        let subtitle_style = subtitle_style
-            .or(*text_style)
-            .unwrap_or(color_scheme.texts());
-
-        let box_style = box_style.unwrap_or(color_scheme.normals());
-        let text_style = text_style.unwrap_or(color_scheme.texts());
+        let title_style = theme.get("ui_menu_title");
+        let subtitle_style = theme.get("ui_menu_subtitle");
+        let box_style = theme.get("ui_menu_border");
+        let text_style = theme.get("ui_menu_text");
 
         let MenuDimenstions {
             size,
@@ -541,7 +537,7 @@ impl Screen for Menu {
 
         for (i, option) in options.iter().enumerate() {
             let style = if i == self.selected {
-                invert_style(text_style)
+                text_style.invert()
             } else {
                 text_style
             };
@@ -642,4 +638,16 @@ pub fn split_menu_actions<R>(
     actions: Vec<(MenuItem, MenuAction<R>)>,
 ) -> (Vec<MenuItem>, Vec<MenuAction<R>>) {
     actions.into_iter().unzip()
+}
+
+pub fn menu_theme_resolver() -> ThemeResolver {
+    let mut resolver = ThemeResolver::new();
+
+    resolver
+        .link("ui_menu_border", "border")
+        .link("ui_menu_text", "text")
+        .link("ui_menu_title", "ui_menu_text")
+        .link("ui_menu_subtitle", "ui_menu_text");
+
+    resolver
 }

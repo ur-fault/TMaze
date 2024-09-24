@@ -53,7 +53,7 @@ fn main() -> Result<(), GameError> {
     better_panic::install();
 
     let mut app = App::empty();
-    let menu = MainMenu::new(&app.data().settings);
+    let menu = MainMenu::new();
     app.activities_mut()
         .push(Activity::new_base_boxed("main menu", menu));
 

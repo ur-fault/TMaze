@@ -4,13 +4,12 @@ use std::{
 };
 
 use cmaze::dims::Dims;
-use crossterm::style::{Attribute, Color, ContentStyle};
 use log::{Log, Metadata, Record};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
     renderer::{self, drawable::Drawable},
-    ui::style_with_attribute,
+    settings::theme::{Color, NamedColor, Style},
 };
 
 static LOGGER: OnceLock<AppLogger> = OnceLock::new();
@@ -154,25 +153,23 @@ impl Log for AppLogger {
 
 impl Drawable for AppLogger {
     fn draw(&self, pos: Dims, frame: &mut renderer::Frame) {
-        self.draw_with_style(pos, frame, crossterm::style::ContentStyle::default());
+        self.draw_with_style(pos, frame, Style::default());
     }
 
-    fn draw_with_style(&self, pos: Dims, frame: &mut renderer::Frame, style: ContentStyle) {
+    fn draw_with_style(&self, pos: Dims, frame: &mut renderer::Frame, style: Style) {
         for (i, log) in self.get_logs().take(self.max_visible).enumerate() {
             let color = match log.level {
-                log::Level::Error => Color::Red,
-                log::Level::Warn => Color::Yellow,
-                log::Level::Info => Color::White,
-                log::Level::Debug => Color::Blue,
-                log::Level::Trace => Color::Grey,
+                log::Level::Error => NamedColor::Red,
+                log::Level::Warn => NamedColor::Yellow,
+                log::Level::Info => NamedColor::White,
+                log::Level::Debug => NamedColor::Blue,
+                log::Level::Trace => NamedColor::Grey,
             };
 
-            let indicator_style = ContentStyle {
-                foreground_color: Some(color),
-                ..style
-            };
+            let indicator_style = Style::fg(Color::Named(color));
 
-            let source_style = style_with_attribute(style, Attribute::Dim);
+            // let source_style = style_with_attribute(style, Attribute::Dim);
+            let source_style = style; // TODO: attributes in styles
 
             let y = pos.1 + i as i32;
             let len = log.source.width() + 4 + log.message.width();

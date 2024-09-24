@@ -25,10 +25,16 @@ pub mod colors {
 pub mod paths {
     use std::path::PathBuf;
 
-    use dirs::preference_dir;
-
+    #[cfg(not(feature = "local_paths"))]
     pub fn base_path() -> PathBuf {
+        use dirs::preference_dir;
+
         preference_dir().unwrap().join("tmaze")
+    }
+
+    #[cfg(feature = "local_paths")]
+    pub fn base_path() -> PathBuf {
+        PathBuf::from("./")
     }
 
     pub fn theme_path() -> PathBuf {
