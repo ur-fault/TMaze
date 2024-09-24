@@ -61,7 +61,7 @@ Settings (
     enable_mouse: true,
 
     // enable dpad, it is virtual controller for mobile devices
-    enable_dpad: true,
+    enable_dpad: false,
 
     // default algorithm used for maze generation
     default_maze_gen_algo: RandomKruskals,
