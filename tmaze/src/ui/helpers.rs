@@ -73,20 +73,3 @@ pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyl
         ..style
     }
 }
-
-// pub fn invert_style(style: ContentStyle) -> ContentStyle {
-//     ContentStyle {
-//         background_color: Some(style.foreground_color.unwrap_or(Color::White)),
-//         foreground_color: Some(style.background_color.unwrap_or(Color::Black)),
-//         ..style
-//     }
-// }
-
-// pub fn merge_styles(a: ContentStyle, b: ContentStyle) -> ContentStyle {
-//     ContentStyle {
-//         foreground_color: a.foreground_color.or(b.foreground_color),
-//         background_color: a.background_color.or(b.background_color),
-//         attributes: a.attributes | b.attributes,
-//         underline_color: a.underline_color.or(b.underline_color),
-//     }
-// }

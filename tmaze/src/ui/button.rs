@@ -14,9 +14,6 @@ pub struct Button {
     pub text: String,
     pub pos: Dims,
     pub size: Dims,
-    // pub normal_style: Option<ContentStyle>,
-    // pub content_style: Option<ContentStyle>,
-    // pub highlight_style: Option<ContentStyle>,
     pub disable_highlight: bool,
     pub set: bool,
     pub disabled: bool,
@@ -39,37 +36,10 @@ impl Button {
         }
     }
 
-    // pub fn normal_style(mut self, style: ContentStyle) -> Self {
-    //     self.normal_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn content_style(mut self, style: ContentStyle) -> Self {
-    //     self.content_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn highlight_style(mut self, style: ContentStyle) -> Self {
-    //     self.highlight_style = Some(style);
-    //     self
-    // }
-
     pub fn disable_highlight(mut self, disable_highlight: bool) -> Self {
         self.disable_highlight = disable_highlight;
         self
     }
-
-    // pub fn load_styles_from_settings(&mut self, settings: &Settings) {
-    //     let colorscheme = settings.get_color_scheme();
-    //     self.normal_style = Some(colorscheme.normals());
-    //     self.content_style = Some(colorscheme.texts());
-    //     self.highlight_style = Some(colorscheme.highlights());
-    // }
-    //
-    // pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
-    //     self.load_styles_from_settings(settings);
-    //     self
-    // }
 
     pub fn set(mut self, set: bool) -> Self {
         self.set = set;
@@ -94,7 +64,6 @@ impl Button {
             normal
         };
 
-        // let inverted_bg = invert_style(if set { highlight } else { normal });
         let inverted_bg = Style::invert(if set { highlight } else { normal });
 
         // Box

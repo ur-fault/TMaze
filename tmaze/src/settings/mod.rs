@@ -16,15 +16,10 @@ use std::{
 
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
-    helpers::constants::
-        paths::{self, settings_path}
-    ,
+    helpers::constants::paths::{self, settings_path},
     menu_actions,
     renderer::MouseGuard,
-    ui::{
-        split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem,
-        OptionDef, Popup, Screen,
-    },
+    ui::{split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem, OptionDef, Popup, Screen},
 };
 
 #[cfg(feature = "sound")]
@@ -55,104 +50,6 @@ pub struct MazePreset {
 fn default_depth() -> u16 {
     1
 }
-
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// pub struct ColorScheme {
-//     #[serde(default = "colors::fun::white")]
-//     pub normal: Color,
-//     #[serde(default = "colors::fun::white")]
-//     pub player: Color,
-//     #[serde(default = "colors::fun::white")]
-//     pub goal: Color,
-//     #[serde(default = "colors::fun::white")]
-//     pub text: Color,
-//     #[serde(default = "colors::fun::red")]
-//     pub highlight: Color,
-// }
-//
-// #[allow(dead_code)]
-// impl ColorScheme {
-//     pub fn new() -> Self {
-//         Self::default()
-//     }
-//
-//     pub fn normal(mut self, value: Color) -> Self {
-//         self.normal = value;
-//         self
-//     }
-//
-//     pub fn player(mut self, value: Color) -> Self {
-//         self.player = value;
-//         self
-//     }
-//
-//     pub fn goal(mut self, value: Color) -> Self {
-//         self.goal = value;
-//         self
-//     }
-//
-//     pub fn text(mut self, value: Color) -> Self {
-//         self.text = value;
-//         self
-//     }
-//
-//     pub fn highlight(mut self, value: Color) -> Self {
-//         self.highlight = value;
-//         self
-//     }
-//
-//     pub fn normals(&self) -> ContentStyle {
-//         ContentStyle {
-//             foreground_color: Some(self.normal),
-//             background_color: None,
-//             ..Default::default()
-//         }
-//     }
-//
-//     pub fn players(&self) -> ContentStyle {
-//         ContentStyle {
-//             foreground_color: Some(self.player),
-//             background_color: None,
-//             ..Default::default()
-//         }
-//     }
-//
-//     pub fn goals(&self) -> ContentStyle {
-//         ContentStyle {
-//             foreground_color: Some(self.goal),
-//             background_color: None,
-//             ..Default::default()
-//         }
-//     }
-//
-//     pub fn texts(&self) -> ContentStyle {
-//         ContentStyle {
-//             foreground_color: Some(self.text),
-//             background_color: None,
-//             ..Default::default()
-//         }
-//     }
-//
-//     pub fn highlights(&self) -> ContentStyle {
-//         ContentStyle {
-//             foreground_color: Some(self.highlight),
-//             background_color: None,
-//             ..Default::default()
-//         }
-//     }
-// }
-//
-// impl Default for ColorScheme {
-//     fn default() -> Self {
-//         ColorScheme {
-//             normal: Color::White,
-//             player: Color::White,
-//             goal: Color::White,
-//             text: Color::White,
-//             highlight: Color::White,
-//         }
-//     }
-// }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum MazeGenAlgo {
@@ -187,10 +84,6 @@ pub enum UpdateCheckInterval {
 #[derivative(Default)]
 #[serde(rename = "Settings")]
 pub struct SettingsInner {
-    // general
-    // #[serde(default)]
-    // pub color_scheme: Option<ColorScheme>,
-
     // viewport
     #[serde(default)]
     pub slow: Option<bool>,
@@ -285,15 +178,6 @@ impl Settings {
 }
 
 impl Settings {
-    // pub fn get_color_scheme(&self) -> ColorScheme {
-    //     self.read().color_scheme.clone().unwrap_or_default()
-    // }
-    //
-    // pub fn set_color_scheme(&mut self, value: ColorScheme) -> &mut Self {
-    //     self.write().color_scheme = Some(value);
-    //     self
-    // }
-
     pub fn get_slow(&self) -> bool {
         self.read().slow.unwrap_or_default()
     }

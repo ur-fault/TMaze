@@ -168,7 +168,6 @@ impl Drawable for AppLogger {
 
             let indicator_style = Style::fg(Color::Named(color));
 
-            // let source_style = style_with_attribute(style, Attribute::Dim);
             let source_style = style; // TODO: attributes in styles
 
             let y = pos.1 + i as i32;

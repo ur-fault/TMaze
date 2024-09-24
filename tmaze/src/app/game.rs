@@ -203,7 +203,6 @@ pub struct MazeSizeMenu {
 
 impl MazeSizeMenu {
     pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
-        // let color_scheme = settings.get_color_scheme();
         let mut menu_config = MenuConfig::new_from_strings(
             "Maze size".to_string(),
             settings
@@ -212,8 +211,6 @@ impl MazeSizeMenu {
                 .map(|maze| maze.title.clone())
                 .collect::<Vec<_>>(),
         );
-        // .box_style(color_scheme.normals())
-        // .text_style(color_scheme.texts());
 
         let default = app_state_data
             .last_selected_preset
@@ -734,7 +731,6 @@ impl GameActivity {
         let swap_up_down = data.settings.get_dpad_swap_up_down();
 
         let touch_controls = DPad::new(None, swap_up_down, dpad_type);
-        // touch_controls.styles_from_settings(&data.settings);
         self.touch_controls = Some(Box::new(touch_controls));
     }
 
@@ -1033,7 +1029,6 @@ impl MazeBoard {
     }
 
     fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, theme: &Theme) {
-        // let (normal, goal) = (scheme.normals(), scheme.goals());
         let [normal, goal] = theme.extract(["game_stairs", "game_goals"]);
 
         for (y, row) in floors.iter().enumerate() {
