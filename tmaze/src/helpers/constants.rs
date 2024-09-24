@@ -21,3 +21,29 @@ pub mod colors {
         }
     }
 }
+
+pub mod paths {
+    use std::path::PathBuf;
+
+    use dirs::preference_dir;
+
+    pub fn base_path() -> PathBuf {
+        preference_dir().unwrap().join("tmaze")
+    }
+
+    pub fn theme_path() -> PathBuf {
+        base_path().join("themes/")
+    }
+
+    pub fn theme_file_path(theme: &str) -> PathBuf {
+        theme_path().join(theme)
+    }
+
+    pub fn settings_path() -> PathBuf {
+        base_path().join("settings.ron")
+    }
+
+    pub fn save_data_path() -> PathBuf {
+        base_path().join("data.ron")
+    }
+}
