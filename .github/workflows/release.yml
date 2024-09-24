@@ -302,11 +302,19 @@ jobs:
 
         - run: sudo apt update && sudo apt install libasound2-dev
 
-        - name: publish cmaze
-          if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
-          run: cargo publish -p cmaze --token ${{ secrets.CRATES_IO }}
 
-        - name: publish tmaze
-          if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
-          run: cargo publish -p tmaze --token ${{ secrets.CRATES_IO }}
+      - name: publish cmaze
+          if: ${{ fromJSON(needs.create-release.outputs.do_smt) == true }}
+          uses: katyo/publish-crates@v2
+          with:
+              path: ./cmaze
+              registry-token: ${{ secrets.CRATES_IO }}
+              ignore-unpublished-changes: true
 
+      - name: publish tmaze
+          if: ${{ fromJSON(needs.create-release.outputs.do_smt) == true }}
+          uses: katyo/publish-crates@v2
+          with:
+              path: ./tmaze
+              registry-token: ${{ secrets.CRATES_IO }}
+              ignore-unpublished-changes: true
