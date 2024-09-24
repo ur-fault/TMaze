@@ -1,3 +1,5 @@
+pub mod theme;
+
 use cmaze::{
     dims::{Dims, Offset},
     game::GeneratorFn,
@@ -15,8 +17,7 @@ use std::{
 
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
-    constants::base_path,
-    helpers::constants::colors,
+    helpers::constants::{colors, paths::{self, settings_path}},
     menu_actions,
     renderer::MouseGuard,
     ui::{
@@ -243,7 +244,7 @@ pub struct SettingsInner {
 
     // other
     #[serde(skip)]
-    #[derivative(Default(value = "Settings::default_path()"))]
+    #[derivative(Default(value = "paths::settings_path()"))]
     pub path: PathBuf,
     // TODO: it's not possible in RON to have a HashMap with flattened keys,
     // so we will support it in different way formats
@@ -264,10 +265,6 @@ impl Default for Settings {
 
 #[allow(dead_code)]
 impl Settings {
-    pub fn default_path() -> PathBuf {
-        base_path().join("settings.ron")
-    }
-
     pub fn new() -> Self {
         Self::default()
     }
@@ -514,7 +511,7 @@ impl Settings {
         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
         *self.write() = options.from_str(default_settings_string).unwrap();
 
-        let path = Settings::default_path();
+        let path = settings_path();
         fs::write(&path, default_settings_string).unwrap();
 
         self.write().path = path;

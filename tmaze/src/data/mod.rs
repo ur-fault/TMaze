@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    constants::base_path,
+    helpers::constants::paths::save_data_path,
     settings::{Settings, UpdateCheckInterval},
 };
 
@@ -36,17 +36,13 @@ pub struct SaveData {
 }
 
 impl SaveData {
-    pub fn default_path() -> PathBuf {
-        base_path().join("data.ron")
-    }
-
     pub fn load() -> Result<Self, ron::Error> {
-        match Self::load_from(&Self::default_path()) {
+        match Self::load_from(&save_data_path()) {
             Ok(data) => Ok(data),
             Err(ron::Error::Io(_)) => Ok(SaveData {
                 last_update_check: None,
                 best_results: HashMap::new(),
-                path: Self::default_path(),
+                path: save_data_path(),
             }),
             Err(err) => Err(err),
         }
@@ -56,7 +52,7 @@ impl SaveData {
         Self::load().unwrap_or_else(|_| Self {
             last_update_check: None,
             best_results: HashMap::new(),
-            path: Self::default_path(),
+            path: save_data_path(),
         })
     }
 

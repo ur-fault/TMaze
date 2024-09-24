@@ -1,5 +1,6 @@
 use tmaze::{
     app::{game::MainMenu, Activity, App, GameError},
+    helpers::constants::paths::{save_data_path, settings_path},
     settings::Settings,
 };
 
@@ -25,12 +26,12 @@ fn main() -> Result<(), GameError> {
     let _args = Args::parse();
 
     if _args.reset_config {
-        Settings::reset_config(Settings::default_path());
+        Settings::reset_config(settings_path());
         return Ok(());
     }
 
     if _args.show_config_path {
-        let settings_path = Settings::default_path();
+        let settings_path = settings_path();
         if let Some(s) = settings_path.to_str() {
             println!("{}", s);
         } else {
@@ -40,12 +41,12 @@ fn main() -> Result<(), GameError> {
     }
 
     if _args.debug_config {
-        println!("{:#?}", Settings::load(Settings::default_path()));
+        println!("{:#?}", Settings::load(settings_path()));
         return Ok(());
     }
 
     if _args.delete_data {
-        let _ = std::fs::remove_file(tmaze::data::SaveData::default_path());
+        let _ = std::fs::remove_file(save_data_path());
         return Ok(());
     }
 

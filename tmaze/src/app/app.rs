@@ -6,7 +6,7 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
     data::SaveData,
-    helpers::on_off,
+    helpers::{constants::paths::settings_path, on_off},
     logging::{self, get_logger},
     renderer::{drawable::Drawable, Renderer},
     settings::Settings,
@@ -86,7 +86,7 @@ impl App {
         let renderer = Renderer::new().expect("Failed to create renderer");
         let activities = Activities::empty();
 
-        let settings = Settings::load(Settings::default_path()).expect("Failed to load settings");
+        let settings = Settings::load(settings_path()).expect("Failed to load settings");
         let save = SaveData::load().expect("Failed to load save data");
         let use_data = AppStateData::default();
         let jobs = Jobs::new();

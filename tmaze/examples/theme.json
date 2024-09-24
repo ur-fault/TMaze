@@ -1,0 +1,23 @@
+{
+    "meta": {
+        "name": "My Theme",
+        "description": "My Theme Description"
+    },
+    "styles": {
+        "default": {
+            "fg": "white",
+            "bg": "black"
+        },
+        "popup_text": {
+            "fg": "dark_red"
+        },
+        "custom": {
+            "fg": "yellow"
+        },
+        "button_ui": "custom",
+        "button_text": "unknown",
+        "button_hover_ui": {
+            "fg": [0, 255, 128]
+        },
+    }
+}
