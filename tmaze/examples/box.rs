@@ -2,11 +2,7 @@ use std::io;
 
 use cmaze::dims::Dims;
 use tmaze::{
-    app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
-    helpers::is_release,
-    renderer::{Cell, Frame},
-    settings::ColorScheme,
-    ui::Screen,
+    app::{app::AppData, Activity, ActivityHandler, App, Change, Event}, helpers::is_release, renderer::{Cell, Frame}, settings::theme::Theme, ui::Screen
 };
 
 use crossterm::event::{Event as TermEvent, KeyEvent};
@@ -41,7 +37,7 @@ impl ActivityHandler for MyActivity {
 }
 
 impl Screen for MyActivity {
-    fn draw(&self, frame: &mut Frame, _: &ColorScheme) -> io::Result<()> {
+    fn draw(&self, frame: &mut Frame, _: &Theme) -> io::Result<()> {
         for y in 0..5 {
             for x in 0..5 {
                 frame.set(Dims(x, y), Cell::new('█'));

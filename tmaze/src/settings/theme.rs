@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, ops, path::PathBuf};
 
 use crossterm::style::ContentStyle;
 use hashbrown::HashMap;
@@ -14,7 +14,15 @@ pub struct Theme {
 
 impl Theme {
     pub fn get(&self, key: &str) -> Style {
-        self.styles.get(key).unwrap().clone()
+        let Some(style) = self.styles.get(key) else {
+            panic!("style not found: {}", key);
+        };
+
+        *style
+    }
+
+    pub fn extract<const N: usize>(&self, keys: [&str; N]) -> [Style; N] {
+        keys.map(|key| self.get(key))
     }
 }
 
@@ -30,6 +38,8 @@ impl ThemeDefinition {
     }
 
     pub fn load_by_path(path: PathBuf) -> Result<Self, LoadError> {
+        log::debug!("Loading theme from {:?}", path);
+
         let ext = path
             .extension()
             .and_then(|s| s.to_str())
@@ -75,10 +85,45 @@ pub enum StyleIdent {
     Ref(String),
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Style {
     pub bg: Option<Color>,
     pub fg: Option<Color>,
+    // TODO: attributes
+}
+
+impl Style {
+    pub fn fg(color: Color) -> Self {
+        Self {
+            fg: Some(color),
+            ..Self::default()
+        }
+    }
+
+    pub fn bg(color: Color) -> Self {
+        Self {
+            bg: Some(color),
+            ..Self::default()
+        }
+    }
+
+    pub fn swap(self) -> Self {
+        Style {
+            bg: self.fg,
+            fg: self.bg,
+        }
+    }
+
+    pub fn invert(self) -> Self {
+        Style {
+            fg: Some(self.bg.unwrap_or(Color::Named(NamedColor::Black))),
+            bg: Some(self.fg.unwrap_or(Color::Named(NamedColor::White))),
+        }
+    }
+
+    pub fn to_cross(self) -> ContentStyle {
+        self.into()
+    }
 }
 
 impl From<Style> for ContentStyle {
@@ -91,7 +136,18 @@ impl From<Style> for ContentStyle {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+impl ops::BitOr for Style {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self {
+        Self {
+            bg: self.bg.or(rhs.bg),
+            fg: self.fg.or(rhs.fg),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Color {
     Named(NamedColor),
@@ -127,7 +183,7 @@ impl From<Color> for crossterm::style::Color {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NamedColor {
     Black,
@@ -181,7 +237,7 @@ impl ThemeResolver {
         loop {
             let style = definition.get(&key);
             match style {
-                Some(StyleIdent::Style(style)) => return style.clone(),
+                Some(StyleIdent::Style(style)) => return style,
                 Some(StyleIdent::Ref(new_key)) => key = new_key,
                 None => key = self.get(&key).to_string(),
             }
@@ -233,7 +289,7 @@ mod tests {
     #[test]
     fn resolver() {
         let mut resolver = ThemeResolver::new();
-        resolver.link("text", "default");
+        resolver.link("text", "");
         resolver.link("border", "text");
         resolver.link("item", "unknown");
 
@@ -247,7 +303,7 @@ mod tests {
         };
 
         let definition = ThemeDefinition {
-            styles: [("text".into(), StyleIdent::Style(text_style.clone()))]
+            styles: [("text".into(), StyleIdent::Style(text_style))]
                 .iter()
                 .cloned()
                 .collect(),

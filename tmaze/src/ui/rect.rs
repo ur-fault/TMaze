@@ -1,11 +1,11 @@
 use cmaze::dims::*;
 
-use crossterm::style::ContentStyle;
 use substring::Substring as _;
 
 use crate::{
     helpers::box_center,
     renderer::{drawable::Drawable, Frame},
+    settings::theme::{Style, ThemeResolver},
 };
 
 use super::draw_box;
@@ -143,19 +143,23 @@ impl Rect {
 }
 
 impl Rect {
-    pub fn render(&self, frame: &mut Frame, style: ContentStyle) {
+    pub fn render(&self, frame: &mut Frame, style: Style) {
         draw_box(frame, self.start, self.size(), style);
     }
 }
 
 impl Drawable for Rect {
     fn draw(&self, pos: Dims, frame: &mut Frame) {
-        self.draw_with_style(pos, frame, ContentStyle::default());
+        self.draw_with_style(pos, frame, Style::default());
     }
 
-    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, style: ContentStyle) {
+    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, style: Style) {
         draw_box(frame, pos + self.start, self.size(), style);
     }
+}
+
+pub fn rect_theme_resolver() -> ThemeResolver {
+    ThemeResolver::new()
 }
 
 #[cfg(test)]

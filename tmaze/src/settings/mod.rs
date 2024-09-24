@@ -5,7 +5,6 @@ use cmaze::{
     game::GeneratorFn,
     gameboard::algorithms::MazeAlgorithm,
 };
-use crossterm::style::{Color, ContentStyle};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
@@ -17,11 +16,13 @@ use std::{
 
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
-    helpers::constants::{colors, paths::{self, settings_path}},
+    helpers::constants::
+        paths::{self, settings_path}
+    ,
     menu_actions,
     renderer::MouseGuard,
     ui::{
-        split_menu_actions, style_with_attribute, Menu, MenuAction, MenuConfig, MenuItem,
+        split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem,
         OptionDef, Popup, Screen,
     },
 };
@@ -55,103 +56,103 @@ fn default_depth() -> u16 {
     1
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColorScheme {
-    #[serde(default = "colors::fun::white")]
-    pub normal: Color,
-    #[serde(default = "colors::fun::white")]
-    pub player: Color,
-    #[serde(default = "colors::fun::white")]
-    pub goal: Color,
-    #[serde(default = "colors::fun::white")]
-    pub text: Color,
-    #[serde(default = "colors::fun::red")]
-    pub highlight: Color,
-}
-
-#[allow(dead_code)]
-impl ColorScheme {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn normal(mut self, value: Color) -> Self {
-        self.normal = value;
-        self
-    }
-
-    pub fn player(mut self, value: Color) -> Self {
-        self.player = value;
-        self
-    }
-
-    pub fn goal(mut self, value: Color) -> Self {
-        self.goal = value;
-        self
-    }
-
-    pub fn text(mut self, value: Color) -> Self {
-        self.text = value;
-        self
-    }
-
-    pub fn highlight(mut self, value: Color) -> Self {
-        self.highlight = value;
-        self
-    }
-
-    pub fn normals(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.normal),
-            background_color: None,
-            ..Default::default()
-        }
-    }
-
-    pub fn players(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.player),
-            background_color: None,
-            ..Default::default()
-        }
-    }
-
-    pub fn goals(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.goal),
-            background_color: None,
-            ..Default::default()
-        }
-    }
-
-    pub fn texts(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.text),
-            background_color: None,
-            ..Default::default()
-        }
-    }
-
-    pub fn highlights(&self) -> ContentStyle {
-        ContentStyle {
-            foreground_color: Some(self.highlight),
-            background_color: None,
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for ColorScheme {
-    fn default() -> Self {
-        ColorScheme {
-            normal: Color::White,
-            player: Color::White,
-            goal: Color::White,
-            text: Color::White,
-            highlight: Color::White,
-        }
-    }
-}
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct ColorScheme {
+//     #[serde(default = "colors::fun::white")]
+//     pub normal: Color,
+//     #[serde(default = "colors::fun::white")]
+//     pub player: Color,
+//     #[serde(default = "colors::fun::white")]
+//     pub goal: Color,
+//     #[serde(default = "colors::fun::white")]
+//     pub text: Color,
+//     #[serde(default = "colors::fun::red")]
+//     pub highlight: Color,
+// }
+//
+// #[allow(dead_code)]
+// impl ColorScheme {
+//     pub fn new() -> Self {
+//         Self::default()
+//     }
+//
+//     pub fn normal(mut self, value: Color) -> Self {
+//         self.normal = value;
+//         self
+//     }
+//
+//     pub fn player(mut self, value: Color) -> Self {
+//         self.player = value;
+//         self
+//     }
+//
+//     pub fn goal(mut self, value: Color) -> Self {
+//         self.goal = value;
+//         self
+//     }
+//
+//     pub fn text(mut self, value: Color) -> Self {
+//         self.text = value;
+//         self
+//     }
+//
+//     pub fn highlight(mut self, value: Color) -> Self {
+//         self.highlight = value;
+//         self
+//     }
+//
+//     pub fn normals(&self) -> ContentStyle {
+//         ContentStyle {
+//             foreground_color: Some(self.normal),
+//             background_color: None,
+//             ..Default::default()
+//         }
+//     }
+//
+//     pub fn players(&self) -> ContentStyle {
+//         ContentStyle {
+//             foreground_color: Some(self.player),
+//             background_color: None,
+//             ..Default::default()
+//         }
+//     }
+//
+//     pub fn goals(&self) -> ContentStyle {
+//         ContentStyle {
+//             foreground_color: Some(self.goal),
+//             background_color: None,
+//             ..Default::default()
+//         }
+//     }
+//
+//     pub fn texts(&self) -> ContentStyle {
+//         ContentStyle {
+//             foreground_color: Some(self.text),
+//             background_color: None,
+//             ..Default::default()
+//         }
+//     }
+//
+//     pub fn highlights(&self) -> ContentStyle {
+//         ContentStyle {
+//             foreground_color: Some(self.highlight),
+//             background_color: None,
+//             ..Default::default()
+//         }
+//     }
+// }
+//
+// impl Default for ColorScheme {
+//     fn default() -> Self {
+//         ColorScheme {
+//             normal: Color::White,
+//             player: Color::White,
+//             goal: Color::White,
+//             text: Color::White,
+//             highlight: Color::White,
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum MazeGenAlgo {
@@ -187,10 +188,11 @@ pub enum UpdateCheckInterval {
 #[serde(rename = "Settings")]
 pub struct SettingsInner {
     // general
-    #[serde(default)]
-    pub color_scheme: Option<ColorScheme>,
-    #[serde(default)]
+    // #[serde(default)]
+    // pub color_scheme: Option<ColorScheme>,
+
     // viewport
+    #[serde(default)]
     pub slow: Option<bool>,
     #[serde(default)]
     pub disable_tower_auto_up: Option<bool>,
@@ -283,14 +285,14 @@ impl Settings {
 }
 
 impl Settings {
-    pub fn get_color_scheme(&self) -> ColorScheme {
-        self.read().color_scheme.clone().unwrap_or_default()
-    }
-
-    pub fn set_color_scheme(&mut self, value: ColorScheme) -> &mut Self {
-        self.write().color_scheme = Some(value);
-        self
-    }
+    // pub fn get_color_scheme(&self) -> ColorScheme {
+    //     self.read().color_scheme.clone().unwrap_or_default()
+    // }
+    //
+    // pub fn set_color_scheme(&mut self, value: ColorScheme) -> &mut Self {
+    //     self.write().color_scheme = Some(value);
+    //     self
+    // }
 
     pub fn get_slow(&self) -> bool {
         self.read().slow.unwrap_or_default()
@@ -536,8 +538,7 @@ impl OtherSettingsPopup {
                 "Other settings are not implemented in UI yet.".to_string(),
                 "Please edit the settings file directly.".to_string(),
             ],
-        )
-        .styles_from_settings(settings);
+        );
 
         Self(popup, MouseGuard::new().unwrap())
     }
@@ -564,8 +565,9 @@ impl SettingsActivity {
     }
 }
 
+#[allow(clippy::new_without_default)]
 impl SettingsActivity {
-    pub fn new(settings: &Settings) -> Self {
+    pub fn new() -> Self {
         let options = menu_actions!(
             "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
             "Controls" -> data => Change::push(create_controls_settings(data)),
@@ -575,13 +577,7 @@ impl SettingsActivity {
 
         let (options, actions) = split_menu_actions(options);
 
-        let menu_config = MenuConfig::new("Settings", options)
-            .styles_from_settings(settings)
-            .subtitle("Changes are not saved")
-            .subtitle_style(style_with_attribute(
-                settings.get_color_scheme().texts(),
-                crossterm::style::Attribute::Dim,
-            ));
+        let menu_config = MenuConfig::new("Settings", options).subtitle("Changes are not saved");
 
         Self {
             actions,
@@ -589,8 +585,8 @@ impl SettingsActivity {
         }
     }
 
-    pub fn new_activity(settings: &Settings) -> Activity {
-        Activity::new_base_boxed("settings".to_string(), Self::new(settings))
+    pub fn new_activity() -> Activity {
+        Activity::new_base_boxed("settings".to_string(), Self::new())
     }
 }
 
