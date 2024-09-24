@@ -158,10 +158,6 @@ impl fmt::Debug for MenuItem {
 }
 
 pub struct MenuConfig {
-    // pub box_style: Option<ContentStyle>,
-    // pub text_style: Option<ContentStyle>,
-    // pub title_style: Option<ContentStyle>,
-    // pub subtitle_style: Option<ContentStyle>,
     pub title: String,
     pub subtitles: Vec<String>,
     pub options: Vec<MenuItem>,
@@ -182,10 +178,6 @@ impl MenuConfig {
 
     pub fn new(title: impl Into<String>, options: impl Into<Vec<MenuItem>>) -> Self {
         Self {
-            // box_style: None,
-            // text_style: None,
-            // title_style: None,
-            // subtitle_style: None,
             title: title.into(),
             subtitles: vec![],
             options: options.into(),
@@ -194,13 +186,6 @@ impl MenuConfig {
             q_to_quit: true,
         }
     }
-
-    // pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
-    //     let colorscheme = settings.get_color_scheme();
-    //     self.box_style = Some(colorscheme.normals());
-    //     self.text_style = Some(colorscheme.texts());
-    //     self
-    // }
 
     pub fn counted(mut self) -> Self {
         self.counted = true;
@@ -216,26 +201,6 @@ impl MenuConfig {
         self.default = default;
         self
     }
-
-    // pub fn box_style(mut self, style: ContentStyle) -> Self {
-    //     self.box_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn text_style(mut self, style: ContentStyle) -> Self {
-    //     self.text_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn title_style(mut self, style: ContentStyle) -> Self {
-    //     self.title_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn subtitle_style(mut self, style: ContentStyle) -> Self {
-    //     self.subtitle_style = Some(style);
-    //     self
-    // }
 
     pub fn no_q(mut self) -> Self {
         self.q_to_quit = false;
@@ -478,10 +443,6 @@ impl ActivityHandler for Menu {
 impl Screen for Menu {
     fn draw(&self, frame: &mut Frame, theme: &Theme) -> Result<(), io::Error> {
         let MenuConfig {
-            // box_style,
-            // text_style,
-            // title_style,
-            // subtitle_style,
             title,
             counted,
             ..
@@ -570,7 +531,6 @@ struct MenuDimenstions {
     items_pos: Dims,
     items_size: Dims,
     subtitles_pos: Dims,
-    // subtitles_size: Dims,
 }
 
 impl MenuDimenstions {
@@ -611,7 +571,6 @@ impl MenuDimenstions {
             items_pos,
             items_size: Dims(menu_size.0 - 2, config.options.len() as i32),
             subtitles_pos: pos + Dims(2, 2),
-            // subtitles_size: Dims(menu_size.0 - 2, config.subtitles.len() as i32),
         }
     }
 }

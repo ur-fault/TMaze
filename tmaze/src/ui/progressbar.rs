@@ -7,8 +7,6 @@ use super::{draw_fn::*, *};
 pub struct ProgressBar {
     title: String,
     progress: f64,
-    // box_style: Option<ContentStyle>,
-    // text_style: Option<ContentStyle>,
 }
 
 impl ProgressBar {
@@ -16,20 +14,8 @@ impl ProgressBar {
         Self {
             title,
             progress: 0.,
-            // box_style: None,
-            // text_style: None,
         }
     }
-
-    // pub fn box_style(mut self, style: ContentStyle) -> Self {
-    //     self.box_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn text_style(mut self, style: ContentStyle) -> Self {
-    //     self.text_style = Some(style);
-    //     self
-    // }
 
     pub fn update_progress(&mut self, progress: f64) {
         self.progress = progress;
@@ -38,13 +24,6 @@ impl ProgressBar {
     pub fn update_title(&mut self, title: String) {
         self.title = title;
     }
-
-    // pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
-    //     let colorscheme = settings.get_color_scheme();
-    //     self.box_style = Some(colorscheme.normals());
-    //     self.text_style = Some(colorscheme.texts());
-    //     self
-    // }
 }
 
 impl Screen for ProgressBar {

@@ -12,9 +12,6 @@ use crate::{
 pub struct Popup {
     title: String,
     texts: Vec<String>,
-    // box_style: Option<ContentStyle>,
-    // text_style: Option<ContentStyle>,
-    // title_style: Option<ContentStyle>,
 }
 
 impl Popup {
@@ -22,33 +19,8 @@ impl Popup {
         Self {
             title,
             texts: texts.into(),
-            // box_style: None,
-            // text_style: None,
-            // title_style: None,
         }
     }
-
-    // pub fn box_style(mut self, style: ContentStyle) -> Self {
-    //     self.box_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn text_style(mut self, style: ContentStyle) -> Self {
-    //     self.text_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn title_style(mut self, style: ContentStyle) -> Self {
-    //     self.title_style = Some(style);
-    //     self
-    // }
-    //
-    // pub fn styles_from_settings(mut self, settings: &Settings) -> Self {
-    //     let colorscheme = settings.get_color_scheme();
-    //     self.box_style = Some(colorscheme.normals());
-    //     self.text_style = Some(colorscheme.texts());
-    //     self
-    // }
 }
 
 impl ActivityHandler for Popup {
