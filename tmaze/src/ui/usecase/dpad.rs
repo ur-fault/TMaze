@@ -9,8 +9,8 @@ use crate::{
     helpers::line_center,
     make_even, make_odd,
     renderer::Frame,
-    settings::theme::Theme,
-    ui::{Button, Rect},
+    settings::theme::{Theme, ThemeResolver},
+    ui::{Button, ButtonStyles, Rect},
 };
 
 pub enum DPadType {
@@ -72,7 +72,15 @@ impl DPad {
                     Down => "Down",
                 };
 
-                Button::new(chr.to_string(), pos, size)
+                let styles = ButtonStyles {
+                    border: "ui_dpad_border",
+                    highlight: "ui_dpad_highlight",
+                    text: "ui_dpad_text",
+                    disabled_border: "ui_dpad_disabled_border",
+                    disabled_text: "ui_dpad_disabled_text",
+                };
+
+                Button::new(chr.to_string(), pos, size).with_styles(styles)
             })
             .collect();
 
@@ -224,4 +232,16 @@ impl DPad {
             f(button);
         }
     }
+}
+
+pub fn dpad_theme_resolver() -> ThemeResolver {
+    let mut resolver = ThemeResolver::new();
+    resolver
+        .link("ui_dpad_border", "ui_button_border")
+        .link("ui_dpad_highlight", "ui_button_highlight")
+        .link("ui_dpad_text", "ui_button_text")
+        .link("ui_dpad_disabled_border", "ui_button_disabled_border")
+        .link("ui_dpad_disabled_text", "ui_button_disabled_text");
+
+    resolver
 }

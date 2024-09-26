@@ -42,7 +42,8 @@ pub fn theme_resolver() -> ThemeResolver {
         .extend(menu::menu_theme_resolver())
         .extend(popup::popup_theme_resolver())
         .extend(progressbar::progressbar_theme_resolver())
-        .extend(rect::rect_theme_resolver());
+        .extend(rect::rect_theme_resolver())
+        .extend(usecase::usedcase_ui_theme_resolver());
 
     resolver
 }

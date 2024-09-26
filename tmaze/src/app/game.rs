@@ -933,8 +933,7 @@ impl Screen for GameActivity {
 
 #[inline]
 fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut Frame, vp: Rect, theme: &Theme) {
-    let goals = theme.get("game_goals");
-    let players = theme.get("game_player");
+    let [s_start, s_end] = theme.extract(["debug_rulers_start", "debug_rulers_end"]);
 
     let vps = vp.size();
 
@@ -949,8 +948,8 @@ fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut Frame, vp: Re
 
     let mut draw = |pos, dir, end| {
         let style = match end {
-            false => goals,
-            true => players,
+            false => s_start,
+            true => s_end,
         };
         frame.draw(frame_pos + pos, dir, style)
     };
@@ -1030,19 +1029,22 @@ impl MazeBoard {
     }
 
     fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, theme: &Theme) {
-        let [normal, goal] = theme.extract(["game_stairs", "game_goals"]);
+        let s_stairs_up = theme.get("game_stairs_up");
+        let s_stairs_down = theme.get("game_stairs_down");
+        let s_stairs_both = theme.get("game_stairs_both");
+        let s_stairs_up_tower = theme.get("game_stairs_up_tower");
 
         for (y, row) in floors.iter().enumerate() {
             for (x, cell) in row.iter().enumerate() {
                 let (up, down) = (!cell.get_wall(CellWall::Up), !cell.get_wall(CellWall::Down));
-                let ch = match (up, down) {
-                    (true, true) => '⥮',
-                    (true, false) => '↑',
-                    (false, true) => '↓',
+                let (ch, st) = match (up, down) {
+                    (true, true) => ('⥮', s_stairs_both),
+                    (true, false) => ('↑', s_stairs_up),
+                    (false, true) => ('↓', s_stairs_down),
                     _ => continue,
                 };
 
-                let style = if tower && up { goal } else { normal };
+                let style = if tower && up { s_stairs_up_tower } else { st };
                 let pos = maze2screen(Dims(x as i32, y as i32));
                 frame.draw(pos, ch, style);
             }
@@ -1050,7 +1052,7 @@ impl MazeBoard {
     }
 
     fn render_special(frames: &mut [Frame], game: &RunningGame, theme: &Theme) {
-        let goal_style = theme.get("game_goals");
+        let goal_style = theme.get("game_goal");
         let goal_pos = game.get_goal_pos();
 
         frames[goal_pos.2 as usize].draw(maze2screen(goal_pos), '$', goal_style);
@@ -1062,11 +1064,23 @@ pub fn game_theme_resolver() -> ThemeResolver {
 
     resolver
         .link("game_walls", "border")
+        // stairs
         .link("game_stairs", "game_walls")
-        .link("game_goals", "")
+        .link("game_stairs_up", "game_stairs")
+        .link("game_stairs_down", "game_stairs")
+        .link("game_stairs_both", "game_stairs")
+        .link("game_stairs_up_tower", "game_goal")
+        // game
+        .link("game_goal", "")
         .link("game_player", "highlight")
+        .link("game_player_on_stairs", "game_stairs")
+        .link("game_visited", "dim")
+        // special
         .link("game_viewport_border", "border")
-        .link("game_visited", "dim");
+        .link("debug_border", "border")
+        .link("debug_rulers", "debug_border")
+        .link("debug_rulers_start", "debug_rulers")
+        .link("debug_rulers_end", "debug_rulers");
 
     resolver
 }

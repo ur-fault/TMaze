@@ -86,6 +86,7 @@ pub enum StyleIdent {
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
 pub struct Style {
     pub bg: Option<Color>,
     pub fg: Option<Color>,
