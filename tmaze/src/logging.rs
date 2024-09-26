@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     renderer::{self, drawable::Drawable},
-    settings::theme::{Color, NamedColor, Style},
+    settings::theme::{Color, NamedColor, Style, Theme},
 };
 
 static LOGGER: OnceLock<AppLogger> = OnceLock::new();
@@ -151,12 +151,11 @@ impl Log for AppLogger {
     }
 }
 
-impl Drawable for AppLogger {
-    fn draw(&self, pos: Dims, frame: &mut renderer::Frame) {
-        self.draw_with_style(pos, frame, Style::default());
-    }
+impl Drawable<&Theme> for AppLogger {
+    fn draw(&self, pos: Dims, frame: &mut renderer::Frame, theme: &Theme) {
+        let [msg_style, source_style, extra] =
+            theme.extract(["log_message", "log_source", "log_extra"]);
 
-    fn draw_with_style(&self, pos: Dims, frame: &mut renderer::Frame, style: Style) {
         for (i, log) in self.get_logs().take(self.max_visible).enumerate() {
             let color = match log.level {
                 log::Level::Error => NamedColor::Red,
@@ -167,8 +166,6 @@ impl Drawable for AppLogger {
             };
 
             let indicator_style = Style::fg(Color::Named(color));
-
-            let source_style = style; // TODO: attributes in styles
 
             let y = pos.1 + i as i32;
             let len = log.source.width() + 4 + log.message.width();
@@ -184,10 +181,21 @@ impl Drawable for AppLogger {
             // const INDICATOR_CHAR: char = '█';
             // const INDICATOR_CHAR: char = '•';
 
-            log.source.draw_with_style(src_pos, frame, source_style);
-            "->".draw_with_style(Dims(msg_x - 3, y), frame, style);
-            log.message.draw_with_style(msg_pos, frame, style);
-            INDICATOR_CHAR.draw_with_style(Dims(frame.size.0 - 1, y), frame, indicator_style);
+            log.source.draw(src_pos, frame, source_style);
+            "->".draw(Dims(msg_x - 3, y), frame, extra);
+            log.message.draw(msg_pos, frame, msg_style);
+            INDICATOR_CHAR.draw(Dims(frame.size.0 - 1, y), frame, indicator_style);
         }
     }
+}
+
+pub fn logging_theme_resolver() -> crate::settings::theme::ThemeResolver {
+    let mut resolver = crate::settings::theme::ThemeResolver::new();
+
+    resolver
+        .link("log_message", "text")
+        .link("log_source", "text")
+        .link("log_extra", "border");
+
+    resolver
 }

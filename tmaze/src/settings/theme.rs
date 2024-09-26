@@ -243,6 +243,7 @@ impl ThemeResolver {
             }
 
             if used.contains(&key) {
+                // FIXME: we should panic here
                 return Style::default();
             }
 

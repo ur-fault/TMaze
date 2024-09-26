@@ -67,7 +67,7 @@ impl Button {
         let inverted_bg = Style::invert(if set { highlight } else { normal });
 
         // Box
-        frame.draw_styled(
+        frame.draw(
             self.pos,
             Rect::sized(self.size),
             if set { highlight } else { normal },
@@ -86,7 +86,7 @@ impl Button {
         let text = strings::trim_center(self.text.as_str(), text_rect.size().0 as usize);
         let style = if set { highlight.invert() } else { content };
 
-        frame.draw_styled(text_rect.start, text, style);
+        frame.draw(text_rect.start, text, style);
     }
 
     pub fn detect_over(&self, pos: Dims) -> bool {

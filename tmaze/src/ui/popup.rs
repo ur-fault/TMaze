@@ -65,17 +65,17 @@ impl Screen for Popup {
         let title_style = theme.get("ui_popup_title");
 
         draw_box(frame, pos, box_size, box_style);
-        frame.draw_styled(Dims(title_pos, pos.1 + 1), self.title.as_str(), title_style);
+        frame.draw(Dims(title_pos, pos.1 + 1), self.title.as_str(), title_style);
 
         if !self.texts.is_empty() {
-            frame.draw_styled(
+            frame.draw(
                 pos + Dims(1, 2),
                 "─".repeat(box_size.0 as usize - 2),
                 box_style,
             );
 
             for (i, text) in self.texts.iter().enumerate() {
-                frame.draw_styled(pos + Dims(2, i as i32 + 3), text.as_str(), text_style);
+                frame.draw(pos + Dims(2, i as i32 + 3), text.as_str(), text_style);
             }
         }
 
