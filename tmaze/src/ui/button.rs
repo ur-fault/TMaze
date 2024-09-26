@@ -10,6 +10,41 @@ use crate::{
 use super::Rect;
 
 #[derive(Debug)]
+pub struct ButtonStyles {
+    pub border: &'static str,
+    pub highlight: &'static str,
+    pub text: &'static str,
+
+    pub disabled_border: &'static str,
+    pub disabled_text: &'static str,
+}
+
+impl ButtonStyles {
+    pub fn extract(&self, theme: &Theme) -> [Style; 5] {
+        [
+            theme.get(self.border),
+            theme.get(self.highlight),
+            theme.get(self.text),
+            theme.get(self.disabled_border),
+            theme.get(self.disabled_text),
+        ]
+    }
+}
+
+impl Default for ButtonStyles {
+    fn default() -> Self {
+        Self {
+            border: "ui_button_border",
+            highlight: "ui_button_highlight",
+            text: "ui_button_text",
+
+            disabled_border: "ui_button_disabled_border",
+            disabled_text: "ui_button_disabled_text",
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Button {
     pub text: String,
     pub pos: Dims,
@@ -17,6 +52,7 @@ pub struct Button {
     pub disable_highlight: bool,
     pub set: bool,
     pub disabled: bool,
+    pub styles: ButtonStyles,
 }
 
 impl Button {
@@ -33,11 +69,17 @@ impl Button {
             disable_highlight: false,
             set: false,
             disabled: false,
+            styles: ButtonStyles::default(),
         }
     }
 
     pub fn disable_highlight(mut self, disable_highlight: bool) -> Self {
         self.disable_highlight = disable_highlight;
+        self
+    }
+
+    pub fn with_styles(mut self, styles: ButtonStyles) -> Self {
+        self.styles = styles;
         self
     }
 
@@ -50,41 +92,54 @@ impl Button {
         self.disabled = disabled;
         self
     }
-}
 
-impl Button {
-    pub fn draw_colored(&self, frame: &mut Frame, theme: &Theme) {
-        let set = self.set && !self.disabled && !self.disable_highlight;
+    fn apply_styles(&self, theme: &Theme) -> AppliedStyles {
+        let disabled = self.disabled;
+        let set = self.set && !disabled && !self.disable_highlight;
 
-        let normal = theme.get("ui_button_border");
-        let highlight = theme.get("ui_button_highlight");
-        let content = if !self.disabled {
-            theme.get("ui_button_text")
+        let [normal, highlight, content, disabled_border, disabled_text] =
+            self.styles.extract(theme);
+
+        let normal = if disabled {
+            disabled_border
+        } else if set {
+            highlight
         } else {
             normal
         };
 
+        let content = if disabled { disabled_text } else { content };
+
         let inverted_bg = Style::invert(if set { highlight } else { normal });
 
+        AppliedStyles {
+            normal,
+            content: if set { inverted_bg } else { content },
+        }
+    }
+}
+
+impl Button {
+    pub fn draw_colored(&self, frame: &mut Frame, theme: &Theme) {
+        // let set = self.set && !self.disabled && !self.disable_highlight;
+
+        let AppliedStyles { normal, content } = self.apply_styles(theme);
+
         // Box
-        frame.draw(
-            self.pos,
-            Rect::sized(self.size),
-            if set { highlight } else { normal },
-        );
+        frame.draw(self.pos, Rect::sized(self.size), normal);
 
         // Background
         frame.fill_rect(
             self.pos + Dims(1, 1),
             self.size - Dims(2, 2),
-            Cell::styled(' ', if set { inverted_bg } else { content }),
+            Cell::styled(' ', content),
         );
 
         // Text (content)
         let text_rect = Rect::sized_at(self.pos + Dims(1, 1), self.size - Dims(2, 2))
             .centered(Dims(self.text.width() as i32, 1));
         let text = strings::trim_center(self.text.as_str(), text_rect.size().0 as usize);
-        let style = if set { highlight.invert() } else { content };
+        let style = content;
 
         frame.draw(text_rect.start, text, style);
     }
@@ -101,12 +156,19 @@ impl Button {
     }
 }
 
+struct AppliedStyles {
+    normal: Style,
+    content: Style,
+}
+
 pub fn button_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
     resolver
         .link("ui_button_border", "border")
         .link("ui_button_highlight", "highlight")
-        .link("ui_button_text", "text");
+        .link("ui_button_text", "text")
+        .link("ui_button_disabled_border", "disabled_border")
+        .link("ui_button_disabled_text", "disabled_text");
 
     resolver
 }
