@@ -477,17 +477,17 @@ impl Screen for Menu {
 
         draw_box(frame, pos, size, box_style);
 
-        frame.draw_styled(title_pos, title.as_str(), title_style);
+        frame.draw(title_pos, title.as_str(), title_style);
 
         for (i, subtitle) in self.config.subtitles.iter().enumerate() {
-            frame.draw_styled(
+            frame.draw(
                 subtitles_pos + Dims(0, i as i32),
                 subtitle.as_str(),
                 subtitle_style,
             );
         }
 
-        frame.draw_styled(
+        frame.draw(
             items_pos - Dims(0, 1),
             LineDir::Horizontal
                 .round()
@@ -518,7 +518,7 @@ impl Screen for Menu {
 
             let padded = buf.pad_to_width(size.0 as usize - 2);
 
-            frame.draw_styled(items_pos + Dims(0, i as i32), padded, style);
+            frame.draw(items_pos + Dims(0, i as i32), padded, style);
         }
 
         Ok(())

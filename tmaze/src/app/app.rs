@@ -226,7 +226,7 @@ impl App {
                 .draw(self.renderer.frame(), &self.data.theme)
                 .unwrap();
 
-            logging::get_logger().draw(Dims(0, 0), self.renderer.frame());
+            logging::get_logger().draw(Dims(0, 0), self.renderer.frame(), &self.data.theme);
 
             // TODO: let activities show debug info and about the app itself
             // then we can draw it here
@@ -289,7 +289,8 @@ fn init_theme_resolver() -> ThemeResolver {
 
     resolver
         .extend(ui::theme_resolver())
-        .extend(game::game_theme_resolver());
+        .extend(game::game_theme_resolver())
+        .extend(logging::logging_theme_resolver());
 
     resolver
 }

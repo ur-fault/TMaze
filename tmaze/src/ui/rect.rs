@@ -148,12 +148,8 @@ impl Rect {
     }
 }
 
-impl Drawable for Rect {
-    fn draw(&self, pos: Dims, frame: &mut Frame) {
-        self.draw_with_style(pos, frame, Style::default());
-    }
-
-    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, style: Style) {
+impl Drawable<Style> for Rect {
+    fn draw(&self, pos: Dims, frame: &mut Frame, style: Style) {
         draw_box(frame, pos + self.start, self.size(), style);
     }
 }

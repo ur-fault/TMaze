@@ -1,5 +1,5 @@
-use cmaze::dims::*;
 use crate::{renderer::Frame, settings::theme::Style};
+use cmaze::dims::*;
 
 pub use substring::Substring;
 
@@ -55,7 +55,7 @@ pub fn draw_str(frame: &mut Frame, mut x: i32, y: i32, mut text: &str, style: St
         return;
     }
 
-    frame.draw(Dims(x, y), (text, style));
+    frame.draw(Dims(x, y), text, style);
 }
 
 pub fn draw_char(frame: &mut Frame, x: i32, y: i32, text: char, style: Style) {
@@ -63,5 +63,5 @@ pub fn draw_char(frame: &mut Frame, x: i32, y: i32, text: char, style: Style) {
         return;
     }
 
-    frame.draw(Dims(x, y), (text, style));
+    frame.draw(Dims(x, y), text, style);
 }

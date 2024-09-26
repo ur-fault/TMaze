@@ -281,9 +281,9 @@ impl Frame {
         }
     }
 
-    pub fn put_char(&mut self, pos: Dims, character: char) {
-        self.put_char_styled(pos, character, Style::default());
-    }
+    // pub fn put_char(&mut self, pos: Dims, character: char) {
+    //     self.put_char_styled(pos, character, Style::default());
+    // }
 
     pub fn try_set(&mut self, pos: Dims, cell: Cell) -> bool {
         if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
@@ -298,12 +298,8 @@ impl Frame {
         self.buffer[pos.1 as usize][pos.0 as usize] = cell;
     }
 
-    pub fn draw(&mut self, pos: Dims, content: impl Drawable) {
-        content.draw(pos, self);
-    }
-
-    pub fn draw_styled(&mut self, pos: Dims, content: impl Drawable, style: Style) {
-        content.draw_with_style(pos, self, style);
+    pub fn draw<D: Drawable<S>, S>(&mut self, pos: Dims, content: D, styles: S) {
+        content.draw(pos, self, styles);
     }
 
     pub fn resize(&mut self, size: Dims) {
@@ -369,16 +365,11 @@ impl std::ops::Index<i32> for Frame {
 }
 
 impl Drawable for &Frame {
-    fn draw(&self, pos: Dims, frame: &mut Frame) {
+    fn draw(&self, pos: Dims, frame: &mut Frame, _: ()) {
         for y in 0..self.size.1 {
             for x in 0..self.size.0 {
                 frame.try_set(Dims(pos.0 + x, pos.1 + y), self[Dims(x, y)]);
             }
         }
-    }
-
-    fn draw_with_style(&self, pos: Dims, frame: &mut Frame, _: Style) {
-        // we ignore the style
-        self.draw(pos, frame);
     }
 }
