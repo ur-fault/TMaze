@@ -243,8 +243,8 @@ impl ThemeResolver {
             }
 
             if used.contains(&key) {
-                // FIXME: we should panic here
-                return Style::default();
+                used.push(key.clone());
+                panic!("Loop detected: {:?}", used);
             }
 
             used.push(key.clone());
@@ -294,8 +294,8 @@ mod tests {
         resolver.link("border", "text");
         resolver.link("item", "unknown");
 
-        resolver.link("loop A", "loop B");
-        resolver.link("loop B", "loop A");
+        // resolver.link("loop A", "loop B");
+        // resolver.link("loop B", "loop A");
 
         let default_style = Some(&Style { bg: None, fg: None });
         let text_style = Style {
@@ -326,5 +326,23 @@ mod tests {
         assert_eq!(theme.styles.get("border"), Some(&text_style));
 
         assert_eq!(theme.styles.get("item"), default_style);
+    }
+
+    #[test]
+    fn resolver_loop() {
+        use std::panic;
+
+        let mut resolver = ThemeResolver::new();
+        resolver.link("loop A", "loop B");
+        resolver.link("loop B", "loop A");
+
+        let definition = ThemeDefinition {
+            styles: HashMap::new(),
+            meta: None,
+        };
+
+        let result = panic::catch_unwind(|| resolver.resolve(&definition));
+
+        assert!(result.is_err());
     }
 }
