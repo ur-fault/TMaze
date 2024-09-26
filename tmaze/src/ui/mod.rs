@@ -35,9 +35,7 @@ pub fn theme_resolver() -> ThemeResolver {
         .link("border", "")
         .link("highlight", "")
         .link("background", "") // TODO: use
-        .link("dim", "");
-
-    resolver
+        .link("dim", "")
         .extend(button::button_theme_resolver())
         .extend(menu::menu_theme_resolver())
         .extend(popup::popup_theme_resolver())
