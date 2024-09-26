@@ -281,16 +281,12 @@ impl Frame {
         }
     }
 
-    // pub fn put_char(&mut self, pos: Dims, character: char) {
-    //     self.put_char_styled(pos, character, Style::default());
-    // }
-
     pub fn try_set(&mut self, pos: Dims, cell: Cell) -> bool {
         if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
             return false;
         }
 
-        self.buffer[pos.1 as usize][pos.0 as usize] = cell;
+        self.set(pos, cell);
         true
     }
 
