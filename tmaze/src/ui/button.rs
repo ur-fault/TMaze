@@ -22,11 +22,11 @@ pub struct ButtonStyles {
 impl ButtonStyles {
     pub fn extract(&self, theme: &Theme) -> [Style; 5] {
         [
-            theme.get(self.border),
-            theme.get(self.highlight),
-            theme.get(self.text),
-            theme.get(self.disabled_border),
-            theme.get(self.disabled_text),
+            theme[self.border],
+            theme[self.highlight],
+            theme[self.text],
+            theme[self.disabled_border],
+            theme[self.disabled_text],
         ]
     }
 }

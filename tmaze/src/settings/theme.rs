@@ -26,6 +26,14 @@ impl Theme {
     }
 }
 
+impl ops::Index<&str> for Theme {
+    type Output = Style;
+
+    fn index(&self, key: &str) -> &Self::Output {
+        &self.styles[key]
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct ThemeDefinition {
     meta: Option<HashMap<String, String>>,
