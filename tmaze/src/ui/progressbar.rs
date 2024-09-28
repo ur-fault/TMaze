@@ -33,9 +33,9 @@ impl Screen for ProgressBar {
 
         let prg = "█".repeat((self.title.width() as f64 * self.progress) as usize);
 
-        let box_style = theme.get("ui_progressbar_border");
-        let text_style = theme.get("ui_progressbar_text");
-        let prg_style = theme.get("ui_progressbar_progress");
+        let box_style = theme["ui_progressbar_border"];
+        let text_style = theme["ui_progressbar_text"];
+        let prg_style = theme["ui_progressbar_progress"];
 
         draw_box(frame, pos, progress_size, box_style);
         frame.draw(pos + Dims(2, 1), self.title.as_str(), text_style);

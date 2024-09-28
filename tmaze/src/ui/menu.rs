@@ -261,13 +261,13 @@ pub struct MenuStyles {
 impl MenuStyles {
     fn apply(&self, theme: &Theme) -> AppliedStyles {
         AppliedStyles {
-            title: theme.get(self.title),
-            subtitle: theme.get(self.subtitle),
-            text: theme.get(self.text),
-            border: theme.get(self.border),
-            separator: theme.get(self.separator),
-            selector: theme.get(self.selector),
-            number: theme.get(self.number),
+            title: theme[self.title],
+            subtitle: theme[self.subtitle],
+            text: theme[self.text],
+            border: theme[self.border],
+            separator: theme[self.separator],
+            selector: theme[self.selector],
+            number: theme[self.number],
         }
     }
 }
@@ -500,10 +500,6 @@ impl Screen for Menu {
     fn draw(&self, frame: &mut Frame, theme: &Theme) -> Result<(), io::Error> {
         let MenuConfig { title, counted, .. } = &self.config;
 
-        // let title_style = theme.get("ui_menu_title");
-        // let subtitle_style = theme.get("ui_menu_subtitle");
-        // let box_style = theme.get("ui_menu_border");
-        // let text_style = theme.get("ui_menu_text");
         let AppliedStyles {
             title: title_style,
             subtitle: subtitle_style,

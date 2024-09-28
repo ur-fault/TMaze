@@ -60,9 +60,9 @@ impl Screen for Popup {
         let title_pos = center_box_in_screen(Dims(self.title.width() as i32, 1)).0;
         let pos = center_box_in_screen(box_size);
 
-        let box_style = theme.get("ui_popup_border");
-        let text_style = theme.get("ui_popup_text");
-        let title_style = theme.get("ui_popup_title");
+        let box_style = theme["ui_popup_border"];
+        let text_style = theme["ui_popup_text"];
+        let title_style = theme["ui_popup_title"];
 
         draw_box(frame, pos, box_size, box_style);
         frame.draw(Dims(title_pos, pos.1 + 1), self.title.as_str(), title_style);
@@ -96,7 +96,8 @@ pub fn popup_size(title: &str, texts: &[String]) -> Dims {
 pub fn popup_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
 
-    resolver.link("ui_popup_border", "border")
+    resolver
+        .link("ui_popup_border", "border")
         .link("ui_popup_text", "text")
         .link("ui_popup_title", "title");
 
