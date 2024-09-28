@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 
 use std::{
     borrow::Cow,
-    fmt::{self, Write},
+    fmt::{self},
     io,
     ops::RangeInclusive,
 };
@@ -22,7 +22,7 @@ use crate::{
     },
     helpers::{is_release, strings::MbyStaticStr, LineDir},
     renderer::Frame,
-    settings::theme::{Theme, ThemeResolver},
+    settings::theme::{Style, Theme, ThemeResolver},
 };
 
 use super::{center_box_in_screen, draw_box, Rect, Screen};
@@ -47,6 +47,7 @@ pub struct OptionDef {
     pub fun: Box<dyn FnMut(&mut bool, &mut AppData)>,
 }
 
+// TODO: styling individual items
 pub enum MenuItem {
     Text(MbyStaticStr),
     Option(OptionDef),
@@ -164,6 +165,7 @@ pub struct MenuConfig {
     pub default: Option<usize>,
     pub counted: bool,
     pub q_to_quit: bool,
+    pub styles: MenuStyles,
 }
 
 impl MenuConfig {
@@ -184,6 +186,7 @@ impl MenuConfig {
             default: None,
             counted: false,
             q_to_quit: true,
+            styles: MenuStyles::default(),
         }
     }
 
@@ -217,6 +220,11 @@ impl MenuConfig {
         self
     }
 
+    pub fn with_styles(mut self, styles: MenuStyles) -> Self {
+        self.styles = styles;
+        self
+    }
+
     fn special_width(&self) -> usize {
         let mut special = 2; // 2 is for cursor
 
@@ -238,6 +246,54 @@ impl MenuConfig {
     ) -> impl Iterator<Item = T> + 's {
         self.options.iter().map(f)
     }
+}
+
+pub struct MenuStyles {
+    pub title: &'static str,
+    pub subtitle: &'static str,
+    pub text: &'static str,
+    pub border: &'static str,
+    pub separator: &'static str,
+    pub selector: &'static str,
+    pub number: &'static str,
+}
+
+impl MenuStyles {
+    fn apply(&self, theme: &Theme) -> AppliedStyles {
+        AppliedStyles {
+            title: theme.get(self.title),
+            subtitle: theme.get(self.subtitle),
+            text: theme.get(self.text),
+            border: theme.get(self.border),
+            separator: theme.get(self.separator),
+            selector: theme.get(self.selector),
+            number: theme.get(self.number),
+        }
+    }
+}
+
+impl Default for MenuStyles {
+    fn default() -> Self {
+        Self {
+            title: "ui_menu_title",
+            subtitle: "ui_menu_subtitle",
+            text: "ui_menu_text",
+            border: "ui_menu_border",
+            separator: "ui_menu_separator",
+            selector: "ui_menu_selector",
+            number: "ui_menu_number",
+        }
+    }
+}
+
+struct AppliedStyles {
+    title: Style,
+    subtitle: Style,
+    text: Style,
+    border: Style,
+    separator: Style,
+    selector: Style,
+    number: Style,
 }
 
 pub struct Menu {
@@ -442,23 +498,31 @@ impl ActivityHandler for Menu {
 
 impl Screen for Menu {
     fn draw(&self, frame: &mut Frame, theme: &Theme) -> Result<(), io::Error> {
-        let MenuConfig {
-            title,
-            counted,
-            ..
-        } = &self.config;
+        let MenuConfig { title, counted, .. } = &self.config;
 
-        let title_style = theme.get("ui_menu_title");
-        let subtitle_style = theme.get("ui_menu_subtitle");
-        let box_style = theme.get("ui_menu_border");
-        let text_style = theme.get("ui_menu_text");
+        // let title_style = theme.get("ui_menu_title");
+        // let subtitle_style = theme.get("ui_menu_subtitle");
+        // let box_style = theme.get("ui_menu_border");
+        // let text_style = theme.get("ui_menu_text");
+        let AppliedStyles {
+            title: title_style,
+            subtitle: subtitle_style,
+            text: text_style,
+            border: border_style,
+            separator: separator_style,
+            selector: selector_style,
+            number: number_style,
+        } = self.config.styles.apply(theme);
 
         let MenuDimenstions {
             size,
             title_pos,
             items_pos,
             subtitles_pos,
-            ..
+            items_size: _,
+            count_pos,
+            item_text_pos,
+            item_text_len,
         } = MenuDimenstions::calc(&self.config);
 
         let max_item_width = size.0 as usize - 2 - self.config.special_width();
@@ -475,7 +539,7 @@ impl Screen for Menu {
 
         let max_count = opt_count.to_string().len();
 
-        draw_box(frame, pos, size, box_style);
+        draw_box(frame, pos, size, border_style);
 
         frame.draw(title_pos, title.as_str(), title_style);
 
@@ -493,32 +557,68 @@ impl Screen for Menu {
                 .round()
                 .to_string()
                 .repeat(size.0 as usize - 2),
-            box_style,
+            separator_style,
         );
 
         for (i, option) in options.iter().enumerate() {
-            let style = if i == self.selected {
-                text_style.invert()
-            } else {
-                text_style
+            // let style = if i == self.selected {
+            //     text_style.invert()
+            // } else {
+            //     text_style
+            // };
+            let prep_style = |style: Style| {
+                if i == self.selected {
+                    style.invert()
+                } else {
+                    style
+                }
             };
 
-            let mut buf = String::new();
-
+            // selector
             if i == self.selected {
-                write!(&mut buf, "> ").unwrap();
+                frame.draw(
+                    items_pos + Dims(0, i as i32),
+                    "> ",
+                    prep_style(selector_style),
+                );
             } else {
-                write!(&mut buf, "  ").unwrap();
+                frame.draw(
+                    items_pos + Dims(0, i as i32),
+                    "  ",
+                    prep_style(selector_style),
+                );
             }
 
             if *counted {
-                write!(&mut buf, "{:width$}. ", i + 1, width = max_count).unwrap();
+                frame.draw(
+                    count_pos.unwrap() + Dims(0, i as i32),
+                    format!("{:width$}. ", i + 1, width = max_count),
+                    prep_style(number_style),
+                );
             }
-            write!(&mut buf, "{}", option).unwrap();
 
-            let padded = buf.pad_to_width(size.0 as usize - 2);
+            frame.draw(
+                item_text_pos + Dims(0, i as i32),
+                option.as_ref().pad_to_width(item_text_len),
+                prep_style(text_style),
+            );
 
-            frame.draw(items_pos + Dims(0, i as i32), padded, style);
+            // let mut buf = String::new();
+            //
+            // if i == self.selected {
+            //     write!(&mut buf, "> ").unwrap();
+            // } else {
+            //     write!(&mut buf, "  ").unwrap();
+            // }
+            //
+            // if *counted {
+            //     write!(&mut buf, "{:width$}. ", i + 1, width = max_count).unwrap();
+            // }
+            // write!(&mut buf, "{}", option).unwrap();
+            //
+            // let padded = buf.pad_to_width(size.0 as usize - 2);
+            //
+            // frame.draw(items_pos + Dims(0, i as i32), padded, style);
         }
 
         Ok(())
@@ -531,6 +631,9 @@ struct MenuDimenstions {
     items_pos: Dims,
     items_size: Dims,
     subtitles_pos: Dims,
+    count_pos: Option<Dims>,
+    item_text_pos: Dims,
+    item_text_len: usize,
 }
 
 impl MenuDimenstions {
@@ -565,12 +668,30 @@ impl MenuDimenstions {
 
         let items_pos = Dims(pos.0 + 1, pos.1 + config.subtitles.len() as i32 + 3);
 
+        let mut item_text_len = menu_size.0 as usize - 4;
+
+        let count_pos = if config.counted {
+            let max_count = config.options.len().to_string().len();
+            item_text_len -= max_count + 2;
+            Some(Dims(items_pos.0 + 2, items_pos.1))
+        } else {
+            None
+        };
+
+        let item_text_pos = count_pos.map_or(Dims(items_pos.0 + 2, items_pos.1), |pos| {
+            let max_count = config.options.len().to_string().len();
+            Dims(pos.0 + max_count as i32 + 2, pos.1)
+        });
+
         Self {
             size: menu_size,
             title_pos: pos + Dims(3, 1),
             items_pos,
             items_size: Dims(menu_size.0 - 2, config.options.len() as i32),
             subtitles_pos: pos + Dims(2, 2),
+            count_pos,
+            item_text_pos,
+            item_text_len,
         }
     }
 }
@@ -606,7 +727,10 @@ pub fn menu_theme_resolver() -> ThemeResolver {
         .link("ui_menu_border", "border")
         .link("ui_menu_text", "text")
         .link("ui_menu_title", "ui_menu_text")
-        .link("ui_menu_subtitle", "ui_menu_text");
+        .link("ui_menu_subtitle", "ui_menu_text")
+        .link("ui_menu_separator", "ui_menu_border")
+        .link("ui_menu_selector", "ui_menu_text")
+        .link("ui_menu_number", "ui_menu_text");
 
     resolver
 }
