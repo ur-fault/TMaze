@@ -1,13 +1,15 @@
 use std::{fmt::Display, ops, path::PathBuf};
 
-use crossterm::style::ContentStyle;
+use crossterm::style::{Attributes, ContentStyle};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::helpers::constants::paths::theme_file_path;
+use crate::{
+    helpers::constants::paths::theme_file_path, settings::attribute::deserialize_attributes,
+};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
     styles: HashMap<String, Style>,
 }
@@ -86,19 +88,20 @@ impl ThemeDefinition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(untagged)]
 pub enum StyleIdent {
     Style(Style),
     Ref(String),
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Deserialize)]
 #[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
 pub struct Style {
     pub bg: Option<Color>,
     pub fg: Option<Color>,
-    // TODO: attributes
+    #[serde(deserialize_with = "deserialize_attributes", default)]
+    pub attr: Attributes,
 }
 
 impl Style {
@@ -120,6 +123,7 @@ impl Style {
         Style {
             bg: self.fg,
             fg: self.bg,
+            ..self
         }
     }
 
@@ -127,6 +131,7 @@ impl Style {
         Style {
             fg: Some(self.bg.unwrap_or(Color::Named(NamedColor::Black))),
             bg: Some(self.fg.unwrap_or(Color::Named(NamedColor::White))),
+            ..self
         }
     }
 
@@ -140,6 +145,7 @@ impl From<Style> for ContentStyle {
         ContentStyle {
             foreground_color: value.fg.map(|c| c.into()),
             background_color: value.bg.map(|c| c.into()),
+            attributes: value.attr,
             ..ContentStyle::default()
         }
     }
@@ -152,6 +158,7 @@ impl ops::BitOr for Style {
         Self {
             bg: self.bg.or(rhs.bg),
             fg: self.fg.or(rhs.fg),
+            attr: self.attr | rhs.attr,
         }
     }
 }
@@ -159,8 +166,10 @@ impl ops::BitOr for Style {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Color {
-    Named(NamedColor),
+    // TODO: hex
+    // TODO: 256
     RGB(u8, u8, u8),
+    Named(NamedColor),
 }
 
 impl From<Color> for crossterm::style::Color {
@@ -168,6 +177,7 @@ impl From<Color> for crossterm::style::Color {
         use crossterm::style::Color as CsColor;
         use NamedColor as NmColor;
 
+        // could use `mem::transmute` here, but this is more future proof
         match value {
             Color::Named(named) => match named {
                 NmColor::Black => CsColor::Black,
@@ -306,10 +316,16 @@ mod tests {
         // resolver.link("loop A", "loop B");
         // resolver.link("loop B", "loop A");
 
-        let default_style = Some(&Style { bg: None, fg: None });
+        let default_style = Style {
+            bg: None,
+            fg: None,
+            attr: Attributes::default(),
+        };
+        let default_style = Some(&default_style);
         let text_style = Style {
             bg: Some(Color::Named(NamedColor::Black)),
             fg: Some(Color::Named(NamedColor::White)),
+            attr: Attributes::default(),
         };
 
         let definition = ThemeDefinition {
@@ -327,6 +343,7 @@ mod tests {
             Some(&Style {
                 bg: Some(Color::Named(NamedColor::Black)),
                 fg: Some(Color::Named(NamedColor::White)),
+                attr: Attributes::default()
             })
         );
 
