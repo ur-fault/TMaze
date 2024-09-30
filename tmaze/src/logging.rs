@@ -156,6 +156,7 @@ impl Drawable<&Theme> for AppLogger {
         let [msg_style, source_style, extra] =
             theme.extract(["log_message", "log_source", "log_extra"]);
 
+        // NOTE: please don't call any `log` function in this loop, it will cause a deadlock
         for (i, log) in self.get_logs().take(self.max_visible).enumerate() {
             let color = match log.level {
                 log::Level::Error => NamedColor::Red,

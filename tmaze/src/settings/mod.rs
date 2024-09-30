@@ -1,4 +1,5 @@
 pub mod theme;
+mod attribute;
 
 use cmaze::{
     dims::{Dims, Offset},
