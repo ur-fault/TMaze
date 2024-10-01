@@ -249,7 +249,7 @@ impl Cell {
 }
 
 pub struct Frame {
-    pub(crate) buffer: Vec<Vec<Cell>>,
+    buffer: Vec<Vec<Cell>>,
     pub(crate) size: Dims,
 }
 

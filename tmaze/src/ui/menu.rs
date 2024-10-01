@@ -1,5 +1,5 @@
 use crossterm::event::{
-    Event as TermEvent, KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind,
+    Event as TermEvent, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 
 use pad::PadStr;
@@ -452,7 +452,10 @@ impl ActivityHandler for Menu {
                     }
                 }
                 Event::Term(TermEvent::Mouse(MouseEvent {
-                    kind, column, row, ..
+                    kind,
+                    column,
+                    row,
+                    modifiers,
                 })) => {
                     let mouse_pos = (column, row).into();
                     match kind {
@@ -462,10 +465,18 @@ impl ActivityHandler for Menu {
                             }
                         }
                         MouseEventKind::ScrollDown => {
-                            self.select(true);
+                            if modifiers.contains(KeyModifiers::CONTROL) {
+                                self.update_slider(false, app_data);
+                            } else {
+                                self.select(true);
+                            }
                         }
                         MouseEventKind::ScrollUp => {
-                            self.select(false);
+                            if modifiers.contains(KeyModifiers::CONTROL) {
+                                self.update_slider(true, app_data);
+                            } else {
+                                self.select(false);
+                            }
                         }
                         MouseEventKind::Up(MouseButton::Left) => {
                             if let Some(selected) = self.get_opt_by_mouse_pos(mouse_pos) {
@@ -557,11 +568,6 @@ impl Screen for Menu {
         );
 
         for (i, option) in options.iter().enumerate() {
-            // let style = if i == self.selected {
-            //     text_style.invert()
-            // } else {
-            //     text_style
-            // };
             let prep_style = |style: Style| {
                 if i == self.selected {
                     style.invert()
@@ -598,23 +604,6 @@ impl Screen for Menu {
                 option.as_ref().pad_to_width(item_text_len),
                 prep_style(text_style),
             );
-
-            // let mut buf = String::new();
-            //
-            // if i == self.selected {
-            //     write!(&mut buf, "> ").unwrap();
-            // } else {
-            //     write!(&mut buf, "  ").unwrap();
-            // }
-            //
-            // if *counted {
-            //     write!(&mut buf, "{:width$}. ", i + 1, width = max_count).unwrap();
-            // }
-            // write!(&mut buf, "{}", option).unwrap();
-            //
-            // let padded = buf.pad_to_width(size.0 as usize - 2);
-            //
-            // frame.draw(items_pos + Dims(0, i as i32), padded, style);
         }
 
         Ok(())
