@@ -42,7 +42,25 @@ pub struct ThemeDefinition {
     styles: HashMap<String, StyleIdent>,
 }
 
+// For some reason, Rust concat! doesn't allow const, so we have to use a macro
+macro_rules! default_theme_name {
+    () => {
+        "default_theme.json5"
+    };
+}
+const DEFAULT_THEME_NAME: &str = default_theme_name!();
+const DEFAULT_THEME: &str = include_str!(concat!("./", default_theme_name!()));
+
 impl ThemeDefinition {
+    pub fn load_default_or_save() -> Result<Self, LoadError> {
+        let path = theme_file_path(DEFAULT_THEME_NAME);
+        if !path.exists() {
+            std::fs::write(&path, DEFAULT_THEME)?;
+        }
+
+        Self::load_by_path(path)
+    }
+
     pub fn load_by_name(path: &str) -> Result<Self, LoadError> {
         Self::load_by_path(theme_file_path(path))
     }
