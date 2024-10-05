@@ -32,7 +32,11 @@ impl ops::Index<&str> for Theme {
     type Output = Style;
 
     fn index(&self, key: &str) -> &Self::Output {
-        &self.styles[key]
+        let Some(style) = self.styles.get(key) else {
+            panic!("style not found: {}", key);
+        };
+
+        style
     }
 }
 

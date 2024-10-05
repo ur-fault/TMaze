@@ -154,7 +154,7 @@ impl Log for AppLogger {
 impl Drawable<&Theme> for AppLogger {
     fn draw(&self, pos: Dims, frame: &mut renderer::Frame, theme: &Theme) {
         let [msg_style, source_style, extra] =
-            theme.extract(["log_message", "log_source", "log_extra"]);
+            theme.extract(["log.message", "log.source", "log.extra"]);
 
         // NOTE: please don't call any `log` function in this loop, it will cause a deadlock
         for (i, log) in self.get_logs().take(self.max_visible).enumerate() {
@@ -194,9 +194,9 @@ pub fn logging_theme_resolver() -> crate::settings::theme::ThemeResolver {
     let mut resolver = crate::settings::theme::ThemeResolver::new();
 
     resolver
-        .link("log_message", "text")
-        .link("log_source", "text")
-        .link("log_extra", "border");
+        .link("log.message", "text")
+        .link("log.source", "text")
+        .link("log.extra", "border");
 
     resolver
 }

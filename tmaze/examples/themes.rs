@@ -12,17 +12,17 @@ fn main() {
 
     let mut popup_res = ThemeResolver::new();
     popup_res
-        .link("popup_ui", "ui")
-        .link("popup_text", "text")
-        .link("popup_title", "popup_text")
-        .link("popup_content", "popup_text");
+        .link("popup.ui", "ui")
+        .link("popup.text", "text")
+        .link("popup.title", "popup.text")
+        .link("popup.content", "popup.text");
 
     let mut button_res = ThemeResolver::new();
     button_res
-        .link("button_ui", "ui")
-        .link("button_text", "text")
-        .link("button_hover_ui", "button_ui")
-        .link("button_hover_text", "button_text");
+        .link("button.ui", "ui")
+        .link("button.text", "text")
+        .link("button.hover.ui", "button.ui")
+        .link("button.hover.text", "button.text");
 
     resolver
         .link("text", "")
