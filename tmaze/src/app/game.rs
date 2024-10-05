@@ -674,7 +674,7 @@ impl GameActivity {
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
                 let real_pos = maze2screen(*move_pos) + maze_pos;
                 frame.draw(real_pos, '.', theme["game_visited"]); // FIXME: move out of the
-                                                                      // loop
+                                                                  // loop
             }
         }
     }
@@ -699,11 +699,7 @@ impl GameActivity {
                 .style
                 .foreground_color = theme["game_player"].to_cross().foreground_color;
         } else {
-            viewport.draw(
-                player_draw_pos,
-                self.game.player_char,
-                theme["game_player"],
-            );
+            viewport.draw(player_draw_pos, self.game.player_char, theme["game_player"]);
         }
     }
 

@@ -2,7 +2,11 @@ use std::io;
 
 use cmaze::dims::Dims;
 use tmaze::{
-    app::{app::AppData, Activity, ActivityHandler, App, Change, Event}, helpers::is_release, renderer::{Cell, Frame}, settings::theme::Theme, ui::Screen
+    app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
+    helpers::is_release,
+    renderer::{Cell, Frame},
+    settings::theme::Theme,
+    ui::Screen,
 };
 
 use crossterm::event::{Event as TermEvent, KeyEvent};

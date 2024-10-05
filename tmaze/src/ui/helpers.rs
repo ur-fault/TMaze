@@ -3,7 +3,10 @@ use std::time::Duration;
 use cmaze::dims::Dims;
 use crossterm::style::{Attribute, Color, ContentStyle};
 
-use crate::{helpers::{self, strings::multisize_string}, renderer::helpers::term_size};
+use crate::{
+    helpers::{self, strings::multisize_string},
+    renderer::helpers::term_size,
+};
 
 pub fn center_box_in_screen(box_dims: Dims) -> Dims {
     let size_u16 = term_size();
