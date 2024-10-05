@@ -57,7 +57,7 @@ impl ThemeDefinition {
 
         match ext {
             "toml" => Self::load_toml(path),
-            "json" => Self::load_json(path),
+            "json" | "json5" => Self::load_json(path),
             _ => Err(LoadError::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "Unknown file extension",
