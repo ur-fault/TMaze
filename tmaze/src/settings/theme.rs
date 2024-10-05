@@ -212,6 +212,7 @@ where
         panic!("invalid hex color: {:?}", s);
     }
     let s = s.trim_start_matches('#');
+    assert!(s.len() == 6 || s.len() == 3, "invalid hex color: {:?}", s);
 
     let r = u8::from_str_radix(&s[0..2], 16).map_err(serde::de::Error::custom)?;
     let g = u8::from_str_radix(&s[2..4], 16).map_err(serde::de::Error::custom)?;
