@@ -203,16 +203,20 @@ impl From<Color> for crossterm::style::Color {
     }
 }
 
-pub fn deserialize_hex<'de, D>(deserializer: D) -> Result<(u8, u8, u8), D::Error>
+fn deserialize_hex<'de, D>(deserializer: D) -> Result<(u8, u8, u8), D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s = String::deserialize(deserializer)?;
     if !(s.len() == 7 || s.len() == 4) {
-        panic!("invalid hex color: {:?}", s);
+        panic!("invalid hex color, expected length 7 or 4: {:?}", s);
     }
     let s = s.trim_start_matches('#');
-    assert!(s.len() == 6 || s.len() == 3, "invalid hex color: {:?}", s);
+    assert!(
+        s.len() == 6 || s.len() == 3,
+        "invalid hex color, too many '#': {:?}",
+        s
+    );
 
     let r = u8::from_str_radix(&s[0..2], 16).map_err(serde::de::Error::custom)?;
     let g = u8::from_str_radix(&s[2..4], 16).map_err(serde::de::Error::custom)?;
