@@ -16,12 +16,5 @@ hashbrown = { version = "0.14", optional = true }
 log = "0.4"
 serde = { version = "^1", features = ["derive"] }
 
-[dev-dependencies]
-criterion = "0.5"
-
 [features]
 hashbrown = ["dep:hashbrown"]
-
-[[bench]]
-name = "kruskals"
-harness = false
