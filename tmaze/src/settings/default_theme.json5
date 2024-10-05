@@ -13,15 +13,18 @@
         "highlight": {
             "fg": "yellow"
         },
+        "game.goal": {
+            "fg": "red"
+        },
 
         // # General architecture of themes
         //
         // Styles are defined in hiearchy, so if you do not define a style
         // it will inherit from the parent style.
         // For example, "text" will inherit from "default" style.
-        // And "ui_menu_text" will inherit from "text" style.
+        // And "ui.menu.text" will inherit from "text" style.
         //
-        // You can define as little colors as possible or go really nuts
+        // You can define as little styles as possible or go really nuts
         // and define every single style and make TMaze really your own.
         //
         //

@@ -164,11 +164,11 @@ struct AppliedStyles {
 pub fn button_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
     resolver
-        .link("ui_button_border", "border")
-        .link("ui_button_highlight", "highlight")
-        .link("ui_button_text", "text")
-        .link("ui_button_disabled_border", "disabled_border")
-        .link("ui_button_disabled_text", "disabled_text");
+        .link("ui.button.border", "border")
+        .link("ui.button.highlight", "highlight")
+        .link("ui.button.text", "text")
+        .link("ui.button.disabled.border", "disabled.border")
+        .link("ui.button.disabled.text", "disabled.text");
 
     resolver
 }

@@ -673,7 +673,7 @@ impl GameActivity {
             let cell = game.get_maze().get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
                 let real_pos = maze2screen(*move_pos) + maze_pos;
-                frame.draw(real_pos, '.', theme["game_visited"]); // FIXME: move out of the
+                frame.draw(real_pos, '.', theme["game.visited"]); // FIXME: move out of the
                                                                   // loop
             }
         }
@@ -697,9 +697,9 @@ impl GameActivity {
                 .content_mut()
                 .unwrap()
                 .style
-                .foreground_color = theme["game_player"].to_cross().foreground_color;
+                .foreground_color = theme["game.player"].to_cross().foreground_color;
         } else {
-            viewport.draw(player_draw_pos, self.game.player_char, theme["game_player"]);
+            viewport.draw(player_draw_pos, self.game.player_char, theme["game.player"]);
         }
     }
 
@@ -895,7 +895,7 @@ impl Screen for GameActivity {
         // show viewport box
         let vp_pos = (game_view_size - vp_size) / 2 + self.viewport_rect.start;
         let vp_rect = Rect::sized_at(vp_pos, vp_size).margin(Dims(-1, -1));
-        vp_rect.render(frame, theme["game_viewport_border"]);
+        vp_rect.render(frame, theme["game.viewport.border"]);
 
         if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
             if !does_fit && self.show_debug {
@@ -917,10 +917,10 @@ impl Screen for GameActivity {
 
         if self.show_debug {
             if let Some(dpad_rect) = self.dpad_rect {
-                dpad_rect.render(frame, theme["debug_border"]);
+                dpad_rect.render(frame, theme["debug.border"]);
             }
 
-            self.viewport_rect.render(frame, theme["debug_border"]);
+            self.viewport_rect.render(frame, theme["debug.border"]);
         }
 
         Ok(())
@@ -983,7 +983,7 @@ impl MazeBoard {
 
     fn render_floor(game: &RunningGame, floor: i32, theme: &Theme) -> Frame {
         let maze = game.get_maze();
-        let normals = theme["game_walls"];
+        let normals = theme["game.walls"];
 
         let size = maze_render_size(maze);
 
@@ -1025,10 +1025,10 @@ impl MazeBoard {
     }
 
     fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, theme: &Theme) {
-        let s_stairs_up = theme["game_stairs_up"];
-        let s_stairs_down = theme["game_stairs_down"];
-        let s_stairs_both = theme["game_stairs_both"];
-        let s_stairs_up_tower = theme["game_stairs_up_tower"];
+        let s_stairs_up = theme["game.stairs.up"];
+        let s_stairs_down = theme["game.stairs.down"];
+        let s_stairs_both = theme["game.stairs.both"];
+        let s_stairs_up_tower = theme["game.stairs.up.tower"];
 
         for (y, row) in floors.iter().enumerate() {
             for (x, cell) in row.iter().enumerate() {
@@ -1048,7 +1048,7 @@ impl MazeBoard {
     }
 
     fn render_special(frames: &mut [Frame], game: &RunningGame, theme: &Theme) {
-        let goal_style = theme["game_goal"];
+        let goal_style = theme["game.goal"];
         let goal_pos = game.get_goal_pos();
 
         frames[goal_pos.2 as usize].draw(maze2screen(goal_pos), '$', goal_style);
@@ -1059,24 +1059,24 @@ pub fn game_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
 
     resolver
-        .link("game_walls", "border")
+        .link("game.walls", "border")
         // stairs
-        .link("game_stairs", "game_walls")
-        .link("game_stairs_up", "game_stairs")
-        .link("game_stairs_down", "game_stairs")
-        .link("game_stairs_both", "game_stairs")
-        .link("game_stairs_up_tower", "game_goal")
+        .link("game.stairs", "game.walls")
+        .link("game.stairs.up", "game.stairs")
+        .link("game.stairs.down", "game.stairs")
+        .link("game.stairs.both", "game.stairs")
+        .link("game.stairs.up.tower", "game.goal")
         // game
-        .link("game_goal", "")
-        .link("game_player", "highlight")
-        .link("game_player_on_stairs", "game_stairs")
-        .link("game_visited", "dim")
+        .link("game.goal", "")
+        .link("game.player", "highlight")
+        .link("game.player.on.stairs", "game.stairs")
+        .link("game.visited", "dim")
         // special
-        .link("game_viewport_border", "border")
-        .link("debug_border", "border")
-        .link("debug_rulers", "debug_border")
-        .link("debug_rulers_start", "debug_rulers")
-        .link("debug_rulers_end", "debug_rulers");
+        .link("game.viewport.border", "border")
+        .link("debug.border", "border")
+        .link("debug.rulers", "debug.border")
+        .link("debug.rulers.start", "debug.rulers")
+        .link("debug.rulers.end", "debug.rulers");
 
     resolver
 }

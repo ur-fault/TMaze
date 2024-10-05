@@ -73,11 +73,11 @@ impl DPad {
                 };
 
                 let styles = ButtonStyles {
-                    border: "ui_dpad_border",
-                    highlight: "ui_dpad_highlight",
-                    text: "ui_dpad_text",
-                    disabled_border: "ui_dpad_disabled_border",
-                    disabled_text: "ui_dpad_disabled_text",
+                    border: "ui.dpad.border",
+                    highlight: "ui.dpad.highlight",
+                    text: "ui.dpad.text",
+                    disabled_border: "ui.dpad.disabled.border",
+                    disabled_text: "ui.dpad.disabled.text",
                 };
 
                 Button::new(chr.to_string(), pos, size).with_styles(styles)
@@ -237,11 +237,11 @@ impl DPad {
 pub fn dpad_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
     resolver
-        .link("ui_dpad_border", "ui_button_border")
-        .link("ui_dpad_highlight", "ui_button_highlight")
-        .link("ui_dpad_text", "ui_button_text")
-        .link("ui_dpad_disabled_border", "ui_button_disabled_border")
-        .link("ui_dpad_disabled_text", "ui_button_disabled_text");
+        .link("ui.dpad.border", "ui.button.border")
+        .link("ui.dpad.highlight", "ui.button.highlight")
+        .link("ui.dpad.text", "ui.button.text")
+        .link("ui.dpad.disabled.border", "ui.button.disabled.border")
+        .link("ui.dpad.disabled.text", "ui.button.disabled.text");
 
     resolver
 }
