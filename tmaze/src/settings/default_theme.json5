@@ -1,0 +1,50 @@
+{
+    "meta": {
+        "name": "Default theme",
+        "version": "1.0.0",
+        "description": "Default theme for the game"
+        "author": "ur-fault",
+    },
+    "styles": {
+        // Basic styles
+        "default": {
+            "fg": "white",
+        },
+        "highlight": {
+            "fg": "yellow"
+        },
+
+        // # General architecture of themes
+        //
+        // Styles are defined in hiearchy, so if you do not define a style
+        // it will inherit from the parent style.
+        // For example, "text" will inherit from "default" style.
+        // And "ui_menu_text" will inherit from "text" style.
+        //
+        // You can define as little colors as possible or go really nuts
+        // and define every single style and make TMaze really your own.
+        //
+        //
+        // # Styles themself
+        //
+        // A style is a pair of "key": "value" where key is the name of the style.
+        // A value can have two forms:
+        // - string: "a name of some other style" - this will inherit from/reference that style.
+        // - object: {
+        //    "fg": <color> | null,
+        //    "bg": <color> | null,
+        //    "attr": <list of strings> | null,
+        // }
+        //
+        // A color is also polymorphic:
+        // - null - undefined, basically default terminal color
+        // - array: [r, g, b] - where r, g, b are integers from 0 to 255
+        // - string: "name of the color" - for example "red" or "yellow"
+        // - string: "a hex color" - for example "#ff0000" is red,
+        //     it can be either 4 or 7 characters long (# included), lowercase/uppercase
+        //
+        // Really cool feature is that you can define your own styles/keys,
+        // which won't be used by the game, but you can reference them by other styles.
+        // Basically custom constants, which can be resued in other styles.
+    }
+}

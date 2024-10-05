@@ -107,11 +107,11 @@ impl App {
     /// - initializes the logging system,
     /// - initializes the job queue,
     pub fn empty() -> Self {
-        let renderer = Renderer::new().expect("Failed to create renderer");
+        let renderer = Renderer::new().expect("failed to create renderer");
         let activities = Activities::empty();
 
-        let settings = Settings::load(settings_path()).expect("Failed to load settings");
-        let save = SaveData::load().expect("Failed to load save data");
+        let settings = Settings::load(settings_path()).expect("failed to load settings");
+        let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
         let jobs = Jobs::new();
         let app_start = Instant::now();
@@ -119,10 +119,8 @@ impl App {
 
         log::info!("Loading theme");
         let resolver = init_theme_resolver();
-        let theme_def = ThemeDefinition::load_by_name("theme.json").expect("Failed to load theme");
+        let theme_def = ThemeDefinition::load_by_name("theme.json5").expect("failed to load theme");
         let theme = resolver.resolve(&theme_def);
-
-        // panic!("theme: {:#?}", theme);
 
         logging::init();
 
@@ -285,7 +283,10 @@ pub struct AppStateData {
 fn init_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
 
-    resolver.link("background", "").link("empty", "");
+    resolver
+        .link("default", "")
+        .link("background", "")
+        .link("empty", "");
 
     resolver
         .extend(ui::theme_resolver())
