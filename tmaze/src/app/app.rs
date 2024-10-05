@@ -10,7 +10,7 @@ use crate::{
     logging::{self, get_logger},
     renderer::{drawable::Drawable, Renderer},
     settings::{
-        theme::{Theme, ThemeDefinition, ThemeResolver},
+        theme::{Theme, ThemeResolver},
         Settings,
     },
     ui,
@@ -119,7 +119,7 @@ impl App {
 
         log::info!("Loading theme");
         let resolver = init_theme_resolver();
-        let theme_def = ThemeDefinition::load_by_name("theme.json5").expect("failed to load theme");
+        let theme_def = settings.get_theme();
         let theme = resolver.resolve(&theme_def);
 
         logging::init();

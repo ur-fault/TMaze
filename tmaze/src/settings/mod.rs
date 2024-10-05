@@ -1,11 +1,7 @@
-pub mod theme;
 mod attribute;
+pub mod theme;
 
-use cmaze::{
-    dims::{Dims, Offset},
-    game::GeneratorFn,
-    gameboard::algorithms::MazeAlgorithm,
-};
+use cmaze::{dims::{Dims, Offset}, game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
@@ -14,6 +10,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, RwLock},
 };
+use theme::ThemeDefinition;
 
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
@@ -85,6 +82,10 @@ pub enum UpdateCheckInterval {
 #[derivative(Default)]
 #[serde(rename = "Settings")]
 pub struct SettingsInner {
+    // general
+    #[serde(default)]
+    pub theme: Option<String>,
+
     // viewport
     #[serde(default)]
     pub slow: Option<bool>,
@@ -138,7 +139,7 @@ pub struct SettingsInner {
     #[serde(default)]
     pub mazes: Option<Vec<MazePreset>>,
 
-    // other
+    // special
     #[serde(skip)]
     #[derivative(Default(value = "paths::settings_path()"))]
     pub path: PathBuf,
@@ -179,6 +180,15 @@ impl Settings {
 }
 
 impl Settings {
+    pub fn get_theme(&self) -> ThemeDefinition {
+        let theme_name = self.read().theme.clone();
+        if let Some(theme_name) = theme_name {
+            ThemeDefinition::load_by_name(&theme_name).expect("could not load theme")
+        } else {
+            ThemeDefinition::load_default_or_save().expect("could not load default theme")
+        }
+    }
+
     pub fn get_slow(&self) -> bool {
         self.read().slow.unwrap_or_default()
     }

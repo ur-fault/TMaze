@@ -1,4 +1,12 @@
 Settings (
+    // theme of the game, if None, default theme will be used
+    // default theme is automatically loaded from <game config>/themes/default_theme.json5,
+    // which is generated when none is found.
+    //
+    // Othwerwise, you can specify your own theme file, which will be loaded
+    // from the <game config>/themes directory. It can be either .json[5] or .toml format.
+    // theme: "theme.json",
+
     // color scheme:
     // - valid colors:
     //  - black

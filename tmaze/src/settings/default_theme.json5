@@ -2,7 +2,7 @@
     "meta": {
         "name": "Default theme",
         "version": "1.0.0",
-        "description": "Default theme for the game"
+        "description": "Default theme for the game",
         "author": "ur-fault",
     },
     "styles": {
