@@ -286,35 +286,35 @@ jobs:
     runs-on: ubuntu-latest
     needs: ['create-release']
     steps:
-        - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-        - name: Restore target cache
-          uses: actions/cache@v4
-          with:
-            path: target
-            key: cratesio-${{ runner.os }}--cargo-${{ hashFiles('**/Cargo.lock') }}
-            save-always: true
+      - name: Restore target cache
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: cratesio-${{ runner.os }}--cargo-${{ hashFiles('**/Cargo.lock') }}
+          save-always: true
 
-        - name: Install 
-          uses: actions-rs/toolchain@v1
-          with:
-              toolchain: stable
+      - name: Install 
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
 
-        - run: sudo apt update && sudo apt install libasound2-dev
+      - run: sudo apt update && sudo apt install libasound2-dev
 
-        - name: publish cmaze
-          if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
-          uses: katyo/publish-crates@v2
-          with:
-              path: ./cmaze
-              registry-token: ${{ secrets.CRATES_IO }}
-              ignore-unpublished-changes: true
 
-        - name: publish tmaze
-          if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
-          uses: katyo/publish-crates@v2
-          with:
-              path: ./tmaze
-              registry-token: ${{ secrets.CRATES_IO }}
-              ignore-unpublished-changes: true
+      - name: publish cmaze
+        if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
+        uses: katyo/publish-crates@v2
+        with:
+            path: ./cmaze
+            registry-token: ${{ secrets.CRATES_IO }}
+            ignore-unpublished-changes: true
 
+      - name: publish tmaze
+        if: ${{ needs.create-release.outputs.dry_run != 'yes' }}
+        uses: katyo/publish-crates@v2
+        with:
+            path: ./tmaze
+            registry-token: ${{ secrets.CRATES_IO }}
+            ignore-unpublished-changes: true
