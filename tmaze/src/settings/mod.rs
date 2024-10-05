@@ -1,7 +1,11 @@
 mod attribute;
 pub mod theme;
 
-use cmaze::{dims::{Dims, Offset}, game::GeneratorFn, gameboard::algorithms::MazeAlgorithm};
+use cmaze::{
+    dims::{Dims, Offset},
+    game::GeneratorFn,
+    gameboard::algorithms::MazeAlgorithm,
+};
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
