@@ -58,6 +58,8 @@ const DEFAULT_THEME: &str = include_str!(concat!("./", default_theme_name!()));
 impl ThemeDefinition {
     pub fn load_default_or_save() -> Result<Self, LoadError> {
         let path = theme_file_path(DEFAULT_THEME_NAME);
+
+        std::fs::create_dir_all(path.parent().unwrap())?;
         if !path.exists() {
             std::fs::write(&path, DEFAULT_THEME)?;
         }
