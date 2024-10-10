@@ -25,6 +25,7 @@ pub struct SoundPlayer {
 impl SoundPlayer {
     pub fn new(settings: Settings) -> Self {
         let Ok((stream, handle)) = rodio::OutputStream::try_default() else {
+            log::warn!("Failed to create audio stream, no sound will be played");
             return Self {
                 handles: None,
                 settings,
