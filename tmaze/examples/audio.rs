@@ -72,10 +72,9 @@ fn main() {
 fn update_vol(data: &mut AppData) {
     if data.settings.get_enable_audio() && data.settings.get_enable_music() {
         data.sound_player
-            .sink()
             .set_volume(data.settings.get_audio_volume() * data.settings.get_music_volume());
     } else {
-        data.sound_player.sink().set_volume(0.0);
+        data.sound_player.set_volume(0.0);
     }
 }
 

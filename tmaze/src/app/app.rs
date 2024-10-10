@@ -69,7 +69,7 @@ impl AppData {
         } else {
             0.0
         };
-        self.sound_player.sink().set_volume(volume);
+        self.sound_player.set_volume(volume);
 
         self.bgm_track = Some(track);
         let track = track.get_track().repeat_infinite();

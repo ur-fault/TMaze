@@ -11,43 +11,67 @@ use crate::{
 
 use self::track::Track;
 
-pub struct SoundPlayer {
+struct SoundHandles {
     _stream: OutputStream,
     handle: OutputStreamHandle,
     sink: Sink,
+}
+
+pub struct SoundPlayer {
+    handles: Option<SoundHandles>,
     settings: Settings,
 }
 
 impl SoundPlayer {
     pub fn new(settings: Settings) -> Self {
-        let (stream, handle) =
-            rodio::OutputStream::try_default().expect("Failed to create output stream");
+        let Ok((stream, handle)) = rodio::OutputStream::try_default() else {
+            return Self {
+                handles: None,
+                settings,
+            };
+        };
 
         let sink = Sink::try_new(&handle).expect("Failed to create sink");
 
         Self {
-            _stream: stream,
-            handle,
-            sink,
+            handles: Some(SoundHandles {
+                _stream: stream,
+                handle,
+                sink,
+            }),
             settings,
+        }
+    }
+
+    #[inline]
+    fn apply(&self, f: impl FnOnce(&Sink)) {
+        if let Some(handles) = &self.handles {
+            f(&handles.sink);
         }
     }
 
     #[allow(dead_code)]
     pub fn enqueue(&self, track: Track) {
-        self.sink.append(track);
-        self.sink.play();
+        self.apply(|sink| {
+            sink.append(track);
+            sink.play();
+        });
     }
 
     pub fn play_track(&self, track: Track) {
-        self.sink.stop();
-        self.sink.append(track);
-        self.sink.play();
+        self.apply(|sink| {
+            sink.stop();
+            sink.append(track);
+            sink.play();
+        });
     }
 
     #[allow(dead_code)]
     pub fn play_sound(&self, track: Track) {
-        let sink = Sink::try_new(&self.handle).expect("Failed to create sink");
+        let Some(handle) = self.handles.as_ref().map(|h| &h.handle) else {
+            return;
+        };
+        let sink = Sink::try_new(handle).expect("Failed to create sink");
         sink.set_volume(self.settings.get_audio_volume());
         sink.append(track);
         sink.play();
@@ -56,15 +80,11 @@ impl SoundPlayer {
 
     #[allow(dead_code)]
     pub fn wait(&self) {
-        self.sink.sleep_until_end();
-    }
-
-    pub fn sink(&self) -> &Sink {
-        &self.sink
+        self.apply(|sink| sink.sleep_until_end());
     }
 
     pub fn set_volume(&self, volume: f32) {
-        self.sink.set_volume(volume);
+        self.apply(|sink| sink.set_volume(volume));
     }
 }
 
@@ -72,10 +92,9 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
     fn update_vol(data: &mut AppData) {
         if data.settings.get_enable_audio() && data.settings.get_enable_music() {
             data.sound_player
-                .sink()
                 .set_volume(data.settings.get_audio_volume() * data.settings.get_music_volume());
         } else {
-            data.sound_player.sink().set_volume(0.0);
+            data.sound_player.set_volume(0.0);
         }
     }
 
