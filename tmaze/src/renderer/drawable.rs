@@ -22,10 +22,9 @@ impl Drawable<Style> for String {
 
 impl<'a> Drawable<Style> for &'a str {
     fn draw(&self, pos: Dims, frame: &mut Frame, style: Style) {
-        let this = &self;
-        // TODO: Custom iterator which returns (total_width, char)
-        for (i, character) in this.chars().enumerate() {
-            frame.put_char_styled(Dims(pos.0 + i as i32, pos.1), character, style);
+        let mut x = 0;
+        for character in self.chars() {
+            x += frame.put_char_styled(Dims(pos.0 + x as i32, pos.1), character, style);
         }
     }
 }

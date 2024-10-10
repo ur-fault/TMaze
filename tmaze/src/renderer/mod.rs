@@ -262,14 +262,14 @@ impl Frame {
         Frame { buffer, size }
     }
 
-    pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: Style) {
+    pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: Style) -> usize {
         if x < 0 || self.size.0 <= x || y < 0 || self.size.1 <= y {
-            return;
+            return 0;
         }
 
         let width = character.width().unwrap_or(1) as i32;
         if width == 0 {
-            return;
+            return 0;
         }
 
         let cell = Cell::styled(character, style);
@@ -279,6 +279,8 @@ impl Frame {
         for i in x + 1..x + width {
             self.buffer[y as usize][i as usize] = Cell::Empty;
         }
+
+        width as usize
     }
 
     pub fn try_set(&mut self, pos: Dims, cell: Cell) -> bool {
