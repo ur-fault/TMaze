@@ -1,4 +1,7 @@
 {
+    // Some metadata about your theme. Currently they are *NOT* used by the game,
+    // but a plan is to have a theme manager, where you can see all the themes
+    // and their metadata, so you can choose the one you like the most.
     "meta": {
         "name": "Default theme",
         "version": "1.0.0",
@@ -19,10 +22,10 @@
 
         // # General architecture of themes
         //
-        // Styles are defined in hiearchy, so if you do not define a style
+        // Styles are defined in a hiearchy, so if you do not define a style
         // it will inherit from the parent style.
-        // For example, "text" will inherit from "default" style.
-        // And "ui.menu.text" will inherit from "text" style.
+        // For example, "text" will inherit from the "default" style.
+        // And "ui.menu.text" will inherit from the "text" style.
         //
         // You can define as little styles as possible or go really nuts
         // and define every single style and make TMaze really your own.
@@ -34,12 +37,12 @@
         // A value can have two forms:
         // - string: "a name of some other style" - this will inherit from/reference that style.
         // - object: {
-        //    "fg": <color> | null,
-        //    "bg": <color> | null,
-        //    "attr": <list of strings> | null,
+        //    "fg": <color> | null,             // fg - foreground color
+        //    "bg": <color> | null,             // bg - background color
+        //    "attr": <list of strings> | null, // a list of attributes, for example ["bold", "underscore"]
         // }
         //
-        // A color is also polymorphic:
+        // A color is also polymorphic (can be defined in several ways):
         // - null - undefined, basically default terminal color
         // - array: [r, g, b] - where r, g, b are integers from 0 to 255
         // - string: "name of the color" - for example "red" or "yellow"
@@ -49,5 +52,6 @@
         // Really cool feature is that you can define your own styles/keys,
         // which won't be used by the game, but you can reference them by other styles.
         // Basically custom constants, which can be resued in other styles.
+        // Meaning you can create a color pallete and then use that in your theme.
     }
 }
