@@ -8,7 +8,7 @@ use tmaze::{
 
 #[cfg(feature = "sound")]
 fn main() {
-    logging::get_logger().switch_debug();
+    logging::get_logger(log::Level::Info);
 
     let mut app = App::empty();
 

@@ -122,7 +122,7 @@ impl App {
         let theme_def = settings.get_theme();
         let theme = resolver.resolve(&theme_def);
 
-        logging::init();
+        logging::init(settings.get_logging_level());
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
@@ -224,7 +224,11 @@ impl App {
                 .draw(self.renderer.frame(), &self.data.theme)
                 .unwrap();
 
-            logging::get_logger().draw(Dims(0, 0), self.renderer.frame(), &self.data.theme);
+            logging::get_logger(self.data.settings.get_logging_level()).draw(
+                Dims(0, 0),
+                self.renderer.frame(),
+                &self.data.theme,
+            );
 
             // TODO: let activities show debug info and about the app itself
             // then we can draw it here
@@ -242,7 +246,7 @@ impl App {
 
     fn switch_debug(&mut self) {
         self.data.use_data.show_debug = !self.data.use_data.show_debug;
-        get_logger().switch_debug();
+        get_logger(self.data.settings.get_logging_level()).switch_debug(&self.data.settings);
         log::warn!(
             "Debug mode: {}",
             on_off(self.data.use_data.show_debug, false)
