@@ -89,6 +89,10 @@ pub struct SettingsInner {
     // general
     #[serde(default)]
     pub theme: Option<String>,
+    #[serde(default)]
+    pub logging_level: Option<String>,
+    #[serde(default)]
+    pub debug_logging_level: Option<String>,
 
     // viewport
     #[serde(default)]
@@ -191,6 +195,22 @@ impl Settings {
         } else {
             ThemeDefinition::load_default_or_save().expect("could not load default theme")
         }
+    }
+
+    pub fn get_logging_level(&self) -> log::Level {
+        self.read()
+            .logging_level
+            .clone()
+            .and_then(|level| level.parse().ok())
+            .unwrap_or(log::Level::Info)
+    }
+
+    pub fn get_debug_logging_level(&self) -> log::Level {
+        self.read()
+            .debug_logging_level
+            .clone()
+            .and_then(|level| level.parse().ok())
+            .unwrap_or(log::Level::Info)
     }
 
     pub fn get_slow(&self) -> bool {

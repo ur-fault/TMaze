@@ -9,24 +9,23 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     renderer::{self, drawable::Drawable},
-    settings::theme::{Color, NamedColor, Style, Theme},
+    settings::{
+        theme::{Color, NamedColor, Style, Theme},
+        Settings,
+    },
 };
-
-static LOGGER: OnceLock<AppLogger> = OnceLock::new();
-
-pub fn get_logger() -> &'static AppLogger {
+pub fn get_logger(level: log::Level) -> &'static AppLogger {
     // default configuration
     const DEFAULT_DECAY: Duration = Duration::from_secs(5);
     const DEFAULT_MAX_VISIBLE: usize = 5;
 
-    let level = log::Level::Warn;
-    // let level = log::Level::Info;
+    static LOGGER: OnceLock<AppLogger> = OnceLock::new();
 
     LOGGER.get_or_init(|| AppLogger::new(level, DEFAULT_DECAY, DEFAULT_MAX_VISIBLE))
 }
 
-pub fn init() {
-    log::set_logger(get_logger()).unwrap();
+pub fn init(level: log::Level) {
+    log::set_logger(get_logger(level)).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
 }
 
@@ -83,6 +82,7 @@ pub struct AppLogger {
     pub min_level: Arc<RwLock<log::Level>>,
     pub decay: Duration,
     pub max_visible: usize,
+    pub debug: Arc<RwLock<bool>>,
     logs: Arc<Mutex<Logs>>,
 }
 
@@ -92,6 +92,7 @@ impl AppLogger {
             min_level: Arc::new(RwLock::new(min_level)),
             decay,
             max_visible,
+            debug: Arc::new(RwLock::new(false)),
             logs: Arc::new(Mutex::new(Logs {
                 logs: Default::default(),
             })),
@@ -121,11 +122,14 @@ impl AppLogger {
         }
     }
 
-    pub fn switch_debug(&self) {
-        if self.min_level() == log::Level::Debug {
-            *self.min_level.write().unwrap() = log::Level::Warn;
+    pub fn switch_debug(&self, settings: &Settings) {
+        let mut debug = self.debug.write().unwrap();
+        *debug = !*debug;
+
+        if *debug {
+            *self.min_level.write().unwrap() = settings.get_debug_logging_level();
         } else {
-            *self.min_level.write().unwrap() = log::Level::Debug;
+            *self.min_level.write().unwrap() = settings.get_logging_level();
         }
     }
 }
