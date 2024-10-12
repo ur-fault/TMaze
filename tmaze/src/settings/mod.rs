@@ -93,6 +93,8 @@ pub struct SettingsInner {
     pub logging_level: Option<String>,
     #[serde(default)]
     pub debug_logging_level: Option<String>,
+    #[serde(default)]
+    pub file_logging_level: Option<String>,
 
     // viewport
     #[serde(default)]
@@ -208,6 +210,14 @@ impl Settings {
     pub fn get_debug_logging_level(&self) -> log::Level {
         self.read()
             .debug_logging_level
+            .clone()
+            .and_then(|level| level.parse().ok())
+            .unwrap_or(log::Level::Info)
+    }
+
+    pub fn get_file_logging_level(&self) -> log::Level {
+        self.read()
+            .file_logging_level
             .clone()
             .and_then(|level| level.parse().ok())
             .unwrap_or(log::Level::Info)

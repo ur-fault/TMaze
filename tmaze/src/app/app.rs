@@ -7,7 +7,7 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
-    logging::{self, get_logger},
+    logging::{self, AppLogger, UILogs},
     renderer::{drawable::Drawable, Renderer},
     settings::{
         theme::{Theme, ThemeResolver},
@@ -42,6 +42,7 @@ pub struct AppData {
     pub use_data: AppStateData,
     pub screen_size: Dims,
     pub theme: Theme,
+    pub logs: UILogs,
     jobs: Jobs,
     app_start: Instant,
 
@@ -122,7 +123,8 @@ impl App {
         let theme_def = settings.get_theme();
         let theme = resolver.resolve(&theme_def);
 
-        logging::init(settings.get_logging_level());
+        let (logger, logs) = AppLogger::new(settings.get_logging_level());
+        logger.init();
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
@@ -138,6 +140,7 @@ impl App {
                 screen_size: frame_size,
                 jobs,
                 theme,
+                logs,
 
                 #[cfg(feature = "sound")]
                 sound_player,
@@ -224,11 +227,9 @@ impl App {
                 .draw(self.renderer.frame(), &self.data.theme)
                 .unwrap();
 
-            logging::get_logger(self.data.settings.get_logging_level()).draw(
-                Dims(0, 0),
-                self.renderer.frame(),
-                &self.data.theme,
-            );
+            self.data
+                .logs
+                .draw(Dims(0, 0), self.renderer.frame(), &self.data.theme);
 
             // TODO: let activities show debug info and about the app itself
             // then we can draw it here
@@ -246,7 +247,7 @@ impl App {
 
     fn switch_debug(&mut self) {
         self.data.use_data.show_debug = !self.data.use_data.show_debug;
-        get_logger(self.data.settings.get_logging_level()).switch_debug(&self.data.settings);
+        self.data.logs.switch_debug(&self.data.settings);
         log::warn!(
             "Debug mode: {}",
             on_off(self.data.use_data.show_debug, false)

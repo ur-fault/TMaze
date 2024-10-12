@@ -1,5 +1,8 @@
 use std::{
-    sync::{Arc, Mutex, MutexGuard, OnceLock, RwLock},
+    io::Write,
+    ops,
+    path::PathBuf,
+    sync::{Arc, Mutex, MutexGuard, RwLock},
     time::Duration,
 };
 
@@ -8,26 +11,16 @@ use log::{Log, Metadata, Record};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
+    helpers::constants::paths,
     renderer::{self, drawable::Drawable},
     settings::{
         theme::{Color, NamedColor, Style, Theme},
         Settings,
     },
 };
-pub fn get_logger(level: log::Level) -> &'static AppLogger {
-    // default configuration
-    const DEFAULT_DECAY: Duration = Duration::from_secs(5);
-    const DEFAULT_MAX_VISIBLE: usize = 5;
 
-    static LOGGER: OnceLock<AppLogger> = OnceLock::new();
-
-    LOGGER.get_or_init(|| AppLogger::new(level, DEFAULT_DECAY, DEFAULT_MAX_VISIBLE))
-}
-
-pub fn init(level: log::Level) {
-    log::set_logger(get_logger(level)).unwrap();
-    log::set_max_level(log::LevelFilter::Trace);
-}
+const DEFAULT_DECAY: Duration = Duration::from_secs(5);
+const DEFAULT_MAX_VISIBLE: usize = 5;
 
 #[derive(Clone)]
 pub struct Message {
@@ -46,7 +39,7 @@ impl Logs {
         self.logs[message.level as usize - 1].insert(0, message);
     }
 
-    fn clear_old(&mut self, decay: Duration) {
+    fn clear(&mut self, decay: Duration) {
         let now = std::time::Instant::now();
         for level in self.logs.iter_mut() {
             level.retain(|msg| now.duration_since(msg.pushed) < decay);
@@ -54,10 +47,24 @@ impl Logs {
     }
 }
 
+#[derive(Clone)]
+struct LogsView {
+    logs: Arc<Mutex<Logs>>,
+}
+
+impl ops::Deref for LogsView {
+    type Target = Mutex<Logs>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.logs
+    }
+}
+
 pub struct LogsIter<'a> {
     logs: MutexGuard<'a, Logs>,
     level: usize,
     index: usize,
+    min_level: log::Level,
 }
 
 impl<'a> Iterator for LogsIter<'a> {
@@ -68,7 +75,8 @@ impl<'a> Iterator for LogsIter<'a> {
             self.level += 1;
             self.index = 0;
         }
-        if self.level >= self.logs.logs.len() {
+
+        if self.level >= self.logs.logs.len() || self.level > self.min_level as usize {
             return None;
         }
 
@@ -78,47 +86,24 @@ impl<'a> Iterator for LogsIter<'a> {
     }
 }
 
-pub struct AppLogger {
-    pub min_level: Arc<RwLock<log::Level>>,
+pub struct UILogs {
+    logs: LogsView,
     pub decay: Duration,
     pub max_visible: usize,
-    pub debug: Arc<RwLock<bool>>,
-    logs: Arc<Mutex<Logs>>,
+    pub debug: RwLock<bool>,
+    pub min_level: RwLock<log::Level>,
 }
 
-impl AppLogger {
-    fn new(min_level: log::Level, decay: Duration, max_visible: usize) -> Self {
-        Self {
-            min_level: Arc::new(RwLock::new(min_level)),
-            decay,
-            max_visible,
-            debug: Arc::new(RwLock::new(false)),
-            logs: Arc::new(Mutex::new(Logs {
-                logs: Default::default(),
-            })),
-        }
-    }
-
-    pub fn min_level(&self) -> log::Level {
-        *self.min_level.read().unwrap()
-    }
-
-    fn borrow_mut_logs(&self) -> MutexGuard<Logs> {
-        self.logs
-            .lock()
-            // TODO: create new mutex when poisoned,
-            // we will lose logs, but at least we can continue
-            .expect("thread holding log panicked, cannot use this logger")
-    }
-
-    pub fn get_logs(&self) -> impl Iterator<Item = Message> + '_ {
+impl UILogs {
+    pub fn iter(&self) -> impl Iterator<Item = Message> + '_ {
         let mut logs = self.borrow_mut_logs();
-        logs.clear_old(self.decay);
+        logs.clear(self.decay);
 
         LogsIter {
             logs,
             level: 0,
             index: 0,
+            min_level: *self.min_level.read().unwrap(),
         }
     }
 
@@ -132,36 +117,19 @@ impl AppLogger {
             *self.min_level.write().unwrap() = settings.get_logging_level();
         }
     }
-}
 
-impl Log for AppLogger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= self.min_level()
-    }
-
-    fn log(&self, record: &Record) {
-        if self.enabled(record.metadata()) {
-            self.borrow_mut_logs().push(Message {
-                level: record.level(),
-                pushed: std::time::Instant::now(),
-                message: record.args().to_string(),
-                source: record.module_path().unwrap_or("unknown").to_string(),
-            });
-        }
-    }
-
-    fn flush(&self) {
-        todo!()
+    fn borrow_mut_logs(&self) -> MutexGuard<Logs> {
+        self.logs.lock().expect("a thread holding log panicked")
     }
 }
 
-impl Drawable<&Theme> for AppLogger {
+impl Drawable<&Theme> for UILogs {
     fn draw(&self, pos: Dims, frame: &mut renderer::Frame, theme: &Theme) {
         let [msg_style, source_style, extra] =
             theme.extract(["log.message", "log.source", "log.extra"]);
 
-        // NOTE: please don't call any `log` function in this loop, it will cause a deadlock
-        for (i, log) in self.get_logs().take(self.max_visible).enumerate() {
+        // NOTE: please don't call any `log!` macro in this loop, it will cause a deadlock
+        for (i, log) in self.iter().take(self.max_visible).enumerate() {
             let color = match log.level {
                 log::Level::Error => NamedColor::Red,
                 log::Level::Warn => NamedColor::Yellow,
@@ -180,16 +148,118 @@ impl Drawable<&Theme> for AppLogger {
             let src_pos = Dims(src_x, y);
             let msg_pos = Dims(msg_x, y);
 
-            // TODO: make this a setting
             const INDICATOR_CHAR: char = '|';
-            // const INDICATOR_CHAR: char = '*';
-            // const INDICATOR_CHAR: char = '█';
-            // const INDICATOR_CHAR: char = '•';
 
             log.source.draw(src_pos, frame, source_style);
             "->".draw(Dims(msg_x - 3, y), frame, extra);
             log.message.draw(msg_pos, frame, msg_style);
             INDICATOR_CHAR.draw(Dims(frame.size.0 - 1, y), frame, indicator_style);
+        }
+    }
+}
+
+pub struct LoggerOptions {
+    pub decay: Duration,
+    pub max_visible: usize,
+    pub path: Option<PathBuf>,
+}
+
+impl Default for LoggerOptions {
+    fn default() -> Self {
+        Self {
+            decay: DEFAULT_DECAY,
+            max_visible: DEFAULT_MAX_VISIBLE,
+            path: Some(paths::log_file_path()),
+        }
+    }
+}
+
+pub struct AppLogger {
+    logs: LogsView,
+    file: Option<Mutex<std::fs::File>>,
+    pub file_level: RwLock<log::Level>,
+}
+
+impl AppLogger {
+    pub fn new(min_level: log::Level) -> (Self, UILogs) {
+        Self::new_with_options(min_level, LoggerOptions::default())
+    }
+
+    pub fn new_with_options(min_level: log::Level, options: LoggerOptions) -> (Self, UILogs) {
+        let logs = LogsView {
+            logs: Arc::new(Mutex::new(Logs {
+                logs: Default::default(),
+            })),
+        };
+        let logger = Self {
+            logs: logs.clone(),
+            file: options.path.map(|path| {
+                let file = std::fs::File::options()
+                    .create(true)
+                    .append(true)
+                    .open(&path);
+                assert!(file.is_ok(), "Failed to open log file at {:?}", path);
+                Mutex::new(file.unwrap())
+            }),
+            file_level: RwLock::new(log::Level::Debug),
+        };
+        let ui_logs = UILogs {
+            logs,
+            decay: options.decay,
+            max_visible: options.max_visible,
+            debug: RwLock::new(false),
+            min_level: RwLock::new(min_level),
+        };
+
+        (logger, ui_logs)
+    }
+
+    pub fn init(self) {
+        let log_ref = Box::<AppLogger>::leak(Box::new(self));
+        log::set_logger(log_ref).unwrap();
+        log::set_max_level(log::LevelFilter::Trace);
+    }
+
+    fn borrow_mut_logs(&self) -> MutexGuard<Logs> {
+        self.logs.lock().expect("a thread holding log panicked")
+    }
+}
+
+impl Log for AppLogger {
+    fn enabled(&self, _: &Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record) {
+        self.borrow_mut_logs().push(Message {
+            level: record.level(),
+            pushed: std::time::Instant::now(),
+            message: record.args().to_string(),
+            source: record.module_path().unwrap_or("unknown").to_string(),
+        });
+
+        if record.metadata().level() <= *self.file_level.read().unwrap() {
+            if let Some(file) = &self.file {
+                let mut file = file.lock().unwrap();
+                let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
+
+                if let Err(err) = writeln!(
+                    file,
+                    "[{}][{}][{}] {}",
+                    record.level(),
+                    timestamp,
+                    record.module_path().unwrap_or("unknown"),
+                    record.args()
+                ) {
+                    log::error!("Failed to write to log file: {}", err);
+                }
+            }
+        }
+    }
+
+    fn flush(&self) {
+        if let Some(file) = &self.file {
+            file.lock().unwrap().flush().unwrap();
         }
     }
 }
