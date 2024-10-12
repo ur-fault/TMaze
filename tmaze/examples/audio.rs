@@ -1,15 +1,12 @@
 #[cfg(feature = "sound")]
 use tmaze::{
     app::app::{App, AppData},
-    logging,
     sound::track,
     ui::{menu, MenuItem, OptionDef, SliderDef},
 };
 
 #[cfg(feature = "sound")]
 fn main() {
-    logging::get_logger(log::Level::Info);
-
     let mut app = App::empty();
 
     let menu_config = menu::MenuConfig::new(

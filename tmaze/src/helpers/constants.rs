@@ -52,4 +52,8 @@ pub mod paths {
     pub fn save_data_path() -> PathBuf {
         base_path().join("data.ron")
     }
+
+    pub fn log_file_path() -> PathBuf {
+        base_path().join("log.txt")
+    }
 }
