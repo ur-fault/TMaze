@@ -13,7 +13,7 @@ fn main() {
     .default(1);
 
     let menu = menu::Menu::new(menu_config).into_activity();
-    let mut app = App::new(menu);
+    let mut app = App::new(menu, true);
 
     app.run();
 }

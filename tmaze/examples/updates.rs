@@ -8,16 +8,19 @@ use tmaze::{
 
 #[cfg(feature = "updates")]
 fn main() {
-    let mut app = App::new(Activity::new_base_boxed(
-        "activity",
-        MyActivity(Popup::new(
-            "Checking for updates in the background".to_string(),
-            vec![
-                "Please wait...".to_string(),
-                "Result will be shown in the notification area".to_string(),
-            ],
-        )),
-    ));
+    let mut app = App::new(
+        Activity::new_base_boxed(
+            "activity",
+            MyActivity(Popup::new(
+                "Checking for updates in the background".to_string(),
+                vec![
+                    "Please wait...".to_string(),
+                    "Result will be shown in the notification area".to_string(),
+                ],
+            )),
+        ),
+        true,
+    );
 
     app.run();
 }

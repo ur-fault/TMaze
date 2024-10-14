@@ -70,7 +70,9 @@ impl SaveData {
     fn write_to(&self, path: &Path) -> Result<(), ron::Error> {
         to_writer(File::create(path)?, self)
     }
+}
 
+impl SaveData {
     pub fn update_last_check(&mut self) -> Result<(), ron::Error> {
         self.last_update_check = Some(Local::now());
         self.write()

@@ -1,5 +1,5 @@
 Settings (
-    // theme of the game, if None, default theme will be used
+    // theme of the game, if None, default theme will be used.
     // default theme is automatically loaded from <game config>/themes/default_theme.json5,
     // which is generated when none is found.
     //
@@ -7,30 +7,20 @@ Settings (
     // from the <game config>/themes directory. It can be either .json[5] or .toml format.
     // theme: "theme.json",
 
-    // color scheme:
-    // - valid colors:
-    //  - black
-    //  - dark_grey
-    //  - red
-    //  - dark_red
-    //  - green
-    //  - dark_green
-    //  - yellow
-    //  - dark_yellow
-    //  - blue
-    //  - dark_blue
-    //  - magenta
-    //  - dark_magenta
-    //  - cyan
-    //  - dark_cyan
-    //  - white
-    //  - grey
-    color_scheme: ColorScheme (
-        normal: "dark_grey",
-        player: "red",
-        goal: "yellow",
-        text: "grey",
-    ),
+    // logging levels for different logging mechanisms in the game.
+    // - valid levels:
+    //  - trace
+    //  - debug
+    //  - info
+    //  - warn
+    //  - error
+    // 
+    // messages in the UI
+    logging_level: "info",
+    // messages in the UI if debug mode is enabled
+    debug_logging_level: "debug",
+    // messages in the log file
+    file_logging_level: "info",
 
     // player will move only one space at the time,
     // otherwise it will move until other possible move

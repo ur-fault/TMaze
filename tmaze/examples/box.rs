@@ -12,7 +12,7 @@ use tmaze::{
 use crossterm::event::{Event as TermEvent, KeyEvent};
 
 fn main() {
-    let mut app = App::new(Activity::new("example", "box", Box::new(MyActivity)));
+    let mut app = App::new(Activity::new("example", "box", Box::new(MyActivity)), true);
 
     log::info!("Starting app");
 

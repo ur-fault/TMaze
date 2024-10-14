@@ -7,13 +7,16 @@ use tmaze::{
 };
 
 fn main() {
-    let mut app = App::new(Activity::new_base_boxed(
-        "activity",
-        MyActivity(
-            false,
-            Popup::new("Press any key to quit".to_string(), vec![]),
+    let mut app = App::new(
+        Activity::new_base_boxed(
+            "activity",
+            MyActivity(
+                false,
+                Popup::new("Press any key to quit".to_string(), vec![]),
+            ),
         ),
-    ));
+        true,
+    );
 
     app.run();
 }

@@ -7,7 +7,7 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
-    logging::{self, AppLogger, UILogs},
+    logging::{self, AppLogger, LoggerOptions, UiLogs},
     renderer::{drawable::Drawable, Renderer},
     settings::{
         theme::{Theme, ThemeResolver},
@@ -42,7 +42,7 @@ pub struct AppData {
     pub use_data: AppStateData,
     pub screen_size: Dims,
     pub theme: Theme,
-    pub logs: UILogs,
+    pub logs: UiLogs,
     jobs: Jobs,
     app_start: Instant,
 
@@ -92,8 +92,8 @@ impl App {
     ///
     /// # Arguments
     /// * `base_activity` - The activity to push to the app
-    pub fn new(base_activity: Activity) -> Self {
-        let mut s = Self::empty();
+    pub fn new(base_activity: Activity, read_only: bool) -> Self {
+        let mut s = Self::empty(read_only);
         s.activities.push(base_activity);
         s
     }
@@ -107,11 +107,11 @@ impl App {
     /// - initializes the sound player (if the feature is enabled),
     /// - initializes the logging system,
     /// - initializes the job queue,
-    pub fn empty() -> Self {
+    pub fn empty(read_only: bool) -> Self {
         let renderer = Renderer::new().expect("failed to create renderer");
         let activities = Activities::empty();
 
-        let settings = Settings::load(settings_path()).expect("failed to load settings");
+        let settings = Settings::load(settings_path(), read_only).expect("failed to load settings");
         let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
         let jobs = Jobs::new();
@@ -123,8 +123,17 @@ impl App {
         let theme_def = settings.get_theme();
         let theme = resolver.resolve(&theme_def);
 
-        let (logger, logs) = AppLogger::new(settings.get_logging_level());
+        let (logger, logs) = if !read_only {
+            AppLogger::new(settings.get_logging_level())
+        } else {
+            AppLogger::new_with_options(
+                settings.get_logging_level(),
+                LoggerOptions::default().read_only(),
+            )
+        };
         logger.init();
+
+        log::warn!("Read-only mode: {}", on_off(read_only, false));
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
