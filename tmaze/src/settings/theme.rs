@@ -56,15 +56,19 @@ const DEFAULT_THEME_NAME: &str = default_theme_name!();
 const DEFAULT_THEME: &str = include_str!(concat!("./", default_theme_name!()));
 
 impl ThemeDefinition {
-    pub fn load_default_or_save() -> Result<Self, LoadError> {
+    pub fn load_default(read_only: bool) -> Result<Self, LoadError> {
         let path = theme_file_path(DEFAULT_THEME_NAME);
 
-        std::fs::create_dir_all(path.parent().unwrap())?;
-        if !path.exists() {
-            std::fs::write(&path, DEFAULT_THEME)?;
-        }
+        if !read_only {
+            std::fs::create_dir_all(path.parent().unwrap())?;
+            if !path.exists() {
+                std::fs::write(&path, DEFAULT_THEME)?;
+            }
 
-        Self::load_by_path(path)
+            Self::load_by_path(path)
+        } else {
+            Ok(json5::from_str(DEFAULT_THEME)?)
+        }
     }
 
     pub fn load_by_name(path: &str) -> Result<Self, LoadError> {

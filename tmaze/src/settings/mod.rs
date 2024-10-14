@@ -18,7 +18,7 @@ use theme::ThemeDefinition;
 
 use crate::{
     app::{self, app::AppData, Activity, ActivityHandler, Change},
-    helpers::constants::paths::{self, settings_path},
+    helpers::constants::paths::settings_path,
     menu_actions,
     renderer::MouseGuard,
     ui::{split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem, OptionDef, Popup, Screen},
@@ -148,11 +148,6 @@ pub struct SettingsInner {
     // mazes
     #[serde(default)]
     pub mazes: Option<Vec<MazePreset>>,
-
-    // special
-    #[serde(skip)]
-    #[derivative(Default(value = "paths::settings_path()"))]
-    pub path: PathBuf,
     // TODO: it's not possible in RON to have a HashMap with flattened keys,
     // so we will support it in different way formats
     // once we support them - this would mean dropping RON support
@@ -161,12 +156,20 @@ pub struct SettingsInner {
 }
 
 #[derive(Debug, Clone)]
-pub struct Settings(Arc<RwLock<SettingsInner>>);
+pub struct Settings {
+    inner: Arc<RwLock<SettingsInner>>,
+    path: PathBuf,
+    read_only: bool,
+}
 
 impl Default for Settings {
     fn default() -> Self {
         let settings = SettingsInner::default();
-        Self(Arc::new(RwLock::new(settings)))
+        Self {
+            inner: Arc::new(RwLock::new(settings)),
+            path: settings_path(),
+            read_only: false,
+        }
     }
 }
 
@@ -177,15 +180,19 @@ impl Settings {
     }
 
     pub fn path(&self) -> PathBuf {
-        self.0.read().unwrap().path.clone()
+        self.path.clone()
+    }
+
+    pub fn is_ro(&self) -> bool {
+        self.read_only
     }
 
     pub fn read(&self) -> std::sync::RwLockReadGuard<SettingsInner> {
-        self.0.read().unwrap()
+        self.inner.read().unwrap()
     }
 
     pub fn write(&mut self) -> std::sync::RwLockWriteGuard<SettingsInner> {
-        self.0.write().unwrap()
+        self.inner.write().unwrap()
     }
 }
 
@@ -195,7 +202,7 @@ impl Settings {
         if let Some(theme_name) = theme_name {
             ThemeDefinition::load_by_name(&theme_name).expect("could not load theme")
         } else {
-            ThemeDefinition::load_default_or_save().expect("could not load default theme")
+            ThemeDefinition::load_default(self.read_only).expect("could not load default theme")
         }
     }
 
@@ -417,24 +424,28 @@ impl Settings {
 }
 
 impl Settings {
-    pub fn load(path: PathBuf) -> io::Result<Self> {
+    pub fn load(path: PathBuf, read_only: bool) -> io::Result<Self> {
         let default_settings_string = DEFAULT_SETTINGS;
 
         let settings_string = fs::read_to_string(&path);
         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
-        let mut settings: SettingsInner = if let Ok(settings_string) = settings_string {
+        let settings: SettingsInner = if let Ok(settings_string) = settings_string {
             options
                 .from_str(&settings_string)
                 .expect("Could not parse settings file")
-        } else {
+        } else if !read_only {
             fs::create_dir_all(path.parent().unwrap())?;
             fs::write(&path, default_settings_string)?;
             options.from_str(default_settings_string).unwrap()
+        } else {
+            options.from_str(default_settings_string).unwrap()
         };
 
-        settings.path = path;
-
-        Ok(Self(Arc::new(RwLock::new(settings))))
+        Ok(Self {
+            inner: Arc::new(RwLock::new(settings)),
+            path,
+            read_only,
+        })
     }
 
     pub fn reset(&mut self) {
@@ -445,7 +456,7 @@ impl Settings {
         let path = settings_path();
         fs::write(&path, default_settings_string).unwrap();
 
-        self.write().path = path;
+        self.path = path;
     }
 
     pub fn reset_config(path: PathBuf) {

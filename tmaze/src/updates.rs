@@ -54,17 +54,21 @@ pub fn check(app_data: &mut AppData) {
             Ok(Some(version)) => {
                 log::warn!("Newer version found: {}", version);
                 qer.queue(Job::new(|data| {
-                    data.save
-                        .update_last_check()
-                        .expect("Failed to save the save data");
+                    if !data.settings.is_ro() {
+                        data.save
+                            .update_last_check()
+                            .expect("Failed to save the save data");
+                    }
                 }));
             }
             Ok(None) => {
                 log::info!("No newer version found");
                 qer.queue(Job::new(|data| {
-                    data.save
-                        .update_last_check()
-                        .expect("Failed to save the save data");
+                    if !data.settings.is_ro() {
+                        data.save
+                            .update_last_check()
+                            .expect("Failed to save the save data");
+                    }
                 }));
             }
             Err(err) if display_update_errors => {

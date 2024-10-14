@@ -12,7 +12,7 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[clap(version, author, about, name = "tmaze")]
 struct Args {
-    #[clap(short, long, action, help = "Reset config to default and quit")]
+    #[clap(long, action, help = "Reset config to default and quit")]
     reset_config: bool,
     #[clap(short, long, action, help = "Show config path and quit")]
     show_config_path: bool,
@@ -20,6 +20,13 @@ struct Args {
     debug_config: bool,
     #[clap(short, long, action, help = "Delete all saved data and quit")]
     delete_data: bool,
+    #[clap(
+        short,
+        long,
+        action,
+        help = "Run in read-only mode, no data will be saved"
+    )]
+    read_only: bool,
 }
 
 fn main() -> Result<(), GameError> {
@@ -41,7 +48,7 @@ fn main() -> Result<(), GameError> {
     }
 
     if _args.debug_config {
-        println!("{:#?}", Settings::load(settings_path()));
+        println!("{:#?}", Settings::load(settings_path(), true));
         return Ok(());
     }
 
@@ -52,7 +59,7 @@ fn main() -> Result<(), GameError> {
 
     better_panic::install();
 
-    let mut app = App::empty();
+    let mut app = App::empty(_args.read_only);
     let menu = MainMenu::new();
     app.activities_mut()
         .push(Activity::new_base_boxed("main menu", menu));

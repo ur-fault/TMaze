@@ -7,7 +7,7 @@ use tmaze::{
 
 #[cfg(feature = "sound")]
 fn main() {
-    let mut app = App::empty();
+    let mut app = App::empty(true);
 
     let menu_config = menu::MenuConfig::new(
         "Audio settings",

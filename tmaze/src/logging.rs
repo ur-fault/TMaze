@@ -86,7 +86,7 @@ impl<'a> Iterator for LogsIter<'a> {
     }
 }
 
-pub struct UILogs {
+pub struct UiLogs {
     logs: LogsView,
     pub decay: Duration,
     pub max_visible: usize,
@@ -94,7 +94,7 @@ pub struct UILogs {
     pub min_level: RwLock<log::Level>,
 }
 
-impl UILogs {
+impl UiLogs {
     pub fn iter(&self) -> impl Iterator<Item = Message> + '_ {
         let mut logs = self.borrow_mut_logs();
         logs.clear(self.decay);
@@ -123,7 +123,7 @@ impl UILogs {
     }
 }
 
-impl Drawable<&Theme> for UILogs {
+impl Drawable<&Theme> for UiLogs {
     fn draw(&self, pos: Dims, frame: &mut renderer::Frame, theme: &Theme) {
         let [msg_style, source_style, extra] =
             theme.extract(["log.message", "log.source", "log.extra"]);
@@ -164,6 +164,12 @@ pub struct LoggerOptions {
     pub path: Option<PathBuf>,
 }
 
+impl LoggerOptions {
+    pub fn read_only(self) -> Self {
+        Self { path: None, ..self }
+    }
+}
+
 impl Default for LoggerOptions {
     fn default() -> Self {
         Self {
@@ -181,11 +187,11 @@ pub struct AppLogger {
 }
 
 impl AppLogger {
-    pub fn new(min_level: log::Level) -> (Self, UILogs) {
+    pub fn new(min_level: log::Level) -> (Self, UiLogs) {
         Self::new_with_options(min_level, LoggerOptions::default())
     }
 
-    pub fn new_with_options(min_level: log::Level, options: LoggerOptions) -> (Self, UILogs) {
+    pub fn new_with_options(min_level: log::Level, options: LoggerOptions) -> (Self, UiLogs) {
         let logs = LogsView {
             logs: Arc::new(Mutex::new(Logs {
                 logs: Default::default(),
@@ -203,7 +209,7 @@ impl AppLogger {
             }),
             file_level: RwLock::new(log::Level::Debug),
         };
-        let ui_logs = UILogs {
+        let ui_logs = UiLogs {
             logs,
             decay: options.decay,
             max_visible: options.max_visible,
@@ -238,8 +244,8 @@ impl Log for AppLogger {
             source: record.module_path().unwrap_or("unknown").to_string(),
         });
 
-        if record.metadata().level() <= *self.file_level.read().unwrap() {
-            if let Some(file) = &self.file {
+        if let Some(file) = &self.file {
+            if record.metadata().level() <= *self.file_level.read().unwrap() {
                 let mut file = file.lock().unwrap();
                 let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
 
