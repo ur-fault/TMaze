@@ -252,7 +252,7 @@ impl Log for AppLogger {
             level: record.level(),
             pushed: std::time::Instant::now(),
             message: record.args().to_string(),
-            source: record.module_path().unwrap_or("unknown").to_string(),
+            source: record.target().to_string(),
         });
 
         if let Some(file) = &self.file {
@@ -265,7 +265,7 @@ impl Log for AppLogger {
                     "[{}][{}][{}] {}",
                     record.level(),
                     timestamp,
-                    record.module_path().unwrap_or("unknown"),
+                    record.target(),
                     record.args()
                 ) {
                     log::error!("Failed to write to log file: {}", err);
