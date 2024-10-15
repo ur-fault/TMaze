@@ -200,9 +200,9 @@ impl Settings {
     pub fn get_theme(&self) -> ThemeDefinition {
         let theme_name = self.read().theme.clone();
         if let Some(theme_name) = theme_name {
-            ThemeDefinition::load_by_name(&theme_name).expect("could not load theme")
+            ThemeDefinition::load_by_name(&theme_name).expect("could not load the theme")
         } else {
-            ThemeDefinition::load_default(self.read_only).expect("could not load default theme")
+            ThemeDefinition::load_default(self.read_only).expect("could not load the default theme")
         }
     }
 
