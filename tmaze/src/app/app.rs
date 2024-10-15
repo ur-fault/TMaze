@@ -133,8 +133,6 @@ impl App {
         };
         logger.init();
 
-        log::warn!("Read-only mode: {}", on_off(read_only, false));
-
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
 
