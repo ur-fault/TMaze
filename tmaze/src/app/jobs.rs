@@ -65,4 +65,8 @@ impl Job {
     pub fn call(self, data: &mut AppData) {
         (self.task)(data);
     }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
 }

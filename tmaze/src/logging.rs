@@ -158,15 +158,25 @@ impl Drawable<&Theme> for UiLogs {
     }
 }
 
+#[derive(Debug)]
 pub struct LoggerOptions {
     pub decay: Duration,
     pub max_visible: usize,
     pub path: Option<PathBuf>,
+    pub file_level: log::Level,
 }
 
 impl LoggerOptions {
-    pub fn read_only(self) -> Self {
-        Self { path: None, ..self }
+    pub fn read_only(self, ro: bool) -> Self {
+        Self {
+            path: if ro { None } else { self.path },
+            ..self
+        }
+    }
+
+    pub fn file_level(mut self, level: log::Level) -> Self {
+        self.file_level = level;
+        self
     }
 }
 
@@ -176,6 +186,7 @@ impl Default for LoggerOptions {
             decay: DEFAULT_DECAY,
             max_visible: DEFAULT_MAX_VISIBLE,
             path: Some(paths::log_file_path()),
+            file_level: log::Level::Debug,
         }
     }
 }
@@ -207,7 +218,7 @@ impl AppLogger {
                 assert!(file.is_ok(), "Failed to open log file at {:?}", path);
                 Mutex::new(file.unwrap())
             }),
-            file_level: RwLock::new(log::Level::Debug),
+            file_level: RwLock::new(options.file_level),
         };
         let ui_logs = UiLogs {
             logs,
@@ -221,7 +232,7 @@ impl AppLogger {
     }
 
     pub fn init(self) {
-        let log_ref = Box::<AppLogger>::leak(Box::new(self));
+        let log_ref = Box::<_>::leak(Box::new(self));
         log::set_logger(log_ref).unwrap();
         log::set_max_level(log::LevelFilter::Trace);
     }
@@ -245,7 +256,7 @@ impl Log for AppLogger {
         });
 
         if let Some(file) = &self.file {
-            if record.metadata().level() <= *self.file_level.read().unwrap() {
+            if record.level() <= *self.file_level.read().unwrap() {
                 let mut file = file.lock().unwrap();
                 let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
 

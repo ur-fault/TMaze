@@ -123,14 +123,12 @@ impl App {
         let theme_def = settings.get_theme();
         let theme = resolver.resolve(&theme_def);
 
-        let (logger, logs) = if !read_only {
-            AppLogger::new(settings.get_logging_level())
-        } else {
-            AppLogger::new_with_options(
-                settings.get_logging_level(),
-                LoggerOptions::default().read_only(),
-            )
-        };
+        let (logger, logs) = AppLogger::new_with_options(
+            settings.get_logging_level(),
+            LoggerOptions::default()
+                .read_only(read_only)
+                .file_level(settings.get_file_logging_level()),
+        );
         logger.init();
 
         #[cfg(feature = "sound")]
@@ -162,6 +160,7 @@ impl App {
 
         let rem_events = 'mainloop: loop {
             while let Some(job) = self.data.jobs.pop() {
+                log::trace!("Running job: {:?}", job.name().unwrap_or("<unnamed>"));
                 job.call(&mut self.data);
             }
 
@@ -194,7 +193,7 @@ impl App {
 
             while let Some(change) = match self.activities.active_mut() {
                 Some(active) => {
-                    log::trace!("Active activity: '{}'", active.name());
+                    log::trace!("Updating activity: '{}'", active.name());
                     active
                 }
                 None => break 'mainloop events,
@@ -204,7 +203,7 @@ impl App {
                 match change {
                     Change::Push(activity) => {
                         log::trace!(
-                            "Pushed new activity `{}/{}`",
+                            "Pushed new activity '{}/{}'",
                             activity.source(),
                             activity.name()
                         );
