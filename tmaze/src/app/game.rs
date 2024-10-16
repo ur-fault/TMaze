@@ -988,7 +988,7 @@ impl MazeBoard {
         let size = maze_render_size(maze);
 
         let mut frame = Frame::new(size);
-        frame.fill(renderer::Cell::styled(' ', theme["background"]));
+        frame.fill(renderer::Cell::styled(' ', theme["game.background"]));
 
         let mut draw = |pos, l: LineDir| frame.draw(Dims::from(pos), l.double(), normals);
 
@@ -1072,6 +1072,7 @@ pub fn game_theme_resolver() -> ThemeResolver {
         .link("game.player", "highlight")
         .link("game.player.on.stairs", "game.stairs")
         .link("game.visited", "dim")
+        .link("game.background", "background")
         // special
         .link("game.viewport.border", "border")
         .link("debug.border", "border")
