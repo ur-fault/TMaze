@@ -16,7 +16,7 @@ use crate::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
     lerp, menu_actions,
-    renderer::Frame,
+    renderer::{self, Frame},
     settings::{
         self,
         theme::{Theme, ThemeResolver},
@@ -988,6 +988,7 @@ impl MazeBoard {
         let size = maze_render_size(maze);
 
         let mut frame = Frame::new(size);
+        frame.fill(renderer::Cell::styled(' ', theme["background"]));
 
         let mut draw = |pos, l: LineDir| frame.draw(Dims::from(pos), l.double(), normals);
 

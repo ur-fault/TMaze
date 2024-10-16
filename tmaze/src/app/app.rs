@@ -8,7 +8,7 @@ use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
-    renderer::{drawable::Drawable, Renderer},
+    renderer::{drawable::Drawable, Cell, Renderer},
     settings::{
         theme::{Theme, ThemeResolver},
         Settings,
@@ -225,6 +225,10 @@ impl App {
                     }
                 }
             }
+
+            self.renderer
+                .frame()
+                .fill(Cell::styled(' ', self.data.theme.get("background")));
 
             self.activities
                 .active()
