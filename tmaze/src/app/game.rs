@@ -820,7 +820,10 @@ impl ActivityHandler for GameActivity {
                     self.game.camera_pos = maze2screen_3d(self.game.game.get_player_pos());
                 }
                 CameraMode::EdgeFollow(xoff, yoff) => 'b: {
+                    self.game.camera_pos.2 = self.game.game.get_player_pos().2;
+
                     let (vp_size, does_fit) = self.viewport_size(data.screen_size);
+
                     if does_fit {
                         break 'b;
                     }
