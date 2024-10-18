@@ -99,7 +99,7 @@ pub fn popup_theme_resolver() -> ThemeResolver {
     resolver
         .link("ui.popup.border", "border")
         .link("ui.popup.text", "text")
-        .link("ui.popup.title", "title");
+        .link("ui.popup.title", "text");
 
     resolver
 }
