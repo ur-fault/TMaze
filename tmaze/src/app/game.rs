@@ -929,7 +929,7 @@ impl Screen for GameActivity {
 
 #[inline]
 fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut Frame, vp: Rect, theme: &Theme) {
-    let [s_start, s_end] = theme.extract(["debug_rulers_start", "debug_rulers_end"]);
+    let [s_start, s_end] = theme.extract(["debug.rulers.start", "debug.rulers.end"]);
 
     let vps = vp.size();
 
