@@ -274,6 +274,7 @@ impl From<DimsU> for (usize, usize) {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Offset {
     Abs(i32),
     Rel(f32),
