@@ -76,7 +76,7 @@ impl<'a> Iterator for LogsIter<'a> {
             self.index = 0;
         }
 
-        if self.level >= self.logs.logs.len() || self.level > self.min_level as usize {
+        if self.level >= self.logs.logs.len() || self.level >= self.min_level as usize {
             return None;
         }
 
