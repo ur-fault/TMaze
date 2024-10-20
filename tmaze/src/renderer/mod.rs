@@ -255,7 +255,8 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(size: Dims) -> Self {
-        let mut buffer = Vec::new();
+        assert!(size.0 > 0 && size.1 > 0);
+        let mut buffer = Vec::with_capacity(size.1 as usize);
         for _ in 0..size.1 {
             buffer.push(vec![Cell::new(' '); size.0 as usize]);
         }
