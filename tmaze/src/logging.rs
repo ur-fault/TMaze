@@ -1,6 +1,7 @@
 use std::{
     io::Write,
     ops,
+    panic::{self, Location},
     path::PathBuf,
     sync::{Arc, Mutex, MutexGuard, RwLock},
     time::Duration,
@@ -232,9 +233,36 @@ impl AppLogger {
     }
 
     pub fn init(self) {
+        self.register_panic_hook();
         let log_ref = Box::<_>::leak(Box::new(self));
         log::set_logger(log_ref).unwrap();
         log::set_max_level(log::LevelFilter::Trace);
+    }
+
+    fn register_panic_hook(&self) {
+        let prev = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            let message: Option<&str> = if let Some(s) = info.payload().downcast_ref::<&str>() {
+                Some(s)
+            } else if let Some(s) = info.payload().downcast_ref::<String>() {
+                Some(s)
+            } else {
+                None
+            };
+
+            let location = info
+                .location()
+                .map(Location::to_string)
+                .unwrap_or_else(|| "<no location>".to_string());
+
+            log::error!(
+                "Panic occurred: \"{}\" at {}",
+                message.unwrap_or("<no message>"),
+                location
+            );
+
+            prev(info)
+        }));
     }
 
     fn borrow_mut_logs(&self) -> MutexGuard<Logs> {
