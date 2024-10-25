@@ -1,4 +1,5 @@
 use cmaze::{
+    array::Array2DView,
     dims::*,
     game::{GameProperities, GeneratorFn, ProgressComm, RunningGame, RunningGameState},
     gameboard::{
@@ -1022,32 +1023,31 @@ impl MazeBoard {
             }
         }
 
-        let cells = &maze.get_cells()[floor as usize];
-        Self::render_stairs(&mut frame, cells, maze.is_tower(), theme);
+        let layer = maze.get_cells().layer(floor as usize).unwrap();
+        Self::render_stairs(&mut frame, layer, maze.is_tower(), theme);
 
         frame
     }
 
-    fn render_stairs(frame: &mut Frame, floors: &[Vec<Cell>], tower: bool, theme: &Theme) {
+    fn render_stairs(frame: &mut Frame, floors: Array2DView<Cell>, tower: bool, theme: &Theme) {
         let s_stairs_up = theme["game.stairs.up"];
         let s_stairs_down = theme["game.stairs.down"];
         let s_stairs_both = theme["game.stairs.both"];
         let s_stairs_up_tower = theme["game.stairs.up.tower"];
 
-        for (y, row) in floors.iter().enumerate() {
-            for (x, cell) in row.iter().enumerate() {
-                let (up, down) = (!cell.get_wall(CellWall::Up), !cell.get_wall(CellWall::Down));
-                let (ch, st) = match (up, down) {
-                    (true, true) => ('⥮', s_stairs_both),
-                    (true, false) => ('↑', s_stairs_up),
-                    (false, true) => ('↓', s_stairs_down),
-                    _ => continue,
-                };
+        for pos in floors.iter_pos() {
+            let cell = floors[pos];
+            let (up, down) = (!cell.get_wall(CellWall::Up), !cell.get_wall(CellWall::Down));
+            let (ch, st) = match (up, down) {
+                (true, true) => ('⥮', s_stairs_both),
+                (true, false) => ('↑', s_stairs_up),
+                (false, true) => ('↓', s_stairs_down),
+                _ => continue,
+            };
 
-                let style = if tower && up { s_stairs_up_tower } else { st };
-                let pos = maze2screen(Dims(x as i32, y as i32));
-                frame.draw(pos, ch, style);
-            }
+            let style = if tower && up { s_stairs_up_tower } else { st };
+            let pos = maze2screen(pos);
+            frame.draw(pos, ch, style);
         }
     }
 

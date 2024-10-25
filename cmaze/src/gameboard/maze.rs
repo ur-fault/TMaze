@@ -1,9 +1,14 @@
 use self::CellWall::*;
-use crate::{dims::*, gameboard::cell::{Cell, CellWall}};
+use crate::{
+    array::Array3D,
+    dims::*,
+    gameboard::cell::{Cell, CellWall},
+};
 
 #[derive(Clone)]
 pub struct Maze {
-    pub(crate) cells: Vec<Vec<Vec<Cell>>>,
+    // pub(crate) cells: Vec<Vec<Vec<Cell>>>,
+    pub(crate) cells: Array3D<Cell>,
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) depth: usize,
@@ -66,7 +71,7 @@ impl Maze {
         )
     }
 
-    pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
+    pub fn get_neighbors_pos(&self, cell: Dims3D) -> Vec<Dims3D> {
         let offsets = [
             Dims3D(-1, 0, 0),
             Dims3D(1, 0, 0),
@@ -78,10 +83,14 @@ impl Maze {
         offsets
             .into_iter()
             .filter(|off| self.is_valid_neighbor(cell, *off))
-            .map(|off| {
-                &self.cells[(cell.2 + off.2) as usize][(cell.1 + off.1) as usize]
-                    [(cell.0 + off.0) as usize]
-            })
+            .map(|off| Dims3D(cell.0 + off.0, cell.1 + off.1, cell.2 + off.2))
+            .collect()
+    }
+
+    pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
+        self.get_neighbors_pos(cell)
+            .into_iter()
+            .filter_map(|pos| self.get_cell(pos))
             .collect()
     }
 
@@ -90,23 +99,17 @@ impl Maze {
             return;
         }
 
-        self.cells[cell.2 as usize][cell.1 as usize][cell.0 as usize].remove_wall(wall);
-        let neighbor_offset = wall.to_coord();
-        {
-            let x2 = (cell.0 + neighbor_offset.0) as usize;
-            let y2 = (cell.1 + neighbor_offset.1) as usize;
-            let z2 = (cell.2 + neighbor_offset.2) as usize;
-            self.cells[z2][y2][x2].remove_wall(wall.reverse_wall());
-        }
+        self.cells[cell].remove_wall(wall);
+        self.cells[cell + wall.to_coord()].remove_wall(wall.reverse_wall());
     }
 
-    pub fn get_cells(&self) -> &[Vec<Vec<Cell>>] {
+    pub fn get_cells(&self) -> &Array3D<Cell> {
         &self.cells
     }
 
     pub fn get_cell(&self, pos: Dims3D) -> Option<&Cell> {
         if self.is_in_bounds(pos) {
-            Some(&self.cells[pos.2 as usize][pos.1 as usize][pos.0 as usize])
+            Some(&self.cells[pos])
         } else {
             None
         }
@@ -114,7 +117,7 @@ impl Maze {
 
     pub fn get_cell_mut(&mut self, pos: Dims3D) -> Option<&mut Cell> {
         if self.is_in_bounds(pos) {
-            Some(&mut self.cells[pos.2 as usize][pos.1 as usize][pos.0 as usize])
+            Some(&mut self.cells[pos])
         } else {
             None
         }

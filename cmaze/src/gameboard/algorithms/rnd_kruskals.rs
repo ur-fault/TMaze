@@ -4,16 +4,14 @@ use std::sync::{Arc, Mutex};
 
 use super::{
     super::cell::{Cell, CellWall},
-    GenErrorInstant, GenErrorThreaded, Maze, MazeAlgorithm, Progress, StopGenerationFlag,
+    CellMask, GenErrorInstant, GenErrorThreaded, GroupGenerator, Maze, MazeAlgorithm, Progress,
+    StopGenerationFlag,
 };
-use crate::dims::*;
+use crate::{array::Array3D, dims::*};
 
 use CellWall::*;
 
-#[cfg(feature = "hashbrown")]
 use hashbrown::HashSet;
-#[cfg(not(feature = "hashbrown"))]
-use std::collections::HashSet;
 
 pub struct RndKruskals {}
 impl MazeAlgorithm for RndKruskals {
@@ -32,49 +30,27 @@ impl MazeAlgorithm for RndKruskals {
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
         let cell_count = wu * hu * du;
 
-        let mut cells: Vec<Vec<Vec<Cell>>> = vec![vec![Vec::with_capacity(wu); hu]; du];
-
-        for z in 0..d {
-            for y in 0..h {
-                for x in 0..w {
-                    cells[z as usize][y as usize].push(Cell::new(Dims3D(x, y, z)));
-                }
-            }
-        }
+        let cells = Array3D::new(Cell::new(), wu, hu, du);
+        let mut sets = Vec::<HashSet<Dims3D>>::with_capacity(cell_count);
 
         let wall_count = (hu * (wu - 1) + wu * (hu - 1)) * du + wu * hu * (du - 1);
         let mut walls: Vec<(Dims3D, CellWall)> = Vec::with_capacity(wall_count);
         progress.lock().unwrap().from = wall_count;
 
-        for (iz, floor) in cells.iter().enumerate() {
-            for (iy, row) in floor.iter().enumerate() {
-                for ix in 0..row.len() {
-                    if ix != wu - 1 {
-                        walls.push((Dims3D(ix as i32, iy as i32, iz as i32), Right));
-                    }
-
-                    if iy != hu - 1 {
-                        walls.push((Dims3D(ix as i32, iy as i32, iz as i32), Bottom));
-                    }
-
-                    if iz != du - 1 {
-                        walls.push((Dims3D(ix as i32, iy as i32, iz as i32), Up));
-                    }
-                }
+        for pos @ Dims3D(x, y, z) in cells.iter_pos() {
+            if x as usize != wu - 1 {
+                walls.push((pos, Right));
             }
-        }
 
-        let mut sets = Vec::<HashSet<Dims3D>>::with_capacity(cell_count);
-        for iz in 0..cells.len() {
-            for iy in 0..cells[0].len() {
-                for ix in 0..cells[0][0].len() {
-                    sets.push(
-                        vec![Dims3D(ix as i32, iy as i32, iz as i32)]
-                            .into_iter()
-                            .collect(),
-                    );
-                }
+            if y as usize != hu - 1 {
+                walls.push((pos, Bottom));
             }
+
+            if z as usize != du - 1 {
+                walls.push((pos, Up));
+            }
+
+            sets.push(vec![pos].into_iter().collect());
         }
 
         let mut maze = Maze {
@@ -89,13 +65,13 @@ impl MazeAlgorithm for RndKruskals {
         while let Some((pos0, wall)) = walls.pop() {
             let pos1 = pos0 + wall.to_coord();
 
-            let set0_i = sets.iter().position(|set| set.contains(&pos0)).unwrap();
+            let set0_i = sets.iter().position(|set| set.contains(&pos0)).expect("cant find set0");
 
             if sets[set0_i].contains(&pos1) {
                 continue;
             }
 
-            let set1_i = sets.iter().position(|set| set.contains(&pos1)).unwrap();
+            let set1_i = sets.iter().position(|set| set.contains(&pos1)).expect("cant find set1");
 
             maze.get_cell_mut(pos0).unwrap().remove_wall(wall);
             maze.get_cell_mut(pos1)
@@ -117,8 +93,72 @@ impl MazeAlgorithm for RndKruskals {
             }
         }
 
-        progress.lock().unwrap().is_finished = true;
+        progress.lock().unwrap().is_done = true;
 
         Ok(maze)
+    }
+}
+
+impl GroupGenerator for RndKruskals {
+    fn generate(&self, mask: CellMask) -> Maze {
+        let Dims3D(w, h, d) = mask.size();
+        let (wu, hu, du) = (w as usize, h as usize, d as usize);
+
+        let mut walls: Vec<(Dims3D, CellWall)> = Vec::new();
+        let mut sets = Vec::<HashSet<Dims3D>>::new();
+        for z in 0..mask.depth {
+            for y in 0..mask.height {
+                for x in 0..mask.width {
+                    let pos = (x, y, z).into();
+                    if mask[pos] {
+                        if mask[pos + Dims3D(1, 0, 0)] {
+                            walls.push((pos, Right));
+                        }
+
+                        if mask[pos + Dims3D(0, 1, 0)] {
+                            walls.push((pos, Bottom));
+                        }
+
+                        if mask[pos + Dims3D(0, 0, 1)] {
+                            walls.push((pos, Up));
+                        }
+                    }
+
+                    sets.push(vec![pos].into_iter().collect());
+                }
+            }
+        }
+
+        let cells: Array3D<Cell> = Array3D::new(Cell::new(), wu, hu, du);
+
+        let mut maze = Maze {
+            cells,
+            width: w as usize,
+            height: h as usize,
+            depth: d as usize,
+            is_tower: false,
+        };
+
+        walls.shuffle(&mut thread_rng());
+        while let Some((from, wall)) = walls.pop() {
+            let to = from + wall.to_coord();
+
+            let from_set = sets.iter().position(|set| set.contains(&from)).unwrap();
+
+            if sets[from_set].contains(&to) {
+                continue;
+            }
+
+            maze.get_cell_mut(from).unwrap().remove_wall(wall);
+            maze.get_cell_mut(to)
+                .unwrap()
+                .remove_wall(wall.reverse_wall());
+            let from_set = sets.swap_remove(from_set);
+
+            let to_set = sets.iter().position(|set| set.contains(&to)).unwrap();
+            sets[to_set].extend(from_set);
+        }
+
+        todo!()
     }
 }

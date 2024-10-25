@@ -1,6 +1,6 @@
 use crate::{dims::*, gameboard::cell::CellWall::*};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Cell {
     left: bool,
     top: bool,
@@ -8,12 +8,10 @@ pub struct Cell {
     bottom: bool,
     up: bool,
     down: bool,
-
-    coord: Dims3D,
 }
 
 impl Cell {
-    pub fn new(pos: Dims3D) -> Cell {
+    pub fn new() -> Cell {
         Cell {
             left: true,
             right: true,
@@ -21,7 +19,6 @@ impl Cell {
             bottom: true,
             up: true,
             down: true,
-            coord: pos,
         }
     }
 
@@ -46,19 +43,7 @@ impl Cell {
             Down => self.down,
         }
     }
-
-    pub fn get_coord(&self) -> Dims3D {
-        self.coord
-    }
 }
-
-impl PartialEq for Cell {
-    fn eq(&self, other: &Self) -> bool {
-        self.coord == other.coord
-    }
-}
-
-impl Eq for Cell {}
 
 #[derive(Copy, Clone)]
 pub enum CellWall {

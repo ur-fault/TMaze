@@ -107,6 +107,17 @@ impl From<Dims3D> for Dims {
     }
 }
 
+impl Dims3D {
+    pub const ZERO: Dims3D = Dims3D(0, 0, 0);
+    pub const ONE: Dims3D = Dims3D(1, 1, 1);
+
+    pub fn iter_fill(self, to: Dims3D) -> impl Iterator<Item = Dims3D> {
+        (self.0..to.0).flat_map(move |x| {
+            (self.1..to.1).flat_map(move |y| (self.2..to.2).map(move |z| Dims3D(x, y, z)))
+        })
+    }
+}
+
 impl Add for Dims3D {
     type Output = Dims3D;
 

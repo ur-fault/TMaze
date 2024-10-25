@@ -7,7 +7,7 @@ use super::{
     StopGenerationFlag,
 };
 
-use crate::dims::*;
+use crate::{array::Array3D, dims::*};
 
 pub struct DepthFirstSearch {}
 
@@ -32,15 +32,7 @@ impl MazeAlgorithm for DepthFirstSearch {
 
         let (sx, sy, sz) = (0, 0, 0);
 
-        let mut cells: Vec<Vec<Vec<Cell>>> = vec![vec![Vec::with_capacity(wu); hu]; du];
-        for z in 0..d {
-            for y in 0..h {
-                for x in 0..w {
-                    cells[z as usize][y as usize].push(Cell::new(Dims3D(x, y, z)));
-                }
-            }
-        }
-
+        let cells = Array3D::new(Cell::new(), wu, hu, du);
         let mut maze = Maze {
             cells,
             width: wu,
@@ -55,9 +47,8 @@ impl MazeAlgorithm for DepthFirstSearch {
         while !stack.is_empty() {
             current = stack.pop().unwrap();
             let unvisited_neighbors = maze
-                .get_neighbors(current)
+                .get_neighbors_pos(current)
                 .into_iter()
-                .map(|cell| cell.get_coord())
                 .filter(|cell| !visited.contains(cell))
                 .collect::<Vec<_>>();
 
@@ -77,7 +68,7 @@ impl MazeAlgorithm for DepthFirstSearch {
             }
         }
 
-        progress.lock().unwrap().is_finished = true;
+        progress.lock().unwrap().is_done = true;
 
         Ok(maze)
     }
