@@ -49,8 +49,7 @@ fn main() {
 
     let groups = groups.mask(&mask).unwrap();
 
-    let groups = groups.layer(0).unwrap();
-    for cell in 0..groups.len() {
+    for cell in 0..groups.layer(0).unwrap().len() {
         let group = groups[groups.idx_to_dim(cell).unwrap()];
 
         if group.is_none() {
