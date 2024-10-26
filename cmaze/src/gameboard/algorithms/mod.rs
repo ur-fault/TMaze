@@ -312,7 +312,9 @@ impl Generator {
         masks
     }
 
-    pub fn build_region_graph(groups: &Array3D<u8>) -> (HashSet<(u8, u8)>, Vec<(Dims3D, Dims3D)>) {
+    pub fn build_region_graph(
+        groups: &Array3D<u8>,
+    ) -> (HashSet<(u8, u8)>, Vec<((Dims3D, u8), (Dims3D, u8))>) {
         let mut graph = HashSet::new();
         let mut borders = vec![];
 
@@ -329,8 +331,8 @@ impl Generator {
                     graph.insert((group, neighbor_group));
                     graph.insert((neighbor_group, group));
 
-                    borders.push((cell, neighbor));
-                    borders.push((neighbor, cell));
+                    borders.push(((cell, group), (neighbor, neighbor_group)));
+                    borders.push(((neighbor, neighbor_group), (cell, group)));
                 }
             }
         }

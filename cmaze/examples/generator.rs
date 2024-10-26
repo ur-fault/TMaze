@@ -43,8 +43,8 @@ fn main() {
     let mut mask = Array3D::new_dims(false, size).unwrap();
     let (_, borders) = Generator::build_region_graph(&groups);
     for border in borders {
-        mask[border.0] = true;
-        mask[border.1] = true;
+        mask[border.0.0] = true;
+        mask[border.1.0] = true;
     }
 
     let groups = groups.mask(&mask).unwrap();
