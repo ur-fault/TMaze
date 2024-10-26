@@ -54,11 +54,7 @@ fn main() {
         let group = groups[groups.idx_to_dim(cell).unwrap()];
 
         if group.is_none() {
-            if cell as i32 % size.0 == size.0 - 1 {
-                println!(" ");
-            } else {
-                print!(" ");
-            }
+            print!(" ");
         } else {
             let mut hasher = DefaultHasher::new();
             group.hash(&mut hasher);
@@ -66,11 +62,10 @@ fn main() {
             let hash = hasher.finish().wrapping_add(base_hash);
             let (r, g, b) = ((hash >> 16) as u8, (hash >> 8) as u8, hash as u8);
 
-            if cell as i32 % size.0 == size.0 - 1 {
-                println!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
-            } else {
-                print!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
-            }
+            print!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
+        }
+        if cell as i32 % size.0 == size.0 - 1 {
+            println!();
         }
     }
 }
