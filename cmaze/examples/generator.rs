@@ -3,17 +3,15 @@ use std::hash::DefaultHasher;
 
 use std::hash::{Hash as _, Hasher as _};
 
+use cmaze::array::Array3D;
 use cmaze::{
     dims::Dims3D,
-    gameboard::algorithms::{Generator, Random, RndKruskals},
+    gameboard::algorithms::{Generator, Random},
 };
 
 use rand::{thread_rng, Rng as _, SeedableRng as _};
 
 fn main() {
-    let algo = RndKruskals;
-    let gen = Generator::new(Box::new(algo));
-
     let args = env::args()
         .skip(1)
         .take(4)
@@ -39,23 +37,40 @@ fn main() {
     let size = Dims3D(args[0] as i32, args[1] as i32, 1);
     let point_count = args[2] as u8;
 
-    let points = gen.randon_points(size, point_count, &mut rng);
-    let groups = gen.split_groups(points, size, &mut rng);
-    let groups = groups.layer(0).unwrap();
+    let points = Generator::randon_points(size, point_count, &mut rng);
+    let groups = Generator::split_groups(points, size, &mut rng);
 
+    let mut mask = Array3D::new_dims(false, size).unwrap();
+    let (_, borders) = Generator::build_region_graph(&groups);
+    for border in borders {
+        mask[border.0] = true;
+        mask[border.1] = true;
+    }
+
+    let groups = groups.mask(&mask).unwrap();
+
+    let groups = groups.layer(0).unwrap();
     for cell in 0..groups.len() {
         let group = groups[groups.idx_to_dim(cell).unwrap()];
 
-        let mut hasher = DefaultHasher::new();
-        group.hash(&mut hasher);
-
-        let hash = hasher.finish().wrapping_add(base_hash);
-        let (r, g, b) = ((hash >> 16) as u8, (hash >> 8) as u8, hash as u8);
-
-        if cell as i32 % size.0 == size.0 - 1 {
-            println!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
+        if group.is_none() {
+            if cell as i32 % size.0 == size.0 - 1 {
+                println!(" ");
+            } else {
+                print!(" ");
+            }
         } else {
-            print!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
+            let mut hasher = DefaultHasher::new();
+            group.hash(&mut hasher);
+
+            let hash = hasher.finish().wrapping_add(base_hash);
+            let (r, g, b) = ((hash >> 16) as u8, (hash >> 8) as u8, hash as u8);
+
+            if cell as i32 % size.0 == size.0 - 1 {
+                println!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
+            } else {
+                print!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
+            }
         }
     }
 }

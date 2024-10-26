@@ -384,6 +384,7 @@ dependencies = [
  "rand_xoshiro",
  "rayon",
  "serde",
+ "smallvec",
  "thiserror",
 ]
 

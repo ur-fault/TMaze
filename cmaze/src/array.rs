@@ -84,6 +84,24 @@ impl<T> Array3D<T> {
             height: self.height,
         })
     }
+
+    pub fn mask(self, mask: &Array3D<bool>) -> Option<Array3D<Option<T>>> {
+        if self.size() != mask.size() {
+            return None;
+        }
+
+        Some(Array3D {
+            buf: self
+                .buf
+                .into_iter()
+                .zip(mask.buf.iter())
+                .map(|(item, mask)| if *mask { Some(item) } else { None })
+                .collect(),
+            width: self.width,
+            height: self.height,
+            depth: self.depth,
+        })
+    }
 }
 
 impl<T: Clone> Array3D<T> {

@@ -4,6 +4,7 @@ mod rnd_kruskals;
 use hashbrown::HashSet;
 use rand::{seq::SliceRandom as _, thread_rng, Rng, SeedableRng};
 use rayon::prelude::*;
+use smallvec::SmallVec;
 
 use std::{
     ops,
@@ -212,14 +213,20 @@ impl Generator {
         let mut rng = Random::seed_from_u64(thread_rng().gen());
 
         const SPLIT_COUNT: i32 = 100;
-        let point_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32) as u8;
-        let points = self.randon_points(size, point_count, &mut rng);
-        let groups = self.split_groups(points, size, &mut rng);
+        let group_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32) as u8;
+        let points = Self::randon_points(size, group_count, &mut rng);
+        let groups = Self::split_groups(points, size, &mut rng);
+        let masks = Self::split_to_masks(group_count, groups);
+
+        let regions: Vec<_> = masks
+            .into_iter()
+            .map(|mask| self.generator.generate(mask))
+            .collect();
 
         Ok(self.generator.generate(CellMask::new_dims(size)))
     }
 
-    pub fn randon_points(&self, size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
+    pub fn randon_points(size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
         assert!(size.all_positive());
         assert!(count as i32 <= size.product());
 
@@ -244,14 +251,12 @@ impl Generator {
     }
 
     // Split an maze into sensible sized groups,
-    pub fn split_groups(&self, points: Vec<Dims3D>, size: Dims3D, rng: &mut Random) -> Array3D<u8> {
+    pub fn split_groups(points: Vec<Dims3D>, size: Dims3D, rng: &mut Random) -> Array3D<u8> {
         assert!(points.len() <= u8::MAX as usize);
         assert!(!points.is_empty());
         assert!(points.clone().into_iter().collect::<HashSet<_>>().len() == points.len());
 
-        let group_count = points.len();
         let mut groups = Array3D::new_dims(None, size).unwrap();
-        let mut group_ids = (0..group_count as u8).collect::<Vec<_>>();
 
         // assign initial groups
         for (i, point) in points.into_iter().enumerate() {
@@ -263,44 +268,74 @@ impl Generator {
         // If it's found that it generates boring results, it can be replaced with a more complex
         // one.
 
-        if groups.all(|group| group.is_some()) {
-            return groups.map(|group| group.unwrap().0);
-        }
-
         let mut cycle = 0usize;
 
         loop {
-            group_ids.shuffle(rng);
-
-            let mut changed = false;
-
-            for group_id in group_ids.iter().cloned() {
-                for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
-                    if let Some((group, cyc)) = groups[cell] {
-                        if group != group_id || cyc == cycle {
-                            continue;
-                        }
-
-                        for dir in CellWall::get_in_order() {
-                            let pos = cell + dir.to_coord();
-
-                            if let Some(None) = groups.get(pos) {
-                                groups[pos] = Some((group_id, cycle));
-                                changed = true;
-                            }
-                        }
-                    }
-                }
+            if groups.all(|group| group.is_some()) {
+                break;
             }
 
-            if !changed {
-                break;
+            for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
+                if groups[cell].is_some() {
+                    continue;
+                }
+
+                let neighbors = CellWall::get_in_order()
+                    .into_iter()
+                    .map(|dir| cell + dir.to_coord())
+                    .filter_map(|pos| {
+                        groups.get(pos).and_then(|g| {
+                            g.and_then(|(g, cyc)| if cyc == cycle { None } else { Some(g) })
+                        })
+                    })
+                    .collect::<SmallVec<[_; 6]>>();
+
+                if let Some(new_group) = neighbors.choose(rng) {
+                    groups[cell] = Some((*new_group, cycle));
+                }
             }
 
             cycle = cycle.wrapping_add(1);
         }
 
         groups.map(|group| group.unwrap().0)
+    }
+
+    // Split groups into masks, ready for maze generation
+    pub fn split_to_masks(group_count: u8, groups: Array3D<u8>) -> Vec<CellMask> {
+        let mut masks = vec![CellMask::new_dims(groups.size()); group_count as usize];
+
+        for (cell, group) in groups.iter_pos().zip(groups.iter()) {
+            masks[*group as usize][cell] = true;
+        }
+
+        masks
+    }
+
+    pub fn build_region_graph(groups: &Array3D<u8>) -> (HashSet<(u8, u8)>, Vec<(Dims3D, Dims3D)>) {
+        let mut graph = HashSet::new();
+        let mut borders = vec![];
+
+        for cell in Dims3D::iter_fill(Dims3D::ZERO, groups.size()) {
+            let group = groups[cell];
+
+            use CellWall::*;
+            for dir in [Right, Bottom, Down] {
+                let neighbor = cell + dir.to_coord();
+
+                if groups.get(neighbor).is_some() && groups[neighbor] != group {
+                    let neighbor_group = groups[neighbor];
+
+                    graph.insert((group, neighbor_group));
+                    graph.insert((neighbor_group, group));
+
+                    borders.push((cell, neighbor));
+                    borders.push((neighbor, cell));
+                }
+            }
+        }
+
+        (graph, borders)
     }
 }
 
