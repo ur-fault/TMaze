@@ -62,29 +62,26 @@ impl MazeAlgorithm for RndKruskals {
         };
 
         walls.shuffle(&mut thread_rng());
-        while let Some((pos0, wall)) = walls.pop() {
-            let pos1 = pos0 + wall.to_coord();
+        while let Some((from, wall)) = walls.pop() {
+            let to = from + wall.to_coord();
 
-            let set0_i = sets.iter().position(|set| set.contains(&pos0)).expect("cant find set0");
+            let from_set = sets
+                .iter()
+                .position(|set| set.contains(&from))
+                .expect("cant find set0");
 
-            if sets[set0_i].contains(&pos1) {
+            if sets[from_set].contains(&to) {
                 continue;
             }
 
-            let set1_i = sets.iter().position(|set| set.contains(&pos1)).expect("cant find set1");
-
-            maze.get_cell_mut(pos0).unwrap().remove_wall(wall);
-            maze.get_cell_mut(pos1)
+            maze.get_cell_mut(from).unwrap().remove_wall(wall);
+            maze.get_cell_mut(to)
                 .unwrap()
                 .remove_wall(wall.reverse_wall());
-            let set0 = sets.swap_remove(set0_i);
+            let from_set = sets.swap_remove(from_set);
 
-            let set1_i = if set1_i == sets.len() - 1 {
-                sets.len() - 1
-            } else {
-                sets.iter().position(|set| set.contains(&pos1)).unwrap()
-            };
-            sets[set1_i].extend(set0);
+            let to_set = sets.iter().position(|set| set.contains(&to)).unwrap();
+            sets[to_set].extend(from_set);
 
             progress.lock().unwrap().done = wall_count - walls.len();
 

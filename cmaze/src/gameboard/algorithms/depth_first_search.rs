@@ -9,6 +9,8 @@ use super::{
 
 use crate::{array::Array3D, dims::*};
 
+use hashbrown::HashSet;
+
 pub struct DepthFirstSearch {}
 
 impl MazeAlgorithm for DepthFirstSearch {
@@ -27,10 +29,8 @@ impl MazeAlgorithm for DepthFirstSearch {
         let cell_count = wu * hu * du;
         progress.lock().unwrap().from = cell_count;
 
-        let mut visited: Vec<Dims3D> = Vec::with_capacity(cell_count);
-        let mut stack: Vec<Dims3D> = Vec::with_capacity(cell_count);
-
-        let (sx, sy, sz) = (0, 0, 0);
+        let mut visited = HashSet::with_capacity(cell_count);
+        let mut stack = Vec::with_capacity(cell_count);
 
         let cells = Array3D::new(Cell::new(), wu, hu, du);
         let mut maze = Maze {
@@ -41,8 +41,8 @@ impl MazeAlgorithm for DepthFirstSearch {
             is_tower: false,
         };
 
-        let mut current = Dims3D(sx, sy, sz);
-        visited.push(current);
+        let mut current = Dims3D::ZERO;
+        visited.insert(current);
         stack.push(current);
         while !stack.is_empty() {
             current = stack.pop().unwrap();
@@ -57,7 +57,7 @@ impl MazeAlgorithm for DepthFirstSearch {
                 let chosen = *unvisited_neighbors.choose(&mut rand::thread_rng()).unwrap();
                 let chosen_wall = Maze::which_wall_between(current, chosen).unwrap();
                 maze.remove_wall(current, chosen_wall);
-                visited.push(chosen);
+                visited.insert(chosen);
                 stack.push(chosen);
             }
 

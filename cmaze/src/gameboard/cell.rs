@@ -45,6 +45,12 @@ impl Cell {
     }
 }
 
+impl Default for Cell {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Copy, Clone)]
 pub enum CellWall {
     Left,

@@ -19,11 +19,11 @@ impl<T> Array3D<T> {
         let Dims3D(x, y, z) = pos;
         let (x, y, z) = (x as usize, y as usize, z as usize);
 
-        if (x >= self.width) || (y >= self.height) || (z >= self.depth) {
+        if x >= self.width || y >= self.height || z >= self.depth {
             return None;
         }
 
-        Some((z * self.width * self.height + y * self.width + x) as usize)
+        Some(z * self.width * self.height + y * self.width + x)
     }
 
     pub fn idx_to_dim(&self, idx: usize) -> Option<Dims3D> {
@@ -111,7 +111,7 @@ impl<'a, T> Array2DView<'a, T> {
         let Dims(x, y) = pos;
         let (x, y) = (x as usize, y as usize);
 
-        if (x >= self.width) || (y >= self.height) {
+        if x >= self.width || y >= self.height {
             return None;
         }
 
@@ -137,7 +137,7 @@ impl<'a, T> Array2DView<'a, T> {
         self.buf.iter()
     }
 
-    pub fn iter_pos<'b>(&'b self) -> impl Iterator<Item = Dims> + 'b {
+    pub fn iter_pos(&self) -> impl Iterator<Item = Dims> + '_ {
         (0..self.buf.len()).filter_map(move |i| self.idx_to_dim(i))
     }
 }

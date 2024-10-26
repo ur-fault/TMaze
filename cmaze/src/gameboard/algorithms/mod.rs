@@ -321,7 +321,7 @@ pub trait MazeAlgorithm {
 
             for (i, floor) in x.into_iter().enumerate() {
                 for Dims3D(x, y, _) in floor.cells.iter_pos() {
-                    cells[Dims3D(x, y, i as i32)] = floor.cells[Dims3D(x, y, 0)].clone();
+                    cells[Dims3D(x, y, i as i32)] = floor.cells[Dims3D(x, y, 0)];
                 }
             }
 
