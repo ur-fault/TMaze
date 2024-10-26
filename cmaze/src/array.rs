@@ -15,6 +15,10 @@ impl<T> Array3D<T> {
         Dims3D(self.width as i32, self.height as i32, self.depth as i32)
     }
 
+    pub fn len(&self) -> usize {
+        self.buf.len()
+    }
+
     pub fn dim_to_idx(&self, pos: Dims3D) -> Option<usize> {
         let Dims3D(x, y, z) = pos;
         let (x, y, z) = (x as usize, y as usize, z as usize);
@@ -41,13 +45,28 @@ impl<T> Array3D<T> {
     pub fn get(&self, pos: Dims3D) -> Option<&T> {
         self.dim_to_idx(pos).and_then(|i| self.buf.get(i))
     }
+}
 
+impl<T> Array3D<T> {
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.buf.iter()
     }
 
     pub fn iter_pos(&self) -> impl Iterator<Item = Dims3D> + use<'_, T> {
         (0..self.buf.len()).filter_map(move |i| self.idx_to_dim(i))
+    }
+
+    pub fn all(&self, f: impl Fn(&T) -> bool) -> bool {
+        self.buf.iter().all(f)
+    }
+
+    pub fn map<U>(self, f: impl Fn(T) -> U) -> Array3D<U> {
+        Array3D {
+            buf: self.buf.into_iter().map(f).collect(),
+            width: self.width,
+            height: self.height,
+            depth: self.depth,
+        }
     }
 
     pub fn layer(&self, z: usize) -> Option<Array2DView<T>> {
@@ -75,6 +94,18 @@ impl<T: Clone> Array3D<T> {
             height,
             depth,
         }
+    }
+
+    pub fn new_dims(item: T, size: Dims3D) -> Option<Self> {
+        if !size.all_non_negative() {
+            return None;
+        }
+        Some(Self::new(
+            item,
+            size.0 as usize,
+            size.1 as usize,
+            size.2 as usize,
+        ))
     }
 }
 
@@ -105,6 +136,10 @@ pub struct Array2DView<'a, T> {
 impl<'a, T> Array2DView<'a, T> {
     pub fn size(&self) -> Dims {
         Dims(self.width as i32, self.height as i32)
+    }
+
+    pub fn len(&self) -> usize {
+        self.buf.len()
     }
 
     pub fn dim_to_idx(&self, pos: Dims) -> Option<usize> {

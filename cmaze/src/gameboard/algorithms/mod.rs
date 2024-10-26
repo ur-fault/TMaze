@@ -1,7 +1,8 @@
 mod depth_first_search;
 mod rnd_kruskals;
 
-use rand::{thread_rng, Rng};
+use hashbrown::HashSet;
+use rand::{seq::SliceRandom as _, thread_rng, Rng, SeedableRng};
 use rayon::prelude::*;
 
 use std::{
@@ -15,6 +16,8 @@ use super::{Cell, CellWall, Maze};
 use crate::{array::Array3D, dims::*, game::ProgressComm};
 pub use depth_first_search::DepthFirstSearch;
 pub use rnd_kruskals::RndKruskals;
+
+pub type Random = rand_xoshiro::Xoshiro256StarStar;
 
 #[derive(Debug)]
 pub enum GenErrorInstant {
@@ -161,7 +164,7 @@ impl CellMask {
             return false;
         }
 
-        for pos in Dims3D::ZERO.iter_fill(self.size()) {
+        for pos in Dims3D::iter_fill(Dims3D::ZERO, self.size()) {
             if mask[pos] {
                 dfs(&mut mask, pos);
                 break;
@@ -206,7 +209,98 @@ impl Generator {
             return Err(());
         }
 
+        let mut rng = Random::seed_from_u64(thread_rng().gen());
+
+        const SPLIT_COUNT: i32 = 100;
+        let point_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32) as u8;
+        let points = self.randon_points(size, point_count, &mut rng);
+        let groups = self.split_groups(points, size, &mut rng);
+
         Ok(self.generator.generate(CellMask::new_dims(size)))
+    }
+
+    pub fn randon_points(&self, size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
+        assert!(size.all_positive());
+        assert!(count as i32 <= size.product());
+
+        let count = count as usize;
+        let mut points = Vec::with_capacity(count);
+
+        rng.gen_range(0..size.0);
+
+        while points.len() < count {
+            let point = Dims3D(
+                rng.gen_range(0..size.0),
+                rng.gen_range(0..size.1),
+                rng.gen_range(0..size.2),
+            );
+
+            if !points.contains(&point) {
+                points.push(point);
+            }
+        }
+
+        points
+    }
+
+    // Split an maze into sensible sized groups,
+    pub fn split_groups(&self, points: Vec<Dims3D>, size: Dims3D, rng: &mut Random) -> Array3D<u8> {
+        assert!(points.len() <= u8::MAX as usize);
+        assert!(!points.is_empty());
+        assert!(points.clone().into_iter().collect::<HashSet<_>>().len() == points.len());
+
+        let group_count = points.len();
+        let mut groups = Array3D::new_dims(None, size).unwrap();
+        let mut group_ids = (0..group_count as u8).collect::<Vec<_>>();
+
+        // assign initial groups
+        for (i, point) in points.into_iter().enumerate() {
+            groups[point] = Some((i as u8, usize::MAX));
+        }
+
+        // This algorithm uses simple flood with diamond shaped search and randomized group order
+        // on each cycle.
+        // If it's found that it generates boring results, it can be replaced with a more complex
+        // one.
+
+        if groups.all(|group| group.is_some()) {
+            return groups.map(|group| group.unwrap().0);
+        }
+
+        let mut cycle = 0usize;
+
+        loop {
+            group_ids.shuffle(rng);
+
+            let mut changed = false;
+
+            for group_id in group_ids.iter().cloned() {
+                for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
+                    if let Some((group, cyc)) = groups[cell] {
+                        if group != group_id || cyc == cycle {
+                            continue;
+                        }
+
+                        for dir in CellWall::get_in_order() {
+                            let pos = cell + dir.to_coord();
+
+                            if let Some(None) = groups.get(pos) {
+                                groups[pos] = Some((group_id, cycle));
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !changed {
+                break;
+            }
+
+            cycle = cycle.wrapping_add(1);
+        }
+
+        groups.map(|group| group.unwrap().0)
     }
 }
 

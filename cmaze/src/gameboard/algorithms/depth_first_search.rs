@@ -19,11 +19,12 @@ impl MazeAlgorithm for DepthFirstSearch {
         stopper: StopGenerationFlag,
         progress: Arc<Mutex<Progress>>,
     ) -> Result<Maze, GenErrorThreaded> {
-        if size.0 == 0 || size.1 == 0 || size.2 == 0 {
+        if !size.all_positive() {
             return Err(GenErrorThreaded::GenerationError(
                 GenErrorInstant::InvalidSize(size),
             ));
         }
+
         let Dims3D(w, h, d) = size;
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
         let cell_count = wu * hu * du;

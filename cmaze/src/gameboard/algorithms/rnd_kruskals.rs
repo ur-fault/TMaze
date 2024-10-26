@@ -13,7 +13,7 @@ use CellWall::*;
 
 use hashbrown::HashSet;
 
-pub struct RndKruskals {}
+pub struct RndKruskals;
 impl MazeAlgorithm for RndKruskals {
     fn generate_individual(
         size: Dims3D,
