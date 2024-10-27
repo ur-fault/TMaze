@@ -130,9 +130,9 @@ impl GroupGenerator for RndKruskals {
 
         let mut maze = Maze {
             cells,
-            width: w as usize,
-            height: h as usize,
-            depth: d as usize,
+            width: wu,
+            height: hu,
+            depth: du,
             is_tower: false,
         };
 

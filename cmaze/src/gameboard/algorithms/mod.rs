@@ -1,7 +1,7 @@
 mod depth_first_search;
 mod rnd_kruskals;
 
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng, SeedableRng};
 use rayon::prelude::*;
 use smallvec::SmallVec;
@@ -312,10 +312,69 @@ impl Generator {
         masks
     }
 
-    pub fn build_region_graph(
-        groups: &Array3D<u8>,
-    ) -> (HashSet<(u8, u8)>, Vec<((Dims3D, u8), (Dims3D, u8))>) {
-        let mut graph = HashSet::new();
+    pub fn connect_regions(
+        groups: Array3D<u8>,
+        mut regions: Vec<Maze>,
+        rng: &mut Random,
+    ) -> Maze {
+        // Disclaimer: this implementation can be slow af, since there is a maximum of a 256 groups
+        // We use a simple Kruskal's algorithm to connect the regions
+
+        let borders = Self::build_region_graph(&groups);
+
+        let mut walls = HashMap::new();
+        for ((from, from_g), (dir, to_g)) in borders {
+            assert_ne!(from_g, to_g);
+            walls
+                .entry((from_g, to_g))
+                .or_insert_with(|| Vec::new())
+                .push((from, dir));
+        }
+
+        let mut walls: Vec<_> = walls
+            .into_iter()
+            .map(|(k, v)| (k, *v.choose(rng).unwrap()))
+            .collect();
+        walls.shuffle(rng);
+
+        let mut sets: Vec<HashSet<u8>> = (0..regions.len() as u8)
+            .map(|i| vec![i].into_iter().collect())
+            .collect();
+
+        // Combine the regions, so we can start connecting them
+        let mut maze = Maze {
+            cells: Array3D::new_dims(Cell::new(), regions[0].size()).unwrap(),
+            width: regions[0].width,
+            height: regions[0].height,
+            depth: regions[0].depth,
+            is_tower: false,
+        };
+        for cell in groups.iter_pos() {
+            let group = groups[cell];
+            let region = &regions[group as usize];
+            maze.cells[cell] = region.cells[cell];
+        }
+
+        while let Some(((from_g, to_g), (from, dir))) = walls.pop() {
+            let from_set = sets
+                .iter()
+                .enumerate()
+                .find(|(_, set)| set.contains(&from_g))
+                .unwrap();
+            if from_set.1.contains(&to_g) {
+                continue;
+            }
+            regions[from_g as usize].remove_wall(from, dir);
+
+            let from_set = sets.swap_remove(from_set.0);
+            let to_set = sets.iter_mut().find(|set| set.contains(&to_g)).unwrap();
+            to_set.extend(from_set);
+        }
+
+        todo!();
+    }
+
+    pub fn build_region_graph(groups: &Array3D<u8>) -> Vec<((Dims3D, u8), (CellWall, u8))> {
         let mut borders = vec![];
 
         for cell in Dims3D::iter_fill(Dims3D::ZERO, groups.size()) {
@@ -325,19 +384,21 @@ impl Generator {
             for dir in [Right, Bottom, Down] {
                 let neighbor = cell + dir.to_coord();
 
-                if groups.get(neighbor).is_some() && groups[neighbor] != group {
-                    let neighbor_group = groups[neighbor];
+                if let Some(&neighbor_group) = groups.get(neighbor) {
+                    if neighbor_group != group {
+                        let ((from_g, from), (to_g, dir)) = if group < neighbor_group {
+                            ((group, cell), (neighbor_group, dir))
+                        } else {
+                            ((neighbor_group, neighbor), (group, dir.reverse_wall()))
+                        };
 
-                    graph.insert((group, neighbor_group));
-                    graph.insert((neighbor_group, group));
-
-                    borders.push(((cell, group), (neighbor, neighbor_group)));
-                    borders.push(((neighbor, neighbor_group), (cell, group)));
+                        borders.push(((from, from_g), (dir, to_g)));
+                    }
                 }
             }
         }
 
-        (graph, borders)
+        borders
     }
 }
 
