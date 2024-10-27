@@ -312,18 +312,12 @@ impl Generator {
         masks
     }
 
-    pub fn connect_regions(
-        groups: Array3D<u8>,
-        mut regions: Vec<Maze>,
-        rng: &mut Random,
-    ) -> Maze {
+    pub fn connect_regions(groups: Array3D<u8>, mut regions: Vec<Maze>, rng: &mut Random) -> Maze {
         // Disclaimer: this implementation can be slow af, since there is a maximum of a 256 groups
         // We use a simple Kruskal's algorithm to connect the regions
 
-        let borders = Self::build_region_graph(&groups);
-
         let mut walls = HashMap::new();
-        for ((from, from_g), (dir, to_g)) in borders {
+        for ((from, from_g), (dir, to_g)) in Self::build_region_graph(&groups) {
             assert_ne!(from_g, to_g);
             walls
                 .entry((from_g, to_g))
@@ -331,6 +325,7 @@ impl Generator {
                 .push((from, dir));
         }
 
+        // Choose only one wall from all of the options
         let mut walls: Vec<_> = walls
             .into_iter()
             .map(|(k, v)| (k, *v.choose(rng).unwrap()))
@@ -343,7 +338,7 @@ impl Generator {
 
         // Combine the regions, so we can start connecting them
         let mut maze = Maze {
-            cells: Array3D::new_dims(Cell::new(), regions[0].size()).unwrap(),
+            cells: Array3D::new_dims(Cell::new(), groups.size()).unwrap(),
             width: regions[0].width,
             height: regions[0].height,
             depth: regions[0].depth,
