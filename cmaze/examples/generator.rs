@@ -42,17 +42,30 @@ fn main() {
 
     let mut mask = Array3D::new_dims(false, size).unwrap();
     for border in Generator::build_region_graph(&groups) {
-        mask[border.0 .0] = true;
-        mask[border.0 .0 + border.1 .0.to_coord()] = true;
+        let pos = border.1 .0;
+        mask[pos] = true;
+        mask[pos + border.1 .1.to_coord()] = true;
     }
 
-    let groups = groups.mask(&mask).unwrap();
+    let masks = Generator::split_to_masks(point_count, &groups);
+    for (i, mask) in masks.into_iter().enumerate() {
+        println!("Mask {}", i);
+        show_array(&groups, mask.to_array3d(), base_hash, size, '-');
+    }
+}
 
-    for cell in 0..groups.layer(0).unwrap().len() {
-        let group = groups[groups.idx_to_dim(cell).unwrap()];
+fn show_array(
+    groups: &Array3D<u8>,
+    mask: Array3D<bool>,
+    base_hash: u64,
+    size: Dims3D,
+    empty_char: char,
+) {
+    for cell in mask.iter_pos() {
+        let group = groups[cell];
 
-        if group.is_none() {
-            print!(" ");
+        if !mask[cell] {
+            print!("{}", empty_char);
         } else {
             let mut hasher = DefaultHasher::new();
             group.hash(&mut hasher);
@@ -62,7 +75,7 @@ fn main() {
 
             print!("\x1b[48;2;{r};{g};{b}m \x1b[0m");
         }
-        if cell as i32 % size.0 == size.0 - 1 {
+        if cell.0 == size.0 - 1 {
             println!();
         }
     }

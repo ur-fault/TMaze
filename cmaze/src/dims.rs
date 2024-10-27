@@ -12,9 +12,15 @@ pub struct Dims3D(pub i32, pub i32, pub i32);
 pub struct DimsU(pub usize, pub usize);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct GameMode {
+pub struct MazeSpec {
     pub size: Dims3D,
     pub is_tower: bool,
+}
+
+impl MazeSpec {
+    pub fn validate(&self) -> bool {
+        self.size.all_positive()
+    }
 }
 
 impl Add for Dims {

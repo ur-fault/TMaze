@@ -1,12 +1,11 @@
+use std::mem;
+
 use cmaze::{
     array::Array2DView,
     dims::*,
-    game::{GameProperities, GeneratorFn, ProgressComm, RunningGame, RunningGameState},
+    game::{GameProperities, ProgressComm, RunningGame, RunningGameState},
     gameboard::{
-        algorithms::{
-            DepthFirstSearch, GenErrorInstant, GenErrorThreaded, MazeAlgorithm, Progress,
-            RndKruskals,
-        },
+        algorithms::{Generator, GeneratorError, Progress, RndKruskals},
         Cell, CellWall,
     },
 };
@@ -199,7 +198,7 @@ impl ActivityHandler for MainMenu {
 
 pub struct MazeSizeMenu {
     menu: Menu,
-    presets: Vec<GameMode>,
+    presets: Vec<MazeSpec>,
 }
 
 impl MazeSizeMenu {
@@ -226,7 +225,7 @@ impl MazeSizeMenu {
         let presets = settings
             .get_mazes()
             .iter()
-            .map(|maze| GameMode {
+            .map(|maze| MazeSpec {
                 size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
                 is_tower: maze.tower,
             })
@@ -268,16 +267,16 @@ impl ActivityHandler for MazeSizeMenu {
 }
 
 pub struct MazeAlgorithmMenu {
-    preset: GameMode,
+    preset: MazeSpec,
     menu: Menu,
-    functions: Vec<MenuAction<GeneratorFn>>,
+    functions: Vec<MenuAction<Generator>>,
 }
 
 impl MazeAlgorithmMenu {
-    pub fn new(preset: GameMode, settings: &Settings) -> Self {
+    pub fn new(preset: MazeSpec, settings: &Settings) -> Self {
         let options = menu_actions!(
-            "Randomized Kruskal's" -> _ => RndKruskals::generate as GeneratorFn,
-            "Depth-first search" -> _ => DepthFirstSearch::generate,
+            "Randomized Kruskal's" -> _ => Generator::new(Box::new(RndKruskals)),
+            // "Depth-first search" -> _ => DepthFirstSearch::generate,
         );
 
         let (options, functions) = split_menu_actions(options);
@@ -334,23 +333,21 @@ impl ActivityHandler for MazeAlgorithmMenu {
 }
 
 pub struct MazeGenerationActivity {
-    comm: Option<ProgressComm<Result<RunningGame, GenErrorThreaded>>>,
-    game_props: GameProperities,
+    comm: Result<ProgressComm<Option<RunningGame>>, GeneratorError>,
     progress_bar: ProgressBar,
 }
 
 impl MazeGenerationActivity {
-    pub fn new(game_mode: GameMode, maze_gen: GeneratorFn) -> Self {
+    pub fn new(game_mode: MazeSpec, generator: Generator) -> Self {
         let game_props = GameProperities {
             game_mode,
-            generator: maze_gen,
+            generator,
         };
 
         let progress_bar = ProgressBar::new(format!("Generating maze: {:?}", game_mode.size));
 
         Self {
-            comm: None,
-            game_props,
+            comm: RunningGame::new(game_props),
             progress_bar,
         }
     }
@@ -364,7 +361,9 @@ impl ActivityHandler for MazeGenerationActivity {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
                         KeyCode::Esc | KeyCode::Char('q') => {
-                            if let Some(comm) = self.comm.take() {
+                            let mut comm = Err(GeneratorError); // dummy value
+                            mem::swap(&mut self.comm, &mut comm);
+                            if let Ok(comm) = comm {
                                 comm.stop_flag.stop();
                                 let _ = comm.handle.join().unwrap();
                             };
@@ -378,39 +377,18 @@ impl ActivityHandler for MazeGenerationActivity {
         }
 
         match self.comm {
-            None => match RunningGame::new_threaded(self.game_props.clone()) {
-                Ok(comm) => {
-                    log::info!("Maze generation thread started");
-                    self.comm = Some(comm);
-
-                    None
-                }
-                Err(err) => match err {
-                    GenErrorInstant::InvalidSize(size) => {
-                        let popup = Popup::new(
-                            "Invalid maze size".to_string(),
-                            vec![format!("Size: {:?}", size)],
-                        );
-
-                        Some(Change::replace(Activity::new_base_boxed(
-                            "invalid size".to_string(),
-                            popup,
-                        )))
-                    }
-                },
-            },
-
-            Some(ref comm) if comm.handle.is_finished() => {
-                let res = self
-                    .comm
-                    .take()
+            Ok(ref comm) if comm.handle.is_finished() => {
+                let mut comm = Err(GeneratorError); // dummy value
+                mem::swap(&mut self.comm, &mut comm);
+                let res = comm
+                    .ok()
                     .unwrap()
                     .handle
                     .join()
                     .expect("Could not join maze generation thread");
 
                 match res {
-                    Ok(game) => {
+                    Some(game) => {
                         let game_data = GameData {
                             camera_pos: maze2screen_3d(game.get_player_pos()),
                             game,
@@ -422,16 +400,16 @@ impl ActivityHandler for MazeGenerationActivity {
                             GameActivity::new(game_data, data),
                         )))
                     }
-                    Err(err) => match err {
-                        GenErrorThreaded::AbortGeneration => Some(Change::pop_top()),
-                        GenErrorThreaded::GenerationError(_) => {
-                            panic!("Instant generation error should be handled before");
-                        }
-                    },
+                    None => {
+                        const MSG: &str = "Maze generation was aborted";
+                        log::info!("{}", MSG);
+
+                        Some(Change::pop_top())
+                    }
                 }
             }
 
-            Some(ref comm) => {
+            Ok(ref comm) => {
                 let Progress { done, from, .. } = comm.progress();
                 self.progress_bar.update_progress(done as f64 / from as f64);
                 self.progress_bar.update_title(format!(
@@ -441,6 +419,16 @@ impl ActivityHandler for MazeGenerationActivity {
                     done as f64 / from as f64 * 100.0
                 ));
                 None
+            }
+
+            Err(ref err) => {
+                const MSG: &str = "Unknown error while generating maze";
+                log::error!("{}: {:?}", MSG, err);
+
+                Some(Change::replace(Activity::new_base_boxed(
+                    "game gen error",
+                    Popup::new("Error".to_string(), vec![MSG.to_string()]),
+                )))
             }
         }
     }
@@ -496,8 +484,8 @@ impl ActivityHandler for PauseMenu {
 
 pub struct EndGamePopup {
     popup: Popup,
-    game_mode: GameMode,
-    gen_fn: GeneratorFn,
+    game_mode: MazeSpec,
+    generator: Generator,
 }
 
 impl EndGamePopup {
@@ -512,12 +500,12 @@ impl EndGamePopup {
         let popup = Popup::new("You won".to_string(), texts);
 
         let game_mode = game.get_game_mode();
-        let gen_fn = game.get_gen_fn();
+        let generator = game.get_gen_fn().clone();
 
         Self {
             popup,
             game_mode,
-            gen_fn,
+            generator,
         }
     }
 }
@@ -532,7 +520,7 @@ impl ActivityHandler for EndGamePopup {
                 Ok(b) => match *b {
                     KeyCode::Char('r') => Some(Change::replace(Activity::new_base_boxed(
                         "game",
-                        MazeGenerationActivity::new(self.game_mode, self.gen_fn),
+                        MazeGenerationActivity::new(self.game_mode, self.generator.clone()),
                     ))),
                     KeyCode::Char('q') => Some(Change::pop_all()),
                     KeyCode::Enter | KeyCode::Char(' ') => Some(Change::pop_top()),

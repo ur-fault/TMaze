@@ -3,8 +3,7 @@ use std::sync::{Arc, Mutex};
 use rand::seq::SliceRandom;
 
 use super::{
-    super::cell::Cell, GenErrorInstant, GenErrorThreaded, Maze, MazeAlgorithm, Progress,
-    StopGenerationFlag,
+    super::cell::Cell, Flag, GenErrorInstant, GenErrorThreaded, Maze, MazeAlgorithm, Progress,
 };
 
 use crate::{array::Array3D, dims::*};
@@ -16,7 +15,7 @@ pub struct DepthFirstSearch {}
 impl MazeAlgorithm for DepthFirstSearch {
     fn generate_individual(
         size: Dims3D,
-        stopper: StopGenerationFlag,
+        stopper: Flag,
         progress: Arc<Mutex<Progress>>,
     ) -> Result<Maze, GenErrorThreaded> {
         if !size.all_positive() {
@@ -36,9 +35,6 @@ impl MazeAlgorithm for DepthFirstSearch {
         let cells = Array3D::new(Cell::new(), wu, hu, du);
         let mut maze = Maze {
             cells,
-            width: wu,
-            height: hu,
-            depth: du,
             is_tower: false,
         };
 

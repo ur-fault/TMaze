@@ -1,17 +1,20 @@
 use crate::{
     dims::*,
     gameboard::{
-        algorithms::{GenErrorInstant, GenErrorThreaded, Progress, StopGenerationFlag},
+        algorithms::{
+            CellMask, Flag, GenErrorInstant, GenErrorThreaded, Generator, GeneratorError, Progress,
+            Random,
+        },
         CellWall, Maze,
     },
 };
 
 use pausable_clock::{PausableClock, PausableInstant};
 
-use std::time::Duration;
 use std::{
     sync::{Arc, Mutex},
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 #[derive(Debug)]
@@ -30,13 +33,15 @@ pub enum RunningGameState {
     Quitted,
 }
 
-pub type GeneratorFn =
-    fn(Dims3D, bool) -> Result<ProgressComm<Result<Maze, GenErrorThreaded>>, GenErrorInstant>;
+pub type GeneratorFn = fn(
+    CellMask,
+    &mut Random,
+) -> Result<ProgressComm<Result<Maze, GenErrorThreaded>>, GenErrorInstant>;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct GameProperities {
-    pub game_mode: GameMode,
-    pub generator: GeneratorFn,
+    pub game_mode: MazeSpec,
+    pub generator: Generator,
 }
 
 pub enum MoveMode {
@@ -47,7 +52,7 @@ pub enum MoveMode {
 
 pub struct ProgressComm<R> {
     pub handle: JoinHandle<R>,
-    pub stop_flag: StopGenerationFlag,
+    pub stop_flag: Flag,
     pub recv: Arc<Mutex<Progress>>,
 }
 
@@ -60,8 +65,8 @@ impl<R> ProgressComm<R> {
 pub struct RunningGame {
     maze: Maze,
     state: RunningGameState,
-    game_mode: GameMode,
-    gen_fn: GeneratorFn,
+    game_mode: MazeSpec,
+    generator: Generator,
     #[allow(dead_code)]
     clock: Option<PausableClock>,
     start: Option<PausableInstant>,
@@ -71,46 +76,96 @@ pub struct RunningGame {
 }
 
 impl RunningGame {
-    pub fn new_threaded(
+    #[allow(unused_variables)]
+    pub fn new(
         props: GameProperities,
-    ) -> Result<ProgressComm<Result<RunningGame, GenErrorThreaded>>, GenErrorInstant> {
+    ) -> Result<ProgressComm<Option<RunningGame>>, GeneratorError> {
+        if !props.game_mode.validate() {
+            return Err(GeneratorError);
+        }
+
         let GameProperities {
-            game_mode: maze_mode,
-            generator: generation_func,
+            game_mode: game_mode @ MazeSpec { size, is_tower },
+            generator,
         } = props;
 
-        let GameMode {
-            size: msize,
-            is_tower,
-        } = maze_mode;
+        let start = Dims3D(0, 0, 0);
+        let goal = size - Dims3D::ONE;
 
-        let player_pos = Dims3D(0, 0, 0);
-        let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
+        let stop_flag = Flag::new();
+        let progress = Arc::new(Mutex::new(Progress::new_empty()));
+        let recv = Arc::clone(&progress);
 
-        let ProgressComm {
-            handle: maze_handle,
+        let stop_flag_clone = stop_flag.clone();
+
+        let handle = thread::spawn(move || {
+            let maze = generator.generate(size, None).ok()?;
+            progress.lock().unwrap().finish();
+
+            Some(RunningGame {
+                maze,
+                state: RunningGameState::NotStarted,
+                game_mode,
+                generator,
+                clock: None,
+                start: None,
+                player_pos: start,
+                goal_pos: goal,
+                moves: vec![],
+            })
+        });
+
+        let comm = ProgressComm {
+            handle,
             stop_flag,
-            recv: progress,
-        } = generation_func(msize, is_tower)?;
+            recv,
+        };
 
-        Ok(ProgressComm {
-            handle: thread::spawn(move || {
-                let maze = maze_handle.join().unwrap()?;
-                Ok(RunningGame {
-                    maze,
-                    state: RunningGameState::NotStarted,
-                    game_mode: maze_mode,
-                    gen_fn: generation_func,
-                    clock: None,
-                    start: None,
-                    player_pos,
-                    goal_pos,
-                    moves: vec![],
-                })
-            }),
-            stop_flag,
-            recv: progress,
-        })
+        Ok(comm)
+    }
+
+    pub fn new_threaded(
+        _props: GameProperities,
+    ) -> Result<ProgressComm<Result<RunningGame, GenErrorThreaded>>, GenErrorInstant> {
+        todo!();
+
+        // let GameProperities {
+        //     game_mode: maze_mode,
+        //     generator: generation_func,
+        // } = props;
+        //
+        // let MazeSpec {
+        //     size: msize,
+        //     is_tower,
+        // } = maze_mode;
+        //
+        // let player_pos = Dims3D(0, 0, 0);
+        // let goal_pos = Dims3D(msize.0 - 1, msize.1 - 1, msize.2 - 1);
+        //
+        // let ProgressComm {
+        //     handle: maze_handle,
+        //     stop_flag,
+        //     recv: progress,
+        // } = generation_func(msize, is_tower)?;
+        //
+        // Ok(ProgressComm {
+        //     handle: thread::spawn(move || {
+        //         let maze = maze_handle.join().unwrap()?;
+        //         Ok(RunningGame {
+        //             maze,
+        //             state: RunningGameState::NotStarted,
+        //             game_mode: maze_mode,
+        //             gen_fn: generation_func,
+        //             clock: None,
+        //             start: None,
+        //             player_pos,
+        //             goal_pos,
+        //             moves: vec![],
+        //         })
+        //     }),
+        //     stop_flag,
+        //     recv: progress,
+        // })
     }
 
     pub fn get_state(&self) -> RunningGameState {
@@ -137,12 +192,12 @@ impl RunningGame {
         self.moves.len()
     }
 
-    pub fn get_game_mode(&self) -> GameMode {
+    pub fn get_game_mode(&self) -> MazeSpec {
         self.game_mode
     }
 
-    pub fn get_gen_fn(&self) -> GeneratorFn {
-        self.gen_fn
+    pub fn get_gen_fn(&self) -> &Generator {
+        &self.generator
     }
 
     pub fn get_available_moves(&self) -> [bool; 6] {

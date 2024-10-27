@@ -3,8 +3,7 @@ pub mod theme;
 
 use cmaze::{
     dims::{Dims, Offset},
-    game::GeneratorFn,
-    gameboard::algorithms::MazeAlgorithm,
+    gameboard::algorithms::{Generator, RndKruskals},
 };
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
@@ -57,16 +56,13 @@ fn default_depth() -> u16 {
 pub enum MazeGenAlgo {
     #[default]
     RandomKruskals,
-    DepthFirstSearch,
+    // DepthFirstSearch,
 }
 
 impl MazeGenAlgo {
-    pub fn to_fn(&self) -> GeneratorFn {
+    pub fn to_fn(&self) -> Generator {
         match self {
-            MazeGenAlgo::RandomKruskals => cmaze::gameboard::algorithms::RndKruskals::generate,
-            MazeGenAlgo::DepthFirstSearch => {
-                cmaze::gameboard::algorithms::DepthFirstSearch::generate
-            }
+            MazeGenAlgo::RandomKruskals => Generator::new(Box::new(RndKruskals)),
         }
     }
 }

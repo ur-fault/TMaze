@@ -29,7 +29,7 @@ pub struct SaveData {
     pub last_update_check: Option<DateTime<Local>>,
 
     #[serde(default)]
-    best_results: HashMap<GameMode, SolveResult>,
+    best_results: HashMap<MazeSpec, SolveResult>,
 
     #[serde(skip_serializing, skip_deserializing)]
     path: PathBuf,
@@ -101,14 +101,14 @@ impl SaveData {
             .unwrap_or(false)
     }
 
-    pub fn get_best_result(&self, mode: GameMode) -> Option<(i32, f32)> {
+    pub fn get_best_result(&self, mode: MazeSpec) -> Option<(i32, f32)> {
         let result = self.best_results.get(&mode).copied()?;
         Some((result.moves, result.seconds))
     }
 
     pub fn set_best_result(
         &mut self,
-        mode: GameMode,
+        mode: MazeSpec,
         moves: i32,
         seconds: f32,
     ) -> Result<(), ron::Error> {

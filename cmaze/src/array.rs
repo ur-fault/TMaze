@@ -128,6 +128,17 @@ impl<T: Clone> Array3D<T> {
     }
 }
 
+impl<T> Array3D<T> {
+    pub fn from_buf(buf: Vec<T>, width: usize, height: usize, depth: usize) -> Self {
+        Self {
+            buf,
+            width,
+            height,
+            depth,
+        }
+    }
+}
+
 impl<T> ops::Index<Dims3D> for Array3D<T> {
     type Output = T;
 

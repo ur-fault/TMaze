@@ -3,7 +3,9 @@ use rand::{seq::SliceRandom, thread_rng};
 use std::sync::{Arc, Mutex};
 
 use super::{
-    super::cell::{Cell, CellWall}, CellMask, GenErrorInstant, GenErrorThreaded, GroupGenerator, Maze, MazeAlgorithm, Progress, Random, StopGenerationFlag
+    super::cell::{Cell, CellWall},
+    CellMask, Flag, GenErrorInstant, GenErrorThreaded, GroupGenerator, Maze, MazeAlgorithm,
+    Progress, Random,
 };
 use crate::{array::Array3D, dims::*};
 
@@ -11,11 +13,12 @@ use CellWall::*;
 
 use hashbrown::HashSet;
 
+#[derive(Debug)]
 pub struct RndKruskals;
 impl MazeAlgorithm for RndKruskals {
     fn generate_individual(
         size: Dims3D,
-        stopper: StopGenerationFlag,
+        stop_flag: Flag,
         progress: Arc<Mutex<Progress>>,
     ) -> Result<Maze, GenErrorThreaded> {
         if size.0 == 0 || size.1 == 0 || size.2 == 0 {
@@ -53,9 +56,6 @@ impl MazeAlgorithm for RndKruskals {
 
         let mut maze = Maze {
             cells,
-            width: w as usize,
-            height: h as usize,
-            depth: d as usize,
             is_tower: false,
         };
 
@@ -83,7 +83,7 @@ impl MazeAlgorithm for RndKruskals {
 
             progress.lock().unwrap().done = wall_count - walls.len();
 
-            if stopper.is_stopped() {
+            if stop_flag.is_stopped() {
                 return Err(GenErrorThreaded::AbortGeneration);
             }
         }
@@ -101,26 +101,21 @@ impl GroupGenerator for RndKruskals {
 
         let mut walls: Vec<(Dims3D, CellWall)> = Vec::new();
         let mut sets = Vec::<HashSet<Dims3D>>::new();
-        for z in 0..mask.depth {
-            for y in 0..mask.height {
-                for x in 0..mask.width {
-                    let pos = (x, y, z).into();
-                    if mask[pos] {
-                        if mask[pos + Dims3D(1, 0, 0)] {
-                            walls.push((pos, Right));
-                        }
-
-                        if mask[pos + Dims3D(0, 1, 0)] {
-                            walls.push((pos, Bottom));
-                        }
-
-                        if mask[pos + Dims3D(0, 0, 1)] {
-                            walls.push((pos, Up));
-                        }
-                    }
-
-                    sets.push(vec![pos].into_iter().collect());
+        for pos in Dims3D::iter_fill(Dims3D::ZERO, mask.size()) {
+            if mask[pos] {
+                if mask[pos + Dims3D(1, 0, 0)] {
+                    walls.push((pos, Right));
                 }
+
+                if mask[pos + Dims3D(0, 1, 0)] {
+                    walls.push((pos, Bottom));
+                }
+
+                if mask[pos + Dims3D(0, 0, 1)] {
+                    walls.push((pos, Up));
+                }
+
+                sets.push(Some(pos).into_iter().collect());
             }
         }
 
@@ -128,9 +123,6 @@ impl GroupGenerator for RndKruskals {
 
         let mut maze = Maze {
             cells,
-            width: wu,
-            height: hu,
-            depth: du,
             is_tower: false,
         };
 
@@ -144,16 +136,17 @@ impl GroupGenerator for RndKruskals {
                 continue;
             }
 
-            maze.get_cell_mut(from).unwrap().remove_wall(wall);
-            maze.get_cell_mut(to)
-                .unwrap()
-                .remove_wall(wall.reverse_wall());
+            maze.remove_wall(from, wall);
+            // maze.get_cell_mut(from).unwrap().remove_wall(wall);
+            // maze.get_cell_mut(to)
+            //     .unwrap()
+            //     .remove_wall(wall.reverse_wall());
             let from_set = sets.swap_remove(from_set);
 
             let to_set = sets.iter().position(|set| set.contains(&to)).unwrap();
             sets[to_set].extend(from_set);
         }
 
-        todo!()
+        maze
     }
 }

@@ -7,7 +7,7 @@ use rayon::prelude::*;
 use smallvec::SmallVec;
 
 use std::{
-    ops,
+    fmt, ops,
     sync::{Arc, Mutex, RwLock},
     thread,
 };
@@ -33,34 +33,6 @@ pub enum GenErrorThreaded {
 
 #[derive(Debug)]
 pub struct StopGenerationError;
-
-#[derive(Clone, Debug)]
-pub struct StopGenerationFlag {
-    stop: Arc<RwLock<bool>>,
-}
-
-impl Default for StopGenerationFlag {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl StopGenerationFlag {
-    pub fn new() -> Self {
-        StopGenerationFlag {
-            stop: Arc::new(RwLock::new(false)),
-        }
-    }
-
-    pub fn stop(&self) -> bool {
-        *self.stop.write().unwrap() = true;
-        self.is_stopped()
-    }
-
-    pub fn is_stopped(&self) -> bool {
-        *self.stop.read().unwrap()
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct Flag(Arc<RwLock<bool>>);
@@ -92,6 +64,29 @@ pub struct Progress {
     is_done: bool,
 }
 
+impl Progress {
+    pub fn new(done: usize, from: usize) -> Self {
+        Self {
+            done,
+            from,
+            is_done: false,
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        Self::new(0, 1)
+    }
+
+    pub fn percent(&self) -> f32 {
+        self.done as f32 / self.from as f32
+    }
+
+    pub fn finish(&mut self) {
+        self.done = self.from;
+        self.is_done = true;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CellMask {
     // TODO: Use bitset
@@ -113,6 +108,15 @@ impl CellMask {
 
     pub fn new_dims(size: Dims3D) -> Self {
         Self::new(size.0 as usize, size.1 as usize, size.2 as usize)
+    }
+
+    pub fn new_dims_empty(size: Dims3D) -> Self {
+        Self {
+            buf: vec![false; size.product() as usize],
+            width: size.0,
+            height: size.1,
+            depth: size.2,
+        }
     }
 
     pub fn new_2d(width: usize, height: usize) -> Self {
@@ -174,6 +178,19 @@ impl CellMask {
 
         mask.is_empty()
     }
+
+    pub fn to_array3d(self) -> Array3D<bool> {
+        Array3D::from_buf(
+            self.buf,
+            self.width as usize,
+            self.height as usize,
+            self.depth as usize,
+        )
+    }
+
+    pub fn fill(&mut self, value: bool) {
+        self.buf.fill(value);
+    }
 }
 
 impl ops::Index<Dims3D> for CellMask {
@@ -195,27 +212,31 @@ impl ops::IndexMut<Dims3D> for CellMask {
     }
 }
 
+#[derive(Debug)]
 pub struct GeneratorError;
 
+#[derive(Debug, Clone)]
 pub struct Generator {
-    generator: Box<dyn GroupGenerator>,
+    generator: Arc<dyn GroupGenerator>,
 }
 
 impl Generator {
     pub fn new(generator: Box<dyn GroupGenerator>) -> Self {
-        Self { generator }
+        Self {
+            generator: generator.into(),
+        }
     }
 
     // TODO: Custom error type
-    pub fn generate(&self, size: Dims3D) -> Result<Maze, GeneratorError> {
+    pub fn generate(&self, size: Dims3D, seed: Option<u64>) -> Result<Maze, GeneratorError> {
         if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
             return Err(GeneratorError);
         }
 
-        let mut rng = Random::seed_from_u64(thread_rng().gen());
+        let mut rng = Random::seed_from_u64(seed.unwrap_or_else(|| thread_rng().gen()));
 
         const SPLIT_COUNT: i32 = 100;
-        let group_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32) as u8;
+        let group_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32).max(1) as u8;
         let points = Self::random_points(size, group_count, &mut rng);
         let groups = Self::split_groups(points, size, &mut rng);
         let masks = Self::split_to_masks(group_count, &groups);
@@ -229,7 +250,7 @@ impl Generator {
 
     pub fn random_points(size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
         assert!(size.all_positive());
-        assert!(count as i32 <= size.product());
+        assert!(count as i32 <= size.product() && count > 0);
 
         let count = count as usize;
         let mut points = Vec::with_capacity(count);
@@ -304,22 +325,22 @@ impl Generator {
 
     // Split groups into masks, ready for maze generation
     pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>) -> Vec<CellMask> {
-        let mut masks = vec![CellMask::new_dims(groups.size()); group_count as usize];
+        let mut masks = vec![CellMask::new_dims_empty(groups.size()); group_count as usize];
 
-        for (cell, group) in groups.iter_pos().zip(groups.iter()) {
-            masks[*group as usize][cell] = true;
+        for (cell, &group) in groups.iter_pos().zip(groups.iter()) {
+            masks[group as usize][cell] = true;
         }
 
         masks
     }
 
-    pub fn connect_regions(groups: Array3D<u8>, mut regions: Vec<Maze>, rng: &mut Random) -> Maze {
+    pub fn connect_regions(groups: Array3D<u8>, regions: Vec<Maze>, rng: &mut Random) -> Maze {
         // Disclaimer: this implementation can be slow af, since there is a maximum of a 256 groups
         // We use a simple Kruskal's algorithm to connect the regions
 
         let mut walls = HashMap::new();
-        for ((from, from_g), (dir, to_g)) in Self::build_region_graph(&groups) {
-            assert_ne!(from_g, to_g);
+        for ((from_g, to_g), (from, dir)) in Self::build_region_graph(&groups) {
+            assert!(from_g < to_g);
             walls
                 .entry((from_g, to_g))
                 .or_insert_with(Vec::new)
@@ -334,15 +355,12 @@ impl Generator {
         walls.shuffle(rng);
 
         let mut sets: Vec<HashSet<u8>> = (0..regions.len() as u8)
-            .map(|i| vec![i].into_iter().collect())
+            .map(|i| Some(i).into_iter().collect())
             .collect();
 
         // Combine the regions, so we can start connecting them
         let mut maze = Maze {
             cells: Array3D::new_dims(Cell::new(), groups.size()).unwrap(),
-            width: regions[0].width,
-            height: regions[0].height,
-            depth: regions[0].depth,
             is_tower: false,
         };
         for cell in groups.iter_pos() {
@@ -351,6 +369,7 @@ impl Generator {
             maze.cells[cell] = region.cells[cell];
         }
 
+        #[allow(unused_variables)]
         while let Some(((from_g, to_g), (from, dir))) = walls.pop() {
             let from_set = sets
                 .iter()
@@ -360,20 +379,20 @@ impl Generator {
             if from_set.1.contains(&to_g) {
                 continue;
             }
-            regions[from_g as usize].remove_wall(from, dir);
+            maze.remove_wall(from, dir);
 
             let from_set = sets.swap_remove(from_set.0);
             let to_set = sets.iter_mut().find(|set| set.contains(&to_g)).unwrap();
             to_set.extend(from_set);
         }
 
-        todo!();
+        maze
     }
 
-    pub fn build_region_graph(groups: &Array3D<u8>) -> Vec<((Dims3D, u8), (CellWall, u8))> {
+    pub fn build_region_graph(groups: &Array3D<u8>) -> Vec<((u8, u8), (Dims3D, CellWall))> {
         let mut borders = vec![];
 
-        for cell in Dims3D::iter_fill(Dims3D::ZERO, groups.size()) {
+        for cell in groups.iter_pos() {
             let group = groups[cell];
 
             use CellWall::*;
@@ -382,13 +401,11 @@ impl Generator {
 
                 if let Some(&neighbor_group) = groups.get(neighbor) {
                     if neighbor_group != group {
-                        let ((from_g, from), (to_g, dir)) = if group < neighbor_group {
-                            ((group, cell), (neighbor_group, dir))
+                        if group < neighbor_group {
+                            borders.push(((group, neighbor_group), (cell, dir)));
                         } else {
-                            ((neighbor_group, neighbor), (group, dir.reverse_wall()))
-                        };
-
-                        borders.push(((from, from_g), (dir, to_g)));
+                            borders.push(((neighbor_group, group), (cell, dir)));
+                        }
                     }
                 }
             }
@@ -398,7 +415,7 @@ impl Generator {
     }
 }
 
-pub trait GroupGenerator {
+pub trait GroupGenerator: fmt::Debug + Sync + Send {
     fn generate(&self, mask: CellMask, rng: &mut Random) -> Maze;
 }
 
@@ -411,7 +428,7 @@ pub trait MazeAlgorithm {
             return Err(GenErrorInstant::InvalidSize(size));
         }
 
-        let stop_flag = StopGenerationFlag::new();
+        let stop_flag = Flag::new();
         let progress = Arc::new(Mutex::new(Progress {
             done: 0,
             from: 1,
@@ -424,7 +441,7 @@ pub trait MazeAlgorithm {
         Ok(ProgressComm {
             handle: thread::spawn(move || {
                 let Dims3D(w, h, d) = size;
-                let (wu, hu, du) = (w as usize, h as usize, d as usize);
+                let du = d as usize;
 
                 let cells = if floored && d > 1 {
                     let mut cells = Self::generate_floors(size, progress, stop_flag)?;
@@ -442,9 +459,6 @@ pub trait MazeAlgorithm {
 
                 Ok(Maze {
                     cells,
-                    width: wu,
-                    height: hu,
-                    depth: du,
                     is_tower: floored,
                 })
             }),
@@ -456,7 +470,7 @@ pub trait MazeAlgorithm {
     fn generate_floors(
         size: Dims3D,
         progress: Arc<Mutex<Progress>>,
-        stop_flag: StopGenerationFlag,
+        stop_flag: Flag,
     ) -> Result<Array3D<Cell>, GenErrorThreaded> {
         let Dims3D(w, h, d) = size;
         let (.., du) = (w as usize, h as usize, d as usize);
@@ -519,7 +533,7 @@ pub trait MazeAlgorithm {
 
     fn generate_individual(
         size: Dims3D,
-        stopper: StopGenerationFlag,
+        stopper: Flag,
         progress: Arc<Mutex<Progress>>,
     ) -> Result<Maze, GenErrorThreaded>;
 }

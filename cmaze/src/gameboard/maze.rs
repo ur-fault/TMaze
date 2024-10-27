@@ -9,24 +9,21 @@ use crate::{
 pub struct Maze {
     // pub(crate) cells: Vec<Vec<Vec<Cell>>>,
     pub(crate) cells: Array3D<Cell>,
-    pub(crate) width: usize,
-    pub(crate) height: usize,
-    pub(crate) depth: usize,
     pub(crate) is_tower: bool,
 }
 
 impl Maze {
     pub fn size(&self) -> Dims3D {
-        Dims3D(self.width as i32, self.height as i32, self.depth as i32)
+        self.cells.size()
     }
 
     pub fn is_in_bounds(&self, pos: Dims3D) -> bool {
         0 <= pos.0
-            && pos.0 < self.width as i32
+            && pos.0 < self.size().0
             && 0 <= pos.1
-            && pos.1 < self.height as i32
+            && pos.1 < self.size().1
             && 0 <= pos.2
-            && pos.2 < self.depth as i32
+            && pos.2 < self.size().2
     }
 
     pub fn is_valid_neighbor(&self, cell: Dims3D, off: Dims3D) -> bool {
