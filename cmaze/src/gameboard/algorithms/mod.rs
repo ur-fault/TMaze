@@ -214,7 +214,7 @@ impl Generator {
 
         const SPLIT_COUNT: i32 = 100;
         let group_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32) as u8;
-        let points = Self::randon_points(size, group_count, &mut rng);
+        let points = Self::random_points(size, group_count, &mut rng);
         let groups = Self::split_groups(points, size, &mut rng);
         let masks = Self::split_to_masks(group_count, &groups);
         let regions: Vec<_> = masks
@@ -225,7 +225,7 @@ impl Generator {
         Ok(Self::connect_regions(groups, regions, &mut rng))
     }
 
-    pub fn randon_points(size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
+    pub fn random_points(size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
         assert!(size.all_positive());
         assert!(count as i32 <= size.product());
 

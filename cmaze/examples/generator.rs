@@ -37,7 +37,7 @@ fn main() {
     let size = Dims3D(args[0] as i32, args[1] as i32, 1);
     let point_count = args[2] as u8;
 
-    let points = Generator::randon_points(size, point_count, &mut rng);
+    let points = Generator::random_points(size, point_count, &mut rng);
     let groups = Generator::split_groups(points, size, &mut rng);
 
     let mut mask = Array3D::new_dims(false, size).unwrap();
