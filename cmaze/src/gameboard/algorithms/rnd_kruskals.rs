@@ -3,9 +3,7 @@ use rand::{seq::SliceRandom, thread_rng};
 use std::sync::{Arc, Mutex};
 
 use super::{
-    super::cell::{Cell, CellWall},
-    CellMask, GenErrorInstant, GenErrorThreaded, GroupGenerator, Maze, MazeAlgorithm, Progress,
-    StopGenerationFlag,
+    super::cell::{Cell, CellWall}, CellMask, GenErrorInstant, GenErrorThreaded, GroupGenerator, Maze, MazeAlgorithm, Progress, Random, StopGenerationFlag
 };
 use crate::{array::Array3D, dims::*};
 
@@ -97,7 +95,7 @@ impl MazeAlgorithm for RndKruskals {
 }
 
 impl GroupGenerator for RndKruskals {
-    fn generate(&self, mask: CellMask) -> Maze {
+    fn generate(&self, mask: CellMask, rng: &mut Random) -> Maze {
         let Dims3D(w, h, d) = mask.size();
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
@@ -136,7 +134,7 @@ impl GroupGenerator for RndKruskals {
             is_tower: false,
         };
 
-        walls.shuffle(&mut thread_rng());
+        walls.shuffle(rng);
         while let Some((from, wall)) = walls.pop() {
             let to = from + wall.to_coord();
 

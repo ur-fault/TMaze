@@ -216,14 +216,13 @@ impl Generator {
         let group_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32) as u8;
         let points = Self::randon_points(size, group_count, &mut rng);
         let groups = Self::split_groups(points, size, &mut rng);
-        let masks = Self::split_to_masks(group_count, groups);
-
+        let masks = Self::split_to_masks(group_count, &groups);
         let regions: Vec<_> = masks
             .into_iter()
-            .map(|mask| self.generator.generate(mask))
+            .map(|mask| self.generator.generate(mask, &mut rng))
             .collect();
 
-        Ok(self.generator.generate(CellMask::new_dims(size)))
+        Ok(Self::connect_regions(groups, regions, &mut rng))
     }
 
     pub fn randon_points(size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
@@ -302,7 +301,7 @@ impl Generator {
     }
 
     // Split groups into masks, ready for maze generation
-    pub fn split_to_masks(group_count: u8, groups: Array3D<u8>) -> Vec<CellMask> {
+    pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>) -> Vec<CellMask> {
         let mut masks = vec![CellMask::new_dims(groups.size()); group_count as usize];
 
         for (cell, group) in groups.iter_pos().zip(groups.iter()) {
@@ -398,7 +397,7 @@ impl Generator {
 }
 
 pub trait GroupGenerator {
-    fn generate(&self, mask: CellMask) -> Maze;
+    fn generate(&self, mask: CellMask, rng: &mut Random) -> Maze;
 }
 
 pub trait MazeAlgorithm {
