@@ -15,6 +15,7 @@ impl<T> Array3D<T> {
         Dims3D(self.width as i32, self.height as i32, self.depth as i32)
     }
 
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.buf.len()
     }
@@ -156,6 +157,7 @@ impl<'a, T> Array2DView<'a, T> {
         Dims(self.width as i32, self.height as i32)
     }
 
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.buf.len()
     }

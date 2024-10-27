@@ -195,8 +195,10 @@ impl ops::IndexMut<Dims3D> for CellMask {
     }
 }
 
+pub struct GeneratorError;
+
 pub struct Generator {
-    pub generator: Box<dyn GroupGenerator>,
+    generator: Box<dyn GroupGenerator>,
 }
 
 impl Generator {
@@ -205,9 +207,9 @@ impl Generator {
     }
 
     // TODO: Custom error type
-    pub fn generate(&self, size: Dims3D) -> Result<Maze, ()> {
+    pub fn generate(&self, size: Dims3D) -> Result<Maze, GeneratorError> {
         if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
-            return Err(());
+            return Err(GeneratorError);
         }
 
         let mut rng = Random::seed_from_u64(thread_rng().gen());
@@ -320,7 +322,7 @@ impl Generator {
             assert_ne!(from_g, to_g);
             walls
                 .entry((from_g, to_g))
-                .or_insert_with(|| Vec::new())
+                .or_insert_with(Vec::new)
                 .push((from, dir));
         }
 
