@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 
 use std::{
     fmt, ops,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex, MutexGuard, RwLock},
     thread,
 };
 
@@ -58,11 +58,65 @@ impl Default for Flag {
     }
 }
 
+#[derive(Clone)]
+pub struct ProgressHandle {
+    progress: Arc<Mutex<Progress>>,
+    handler: ProgressHandler,
+}
+
+impl ProgressHandle {
+    pub fn new(handler: ProgressHandler) -> Self {
+        Self {
+            progress: Arc::new(Mutex::new(Progress::new_empty())),
+            handler,
+        }
+    }
+
+    pub fn split(&self) -> Self {
+        self.handler.add()
+    }
+
+    pub fn lock(&self) -> MutexGuard<Progress> {
+        self.progress.lock().unwrap()
+    }
+}
+
+#[derive(Clone)]
+pub struct ProgressHandler {
+    jobs: Arc<Mutex<Vec<ProgressHandle>>>,
+}
+
+impl ProgressHandler {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self {
+            jobs: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn add(&self) -> ProgressHandle {
+        let progress = ProgressHandle::new(self.clone());
+        self.jobs.lock().unwrap().push(progress.clone());
+        progress
+    }
+
+    pub fn progress(&self) -> Progress {
+        self.jobs.lock().unwrap().iter().fold(
+            Progress {
+                done: 0,
+                from: 0,
+                is_done: true,
+            },
+            |prog, job| prog.combine(&job.progress.lock().unwrap()),
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Progress {
     pub done: usize,
     pub from: usize,
-    is_done: bool,
+    pub is_done: bool,
 }
 
 impl Progress {
@@ -85,6 +139,14 @@ impl Progress {
     pub fn finish(&mut self) {
         self.done = self.from;
         self.is_done = true;
+    }
+
+    pub fn combine(&self, other: &Self) -> Self {
+        Self {
+            done: self.done + other.done,
+            from: self.from + other.from,
+            is_done: self.is_done && other.is_done,
+        }
     }
 }
 
@@ -125,7 +187,11 @@ impl CellMask {
     }
 
     pub fn random_cell(&self, rng: &mut Random) -> Option<Dims3D> {
-        let enabled = self.0.iter_pos().filter(|&pos| self[pos]).collect::<Vec<_>>();
+        let enabled = self
+            .0
+            .iter_pos()
+            .filter(|&pos| self[pos])
+            .collect::<Vec<_>>();
         enabled.choose(rng).copied()
     }
 
@@ -207,24 +273,35 @@ impl Generator {
     }
 
     // TODO: Custom error type
-    pub fn generate(&self, size: Dims3D, seed: Option<u64>) -> Result<Maze, GeneratorError> {
+    pub fn generate(
+        &self,
+        size: Dims3D,
+        seed: Option<u64>,
+        progress: ProgressHandle,
+    ) -> Result<Maze, GeneratorError> {
         if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
             return Err(GeneratorError);
         }
 
         let mut rng = Random::seed_from_u64(seed.unwrap_or_else(|| thread_rng().gen()));
 
+        progress.lock().done = 0;
+
         const SPLIT_COUNT: i32 = 100;
-        let group_count = (size.product() / SPLIT_COUNT).min(u8::MAX as i32).max(1) as u8;
+        let group_count = (size.product() / SPLIT_COUNT).clamp(1, u8::MAX as i32) as u8;
         let points = Self::random_points(size, group_count, &mut rng);
         let groups = Self::split_groups(points, size, &mut rng);
         let masks = Self::split_to_masks(group_count, &groups);
+
         let regions: Vec<_> = masks
             .into_iter()
-            .map(|mask| self.generator.generate(mask, &mut rng))
+            .map(|mask| self.generator.generate(mask, &mut rng, progress.split()))
             .collect();
 
-        Ok(Self::connect_regions(groups, regions, &mut rng))
+        let connect_regions = Self::connect_regions(groups, regions, &mut rng);
+        progress.lock().finish();
+
+        Ok(connect_regions)
     }
 
     pub fn random_points(size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
@@ -396,7 +473,11 @@ impl Generator {
 }
 
 pub trait GroupGenerator: fmt::Debug + Sync + Send {
-    fn generate(&self, mask: CellMask, rng: &mut Random) -> Maze;
+    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Maze;
+
+    fn guess_progress_complexity(&self, mask: &CellMask) -> usize {
+        mask.enabled_count()
+    }
 }
 
 pub trait MazeAlgorithm {
@@ -404,47 +485,48 @@ pub trait MazeAlgorithm {
         size: Dims3D,
         floored: bool,
     ) -> Result<ProgressComm<Result<Maze, GenErrorThreaded>>, GenErrorInstant> {
-        if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
-            return Err(GenErrorInstant::InvalidSize(size));
-        }
-
-        let stop_flag = Flag::new();
-        let progress = Arc::new(Mutex::new(Progress {
-            done: 0,
-            from: 1,
-            is_done: false,
-        }));
-        let recv = Arc::clone(&progress);
-
-        let stop_flag_clone = stop_flag.clone();
-
-        Ok(ProgressComm {
-            handle: thread::spawn(move || {
-                let Dims3D(w, h, d) = size;
-                let du = d as usize;
-
-                let cells = if floored && d > 1 {
-                    let mut cells = Self::generate_floors(size, progress, stop_flag)?;
-
-                    for floor in 0..du - 1 {
-                        let (x, y) = (thread_rng().gen_range(0..w), thread_rng().gen_range(0..h));
-                        cells[Dims3D(x, y, floor as i32)].remove_wall(CellWall::Up);
-                        cells[Dims3D(x, y, floor as i32 + 1)].remove_wall(CellWall::Down);
-                    }
-
-                    cells
-                } else {
-                    Self::generate_individual(Dims3D(w, h, d), stop_flag, progress)?.cells
-                };
-
-                Ok(Maze {
-                    cells,
-                    is_tower: floored,
-                })
-            }),
-            stop_flag: stop_flag_clone,
-            recv,
-        })
+        todo!()
+        // if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
+        //     return Err(GenErrorInstant::InvalidSize(size));
+        // }
+        //
+        // let stop_flag = Flag::new();
+        // let progress = Arc::new(Mutex::new(Progress {
+        //     done: 0,
+        //     from: 1,
+        //     is_done: false,
+        // }));
+        // let recv = Arc::clone(&progress);
+        //
+        // let stop_flag_clone = stop_flag.clone();
+        //
+        // Ok(ProgressComm {
+        //     handle: thread::spawn(move || {
+        //         let Dims3D(w, h, d) = size;
+        //         let du = d as usize;
+        //
+        //         let cells = if floored && d > 1 {
+        //             let mut cells = Self::generate_floors(size, progress, stop_flag)?;
+        //
+        //             for floor in 0..du - 1 {
+        //                 let (x, y) = (thread_rng().gen_range(0..w), thread_rng().gen_range(0..h));
+        //                 cells[Dims3D(x, y, floor as i32)].remove_wall(CellWall::Up);
+        //                 cells[Dims3D(x, y, floor as i32 + 1)].remove_wall(CellWall::Down);
+        //             }
+        //
+        //             cells
+        //         } else {
+        //             Self::generate_individual(Dims3D(w, h, d), stop_flag, progress)?.cells
+        //         };
+        //
+        //         Ok(Maze {
+        //             cells,
+        //             is_tower: floored,
+        //         })
+        //     }),
+        //     stop_flag: stop_flag_clone,
+        //     recv,
+        // })
     }
 
     fn generate_floors(

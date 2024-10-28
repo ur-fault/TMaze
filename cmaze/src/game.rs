@@ -2,8 +2,7 @@ use crate::{
     dims::*,
     gameboard::{
         algorithms::{
-            CellMask, Flag, GenErrorInstant, GenErrorThreaded, Generator, GeneratorError, Progress,
-            Random,
+            CellMask, Flag, GenErrorInstant, GenErrorThreaded, Generator, GeneratorError, Progress, ProgressHandler, Random
         },
         CellWall, Maze,
     },
@@ -53,12 +52,12 @@ pub enum MoveMode {
 pub struct ProgressComm<R> {
     pub handle: JoinHandle<R>,
     pub stop_flag: Flag,
-    pub recv: Arc<Mutex<Progress>>,
+    pub progress: ProgressHandler,
 }
 
 impl<R> ProgressComm<R> {
     pub fn progress(&self) -> Progress {
-        *self.recv.lock().unwrap()
+        self.progress.progress()
     }
 }
 
@@ -98,9 +97,11 @@ impl RunningGame {
 
         let stop_flag_clone = stop_flag.clone();
 
+        let progress = ProgressHandler::new();
+        let progress_clone = progress.clone();
+
         let handle = thread::spawn(move || {
-            let maze = generator.generate(size, None).ok()?;
-            progress.lock().unwrap().finish();
+            let maze = generator.generate(size, None, progress_clone.add()).ok()?;
 
             Some(RunningGame {
                 maze,
@@ -118,7 +119,7 @@ impl RunningGame {
         let comm = ProgressComm {
             handle,
             stop_flag,
-            recv,
+            progress,
         };
 
         Ok(comm)

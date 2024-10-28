@@ -4,8 +4,7 @@ use rand::seq::SliceRandom;
 use smallvec::SmallVec;
 
 use super::{
-    super::cell::Cell, CellMask, Flag, GenErrorInstant, GenErrorThreaded, GroupGenerator, Maze,
-    MazeAlgorithm, Progress, Random,
+    super::cell::Cell, CellMask, Flag, GenErrorInstant, GenErrorThreaded, GroupGenerator, Maze, MazeAlgorithm, Progress, ProgressHandle, Random
 };
 
 use crate::{array::Array3D, dims::*};
@@ -16,7 +15,7 @@ use hashbrown::HashSet;
 pub struct DepthFirstSearch;
 
 impl GroupGenerator for DepthFirstSearch {
-    fn generate(&self, mask: CellMask, rng: &mut Random) -> Maze {
+    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Maze {
         let size = mask.size();
 
         let cells = Array3D::new_dims(Cell::new(), size).unwrap();
@@ -24,6 +23,8 @@ impl GroupGenerator for DepthFirstSearch {
             cells,
             is_tower: false,
         };
+
+        progress.lock().from = mask.enabled_count();
 
         let mut visited = HashSet::with_capacity(mask.enabled_count());
         let mut stack = Vec::new();
@@ -49,7 +50,11 @@ impl GroupGenerator for DepthFirstSearch {
                 visited.insert(next);
                 stack.push(next);
             }
+
+            progress.lock().done = visited.len();
         }
+
+        progress.lock().finish();
 
         maze
     }
