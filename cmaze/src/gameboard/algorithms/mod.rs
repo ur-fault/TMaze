@@ -2,7 +2,7 @@ mod depth_first_search;
 mod rnd_kruskals;
 
 use hashbrown::{HashMap, HashSet};
-use rand::{seq::SliceRandom as _, thread_rng, Rng, SeedableRng};
+use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
 use rayon::prelude::*;
 use smallvec::SmallVec;
 
@@ -18,6 +18,7 @@ use crate::{array::Array3D, dims::*, game::ProgressComm};
 pub use depth_first_search::DepthFirstSearch;
 pub use rnd_kruskals::RndKruskals;
 
+/// Random number generator used for anything, where determinism is required.
 pub type Random = rand_xoshiro::Xoshiro256StarStar;
 
 #[derive(Debug)]
@@ -88,35 +89,19 @@ impl Progress {
 }
 
 #[derive(Debug, Clone)]
-pub struct CellMask {
-    // TODO: Use bitset
-    buf: Vec<bool>,
-    width: i32,
-    height: i32,
-    depth: i32,
-}
+pub struct CellMask(Array3D<bool>);
 
 impl CellMask {
     pub fn new(width: usize, height: usize, depth: usize) -> Self {
-        Self {
-            buf: vec![true; width * height * depth],
-            width: width as i32,
-            height: height as i32,
-            depth: depth as i32,
-        }
+        Self(Array3D::new(true, width, height, depth))
     }
 
-    pub fn new_dims(size: Dims3D) -> Self {
-        Self::new(size.0 as usize, size.1 as usize, size.2 as usize)
+    pub fn new_dims(size: Dims3D) -> Option<Self> {
+        Some(Self(Array3D::new_dims(true, size)?))
     }
 
-    pub fn new_dims_empty(size: Dims3D) -> Self {
-        Self {
-            buf: vec![false; size.product() as usize],
-            width: size.0,
-            height: size.1,
-            depth: size.2,
-        }
+    pub fn new_dims_empty(size: Dims3D) -> Option<Self> {
+        Some(Self(Array3D::new_dims(false, size)?))
     }
 
     pub fn new_2d(width: usize, height: usize) -> Self {
@@ -124,34 +109,35 @@ impl CellMask {
     }
 
     pub fn size(&self) -> Dims3D {
-        Dims3D(self.width, self.height, self.depth)
+        self.0.size()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.buf.iter().all(|&b| !b)
+        self.0.iter().all(|&b| !b)
     }
 
     pub fn is_full(&self) -> bool {
-        self.buf.iter().all(|&b| b)
+        self.0.iter().all(|&b| b)
     }
 
-    pub fn dim_to_idx(&self, pos: Dims3D) -> Option<usize> {
-        let Dims3D(x, y, z) = pos;
+    pub fn enabled_count(&self) -> usize {
+        self.0.iter().filter(|&&b| b).count()
+    }
 
-        if (x < 0 || x >= self.width) || (y < 0 || y >= self.height) || (z < 0 || z >= self.depth) {
-            None
-        } else {
-            Some((z * self.width * self.height + y * self.width + x) as usize)
-        }
+    pub fn random_cell(&self, rng: &mut Random) -> Option<Dims3D> {
+        let enabled = self.0.iter_pos().filter(|&pos| self[pos]).collect::<Vec<_>>();
+        enabled.choose(rng).copied()
     }
 
     pub fn is_connected(&self) -> bool {
         let mut mask = self.clone();
 
         fn dfs(mask: &mut CellMask, pos: Dims3D) {
-            if (pos.0 < 0 || pos.0 >= mask.width)
-                || (pos.1 < 0 || pos.1 >= mask.height)
-                || (pos.2 < 0 || pos.2 >= mask.depth)
+            let Dims3D(width, height, depth) = mask.size();
+
+            if (pos.0 < 0 || pos.0 >= width)
+                || (pos.1 < 0 || pos.1 >= height)
+                || (pos.2 < 0 || pos.2 >= depth)
             {
                 return;
             }
@@ -180,16 +166,11 @@ impl CellMask {
     }
 
     pub fn to_array3d(self) -> Array3D<bool> {
-        Array3D::from_buf(
-            self.buf,
-            self.width as usize,
-            self.height as usize,
-            self.depth as usize,
-        )
+        self.0
     }
 
     pub fn fill(&mut self, value: bool) {
-        self.buf.fill(value);
+        self.0.fill(value);
     }
 }
 
@@ -198,17 +179,15 @@ impl ops::Index<Dims3D> for CellMask {
 
     /// Returns the value at the given index, or `false` if the index is out of bounds.
     fn index(&self, index: Dims3D) -> &Self::Output {
-        self.dim_to_idx(index)
-            .and_then(|i| self.buf.get(i))
-            .unwrap_or(&false)
+        self.0.get(index).unwrap_or(&false)
     }
 }
 
 impl ops::IndexMut<Dims3D> for CellMask {
     fn index_mut(&mut self, index: Dims3D) -> &mut Self::Output {
-        self.dim_to_idx(index)
-            .and_then(|i| self.buf.get_mut(i))
-            .expect("Index out of bounds")
+        self.0
+            .get_mut(index)
+            .unwrap_or_else(|| panic!("Index out of bounds: {:?}", index))
     }
 }
 
@@ -325,7 +304,8 @@ impl Generator {
 
     // Split groups into masks, ready for maze generation
     pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>) -> Vec<CellMask> {
-        let mut masks = vec![CellMask::new_dims_empty(groups.size()); group_count as usize];
+        let mut masks =
+            vec![CellMask::new_dims_empty(groups.size()).unwrap(); group_count as usize];
 
         for (cell, &group) in groups.iter_pos().zip(groups.iter()) {
             masks[group as usize][cell] = true;

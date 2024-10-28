@@ -46,6 +46,10 @@ impl<T> Array3D<T> {
     pub fn get(&self, pos: Dims3D) -> Option<&T> {
         self.dim_to_idx(pos).and_then(|i| self.buf.get(i))
     }
+
+    pub fn get_mut(&mut self, pos: Dims3D) -> Option<&mut T> {
+        self.dim_to_idx(pos).and_then(move |i| self.buf.get_mut(i))
+    }
 }
 
 impl<T> Array3D<T> {
@@ -125,6 +129,10 @@ impl<T: Clone> Array3D<T> {
             size.1 as usize,
             size.2 as usize,
         ))
+    }
+
+    pub fn fill(&mut self, item: T) {
+        self.buf.fill(item);
     }
 }
 

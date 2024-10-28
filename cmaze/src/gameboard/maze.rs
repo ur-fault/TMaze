@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 use self::CellWall::*;
 use crate::{
     array::Array3D,
@@ -7,7 +9,6 @@ use crate::{
 
 #[derive(Clone)]
 pub struct Maze {
-    // pub(crate) cells: Vec<Vec<Vec<Cell>>>,
     pub(crate) cells: Array3D<Cell>,
     pub(crate) is_tower: bool,
 }
@@ -68,23 +69,16 @@ impl Maze {
         )
     }
 
-    pub fn get_neighbors_pos(&self, cell: Dims3D) -> Vec<Dims3D> {
-        let offsets = [
-            Dims3D(-1, 0, 0),
-            Dims3D(1, 0, 0),
-            Dims3D(0, -1, 0),
-            Dims3D(0, 1, 0),
-            Dims3D(0, 0, -1),
-            Dims3D(0, 0, 1),
-        ];
-        offsets
+    pub fn get_neighbors_pos(&self, cell: Dims3D) -> SmallVec<[Dims3D; 6]> {
+        CellWall::get_in_order()
             .into_iter()
+            .map(|wall| CellWall::to_coord(&wall))
             .filter(|off| self.is_valid_neighbor(cell, *off))
-            .map(|off| Dims3D(cell.0 + off.0, cell.1 + off.1, cell.2 + off.2))
+            .map(|off| cell + off)
             .collect()
     }
 
-    pub fn get_neighbors(&self, cell: Dims3D) -> Vec<&Cell> {
+    pub fn get_neighbors(&self, cell: Dims3D) -> SmallVec<[&Cell; 6]> {
         self.get_neighbors_pos(cell)
             .into_iter()
             .filter_map(|pos| self.get_cell(pos))

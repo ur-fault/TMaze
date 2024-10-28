@@ -5,7 +5,7 @@ use cmaze::{
     dims::*,
     game::{GameProperities, ProgressComm, RunningGame, RunningGameState},
     gameboard::{
-        algorithms::{Generator, GeneratorError, Progress, RndKruskals},
+        algorithms::{DepthFirstSearch, Generator, GeneratorError, Progress, RndKruskals},
         Cell, CellWall,
     },
 };
@@ -233,9 +233,6 @@ impl MazeSizeMenu {
 
         Self { menu, presets }
     }
-
-    // TODO: custom maze size config
-    // just one-time, since it's already in settings
 }
 
 impl ActivityHandler for MazeSizeMenu {
@@ -276,7 +273,7 @@ impl MazeAlgorithmMenu {
     pub fn new(preset: MazeSpec, settings: &Settings) -> Self {
         let options = menu_actions!(
             "Randomized Kruskal's" -> _ => Generator::new(Box::new(RndKruskals)),
-            // "Depth-first search" -> _ => DepthFirstSearch::generate,
+            "Depth-first search" -> _ => Generator::new(Box::new(DepthFirstSearch)),
         );
 
         let (options, functions) = split_menu_actions(options);
