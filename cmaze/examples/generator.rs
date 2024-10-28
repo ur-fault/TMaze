@@ -4,6 +4,7 @@ use std::hash::DefaultHasher;
 use std::hash::{Hash as _, Hasher as _};
 
 use cmaze::array::Array3D;
+use cmaze::gameboard::algorithms::{ProgressHandle, ProgressHandler};
 use cmaze::{
     dims::Dims3D,
     gameboard::algorithms::{Generator, Random},
@@ -37,8 +38,10 @@ fn main() {
     let size = Dims3D(args[0] as i32, args[1] as i32, 1);
     let point_count = args[2] as u8;
 
+    let progress_handler = ProgressHandler::new();
+    let progress = ProgressHandle::new(progress_handler);
     let points = Generator::random_points(size, point_count, &mut rng);
-    let groups = Generator::split_groups(points, size, &mut rng);
+    let groups = Generator::split_groups(points, size, &mut rng, progress.split());
 
     let mut mask = Array3D::new_dims(false, size).unwrap();
     for border in Generator::build_region_graph(&groups) {

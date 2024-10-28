@@ -59,29 +59,6 @@ impl Default for Flag {
 }
 
 #[derive(Clone)]
-pub struct ProgressHandle {
-    progress: Arc<Mutex<Progress>>,
-    handler: ProgressHandler,
-}
-
-impl ProgressHandle {
-    pub fn new(handler: ProgressHandler) -> Self {
-        Self {
-            progress: Arc::new(Mutex::new(Progress::new_empty())),
-            handler,
-        }
-    }
-
-    pub fn split(&self) -> Self {
-        self.handler.add()
-    }
-
-    pub fn lock(&self) -> MutexGuard<Progress> {
-        self.progress.lock().unwrap()
-    }
-}
-
-#[derive(Clone)]
 pub struct ProgressHandler {
     jobs: Arc<Mutex<Vec<ProgressHandle>>>,
 }
@@ -109,6 +86,29 @@ impl ProgressHandler {
             },
             |prog, job| prog.combine(&job.progress.lock().unwrap()),
         )
+    }
+}
+
+#[derive(Clone)]
+pub struct ProgressHandle {
+    progress: Arc<Mutex<Progress>>,
+    handler: ProgressHandler,
+}
+
+impl ProgressHandle {
+    pub fn new(handler: ProgressHandler) -> Self {
+        Self {
+            progress: Arc::new(Mutex::new(Progress::new_empty())),
+            handler,
+        }
+    }
+
+    pub fn split(&self) -> Self {
+        self.handler.add()
+    }
+
+    pub fn lock(&self) -> MutexGuard<Progress> {
+        self.progress.lock().unwrap()
     }
 }
 
@@ -285,17 +285,27 @@ impl Generator {
 
         let mut rng = Random::seed_from_u64(seed.unwrap_or_else(|| thread_rng().gen()));
 
-        progress.lock().done = 0;
+        progress.lock().from = 0;
 
         const SPLIT_COUNT: i32 = 100;
         let group_count = (size.product() / SPLIT_COUNT).clamp(1, u8::MAX as i32) as u8;
         let points = Self::random_points(size, group_count, &mut rng);
-        let groups = Self::split_groups(points, size, &mut rng);
+        let groups = Self::split_groups(points, size, &mut rng, progress.split());
         let masks = Self::split_to_masks(group_count, &groups);
+
+        let progresses = masks
+            .iter()
+            .map(|mask| {
+                let progress = progress.split();
+                progress.lock().from = self.generator.guess_progress_complexity(mask);
+                progress
+            })
+            .collect::<Vec<_>>();
 
         let regions: Vec<_> = masks
             .into_iter()
-            .map(|mask| self.generator.generate(mask, &mut rng, progress.split()))
+            .zip(progresses)
+            .map(|(mask, progress)| self.generator.generate(mask, &mut rng, progress))
             .collect();
 
         let connect_regions = Self::connect_regions(groups, regions, &mut rng);
@@ -304,7 +314,11 @@ impl Generator {
         Ok(connect_regions)
     }
 
-    pub fn random_points(size: Dims3D, count: u8, rng: &mut Random) -> Vec<Dims3D> {
+    pub fn random_points(
+        size: Dims3D,
+        count: u8,
+        rng: &mut Random,
+    ) -> Vec<Dims3D> {
         assert!(size.all_positive());
         assert!(count as i32 <= size.product() && count > 0);
 
@@ -329,7 +343,12 @@ impl Generator {
     }
 
     // Split an maze into sensible sized groups,
-    pub fn split_groups(points: Vec<Dims3D>, size: Dims3D, rng: &mut Random) -> Array3D<u8> {
+    pub fn split_groups(
+        points: Vec<Dims3D>,
+        size: Dims3D,
+        rng: &mut Random,
+        progress: ProgressHandle,
+    ) -> Array3D<u8> {
         assert!(points.len() <= u8::MAX as usize);
         assert!(!points.is_empty());
         assert!(points.clone().into_iter().collect::<HashSet<_>>().len() == points.len());
@@ -347,12 +366,14 @@ impl Generator {
         // one.
 
         let mut cycle = 0usize;
+        progress.lock().from = size.product() as usize;
 
         loop {
             if groups.all(|group| group.is_some()) {
                 break;
             }
 
+            let mut set_new = 0;
             for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
                 if groups[cell].is_some() {
                     continue;
@@ -370,17 +391,24 @@ impl Generator {
 
                 if let Some(new_group) = neighbors.choose(rng) {
                     groups[cell] = Some((*new_group, cycle));
+                    set_new += 1;
                 }
             }
 
             cycle = cycle.wrapping_add(1);
+            progress.lock().done += set_new;
         }
+
+        progress.lock().finish();
 
         groups.map(|group| group.unwrap().0)
     }
 
     // Split groups into masks, ready for maze generation
-    pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>) -> Vec<CellMask> {
+    pub fn split_to_masks(
+        group_count: u8,
+        groups: &Array3D<u8>,
+    ) -> Vec<CellMask> {
         let mut masks =
             vec![CellMask::new_dims_empty(groups.size()).unwrap(); group_count as usize];
 
