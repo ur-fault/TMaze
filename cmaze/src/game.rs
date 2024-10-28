@@ -2,7 +2,8 @@ use crate::{
     dims::*,
     gameboard::{
         algorithms::{
-            CellMask, Flag, GenErrorInstant, GenErrorThreaded, Generator, GeneratorError, Progress, ProgressHandler, Random
+            CellMask, Flag, GenErrorInstant, GenErrorThreaded, Generator, GeneratorError, Progress,
+            ProgressHandler, Random,
         },
         CellWall, Maze,
     },
@@ -101,7 +102,9 @@ impl RunningGame {
         let progress_clone = progress.clone();
 
         let handle = thread::spawn(move || {
-            let maze = generator.generate(size, None, progress_clone.add()).ok()?;
+            let maze = generator
+                .generate(CellMask::new_dims(size).unwrap(), None, progress_clone.add())
+                .ok()?;
 
             Some(RunningGame {
                 maze,

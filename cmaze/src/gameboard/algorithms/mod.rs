@@ -275,22 +275,18 @@ impl Generator {
     // TODO: Custom error type
     pub fn generate(
         &self,
-        size: Dims3D,
+        mask: CellMask,
         seed: Option<u64>,
         progress: ProgressHandle,
     ) -> Result<Maze, GeneratorError> {
-        if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
-            return Err(GeneratorError);
-        }
-
         let mut rng = Random::seed_from_u64(seed.unwrap_or_else(|| thread_rng().gen()));
 
         progress.lock().from = 0;
 
-        const SPLIT_COUNT: i32 = 100;
-        let group_count = (size.product() / SPLIT_COUNT).clamp(1, u8::MAX as i32) as u8;
-        let points = Self::random_points(size, group_count, &mut rng);
-        let groups = Self::split_groups(points, size, &mut rng, progress.split());
+        const SPLIT_COUNT: usize = 100;
+        let group_count = (mask.enabled_count() / SPLIT_COUNT).min(u8::MAX as usize) as u8;
+        let points = Self::random_points(&mask, group_count, &mut rng);
+        let groups = Self::split_groups(points, &mask, &mut rng, progress.split());
         let masks = Self::split_to_masks(group_count, &groups);
 
         let progresses = masks
@@ -314,25 +310,14 @@ impl Generator {
         Ok(connect_regions)
     }
 
-    pub fn random_points(
-        size: Dims3D,
-        count: u8,
-        rng: &mut Random,
-    ) -> Vec<Dims3D> {
-        assert!(size.all_positive());
-        assert!(count as i32 <= size.product() && count > 0);
-
+    pub fn random_points(mask: &CellMask, count: u8, rng: &mut Random) -> Vec<Dims3D> {
         let count = count as usize;
         let mut points = Vec::with_capacity(count);
 
-        rng.gen_range(0..size.0);
-
         while points.len() < count {
-            let point = Dims3D(
-                rng.gen_range(0..size.0),
-                rng.gen_range(0..size.1),
-                rng.gen_range(0..size.2),
-            );
+            // FIXME: this is absolutely horrible and slow implementation,
+            // but since we don't sample a lot of points, it should be fine. I hope...
+            let point = mask.random_cell(rng).unwrap();
 
             if !points.contains(&point) {
                 points.push(point);
@@ -342,10 +327,13 @@ impl Generator {
         points
     }
 
-    // Split an maze into sensible sized groups,
+    /// Split an maze into a regions, where each region is a group of connected cells.
+    ///
+    /// This functions returns a 3D array, where each cell contains a group number. The group of
+    /// the disabled cell is unspecified (but probably `0`).
     pub fn split_groups(
         points: Vec<Dims3D>,
-        size: Dims3D,
+        mask: &CellMask,
         rng: &mut Random,
         progress: ProgressHandle,
     ) -> Array3D<u8> {
@@ -353,6 +341,7 @@ impl Generator {
         assert!(!points.is_empty());
         assert!(points.clone().into_iter().collect::<HashSet<_>>().len() == points.len());
 
+        let size = mask.size();
         let mut groups = Array3D::new_dims(None, size).unwrap();
 
         // assign initial groups
@@ -366,7 +355,7 @@ impl Generator {
         // one.
 
         let mut cycle = 0usize;
-        progress.lock().from = size.product() as usize;
+        progress.lock().from = mask.enabled_count();
 
         loop {
             if groups.all(|group| group.is_some()) {
@@ -375,7 +364,7 @@ impl Generator {
 
             let mut set_new = 0;
             for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
-                if groups[cell].is_some() {
+                if !mask[cell] || groups[cell].is_some() {
                     continue;
                 }
 
@@ -405,10 +394,7 @@ impl Generator {
     }
 
     // Split groups into masks, ready for maze generation
-    pub fn split_to_masks(
-        group_count: u8,
-        groups: &Array3D<u8>,
-    ) -> Vec<CellMask> {
+    pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>) -> Vec<CellMask> {
         let mut masks =
             vec![CellMask::new_dims_empty(groups.size()).unwrap(); group_count as usize];
 
