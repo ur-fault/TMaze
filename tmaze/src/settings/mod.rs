@@ -3,7 +3,7 @@ pub mod theme;
 
 use cmaze::{
     dims::{Dims, Offset},
-    gameboard::algorithms::{DepthFirstSearch, Generator, RndKruskals},
+    gameboard::algorithms::{DefaultRegionSplitter, DepthFirstSearch, Generator, RndKruskals},
 };
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};
@@ -62,8 +62,14 @@ pub enum MazeGenAlgo {
 impl MazeGenAlgo {
     pub fn to_fn(&self) -> Generator {
         match self {
-            MazeGenAlgo::RandomKruskals => Generator::new(Box::new(RndKruskals)),
-            MazeGenAlgo::DepthFirstSearch => Generator::new(Box::new(DepthFirstSearch)),
+            MazeGenAlgo::RandomKruskals => Generator::new(
+                Box::new(RndKruskals),
+                Box::new(DefaultRegionSplitter::default()),
+            ),
+            MazeGenAlgo::DepthFirstSearch => Generator::new(
+                Box::new(DepthFirstSearch),
+                Box::new(DefaultRegionSplitter::default()),
+            ),
         }
     }
 }

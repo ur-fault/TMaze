@@ -343,6 +343,14 @@ pub struct DefaultRegionSplitter {
     pub count: RegionCount,
 }
 
+impl Default for DefaultRegionSplitter {
+    fn default() -> Self {
+        Self {
+            count: RegionCount::Every(100),
+        }
+    }
+}
+
 impl DefaultRegionSplitter {
     pub fn random_points(mask: &CellMask, count: u8, rng: &mut Random) -> Vec<Dims3D> {
         let count = count as usize;

@@ -3,9 +3,11 @@ use std::mem;
 use cmaze::{
     array::Array2DView,
     dims::*,
-    game::{GameProperities, RunningJob, RunningGame, RunningGameState},
+    game::{GameProperities, RunningGame, RunningGameState, RunningJob},
     gameboard::{
-        algorithms::{DepthFirstSearch, Generator, GeneratorError, RndKruskals},
+        algorithms::{
+            DefaultRegionSplitter, DepthFirstSearch, Generator, GeneratorError, RndKruskals,
+        },
         Cell, CellWall,
     },
     progress::Progress,
@@ -273,8 +275,8 @@ pub struct MazeAlgorithmMenu {
 impl MazeAlgorithmMenu {
     pub fn new(preset: MazeSpec, settings: &Settings) -> Self {
         let options = menu_actions!(
-            "Randomized Kruskal's" -> _ => Generator::new(Box::new(RndKruskals)),
-            "Depth-first search" -> _ => Generator::new(Box::new(DepthFirstSearch)),
+            "Randomized Kruskal's" -> _ => Generator::new(Box::new(RndKruskals), Box::new(DefaultRegionSplitter::default())),
+            "Depth-first search" -> _ => Generator::new(Box::new(DepthFirstSearch), Box::new(DefaultRegionSplitter::default())),
         );
 
         let (options, functions) = split_menu_actions(options);
