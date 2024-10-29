@@ -60,7 +60,7 @@ pub enum MazeGenAlgo {
 }
 
 impl MazeGenAlgo {
-    pub fn to_fn(&self) -> Generator {
+    pub fn to_generator(&self) -> Generator {
         match self {
             MazeGenAlgo::RandomKruskals => Generator::new(
                 Box::new(RndKruskals),

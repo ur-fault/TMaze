@@ -302,7 +302,7 @@ impl ActivityHandler for MazeAlgorithmMenu {
                 "maze_gen".to_string(),
                 MazeGenerationActivity::new(
                     self.preset,
-                    data.settings.get_default_maze_gen_algo().to_fn(),
+                    data.settings.get_default_maze_gen_algo().to_generator(),
                 ),
             )));
         }
