@@ -3,12 +3,11 @@ use std::hash::DefaultHasher;
 
 use std::hash::{Hash as _, Hasher as _};
 
-use cmaze::array::Array3D;
-use cmaze::gameboard::algorithms::CellMask;
-use cmaze::progress::{ProgressHandle, ProgressHandler};
+use cmaze::progress::ProgressHandle;
 use cmaze::{
+    array::Array3D,
     dims::Dims3D,
-    gameboard::algorithms::{Generator, Random},
+    gameboard::algorithms::{CellMask, Generator, Random},
 };
 
 use rand::{thread_rng, Rng as _, SeedableRng as _};
@@ -39,11 +38,10 @@ fn main() {
     let size = Dims3D(args[0] as i32, args[1] as i32, 1);
     let point_count = args[2] as u8;
 
-    let progress_handler = ProgressHandler::new();
-    let progress = ProgressHandle::new(progress_handler);
+    let progress = ProgressHandle::new();
     let mask = CellMask::new_dims(size).unwrap();
     let points = Generator::random_points(&mask, point_count, &mut rng);
-    let groups = Generator::split_groups(points, &mask, &mut rng, progress.split());
+    let groups = Generator::split_groups(points, &mask, &mut rng, progress);
 
     let mut mask = Array3D::new_dims(false, size).unwrap();
     for border in Generator::build_region_graph(&groups) {

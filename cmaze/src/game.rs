@@ -4,7 +4,7 @@ use crate::{
         algorithms::{CellMask, Generator, GeneratorError},
         CellWall, Maze,
     },
-    progress::{Flag, Progress, ProgressHandler},
+    progress::{Flag, Progress, ProgressHandle},
 };
 
 use pausable_clock::{PausableClock, PausableInstant};
@@ -45,7 +45,7 @@ pub enum MoveMode {
 pub struct ProgressComm<R> {
     pub handle: JoinHandle<R>,
     pub stop_flag: Flag,
-    pub progress: ProgressHandler,
+    pub progress: ProgressHandle,
 }
 
 impl<R> ProgressComm<R> {
@@ -86,16 +86,12 @@ impl RunningGame {
 
         let stop_flag = Flag::new();
 
-        let progress = ProgressHandler::new();
+        let progress = ProgressHandle::new();
         let progress_clone = progress.clone();
 
         let handle = thread::spawn(move || {
             let maze = generator
-                .generate(
-                    CellMask::new_dims(size).unwrap(),
-                    None,
-                    progress_clone.add(),
-                )
+                .generate(CellMask::new_dims(size).unwrap(), None, progress_clone)
                 .ok()?;
 
             Some(RunningGame {

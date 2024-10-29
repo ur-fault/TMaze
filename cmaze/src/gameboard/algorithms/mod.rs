@@ -3,6 +3,7 @@ mod rnd_kruskals;
 
 use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use smallvec::SmallVec;
 
 use std::{fmt, ops, sync::Arc};
@@ -171,7 +172,8 @@ impl Generator {
     ) -> Result<Maze, GeneratorError> {
         let mut rng = Random::seed_from_u64(seed.unwrap_or_else(|| thread_rng().gen()));
 
-        progress.lock().from = 0;
+        let maze_size = self.generator.guess_progress_complexity(&mask);
+        progress.lock().from = maze_size; // initial work estimate
 
         const SPLIT_COUNT: usize = 100;
         let group_count = (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
@@ -182,16 +184,26 @@ impl Generator {
         let progresses = masks
             .iter()
             .map(|mask| {
-                let progress = progress.split();
-                progress.lock().from = self.generator.guess_progress_complexity(mask);
-                progress
+                let local = progress.split();
+                local.lock().from = self.generator.guess_progress_complexity(mask);
+                local
+            })
+            .collect::<Vec<_>>();
+        progress.lock().from = 0;
+
+        let rngs = masks
+            .iter()
+            .map(|_| {
+                rng.jump();
+                rng.clone()
             })
             .collect::<Vec<_>>();
 
         let regions: Vec<_> = masks
-            .into_iter()
+            .into_par_iter()
             .zip(progresses)
-            .map(|(mask, progress)| self.generator.generate(mask, &mut rng, progress))
+            .zip(rngs)
+            .map(|((mask, progress), mut rng)| self.generator.generate(mask, &mut rng, progress))
             .collect();
 
         let connect_regions = Self::connect_regions(groups, regions, &mut rng);
@@ -220,7 +232,7 @@ impl Generator {
     /// Split an maze into a regions, where each region is a group of connected cells.
     ///
     /// This functions returns a 3D array, where each cell contains a group number. The group of
-    /// the disabled cell is unspecified (but probably `0`).
+    /// the disabled cell is unspecified.
     pub fn split_groups(
         points: Vec<Dims3D>,
         mask: &CellMask,

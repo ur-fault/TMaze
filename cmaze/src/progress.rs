@@ -24,56 +24,37 @@ impl Default for Flag {
 }
 
 #[derive(Clone)]
-pub struct ProgressHandler {
-    jobs: Arc<Mutex<Vec<ProgressHandle>>>,
-}
-
-impl ProgressHandler {
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self {
-            jobs: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    pub fn add(&self) -> ProgressHandle {
-        let progress = ProgressHandle::new(self.clone());
-        self.jobs.lock().unwrap().push(progress.clone());
-        progress
-    }
-
-    pub fn progress(&self) -> Progress {
-        self.jobs.lock().unwrap().iter().fold(
-            Progress {
-                done: 0,
-                from: 0,
-                is_done: true,
-            },
-            |prog, job| prog.combine(&job.progress.lock().unwrap()),
-        )
-    }
-}
-
-#[derive(Clone)]
 pub struct ProgressHandle {
     progress: Arc<Mutex<Progress>>,
-    handler: ProgressHandler,
+    children: Arc<Mutex<Vec<ProgressHandle>>>,
 }
 
 impl ProgressHandle {
-    pub fn new(handler: ProgressHandler) -> Self {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
         Self {
             progress: Arc::new(Mutex::new(Progress::new_empty())),
-            handler,
+            children: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
     pub fn split(&self) -> Self {
-        self.handler.add()
+        let child = Self::new();
+        self.children.lock().unwrap().push(child.clone());
+        child
     }
 
     pub fn lock(&self) -> MutexGuard<Progress> {
         self.progress.lock().unwrap()
+    }
+
+    pub fn progress(&self) -> Progress {
+        let own = *self.lock();
+        self.children
+            .lock()
+            .unwrap()
+            .iter()
+            .fold(own, |prog, child| prog.combine(&child.progress()))
     }
 }
 
@@ -94,7 +75,7 @@ impl Progress {
     }
 
     pub fn new_empty() -> Self {
-        Self::new(0, 1)
+        Self::new(0, 0)
     }
 
     pub fn percent(&self) -> f32 {
