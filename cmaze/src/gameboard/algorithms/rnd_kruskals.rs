@@ -2,7 +2,7 @@ use rand::seq::SliceRandom;
 
 use super::{
     super::cell::{Cell, CellWall},
-    CellMask, GroupGenerator, Maze, ProgressHandle, Random,
+    CellMask, RegionGenerator, Maze, ProgressHandle, Random,
 };
 use crate::{array::Array3D, dims::*};
 
@@ -13,7 +13,7 @@ use hashbrown::HashSet;
 #[derive(Debug)]
 pub struct RndKruskals;
 
-impl GroupGenerator for RndKruskals {
+impl RegionGenerator for RndKruskals {
     fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze> {
         let Dims3D(w, h, d) = mask.size();
         let (wu, hu, du) = (w as usize, h as usize, d as usize);

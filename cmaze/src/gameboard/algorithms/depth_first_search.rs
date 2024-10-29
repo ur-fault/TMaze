@@ -1,7 +1,7 @@
 use rand::seq::SliceRandom;
 use smallvec::SmallVec;
 
-use super::{super::cell::Cell, CellMask, GroupGenerator, Maze, ProgressHandle, Random};
+use super::{super::cell::Cell, CellMask, RegionGenerator, Maze, ProgressHandle, Random};
 
 use crate::array::Array3D;
 
@@ -10,7 +10,7 @@ use hashbrown::HashSet;
 #[derive(Debug)]
 pub struct DepthFirstSearch;
 
-impl GroupGenerator for DepthFirstSearch {
+impl RegionGenerator for DepthFirstSearch {
     fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze> {
         let size = mask.size();
 

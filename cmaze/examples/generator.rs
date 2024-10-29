@@ -3,6 +3,7 @@ use std::hash::DefaultHasher;
 
 use std::hash::{Hash as _, Hasher as _};
 
+use cmaze::gameboard::algorithms::{DefaultRegionSplitter, RegionCount, RegionSplitter};
 use cmaze::progress::ProgressHandle;
 use cmaze::{
     array::Array3D,
@@ -40,10 +41,10 @@ fn main() {
 
     let progress = ProgressHandle::new();
     let mask = CellMask::new_dims(size).unwrap();
-    let points = Generator::random_points(&mask, point_count, &mut rng);
-    let groups = Generator::split_groups(points, &mask, &mut rng, progress).unwrap(); // we never
-                                                                                      // stop the
-                                                                                      // progress
+    let splitter = DefaultRegionSplitter {
+        count: RegionCount::Exact(point_count),
+    };
+    let groups = splitter.split(&mask, &mut rng, progress).unwrap();
 
     let mut mask = Array3D::new_dims(false, size).unwrap();
     for border in Generator::build_region_graph(&groups) {

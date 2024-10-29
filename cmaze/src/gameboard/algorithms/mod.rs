@@ -150,13 +150,15 @@ pub struct GeneratorError;
 
 #[derive(Debug, Clone)]
 pub struct Generator {
-    generator: Arc<dyn GroupGenerator>,
+    default_generator: Arc<dyn RegionGenerator>,
+    splitter: Arc<dyn RegionSplitter>,
 }
 
 impl Generator {
-    pub fn new(generator: Box<dyn GroupGenerator>) -> Self {
+    pub fn new(generator: Box<dyn RegionGenerator>, splitter: Box<dyn RegionSplitter>) -> Self {
         Self {
-            generator: generator.into(),
+            default_generator: generator.into(),
+            splitter: splitter.into(),
         }
     }
 
@@ -169,15 +171,15 @@ impl Generator {
     ) -> Result<Maze, GeneratorError> {
         let mut rng = Random::seed_from_u64(seed.unwrap_or_else(|| thread_rng().gen()));
 
-        let maze_size = self.generator.guess_progress_complexity(&mask);
+        let maze_size = self.default_generator.guess_progress_complexity(&mask);
         progress.lock().from = maze_size; // initial work estimate
 
         const SPLIT_COUNT: usize = 100;
         let group_count = (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
-        let points = Self::random_points(&mask, group_count, &mut rng);
-        let Some(groups) = Self::split_groups(points, &mask, &mut rng, progress.split()) else {
-            return Err(GeneratorError);
-        };
+        let groups = self
+            .splitter
+            .split(&mask, &mut rng, progress.split())
+            .ok_or(GeneratorError)?;
         let masks = Self::split_to_masks(group_count, &groups);
 
         if progress.is_stopped() {
@@ -188,7 +190,7 @@ impl Generator {
             .iter()
             .map(|mask| {
                 let local = progress.split();
-                local.lock().from = self.generator.guess_progress_complexity(mask);
+                local.lock().from = self.default_generator.guess_progress_complexity(mask);
                 local
             })
             .collect::<Vec<_>>();
@@ -206,7 +208,9 @@ impl Generator {
             .into_par_iter()
             .zip(progresses)
             .zip(rngs)
-            .map(|((mask, progress), mut rng)| self.generator.generate(mask, &mut rng, progress))
+            .map(|((mask, progress), mut rng)| {
+                self.default_generator.generate(mask, &mut rng, progress)
+            })
             .collect()
         else {
             return Err(GeneratorError);
@@ -216,93 +220,6 @@ impl Generator {
         progress.lock().finish();
 
         Ok(connect_regions)
-    }
-
-    pub fn random_points(mask: &CellMask, count: u8, rng: &mut Random) -> Vec<Dims3D> {
-        let count = count as usize;
-        let mut points = Vec::with_capacity(count);
-
-        while points.len() < count {
-            // FIXME: this is absolutely horrible and slow implementation,
-            // but since we don't sample a lot of points, it should be fine. I hope...
-            let point = mask.random_cell(rng).unwrap();
-
-            if !points.contains(&point) {
-                points.push(point);
-            }
-        }
-
-        points
-    }
-
-    /// Split an maze into a regions, where each region is a group of connected cells.
-    ///
-    /// This functions returns a 3D array, where each cell contains a group number. The group of
-    /// the disabled cell is unspecified.
-    pub fn split_groups(
-        points: Vec<Dims3D>,
-        mask: &CellMask,
-        rng: &mut Random,
-        progress: ProgressHandle,
-    ) -> Option<Array3D<u8>> {
-        assert!(points.len() <= u8::MAX as usize);
-        assert!(!points.is_empty());
-        assert!(points.iter().collect::<HashSet<_>>().len() == points.len());
-
-        progress.lock().from = mask.enabled_count();
-
-        let size = mask.size();
-        let mut groups = Array3D::new_dims(None, size).unwrap();
-
-        // assign initial groups
-        for (i, point) in points.into_iter().enumerate() {
-            groups[point] = Some((i as u8, usize::MAX));
-        }
-
-        // This algorithm uses simple flood with diamond shaped search and randomized group order
-        // on each cycle.
-        // If it's found that it generates boring results, it can be replaced with a more complex
-        // one.
-
-        let mut cycle = 0usize;
-
-        loop {
-            if groups.all(|group| group.is_some()) {
-                break;
-            }
-
-            let mut set_new = 0;
-            for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
-                if !mask[cell] || groups[cell].is_some() {
-                    continue;
-                }
-
-                let neighbors = CellWall::get_in_order()
-                    .into_iter()
-                    .map(|dir| cell + dir.to_coord())
-                    .filter_map(|pos| {
-                        groups.get(pos).and_then(|g| {
-                            g.and_then(|(g, cyc)| if cyc == cycle { None } else { Some(g) })
-                        })
-                    })
-                    .collect::<SmallVec<[_; 6]>>();
-
-                if let Some(new_group) = neighbors.choose(rng) {
-                    groups[cell] = Some((*new_group, cycle));
-                    set_new += 1;
-                }
-            }
-
-            cycle = cycle.wrapping_add(1);
-            progress.lock().done += set_new;
-            if progress.is_stopped() {
-                return None;
-            }
-        }
-
-        progress.lock().finish();
-
-        Some(groups.map(|group| group.unwrap().0))
     }
 
     // Split groups into masks, ready for maze generation
@@ -398,10 +315,186 @@ impl Generator {
     }
 }
 
-pub trait GroupGenerator: fmt::Debug + Sync + Send {
+pub trait RegionGenerator: fmt::Debug + Sync + Send {
     fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze>;
 
     fn guess_progress_complexity(&self, mask: &CellMask) -> usize {
         mask.enabled_count()
+    }
+}
+
+pub trait RegionSplitter: fmt::Debug + Sync + Send {
+    fn split(
+        &self,
+        mask: &CellMask,
+        rng: &mut Random,
+        progress: ProgressHandle,
+    ) -> Option<Array3D<u8>>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum RegionCount {
+    Every(usize),
+    Exact(u8),
+}
+
+#[derive(Debug)]
+pub struct DefaultRegionSplitter {
+    pub count: RegionCount,
+}
+
+impl DefaultRegionSplitter {
+    pub fn random_points(mask: &CellMask, count: u8, rng: &mut Random) -> Vec<Dims3D> {
+        let count = count as usize;
+        let mut points = Vec::with_capacity(count);
+
+        while points.len() < count {
+            // FIXME: this is absolutely horrible and slow implementation,
+            // but since we don't sample a lot of points, it should be fine. I hope...
+            let point = mask.random_cell(rng).unwrap();
+
+            if !points.contains(&point) {
+                points.push(point);
+            }
+        }
+
+        points
+    }
+    pub fn split_groups(
+        points: Vec<Dims3D>,
+        mask: &CellMask,
+        rng: &mut Random,
+        progress: ProgressHandle,
+    ) -> Option<Array3D<u8>> {
+        assert!(points.len() <= u8::MAX as usize);
+        assert!(!points.is_empty());
+        assert!(points.iter().collect::<HashSet<_>>().len() == points.len());
+
+        progress.lock().from = mask.enabled_count();
+
+        let size = mask.size();
+        let mut groups = Array3D::new_dims(None, size).unwrap();
+
+        // assign initial groups
+        for (i, point) in points.into_iter().enumerate() {
+            groups[point] = Some((i as u8, usize::MAX));
+        }
+
+        // This algorithm uses simple flood with diamond shaped search and randomized group order
+        // on each cycle.
+        // If it's found that it generates boring results, it can be replaced with a more complex
+        // one.
+
+        let mut cycle = 0usize;
+
+        loop {
+            if groups.all(|group| group.is_some()) {
+                break;
+            }
+
+            let mut set_new = 0;
+            for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
+                if !mask[cell] || groups[cell].is_some() {
+                    continue;
+                }
+
+                let neighbors = CellWall::get_in_order()
+                    .into_iter()
+                    .map(|dir| cell + dir.to_coord())
+                    .filter_map(|pos| {
+                        groups.get(pos).and_then(|g| {
+                            g.and_then(|(g, cyc)| if cyc == cycle { None } else { Some(g) })
+                        })
+                    })
+                    .collect::<SmallVec<[_; 6]>>();
+
+                if let Some(new_group) = neighbors.choose(rng) {
+                    groups[cell] = Some((*new_group, cycle));
+                    set_new += 1;
+                }
+            }
+
+            cycle = cycle.wrapping_add(1);
+            progress.lock().done += set_new;
+            if progress.is_stopped() {
+                return None;
+            }
+        }
+
+        progress.lock().finish();
+
+        Some(groups.map(|group| group.unwrap().0))
+    }
+}
+
+impl RegionSplitter for DefaultRegionSplitter {
+    fn split(
+        &self,
+        mask: &CellMask,
+        rng: &mut Random,
+        progress: ProgressHandle,
+    ) -> Option<Array3D<u8>> {
+        let region_count = match self.count {
+            RegionCount::Every(every) => mask.enabled_count() / every,
+            RegionCount::Exact(count) => count as usize,
+        }
+        .clamp(1, u8::MAX as usize) as u8;
+
+        let points = Self::random_points(mask, region_count, rng);
+
+        progress.lock().from = mask.enabled_count();
+
+        let size = mask.size();
+        let mut groups = Array3D::new_dims(None, size).unwrap();
+
+        // assign initial groups
+        for (i, point) in points.into_iter().enumerate() {
+            groups[point] = Some((i as u8, usize::MAX));
+        }
+
+        // This algorithm uses simple flood with diamond shaped search and randomized group order
+        // on each cycle.
+        // If it's found that it generates boring results, it can be replaced with a more complex
+        // one.
+
+        let mut cycle = 0usize;
+
+        loop {
+            if groups.all(|group| group.is_some()) {
+                break;
+            }
+
+            let mut set_new = 0;
+            for cell in Dims3D::iter_fill(Dims3D::ZERO, size) {
+                if !mask[cell] || groups[cell].is_some() {
+                    continue;
+                }
+
+                let neighbors = CellWall::get_in_order()
+                    .into_iter()
+                    .map(|dir| cell + dir.to_coord())
+                    .filter_map(|pos| {
+                        groups.get(pos).and_then(|g| {
+                            g.and_then(|(g, cyc)| if cyc == cycle { None } else { Some(g) })
+                        })
+                    })
+                    .collect::<SmallVec<[_; 6]>>();
+
+                if let Some(new_group) = neighbors.choose(rng) {
+                    groups[cell] = Some((*new_group, cycle));
+                    set_new += 1;
+                }
+            }
+
+            cycle = cycle.wrapping_add(1);
+            progress.lock().done += set_new;
+            if progress.is_stopped() {
+                return None;
+            }
+        }
+
+        progress.lock().finish();
+
+        Some(groups.map(|group| group.unwrap().0))
     }
 }
