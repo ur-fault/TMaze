@@ -1,9 +1,7 @@
 use crate::{
     dims::*,
     gameboard::{
-        algorithms::{
-            CellMask, GenErrorInstant, GenErrorThreaded, Generator, GeneratorError, Random,
-        },
+        algorithms::{CellMask, Generator, GeneratorError},
         CellWall, Maze,
     },
     progress::{Flag, Progress, ProgressHandler},
@@ -31,11 +29,6 @@ pub enum RunningGameState {
     Finished,
     Quitted,
 }
-
-pub type GeneratorFn = fn(
-    CellMask,
-    &mut Random,
-) -> Result<ProgressComm<Result<Maze, GenErrorThreaded>>, GenErrorInstant>;
 
 #[derive(Debug)]
 pub struct GameProperities {

@@ -3,39 +3,18 @@ mod rnd_kruskals;
 
 use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
-use rayon::prelude::*;
 use smallvec::SmallVec;
 
-use std::{
-    fmt, ops,
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::{fmt, ops, sync::Arc};
 
 use super::{Cell, CellWall, Maze};
 
-use crate::{
-    array::Array3D,
-    dims::*,
-    game::ProgressComm,
-    progress::{Flag, Progress, ProgressHandle},
-};
+use crate::{array::Array3D, dims::*, progress::ProgressHandle};
 pub use depth_first_search::DepthFirstSearch;
 pub use rnd_kruskals::RndKruskals;
 
 /// Random number generator used for anything, where determinism is required.
 pub type Random = rand_xoshiro::Xoshiro256StarStar;
-
-#[derive(Debug)]
-pub enum GenErrorInstant {
-    InvalidSize(Dims3D),
-}
-
-#[derive(Debug)]
-pub enum GenErrorThreaded {
-    GenerationError(GenErrorInstant),
-    AbortGeneration,
-}
 
 #[derive(Debug)]
 pub struct StopGenerationError;
@@ -404,124 +383,4 @@ pub trait GroupGenerator: fmt::Debug + Sync + Send {
     fn guess_progress_complexity(&self, mask: &CellMask) -> usize {
         mask.enabled_count()
     }
-}
-
-pub trait MazeAlgorithm {
-    fn generate(
-        size: Dims3D,
-        floored: bool,
-    ) -> Result<ProgressComm<Result<Maze, GenErrorThreaded>>, GenErrorInstant> {
-        todo!()
-        // if size.0 <= 0 || size.1 <= 0 || size.2 <= 0 {
-        //     return Err(GenErrorInstant::InvalidSize(size));
-        // }
-        //
-        // let stop_flag = Flag::new();
-        // let progress = Arc::new(Mutex::new(Progress {
-        //     done: 0,
-        //     from: 1,
-        //     is_done: false,
-        // }));
-        // let recv = Arc::clone(&progress);
-        //
-        // let stop_flag_clone = stop_flag.clone();
-        //
-        // Ok(ProgressComm {
-        //     handle: thread::spawn(move || {
-        //         let Dims3D(w, h, d) = size;
-        //         let du = d as usize;
-        //
-        //         let cells = if floored && d > 1 {
-        //             let mut cells = Self::generate_floors(size, progress, stop_flag)?;
-        //
-        //             for floor in 0..du - 1 {
-        //                 let (x, y) = (thread_rng().gen_range(0..w), thread_rng().gen_range(0..h));
-        //                 cells[Dims3D(x, y, floor as i32)].remove_wall(CellWall::Up);
-        //                 cells[Dims3D(x, y, floor as i32 + 1)].remove_wall(CellWall::Down);
-        //             }
-        //
-        //             cells
-        //         } else {
-        //             Self::generate_individual(Dims3D(w, h, d), stop_flag, progress)?.cells
-        //         };
-        //
-        //         Ok(Maze {
-        //             cells,
-        //             is_tower: floored,
-        //         })
-        //     }),
-        //     stop_flag: stop_flag_clone,
-        //     recv,
-        // })
-    }
-
-    fn generate_floors(
-        size: Dims3D,
-        progress: Arc<Mutex<Progress>>,
-        stop_flag: Flag,
-    ) -> Result<Array3D<Cell>, GenErrorThreaded> {
-        let Dims3D(w, h, d) = size;
-        let (.., du) = (w as usize, h as usize, d as usize);
-        let generate_floor = |progress| {
-            let stop_flag = stop_flag.clone();
-
-            Self::generate_individual(Dims3D(w, h, 1), stop_flag, progress)
-        };
-
-        let stop_flag = stop_flag.clone();
-
-        thread::scope(|s| {
-            let mut local_progresses = (0..du)
-                .map(|_| Progress {
-                    done: 0,
-                    from: 1,
-                    is_done: false,
-                })
-                .collect::<Vec<_>>();
-            let shared_progresses = local_progresses
-                .iter()
-                .map(|p| Arc::new(Mutex::new(*p)))
-                .collect::<Vec<_>>();
-
-            let shared2 = shared_progresses.clone();
-
-            s.spawn(move || loop {
-                for (i, progress) in shared2.iter().enumerate() {
-                    let p = *progress.lock().unwrap();
-                    local_progresses[i] = p;
-                }
-
-                let all_done = local_progresses.iter().all(|p| p.is_done);
-                let mut progress = progress.lock().unwrap();
-                progress.is_done = all_done;
-                progress.done = local_progresses.iter().map(|p| p.done).sum();
-                progress.from = local_progresses.iter().map(|p| p.from).sum();
-
-                if all_done || stop_flag.is_stopped() {
-                    break;
-                }
-            });
-
-            let mut cells = Array3D::new(Cell::new(), w as usize, h as usize, du);
-
-            let x: Vec<_> = (0..du)
-                .into_par_iter()
-                .map(|i| generate_floor(Arc::clone(&shared_progresses[i])))
-                .collect::<Result<_, _>>()?;
-
-            for (i, floor) in x.into_iter().enumerate() {
-                for Dims3D(x, y, _) in floor.cells.iter_pos() {
-                    cells[Dims3D(x, y, i as i32)] = floor.cells[Dims3D(x, y, 0)];
-                }
-            }
-
-            Ok(cells)
-        })
-    }
-
-    fn generate_individual(
-        size: Dims3D,
-        stopper: Flag,
-        progress: Arc<Mutex<Progress>>,
-    ) -> Result<Maze, GenErrorThreaded>;
 }
