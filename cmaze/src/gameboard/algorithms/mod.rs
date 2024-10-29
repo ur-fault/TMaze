@@ -284,7 +284,7 @@ impl Generator {
         progress.lock().from = 0;
 
         const SPLIT_COUNT: usize = 100;
-        let group_count = (mask.enabled_count() / SPLIT_COUNT).min(u8::MAX as usize) as u8;
+        let group_count = (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
         let points = Self::random_points(&mask, group_count, &mut rng);
         let groups = Self::split_groups(points, &mask, &mut rng, progress.split());
         let masks = Self::split_to_masks(group_count, &groups);
