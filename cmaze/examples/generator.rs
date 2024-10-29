@@ -4,7 +4,8 @@ use std::hash::DefaultHasher;
 use std::hash::{Hash as _, Hasher as _};
 
 use cmaze::array::Array3D;
-use cmaze::gameboard::algorithms::{CellMask, ProgressHandle, ProgressHandler};
+use cmaze::gameboard::algorithms::CellMask;
+use cmaze::progress::{ProgressHandle, ProgressHandler};
 use cmaze::{
     dims::Dims3D,
     gameboard::algorithms::{Generator, Random},

@@ -5,9 +5,10 @@ use cmaze::{
     dims::*,
     game::{GameProperities, ProgressComm, RunningGame, RunningGameState},
     gameboard::{
-        algorithms::{DepthFirstSearch, Generator, GeneratorError, Progress, RndKruskals},
+        algorithms::{DepthFirstSearch, Generator, GeneratorError, RndKruskals},
         Cell, CellWall,
     },
+    progress::Progress,
 };
 
 use crate::{
@@ -407,8 +408,8 @@ impl ActivityHandler for MazeGenerationActivity {
             }
 
             Ok(ref comm) => {
-                let Progress { done, from, .. } = comm.progress();
-                self.progress_bar.update_progress(done as f64 / from as f64);
+                let progress @ Progress { done, from, .. } = comm.progress();
+                self.progress_bar.update_progress(progress.percent() as f64);
                 self.progress_bar.update_title(format!(
                     "Generating maze: {}/{} - {:.2} %",
                     done,
