@@ -3,7 +3,7 @@ use std::mem;
 use cmaze::{
     array::Array2DView,
     dims::*,
-    game::{GameProperities, ProgressComm, RunningGame, RunningGameState},
+    game::{GameProperities, RunningJob, RunningGame, RunningGameState},
     gameboard::{
         algorithms::{DepthFirstSearch, Generator, GeneratorError, RndKruskals},
         Cell, CellWall,
@@ -331,7 +331,7 @@ impl ActivityHandler for MazeAlgorithmMenu {
 }
 
 pub struct MazeGenerationActivity {
-    comm: Result<ProgressComm<Option<RunningGame>>, GeneratorError>,
+    comm: Result<RunningJob<Option<RunningGame>>, GeneratorError>,
     progress_bar: ProgressBar,
 }
 
@@ -362,7 +362,7 @@ impl ActivityHandler for MazeGenerationActivity {
                             let mut comm = Err(GeneratorError); // dummy value
                             mem::swap(&mut self.comm, &mut comm);
                             if let Ok(comm) = comm {
-                                comm.stop_flag.stop();
+                                comm.progress.stop();
                                 let _ = comm.handle.join().unwrap();
                             };
                             return Some(Change::pop(2));

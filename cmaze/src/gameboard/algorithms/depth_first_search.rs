@@ -11,7 +11,7 @@ use hashbrown::HashSet;
 pub struct DepthFirstSearch;
 
 impl GroupGenerator for DepthFirstSearch {
-    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Maze {
+    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze> {
         let size = mask.size();
 
         let cells = Array3D::new_dims(Cell::new(), size).unwrap();
@@ -48,10 +48,13 @@ impl GroupGenerator for DepthFirstSearch {
             }
 
             progress.lock().done = visited.len();
+            if progress.is_stopped() {
+                return None;
+            }
         }
 
         progress.lock().finish();
 
-        maze
+        Some(maze)
     }
 }

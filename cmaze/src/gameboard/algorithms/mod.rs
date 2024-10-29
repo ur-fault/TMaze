@@ -17,9 +17,6 @@ pub use rnd_kruskals::RndKruskals;
 /// Random number generator used for anything, where determinism is required.
 pub type Random = rand_xoshiro::Xoshiro256StarStar;
 
-#[derive(Debug)]
-pub struct StopGenerationError;
-
 #[derive(Debug, Clone)]
 pub struct CellMask(Array3D<bool>);
 
@@ -178,8 +175,14 @@ impl Generator {
         const SPLIT_COUNT: usize = 100;
         let group_count = (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
         let points = Self::random_points(&mask, group_count, &mut rng);
-        let groups = Self::split_groups(points, &mask, &mut rng, progress.split());
+        let Some(groups) = Self::split_groups(points, &mask, &mut rng, progress.split()) else {
+            return Err(GeneratorError);
+        };
         let masks = Self::split_to_masks(group_count, &groups);
+
+        if progress.is_stopped() {
+            return Err(GeneratorError);
+        }
 
         let progresses = masks
             .iter()
@@ -199,12 +202,15 @@ impl Generator {
             })
             .collect::<Vec<_>>();
 
-        let regions: Vec<_> = masks
+        let Some(regions) = masks
             .into_par_iter()
             .zip(progresses)
             .zip(rngs)
             .map(|((mask, progress), mut rng)| self.generator.generate(mask, &mut rng, progress))
-            .collect();
+            .collect()
+        else {
+            return Err(GeneratorError);
+        };
 
         let connect_regions = Self::connect_regions(groups, regions, &mut rng);
         progress.lock().finish();
@@ -238,7 +244,7 @@ impl Generator {
         mask: &CellMask,
         rng: &mut Random,
         progress: ProgressHandle,
-    ) -> Array3D<u8> {
+    ) -> Option<Array3D<u8>> {
         assert!(points.len() <= u8::MAX as usize);
         assert!(!points.is_empty());
         assert!(points.clone().into_iter().collect::<HashSet<_>>().len() == points.len());
@@ -289,11 +295,14 @@ impl Generator {
 
             cycle = cycle.wrapping_add(1);
             progress.lock().done += set_new;
+            if progress.is_stopped() {
+                return None;
+            }
         }
 
         progress.lock().finish();
 
-        groups.map(|group| group.unwrap().0)
+        Some(groups.map(|group| group.unwrap().0))
     }
 
     // Split groups into masks, ready for maze generation
@@ -390,7 +399,7 @@ impl Generator {
 }
 
 pub trait GroupGenerator: fmt::Debug + Sync + Send {
-    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Maze;
+    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze>;
 
     fn guess_progress_complexity(&self, mask: &CellMask) -> usize {
         mask.enabled_count()

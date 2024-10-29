@@ -42,13 +42,12 @@ pub enum MoveMode {
     Fast,
 }
 
-pub struct ProgressComm<R> {
+pub struct RunningJob<R> {
     pub handle: JoinHandle<R>,
-    pub stop_flag: Flag,
     pub progress: ProgressHandle,
 }
 
-impl<R> ProgressComm<R> {
+impl<R> RunningJob<R> {
     pub fn progress(&self) -> Progress {
         self.progress.progress()
     }
@@ -69,9 +68,7 @@ pub struct RunningGame {
 
 impl RunningGame {
     #[allow(unused_variables)]
-    pub fn new(
-        props: GameProperities,
-    ) -> Result<ProgressComm<Option<RunningGame>>, GeneratorError> {
+    pub fn new(props: GameProperities) -> Result<RunningJob<Option<RunningGame>>, GeneratorError> {
         if !props.game_mode.validate() {
             return Err(GeneratorError);
         }
@@ -107,13 +104,7 @@ impl RunningGame {
             })
         });
 
-        let comm = ProgressComm {
-            handle,
-            stop_flag,
-            progress,
-        };
-
-        Ok(comm)
+        Ok(RunningJob { handle, progress })
     }
 
     pub fn get_state(&self) -> RunningGameState {

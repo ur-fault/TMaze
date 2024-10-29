@@ -14,7 +14,7 @@ use hashbrown::HashSet;
 pub struct RndKruskals;
 
 impl GroupGenerator for RndKruskals {
-    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Maze {
+    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze> {
         let Dims3D(w, h, d) = mask.size();
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
@@ -65,10 +65,13 @@ impl GroupGenerator for RndKruskals {
             sets[to_set].extend(from_set);
 
             progress.lock().done = starter_wall_count - walls.len();
+            if progress.is_stopped() {
+                return None;
+            }
         }
 
         progress.lock().finish();
 
-        maze
+        Some(maze)
     }
 }

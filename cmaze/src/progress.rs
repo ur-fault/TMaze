@@ -27,6 +27,7 @@ impl Default for Flag {
 pub struct ProgressHandle {
     progress: Arc<Mutex<Progress>>,
     children: Arc<Mutex<Vec<ProgressHandle>>>,
+    flag: Flag,
 }
 
 impl ProgressHandle {
@@ -35,11 +36,13 @@ impl ProgressHandle {
         Self {
             progress: Arc::new(Mutex::new(Progress::new_empty())),
             children: Arc::new(Mutex::new(Vec::new())),
+            flag: Flag::new(),
         }
     }
 
     pub fn split(&self) -> Self {
-        let child = Self::new();
+        let mut child = Self::new();
+        child.flag = self.flag.clone();
         self.children.lock().unwrap().push(child.clone());
         child
     }
@@ -55,6 +58,14 @@ impl ProgressHandle {
             .unwrap()
             .iter()
             .fold(own, |prog, child| prog.combine(&child.progress()))
+    }
+
+    pub fn stop(&self) {
+        self.flag.stop();
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        self.flag.is_stopped()
     }
 }
 

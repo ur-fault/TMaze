@@ -41,7 +41,9 @@ fn main() {
     let progress = ProgressHandle::new();
     let mask = CellMask::new_dims(size).unwrap();
     let points = Generator::random_points(&mask, point_count, &mut rng);
-    let groups = Generator::split_groups(points, &mask, &mut rng, progress);
+    let groups = Generator::split_groups(points, &mask, &mut rng, progress).unwrap(); // we never
+                                                                                      // stop the
+                                                                                      // progress
 
     let mut mask = Array3D::new_dims(false, size).unwrap();
     for border in Generator::build_region_graph(&groups) {
