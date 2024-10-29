@@ -247,7 +247,7 @@ impl Generator {
     ) -> Option<Array3D<u8>> {
         assert!(points.len() <= u8::MAX as usize);
         assert!(!points.is_empty());
-        assert!(points.clone().into_iter().collect::<HashSet<_>>().len() == points.len());
+        assert!(points.iter().collect::<HashSet<_>>().len() == points.len());
 
         progress.lock().from = mask.enabled_count();
 
