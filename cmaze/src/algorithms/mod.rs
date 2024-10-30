@@ -1,5 +1,4 @@
-mod depth_first_search;
-mod rnd_kruskals;
+pub mod region_generator;
 
 use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
@@ -8,11 +7,8 @@ use smallvec::SmallVec;
 
 use std::{fmt, ops, sync::Arc};
 
-use super::{Cell, CellWall, Maze};
-
-use crate::{array::Array3D, dims::*, progress::ProgressHandle};
-pub use depth_first_search::DepthFirstSearch;
-pub use rnd_kruskals::RndKruskals;
+use crate::{array::Array3D, dims::*, gameboard::{Cell, CellWall, Maze}, progress::ProgressHandle};
+use region_generator::RegionGenerator;
 
 /// Random number generator used for anything, where determinism is required.
 pub type Random = rand_xoshiro::Xoshiro256StarStar;
@@ -314,15 +310,6 @@ impl Generator {
         borders
     }
 }
-
-pub trait RegionGenerator: fmt::Debug + Sync + Send {
-    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze>;
-
-    fn guess_progress_complexity(&self, mask: &CellMask) -> usize {
-        mask.enabled_count()
-    }
-}
-
 pub trait RegionSplitter: fmt::Debug + Sync + Send {
     fn split(
         &self,

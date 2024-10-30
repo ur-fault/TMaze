@@ -2,8 +2,8 @@ mod attribute;
 pub mod theme;
 
 use cmaze::{
+    algorithms::{region_generator::{DepthFirstSearch, RndKruskals}, DefaultRegionSplitter, Generator},
     dims::{Dims, Offset},
-    gameboard::algorithms::{DefaultRegionSplitter, DepthFirstSearch, Generator, RndKruskals},
 };
 use derivative::Derivative;
 use ron::{self, extensions::Extensions};

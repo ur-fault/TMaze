@@ -3,12 +3,11 @@ use std::hash::DefaultHasher;
 
 use std::hash::{Hash as _, Hasher as _};
 
-use cmaze::gameboard::algorithms::{DefaultRegionSplitter, RegionCount, RegionSplitter};
-use cmaze::progress::ProgressHandle;
 use cmaze::{
+    algorithms::{CellMask, DefaultRegionSplitter, Generator, Random, RegionCount, RegionSplitter},
     array::Array3D,
     dims::Dims3D,
-    gameboard::algorithms::{CellMask, Generator, Random},
+    progress::ProgressHandle,
 };
 
 use rand::{thread_rng, Rng as _, SeedableRng as _};

@@ -1,9 +1,7 @@
 use crate::{
+    algorithms::{CellMask, Generator, GeneratorError},
     dims::*,
-    gameboard::{
-        algorithms::{CellMask, Generator, GeneratorError},
-        CellWall, Maze,
-    },
+    gameboard::{CellWall, Maze},
     progress::{Flag, Progress, ProgressHandle},
 };
 

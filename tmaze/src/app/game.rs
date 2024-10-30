@@ -1,15 +1,14 @@
 use std::mem;
 
 use cmaze::{
+    algorithms::{
+        region_generator::{DepthFirstSearch, RndKruskals},
+        DefaultRegionSplitter, Generator, GeneratorError,
+    },
     array::Array2DView,
     dims::*,
     game::{GameProperities, RunningGame, RunningGameState, RunningJob},
-    gameboard::{
-        algorithms::{
-            DefaultRegionSplitter, DepthFirstSearch, Generator, GeneratorError, RndKruskals,
-        },
-        Cell, CellWall,
-    },
+    gameboard::{Cell, CellWall},
     progress::Progress,
 };
 
