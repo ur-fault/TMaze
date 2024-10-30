@@ -3,8 +3,9 @@ use std::hash::DefaultHasher;
 
 use std::hash::{Hash as _, Hasher as _};
 
+use cmaze::algorithms::region_splitter::{DefaultRegionSplitter, RegionCount, RegionSplitter as _};
 use cmaze::{
-    algorithms::{CellMask, DefaultRegionSplitter, Generator, Random, RegionCount, RegionSplitter},
+    algorithms::{CellMask, Generator, Random},
     array::Array3D,
     dims::Dims3D,
     progress::ProgressHandle,

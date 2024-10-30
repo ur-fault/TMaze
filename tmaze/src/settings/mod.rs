@@ -2,7 +2,7 @@ mod attribute;
 pub mod theme;
 
 use cmaze::{
-    algorithms::{region_generator::{DepthFirstSearch, RndKruskals}, DefaultRegionSplitter, Generator},
+    algorithms::{region_generator::{DepthFirstSearch, RndKruskals}, region_splitter::DefaultRegionSplitter, Generator},
     dims::{Dims, Offset},
 };
 use derivative::Derivative;

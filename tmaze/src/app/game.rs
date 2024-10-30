@@ -3,7 +3,8 @@ use std::mem;
 use cmaze::{
     algorithms::{
         region_generator::{DepthFirstSearch, RndKruskals},
-        DefaultRegionSplitter, Generator, GeneratorError,
+        region_splitter::DefaultRegionSplitter,
+        Generator, GeneratorError,
     },
     array::Array2DView,
     dims::*,
