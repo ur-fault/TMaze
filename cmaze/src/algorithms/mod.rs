@@ -128,6 +128,10 @@ impl CellMask {
     pub fn fill(&mut self, value: bool) {
         self.0.fill(value);
     }
+
+    pub fn iter_enabled(&self) -> impl Iterator<Item = Dims3D> + '_ {
+        self.0.iter_pos().filter(move |&pos| self[pos])
+    }
 }
 
 impl ops::Index<Dims3D> for CellMask {
@@ -218,7 +222,7 @@ impl Generator {
             return Err(GeneratorError);
         };
 
-        let connect_regions = Self::connect_regions(groups, regions, &mut rng);
+        let connect_regions = Self::connect_regions(groups, &mask, regions, &mut rng);
         progress.lock().finish();
 
         Ok(connect_regions)
@@ -236,12 +240,12 @@ impl Generator {
         masks
     }
 
-    pub fn connect_regions(groups: Array3D<u8>, regions: Vec<Maze>, rng: &mut Random) -> Maze {
+    pub fn connect_regions(groups: Array3D<u8>, mask: &CellMask, regions: Vec<Maze>, rng: &mut Random) -> Maze {
         // Disclaimer: this implementation can be slow af, since there is a maximum of a 256 groups
         // We use a simple Kruskal's algorithm to connect the regions
 
         let mut walls = HashMap::new();
-        for (pair, (from, dir)) in Self::build_region_graph(&groups) {
+        for (pair, (from, dir)) in Self::build_region_graph(&groups, mask) {
             assert!(pair.0 < pair.1);
             walls.entry(pair).or_insert_with(Vec::new).push((from, dir));
         }
@@ -288,10 +292,10 @@ impl Generator {
         maze
     }
 
-    pub fn build_region_graph(groups: &Array3D<u8>) -> Vec<((u8, u8), (Dims3D, CellWall))> {
+    pub fn build_region_graph(groups: &Array3D<u8>, mask: &CellMask) -> Vec<((u8, u8), (Dims3D, CellWall))> {
         let mut borders = vec![];
 
-        for cell in groups.iter_pos() {
+        for cell in mask.iter_enabled() {
             let group = groups[cell];
 
             use CellWall::*;

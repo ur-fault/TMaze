@@ -46,18 +46,19 @@ fn main() {
     };
     let groups = splitter.split(&mask, &mut rng, progress).unwrap();
 
-    let mut mask = Array3D::new_dims(false, size).unwrap();
-    for border in Generator::build_region_graph(&groups) {
-        let pos = border.1 .0;
-        mask[pos] = true;
-        mask[pos + border.1 .1.to_coord()] = true;
-    }
+    show_array(
+        &groups,
+        Array3D::new_dims(true, size).unwrap(),
+        base_hash,
+        size,
+        '•',
+    );
 
-    let masks = Generator::split_to_masks(point_count, &groups);
-    for (i, mask) in masks.into_iter().enumerate() {
-        println!("Mask {}", i);
-        show_array(&groups, mask.to_array3d(), base_hash, size, '-');
-    }
+    // let masks = Generator::split_to_masks(point_count, &groups);
+    // for (i, mask) in masks.into_iter().enumerate() {
+    //     println!("Mask {}", i);
+    //     show_array(&groups, mask.to_array3d(), base_hash, size, '•');
+    // }
 }
 
 fn show_array(
