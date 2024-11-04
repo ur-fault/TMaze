@@ -5,7 +5,7 @@ use std::hash::{Hash as _, Hasher as _};
 
 use cmaze::algorithms::region_splitter::{DefaultRegionSplitter, RegionCount, RegionSplitter as _};
 use cmaze::{
-    algorithms::{CellMask, Generator, Random},
+    algorithms::{CellMask, Random},
     array::Array3D,
     dims::Dims3D,
     progress::ProgressHandle,
@@ -54,6 +54,7 @@ fn main() {
         '•',
     );
 
+    // NOTE: Don't remove
     // let masks = Generator::split_to_masks(point_count, &groups);
     // for (i, mask) in masks.into_iter().enumerate() {
     //     println!("Mask {}", i);
