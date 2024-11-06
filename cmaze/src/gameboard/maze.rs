@@ -2,15 +2,13 @@ use smallvec::SmallVec;
 
 use self::CellWall::*;
 use crate::{
-    array::Array3D,
-    dims::*,
-    gameboard::cell::{Cell, CellWall},
+    algorithms::MazeType, array::Array3D, dims::*, gameboard::cell::{Cell, CellWall}
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Maze {
     pub(crate) cells: Array3D<Cell>,
-    pub(crate) is_tower: bool,
+    pub(crate) type_: MazeType,
 }
 
 impl Maze {
@@ -115,6 +113,6 @@ impl Maze {
     }
 
     pub fn is_tower(&self) -> bool {
-        self.is_tower
+        self.type_ == MazeType::Tower
     }
 }

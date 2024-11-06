@@ -4,3 +4,4 @@ pub mod dims;
 pub mod progress;
 pub mod array;
 pub mod algorithms;
+pub mod registry;

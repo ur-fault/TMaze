@@ -1,6 +1,6 @@
 use crate::{dims::*, gameboard::cell::CellWall::*};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Cell {
     left: bool,
     top: bool,

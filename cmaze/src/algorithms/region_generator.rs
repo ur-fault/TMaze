@@ -4,9 +4,13 @@ use hashbrown::HashSet;
 use rand::seq::SliceRandom as _;
 use smallvec::SmallVec;
 
-use crate::{array::Array3D, gameboard::{Cell, CellWall, Maze}, progress::ProgressHandle};
+use crate::{
+    array::Array3D,
+    gameboard::{Cell, CellWall, Maze},
+    progress::ProgressHandle,
+};
 
-use super::{CellMask, Dims3D, Random};
+use super::{CellMask, Dims3D, MazeType, Random};
 
 pub trait RegionGenerator: fmt::Debug + Sync + Send {
     fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze>;
@@ -26,7 +30,7 @@ impl RegionGenerator for DepthFirstSearch {
         let cells = Array3D::new_dims(Cell::new(), size).unwrap();
         let mut maze = Maze {
             cells,
-            is_tower: false,
+            type_: MazeType::default(),
         };
 
         progress.lock().from = mask.enabled_count();
@@ -105,7 +109,7 @@ impl RegionGenerator for RndKruskals {
 
         let mut maze = Maze {
             cells,
-            is_tower: false,
+            type_: MazeType::default(),
         };
 
         walls.shuffle(rng);

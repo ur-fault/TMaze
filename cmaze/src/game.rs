@@ -1,5 +1,7 @@
 use crate::{
-    algorithms::{CellMask, Generator, GeneratorError},
+    algorithms::{
+        Generator, GeneratorError, GeneratorRegistry, MazeSpec, MazeType, SplitterRegistry,
+    },
     dims::*,
     gameboard::{CellWall, Maze},
     progress::{Flag, Progress, ProgressHandle},
@@ -30,8 +32,7 @@ pub enum RunningGameState {
 
 #[derive(Debug)]
 pub struct GameProperities {
-    pub game_mode: MazeSpec,
-    pub generator: Generator,
+    pub maze_spec: MazeSpec,
 }
 
 pub enum MoveMode {
@@ -54,8 +55,7 @@ impl<R> RunningJob<R> {
 pub struct RunningGame {
     maze: Maze,
     state: RunningGameState,
-    game_mode: MazeSpec,
-    generator: Generator,
+    maze_spec: MazeSpec,
     #[allow(dead_code)]
     clock: Option<PausableClock>,
     start: Option<PausableInstant>,
@@ -66,15 +66,20 @@ pub struct RunningGame {
 
 impl RunningGame {
     #[allow(unused_variables)]
-    pub fn new(props: GameProperities) -> Result<RunningJob<Option<RunningGame>>, GeneratorError> {
-        if !props.game_mode.validate() {
+    pub fn new(
+        props: GameProperities,
+        gen_registry: &GeneratorRegistry,
+        spitter_registry: &SplitterRegistry,
+    ) -> Result<RunningJob<Option<RunningGame>>, GeneratorError> {
+        if !props.maze_spec.validate() {
             return Err(GeneratorError);
         }
 
         let GameProperities {
-            game_mode: game_mode @ MazeSpec { size, is_tower },
-            generator,
+            maze_spec: maze_spec @ MazeSpec { size, .. },
         } = props;
+
+        let generator = Generator::from_maze_spec(&maze_spec, gen_registry, spitter_registry);
 
         let start = Dims3D(0, 0, 0);
         let goal = size - Dims3D::ONE;
@@ -85,15 +90,12 @@ impl RunningGame {
         let progress_clone = progress.clone();
 
         let handle = thread::spawn(move || {
-            let maze = generator
-                .generate(CellMask::new_dims(size).unwrap(), None, progress_clone)
-                .ok()?;
+            let maze = generator.generate(progress_clone).ok()?;
 
             Some(RunningGame {
                 maze,
                 state: RunningGameState::NotStarted,
-                game_mode,
-                generator,
+                maze_spec,
                 clock: None,
                 start: None,
                 player_pos: start,
@@ -129,12 +131,8 @@ impl RunningGame {
         self.moves.len()
     }
 
-    pub fn get_game_mode(&self) -> MazeSpec {
-        self.game_mode
-    }
-
-    pub fn get_gen_fn(&self) -> &Generator {
-        &self.generator
+    pub fn get_basic_game_spec(&self) -> &MazeSpec {
+        &self.maze_spec
     }
 
     pub fn get_available_moves(&self) -> [bool; 6] {
@@ -215,7 +213,7 @@ impl RunningGame {
         }
 
         if tower_auto_up
-            && self.game_mode.is_tower
+            && self.maze.type_ == MazeType::Tower
             && !self
                 .maze
                 .get_cell(self.player_pos)

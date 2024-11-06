@@ -24,7 +24,7 @@ pub trait RegionSplitter: fmt::Debug + Sync + Send {
 
 #[derive(Debug, Clone, Copy)]
 pub enum RegionCount {
-    Every(usize),
+    Per(usize),
     Exact(u8),
 }
 
@@ -36,7 +36,7 @@ pub struct DefaultRegionSplitter {
 impl Default for DefaultRegionSplitter {
     fn default() -> Self {
         Self {
-            count: RegionCount::Every(100),
+            count: RegionCount::Per(100),
         }
     }
 }
@@ -133,7 +133,7 @@ impl RegionSplitter for DefaultRegionSplitter {
         progress: ProgressHandle,
     ) -> Option<Array3D<u8>> {
         let region_count = match self.count {
-            RegionCount::Every(every) => mask.enabled_count() / every,
+            RegionCount::Per(every) => mask.enabled_count() / every,
             RegionCount::Exact(count) => count as usize,
         }
         .clamp(1, u8::MAX as usize) as u8;

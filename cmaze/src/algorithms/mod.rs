@@ -1,5 +1,8 @@
 pub mod region_generator;
 pub mod region_splitter;
+pub mod types;
+
+pub use types::*;
 
 use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
@@ -13,11 +16,18 @@ use crate::{
     dims::*,
     gameboard::{Cell, CellWall, Maze},
     progress::ProgressHandle,
+    registry::Registry,
 };
 use region_generator::RegionGenerator;
 
 /// Random number generator used for anything, where determinism is required.
 pub type Random = rand_xoshiro::Xoshiro256StarStar;
+
+/// Registry of the region generators.
+pub type GeneratorRegistry = Registry<Arc<dyn RegionGenerator>>;
+
+/// Registry of the region splitters.
+pub type SplitterRegistry = Registry<Arc<dyn RegionSplitter>>;
 
 #[derive(Debug, Clone)]
 pub struct CellMask(Array3D<bool>);
@@ -134,6 +144,12 @@ impl CellMask {
     }
 }
 
+impl<T> Array3D<Option<T>> {
+    pub fn to_mask(self) -> CellMask {
+        CellMask(self.map(|v| v.is_some()))
+    }
+}
+
 impl ops::Index<Dims3D> for CellMask {
     type Output = bool;
 
@@ -155,92 +171,234 @@ impl ops::IndexMut<Dims3D> for CellMask {
 pub struct GeneratorError;
 
 #[derive(Debug, Clone)]
+enum LocalSplitterSpec {
+    Predefined {
+        regions: Array3D<Option<u8>>,
+        region_specs: Vec<LocalRegionSpec>,
+    },
+    ToGenerate {
+        mask: CellMask,
+        splitter: (Arc<dyn RegionSplitter>, Params),
+        generator: (Arc<dyn RegionGenerator>, Params),
+    },
+}
+
+#[derive(Debug, Clone)]
+enum LocalRegionSpec {
+    Predefined(Maze),
+    ToGenerate {
+        generator: Arc<dyn RegionGenerator>,
+        params: Params,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub struct Generator {
-    default_generator: Arc<dyn RegionGenerator>,
-    splitter: Arc<dyn RegionSplitter>,
+    seed: Option<u64>,
+    splitter: LocalSplitterSpec,
+    type_: MazeType,
 }
 
 impl Generator {
-    pub fn new(generator: Box<dyn RegionGenerator>, splitter: Box<dyn RegionSplitter>) -> Self {
+    pub fn new(
+        size: Dims3D,
+        generator: (Arc<dyn RegionGenerator>, Params),
+        splitter: (Arc<dyn RegionSplitter>, Params),
+    ) -> Self {
         Self {
-            default_generator: generator.into(),
-            splitter: splitter.into(),
+            seed: None,
+            splitter: LocalSplitterSpec::ToGenerate {
+                mask: CellMask::new_dims(size).unwrap(),
+                splitter,
+                generator,
+            },
+            type_: MazeType::Normal,
+        }
+    }
+
+    pub fn from_maze_spec(
+        spec: &MazeSpec,
+        generators: &GeneratorRegistry,
+        splitters: &SplitterRegistry,
+    ) -> Self {
+        let MazeSpec {
+            size,
+            inner_spec,
+            seed,
+            maze_type,
+        } = spec;
+
+        match inner_spec {
+            MazeSpecType::Simple {
+                start: _,
+                end: _,
+                mask,
+                splitter,
+                generator,
+            } => Self {
+                seed: *seed,
+                splitter: LocalSplitterSpec::ToGenerate {
+                    mask: mask
+                        .clone()
+                        .unwrap_or_else(|| CellMask::new_dims(*size).unwrap()),
+                    splitter: splitter
+                        .clone()
+                        .map(|(name, params)| (splitters.get(&name).unwrap().clone(), params))
+                        .unwrap_or_else(|| {
+                            (splitters.get_default().unwrap().clone(), Params::default())
+                        }),
+                    generator: generator
+                        .clone()
+                        .map(|(name, params)| (generators.get(&name).unwrap().clone(), params))
+                        .unwrap_or_else(|| {
+                            (generators.get_default().unwrap().clone(), Params::default())
+                        }),
+                },
+                type_: maze_type.unwrap_or(MazeType::default()),
+            },
+            MazeSpecType::Regions {
+                regions,
+                start: _,
+                end: _,
+            } => {
+                let mut region_ids = Array3D::new_dims(None, *size).unwrap();
+
+                let region_specs = regions
+                    .into_iter()
+                    .enumerate()
+                    .map(|(region_id, MazeRegionSpec { mask, region_type })| {
+                        for pos in mask.iter_enabled() {
+                            region_ids[pos] = Some(region_id as u8);
+                        }
+                        match region_type {
+                            MazeRegionType::Predefined { maze } => {
+                                LocalRegionSpec::Predefined(maze.clone())
+                            }
+                            MazeRegionType::Generated {
+                                generator: (generator, params),
+                            } => LocalRegionSpec::ToGenerate {
+                                generator: generators.get(generator).unwrap().clone(),
+                                params: params.clone(),
+                            },
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                Self {
+                    seed: *seed,
+                    splitter: LocalSplitterSpec::Predefined {
+                        regions: region_ids,
+                        region_specs,
+                    },
+                    type_: MazeType::Normal,
+                }
+            }
         }
     }
 
     // TODO: Custom error type
-    pub fn generate(
-        &self,
-        mask: CellMask,
-        seed: Option<u64>,
-        progress: ProgressHandle,
-    ) -> Result<Maze, GeneratorError> {
-        let mut rng = Random::seed_from_u64(seed.unwrap_or_else(|| thread_rng().gen()));
+    pub fn generate(&self, progress: ProgressHandle) -> Result<Maze, GeneratorError> {
+        let seed = self.seed.unwrap_or_else(|| thread_rng().gen());
+        let mut rng = Random::seed_from_u64(seed);
 
-        let maze_size = self.default_generator.guess_progress_complexity(&mask);
-        progress.lock().from = maze_size; // initial work estimate
+        Ok(match &self.splitter {
+            LocalSplitterSpec::Predefined {
+                regions,
+                region_specs,
+            } => {
+                let mask = regions.clone().to_mask();
+                progress.lock().from = mask.enabled_count();
 
-        const SPLIT_COUNT: usize = 100;
-        let group_count = (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
-        let groups = self
-            .splitter
-            .split(&mask, &mut rng, progress.split())
-            .ok_or(GeneratorError)?;
-        let masks = Self::split_to_masks(group_count, &groups);
+                let regions = regions.clone().map(|r| r.unwrap_or_default());
+                let generated_regions: Vec<_> = region_specs
+                    .iter()
+                    .map(|spec| match spec {
+                        LocalRegionSpec::Predefined(maze) => Some(maze.clone()),
+                        LocalRegionSpec::ToGenerate { generator, params: _ } => {
+                            generator.generate(mask.clone(), &mut rng, progress.split())
+                        }
+                    })
+                    .collect::<Option<_>>()
+                    .ok_or(GeneratorError)?;
 
-        if progress.is_stopped() {
-            return Err(GeneratorError);
-        }
+                Self::connect_regions(&regions, &mask, generated_regions, &mut rng)
+            }
+            LocalSplitterSpec::ToGenerate {
+                mask,
+                splitter: (splitter, _),
+                generator: (generator, _),
+            } => {
+                progress.lock().from = generator.guess_progress_complexity(mask);
 
-        let progresses = masks
-            .iter()
-            .map(|mask| {
-                let local = progress.split();
-                local.lock().from = self.default_generator.guess_progress_complexity(mask);
-                local
-            })
-            .collect::<Vec<_>>();
-        progress.lock().from = 0;
+                const SPLIT_COUNT: usize = 100;
 
-        let rngs = masks
-            .iter()
-            .map(|_| {
-                rng.jump();
-                rng.clone()
-            })
-            .collect::<Vec<_>>();
+                let group_count =
+                    (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
+                let groups = splitter
+                    .split(&mask, &mut rng, progress.split())
+                    .ok_or(GeneratorError)?;
+                let masks = Self::split_to_masks(group_count, &groups, &mask);
 
-        let Some(regions) = masks
-            .into_par_iter()
-            .zip(progresses)
-            .zip(rngs)
-            .map(|((mask, progress), mut rng)| {
-                self.default_generator.generate(mask, &mut rng, progress)
-            })
-            .collect()
-        else {
-            return Err(GeneratorError);
-        };
+                if progress.is_stopped() {
+                    return Err(GeneratorError);
+                }
 
-        let connect_regions = Self::connect_regions(groups, &mask, regions, &mut rng);
-        progress.lock().finish();
+                let progresses = masks
+                    .iter()
+                    .map(|mask| {
+                        let local = progress.split();
+                        local.lock().from = generator.guess_progress_complexity(mask);
+                        local
+                    })
+                    .collect::<Vec<_>>();
+                progress.lock().from = 0;
 
-        Ok(connect_regions)
+                let rngs = masks
+                    .iter()
+                    .map(|_| {
+                        rng.jump();
+                        rng.clone()
+                    })
+                    .collect::<Vec<_>>();
+
+                let Some(regions) = masks
+                    .into_par_iter()
+                    .zip(progresses)
+                    .zip(rngs)
+                    .map(|((mask, progress), mut rng)| generator.generate(mask, &mut rng, progress))
+                    .collect()
+                else {
+                    return Err(GeneratorError);
+                };
+
+                let connect_regions = Self::connect_regions(&groups, &mask, regions, &mut rng);
+                progress.lock().finish();
+
+                connect_regions
+            }
+        })
     }
 
     // Split groups into masks, ready for maze generation
-    pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>) -> Vec<CellMask> {
+    pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>, mask: &CellMask) -> Vec<CellMask> {
         let mut masks =
             vec![CellMask::new_dims_empty(groups.size()).unwrap(); group_count as usize];
 
         for (cell, &group) in groups.iter_pos().zip(groups.iter()) {
-            masks[group as usize][cell] = true;
+            if mask[cell] {
+                masks[group as usize][cell] = true;
+            }
         }
 
         masks
     }
 
-    pub fn connect_regions(groups: Array3D<u8>, mask: &CellMask, regions: Vec<Maze>, rng: &mut Random) -> Maze {
+    pub fn connect_regions(
+        groups: &Array3D<u8>,
+        mask: &CellMask,
+        regions: Vec<Maze>,
+        rng: &mut Random,
+    ) -> Maze {
         // Disclaimer: this implementation can be slow af, since there is a maximum of a 256 groups
         // We use a simple Kruskal's algorithm to connect the regions
 
@@ -264,7 +422,7 @@ impl Generator {
         // Combine the regions, so we can start connecting them
         let mut maze = Maze {
             cells: Array3D::new_dims(Cell::new(), groups.size()).unwrap(),
-            is_tower: false,
+            type_: MazeType::Normal,
         };
         for cell in groups.iter_pos() {
             let group = groups[cell];
@@ -292,7 +450,10 @@ impl Generator {
         maze
     }
 
-    pub fn build_region_graph(groups: &Array3D<u8>, mask: &CellMask) -> Vec<((u8, u8), (Dims3D, CellWall))> {
+    pub fn build_region_graph(
+        groups: &Array3D<u8>,
+        mask: &CellMask,
+    ) -> Vec<((u8, u8), (Dims3D, CellWall))> {
         let mut borders = vec![];
 
         for cell in mask.iter_enabled() {
