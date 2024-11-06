@@ -1,8 +1,10 @@
 use std::ops;
 
+use serde::{Deserialize, Serialize};
+
 use crate::dims::{Dims, Dims3D};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Array3D<T> {
     buf: Vec<T>,
     width: usize,

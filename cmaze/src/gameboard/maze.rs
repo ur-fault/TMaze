@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use self::CellWall::*;
@@ -5,7 +6,7 @@ use crate::{
     algorithms::MazeType, array::Array3D, dims::*, gameboard::cell::{Cell, CellWall}
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Maze {
     pub(crate) cells: Array3D<Cell>,
     pub(crate) type_: MazeType,

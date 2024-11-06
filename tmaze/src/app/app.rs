@@ -1,6 +1,16 @@
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
-use cmaze::dims::*;
+use cmaze::{
+    algorithms::{
+        region_generator::RndKruskals,
+        region_splitter::{DefaultRegionSplitter, RegionSplitter},
+        GeneratorRegistry, SplitterRegistry,
+    },
+    dims::*,
+};
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
@@ -43,6 +53,7 @@ pub struct AppData {
     pub screen_size: Dims,
     pub theme: Theme,
     pub logs: UiLogs,
+    pub registries: Registries,
     jobs: Jobs,
     app_start: Instant,
 
@@ -82,6 +93,11 @@ impl AppData {
     }
 }
 
+pub struct Registries {
+    pub region_splitters: SplitterRegistry,
+    pub region_generator: GeneratorRegistry,
+}
+
 impl App {
     /// Create a new app with a base activity
     ///
@@ -117,6 +133,12 @@ impl App {
         let jobs = Jobs::new();
         let app_start = Instant::now();
         let frame_size = renderer.frame_size();
+        let registries = Registries {
+            region_splitters: SplitterRegistry::with_default(Arc::new(
+                DefaultRegionSplitter::default(),
+            )),
+            region_generator: GeneratorRegistry::with_default(Arc::new(RndKruskals)),
+        };
 
         log::info!("Loading theme");
         let resolver = init_theme_resolver();
@@ -146,6 +168,7 @@ impl App {
                 jobs,
                 theme,
                 logs,
+                registries,
 
                 #[cfg(feature = "sound")]
                 sound_player,

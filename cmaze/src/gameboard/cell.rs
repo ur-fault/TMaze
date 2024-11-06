@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{dims::*, gameboard::cell::CellWall::*};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Cell {
     left: bool,
     top: bool,

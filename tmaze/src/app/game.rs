@@ -1,11 +1,7 @@
 use std::mem;
 
 use cmaze::{
-    algorithms::{
-        region_generator::{DepthFirstSearch, RndKruskals},
-        region_splitter::DefaultRegionSplitter,
-        Generator, GeneratorError,
-    },
+    algorithms::GeneratorError,
     array::Array2DView,
     dims::*,
     game::{GameProperities, RunningGame, RunningGameState, RunningJob},
@@ -23,7 +19,7 @@ use crate::{
     settings::{
         self,
         theme::{Theme, ThemeResolver},
-        CameraMode, Settings, SettingsActivity,
+        CameraMode, MazePreset, Settings, SettingsActivity,
     },
     ui::{
         self,
@@ -45,7 +41,7 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 use rodio::Source;
 
 use super::{
-    app::{AppData, AppStateData},
+    app::{AppData, AppStateData, Registries},
     Activity, ActivityHandler, Change, Event,
 };
 
@@ -165,7 +161,7 @@ impl MainMenu {
     fn start_new_game(settings: &Settings, use_data: &AppStateData) -> Change {
         Change::push(Activity::new_base_boxed(
             "maze size",
-            MazeSizeMenu::new(settings, use_data),
+            MazePresetMenu::new(settings, use_data),
         ))
     }
 
@@ -199,12 +195,12 @@ impl ActivityHandler for MainMenu {
     }
 }
 
-pub struct MazeSizeMenu {
+pub struct MazePresetMenu {
     menu: Menu,
-    presets: Vec<MazeSpec>,
+    presets: Vec<MazePreset>,
 }
 
-impl MazeSizeMenu {
+impl MazePresetMenu {
     pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
         let mut menu_config = MenuConfig::new_from_strings(
             "Maze size".to_string(),
@@ -228,17 +224,14 @@ impl MazeSizeMenu {
         let presets = settings
             .get_mazes()
             .iter()
-            .map(|maze| MazeSpec {
-                size: Dims3D(maze.width as i32, maze.height as i32, maze.depth as i32),
-                is_tower: maze.tower,
-            })
+            .map(|maze| maze.clone())
             .collect::<Vec<_>>();
 
         Self { menu, presets }
     }
 }
 
-impl ActivityHandler for MazeSizeMenu {
+impl ActivityHandler for MazePresetMenu {
     fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
@@ -248,77 +241,11 @@ impl ActivityHandler for MazeSizeMenu {
                     let index = *size.downcast::<usize>().expect("menu should return index");
                     data.use_data.last_selected_preset = Some(index);
 
-                    let preset = self.presets[index];
+                    let preset = self.presets[index].clone();
 
                     Some(Change::push(Activity::new_base_boxed(
                         "maze_gen".to_string(),
-                        MazeAlgorithmMenu::new(preset, &data.settings),
-                    )))
-                }
-                res => Some(res),
-            },
-            None => None,
-        }
-    }
-
-    fn screen(&self) -> &dyn ui::Screen {
-        &self.menu
-    }
-}
-
-pub struct MazeAlgorithmMenu {
-    preset: MazeSpec,
-    menu: Menu,
-    functions: Vec<MenuAction<Generator>>,
-}
-
-impl MazeAlgorithmMenu {
-    pub fn new(preset: MazeSpec, settings: &Settings) -> Self {
-        let options = menu_actions!(
-            "Randomized Kruskal's" -> _ => Generator::new(Box::new(RndKruskals), Box::new(DefaultRegionSplitter::default())),
-            "Depth-first search" -> _ => Generator::new(Box::new(DepthFirstSearch), Box::new(DefaultRegionSplitter::default())),
-        );
-
-        let (options, functions) = split_menu_actions(options);
-
-        let menu_config = MenuConfig::new("Maze generation algorithm".to_string(), options)
-            .counted()
-            .maybe_default(settings.read().default_maze_gen_algo.map(|a| a as usize));
-
-        let menu = Menu::new(menu_config);
-
-        Self {
-            menu,
-            preset,
-            functions,
-        }
-    }
-}
-
-impl ActivityHandler for MazeAlgorithmMenu {
-    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
-        if data.settings.get_dont_ask_for_maze_algo() {
-            return Some(Change::push(Activity::new_base_boxed(
-                "maze_gen".to_string(),
-                MazeGenerationActivity::new(
-                    self.preset,
-                    data.settings.get_default_maze_gen_algo().to_generator(),
-                ),
-            )));
-        }
-
-        match self.menu.update(events, data) {
-            Some(change) => match change {
-                Change::Pop {
-                    res: Some(algo), ..
-                } => {
-                    let index = *algo.downcast::<usize>().expect("menu should return index");
-
-                    let gen = self.functions[index](data);
-
-                    Some(Change::push(Activity::new_base_boxed(
-                        "maze_gen".to_string(),
-                        MazeGenerationActivity::new(self.preset, gen),
+                        MazeGenerationActivity::new(preset, &data.registries),
                     )))
                 }
                 res => Some(res),
@@ -334,20 +261,26 @@ impl ActivityHandler for MazeAlgorithmMenu {
 
 pub struct MazeGenerationActivity {
     comm: Result<RunningJob<Option<RunningGame>>, GeneratorError>,
+    preset: MazePreset,
     progress_bar: ProgressBar,
 }
 
 impl MazeGenerationActivity {
-    pub fn new(game_mode: MazeSpec, generator: Generator) -> Self {
+    pub fn new(preset: MazePreset, registries: &Registries) -> Self {
+        let text = preset.short_desc();
         let game_props = GameProperities {
-            game_mode,
-            generator,
+            maze_spec: preset.maze_spec.clone(),
         };
 
-        let progress_bar = ProgressBar::new(format!("Generating maze: {:?}", game_mode.size));
+        let progress_bar = ProgressBar::new(format!("Generating maze: {}", text));
 
         Self {
-            comm: RunningGame::new(game_props),
+            comm: RunningGame::prepare(
+                game_props,
+                &registries.region_generator,
+                &registries.region_splitters,
+            ),
+            preset,
             progress_bar,
         }
     }
@@ -394,6 +327,7 @@ impl ActivityHandler for MazeGenerationActivity {
                             game,
                             view_mode: GameViewMode::Adventure,
                             player_char: constants::get_random_player_char(),
+                            maze_preset: self.preset.clone(),
                         };
                         Some(Change::replace(Activity::new_base_boxed(
                             "game".to_string(),
@@ -484,12 +418,11 @@ impl ActivityHandler for PauseMenu {
 
 pub struct EndGamePopup {
     popup: Popup,
-    game_mode: MazeSpec,
-    generator: Generator,
+    preset: MazePreset,
 }
 
 impl EndGamePopup {
-    pub fn new(game: &RunningGame) -> Self {
+    pub fn new(game: &RunningGame, preset: MazePreset) -> Self {
         let maze_size = game.get_maze().size();
         let texts = vec![
             format!("Time:  {}", format_duration(game.get_elapsed().unwrap())),
@@ -499,14 +432,7 @@ impl EndGamePopup {
 
         let popup = Popup::new("You won".to_string(), texts);
 
-        let game_mode = game.get_game_mode();
-        let generator = game.get_gen_fn().clone();
-
-        Self {
-            popup,
-            game_mode,
-            generator,
-        }
+        Self { popup, preset }
     }
 }
 
@@ -520,7 +446,7 @@ impl ActivityHandler for EndGamePopup {
                 Ok(b) => match *b {
                     KeyCode::Char('r') => Some(Change::replace(Activity::new_base_boxed(
                         "game",
-                        MazeGenerationActivity::new(self.game_mode, self.generator.clone()),
+                        MazeGenerationActivity::new(self.preset.clone(), &data.registries),
                     ))),
                     KeyCode::Char('q') => Some(Change::pop_all()),
                     KeyCode::Enter | KeyCode::Char(' ') => Some(Change::pop_top()),
@@ -539,7 +465,7 @@ impl ActivityHandler for EndGamePopup {
 
 pub struct GameActivity {
     camera_mode: CameraMode,
-    game: GameData,
+    data: GameData,
     maze_board: MazeBoard,
     show_debug: bool,
 
@@ -572,7 +498,7 @@ impl GameActivity {
 
         Self {
             camera_mode,
-            game,
+            data: game,
             maze_board,
             show_debug: false,
 
@@ -591,7 +517,7 @@ impl GameActivity {
     pub fn viewport_size(&self, screen_size: Dims) -> (Dims, bool) {
         let vp_size = screen_size - self.margins * 2;
 
-        let maze_frame = &self.maze_board.frames[self.game.game.get_player_pos().2 as usize];
+        let maze_frame = &self.maze_board.frames[self.data.game.get_player_pos().2 as usize];
         let floor_size = maze_frame.size;
 
         let does_fit = floor_size.0 <= vp_size.0 && floor_size.1 <= vp_size.1;
@@ -600,26 +526,26 @@ impl GameActivity {
     }
 
     fn current_floor_frame(&self) -> &Frame {
-        &self.maze_board.frames[self.game.camera_pos.2 as usize]
+        &self.maze_board.frames[self.data.camera_pos.2 as usize]
     }
 
     fn render_meta_texts(&self, frame: &mut Frame, theme: &Theme, vp: Rect) {
         let max_width = (vp.size().0 / 2 + 1) as usize;
 
-        let pl_pos = self.game.game.get_player_pos() + Dims3D(1, 1, 1);
+        let pl_pos = self.data.game.get_player_pos() + Dims3D(1, 1, 1);
 
         // texts
         let from_start =
-            multisize_duration_format(self.game.game.get_elapsed().unwrap(), max_width);
+            multisize_duration_format(self.data.game.get_elapsed().unwrap(), max_width);
         let move_count = strings::multisize_string(
             [
-                format!("{} moves", self.game.game.get_move_count()),
-                format!("{}m", self.game.game.get_move_count()),
+                format!("{} moves", self.data.game.get_move_count()),
+                format!("{}m", self.data.game.get_move_count()),
             ],
             max_width,
         );
 
-        let pos_text = if self.game.game.get_maze().size().2 > 1 {
+        let pos_text = if self.data.game.get_maze().size().2 > 1 {
             strings::multisize_string(
                 [
                     format!("x:{} y:{} floor:{}", pl_pos.0, pl_pos.1, pl_pos.2),
@@ -639,7 +565,7 @@ impl GameActivity {
             )
         };
 
-        let view_mode = self.game.view_mode;
+        let view_mode = self.data.view_mode;
         let view_mode = strings::multisize_string(view_mode.to_multisize_strings(), max_width);
 
         let tl = vp.start - Dims(0, 1);
@@ -657,7 +583,7 @@ impl GameActivity {
     pub fn render_visited_places(&self, frame: &mut Frame, maze_pos: Dims, theme: &Theme) {
         use CellWall::{Down, Up};
 
-        let game = &self.game.game;
+        let game = &self.data.game;
         for (move_pos, _) in game.get_moves() {
             let cell = game.get_maze().get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
@@ -679,7 +605,7 @@ impl GameActivity {
         let player_draw_pos = maze_pos + player.into();
         let cell = game
             .get_maze()
-            .get_cell(self.game.game.get_player_pos())
+            .get_cell(self.data.game.get_player_pos())
             .unwrap();
         if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
             viewport[player_draw_pos]
@@ -688,7 +614,7 @@ impl GameActivity {
                 .style
                 .foreground_color = theme["game.player"].to_cross().foreground_color;
         } else {
-            viewport.draw(player_draw_pos, self.game.player_char, theme["game.player"]);
+            viewport.draw(player_draw_pos, self.data.player_char, theme["game.player"]);
         }
     }
 
@@ -713,7 +639,7 @@ impl GameActivity {
     }
 
     fn init_dpad(&mut self, data: &AppData) {
-        let dpad_type = DPadType::from_maze(self.game.game.get_maze());
+        let dpad_type = DPadType::from_maze(self.data.game.get_maze());
         let swap_up_down = data.settings.get_dpad_swap_up_down();
 
         let touch_controls = DPad::new(None, swap_up_down, dpad_type);
@@ -751,9 +677,9 @@ impl GameActivity {
 
 impl ActivityHandler for GameActivity {
     fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
-        match self.game.game.get_state() {
-            RunningGameState::NotStarted => self.game.game.start().unwrap(),
-            RunningGameState::Paused => self.game.game.resume().unwrap(),
+        match self.data.game.get_state() {
+            RunningGameState::NotStarted => self.data.game.start().unwrap(),
+            RunningGameState::Paused => self.data.game.resume().unwrap(),
             _ => {}
         }
 
@@ -769,9 +695,9 @@ impl ActivityHandler for GameActivity {
             match event {
                 Event::Term(event) => match event {
                     TermEvent::Key(key_event) => {
-                        match self.game.handle_event(&data.settings, key_event) {
+                        match self.data.handle_event(&data.settings, key_event) {
                             Err(false) => {
-                                self.game.game.pause().unwrap();
+                                self.data.game.pause().unwrap();
 
                                 return Some(Change::push(Activity::new_base_boxed(
                                     "pause".to_string(),
@@ -785,7 +711,7 @@ impl ActivityHandler for GameActivity {
                     TermEvent::Mouse(event) => {
                         if let Some(ref mut touch_controls) = self.touch_controls {
                             if let Some(dir) = touch_controls.apply_mouse_event(event) {
-                                self.game.apply_move(&data.settings, dir, false);
+                                self.data.apply_move(&data.settings, dir, false);
                             }
                         }
                     }
@@ -796,20 +722,20 @@ impl ActivityHandler for GameActivity {
         }
 
         if let Some(ref mut tc) = self.touch_controls {
-            tc.update_available_moves(if self.game.view_mode == GameViewMode::Adventure {
-                self.game.game.get_available_moves()
+            tc.update_available_moves(if self.data.view_mode == GameViewMode::Adventure {
+                self.data.game.get_available_moves()
             } else {
                 [true; 6] // enable all
             });
         }
 
-        if self.game.view_mode == GameViewMode::Adventure {
+        if self.data.view_mode == GameViewMode::Adventure {
             match self.camera_mode {
                 CameraMode::CloseFollow => {
-                    self.game.camera_pos = maze2screen_3d(self.game.game.get_player_pos());
+                    self.data.camera_pos = maze2screen_3d(self.data.game.get_player_pos());
                 }
                 CameraMode::EdgeFollow(xoff, yoff) => 'b: {
-                    self.game.camera_pos.2 = self.game.game.get_player_pos().2;
+                    self.data.camera_pos.2 = self.data.game.get_player_pos().2;
 
                     let (vp_size, does_fit) = self.viewport_size(data.screen_size);
 
@@ -820,30 +746,33 @@ impl ActivityHandler for GameActivity {
                     let xoff = xoff.to_abs(vp_size.0);
                     let yoff = yoff.to_abs(vp_size.1);
 
-                    let player_pos = maze2screen(self.game.game.get_player_pos());
+                    let player_pos = maze2screen(self.data.game.get_player_pos());
                     let player_pos_in_vp =
-                        player_pos - self.game.camera_pos.into() + vp_size / 2 + Dims(1, 1);
+                        player_pos - self.data.camera_pos.into() + vp_size / 2 + Dims(1, 1);
 
                     if player_pos_in_vp.0 < xoff || player_pos_in_vp.0 > vp_size.0 - xoff {
-                        self.game.camera_pos.0 = player_pos.0;
+                        self.data.camera_pos.0 = player_pos.0;
                     }
 
                     if player_pos_in_vp.1 < yoff || player_pos_in_vp.1 > vp_size.1 - yoff {
-                        self.game.camera_pos.1 = player_pos.1;
+                        self.data.camera_pos.1 = player_pos.1;
                     }
                 }
             }
         }
 
-        self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.game.game.get_player_pos())) at data.settings.get_player_smoothing());
-        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.game.camera_pos) at data.settings.get_camera_smoothing());
+        self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.data.game.get_player_pos())) at data.settings.get_player_smoothing());
+        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.data.camera_pos) at data.settings.get_camera_smoothing());
 
         self.show_debug = data.use_data.show_debug;
 
-        if self.game.game.get_state() == RunningGameState::Finished {
+        if self.data.game.get_state() == RunningGameState::Finished {
             return Some(Change::replace_at(
                 1,
-                Activity::new_base_boxed("won".to_string(), EndGamePopup::new(&self.game.game)),
+                Activity::new_base_boxed(
+                    "won".to_string(),
+                    EndGamePopup::new(&self.data.game, self.data.maze_preset.clone()),
+                ),
             ));
         };
 
@@ -858,14 +787,14 @@ impl ActivityHandler for GameActivity {
 impl Screen for GameActivity {
     fn draw(&self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
         let maze_frame = self.current_floor_frame();
-        let game = &self.game.game;
+        let game = &self.data.game;
 
         let game_view_rect = self.viewport_rect;
         let game_view_size = game_view_rect.size();
 
         let (vp_size, does_fit) = self.viewport_size(game_view_size);
         let maze_pos = match does_fit {
-            true => match self.game.view_mode {
+            true => match self.data.view_mode {
                 GameViewMode::Adventure => Dims(0, 0),
                 GameViewMode::Spectator => maze2screen(Dims(0, 0)) - self.sm_camera_pos.into(),
             },
@@ -880,7 +809,7 @@ impl Screen for GameActivity {
         self.render_visited_places(&mut viewport, maze_pos, theme);
 
         // player
-        if (self.game.game.get_player_pos().2) == self.sm_camera_pos.2 {
+        if (self.data.game.get_player_pos().2) == self.sm_camera_pos.2 {
             self.render_player(maze_pos, game, &mut viewport, theme);
         }
 

@@ -66,7 +66,7 @@ pub struct RunningGame {
 
 impl RunningGame {
     #[allow(unused_variables)]
-    pub fn new(
+    pub fn prepare(
         props: GameProperities,
         gen_registry: &GeneratorRegistry,
         spitter_registry: &SplitterRegistry,

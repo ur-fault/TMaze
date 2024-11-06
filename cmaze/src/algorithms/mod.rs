@@ -2,6 +2,7 @@ pub mod region_generator;
 pub mod region_splitter;
 pub mod types;
 
+use serde::{Deserialize, Serialize};
 pub use types::*;
 
 use hashbrown::{HashMap, HashSet};
@@ -29,7 +30,7 @@ pub type GeneratorRegistry = Registry<Arc<dyn RegionGenerator>>;
 /// Registry of the region splitters.
 pub type SplitterRegistry = Registry<Arc<dyn RegionSplitter>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CellMask(Array3D<bool>);
 
 impl CellMask {
@@ -243,13 +244,29 @@ impl Generator {
                         .unwrap_or_else(|| CellMask::new_dims(*size).unwrap()),
                     splitter: splitter
                         .clone()
-                        .map(|(name, params)| (splitters.get(&name).unwrap().clone(), params))
+                        .map(|(name, params)| {
+                            (
+                                splitters
+                                    .get(&name)
+                                    .expect("cannot find specified splitter")
+                                    .clone(),
+                                params,
+                            )
+                        })
                         .unwrap_or_else(|| {
                             (splitters.get_default().unwrap().clone(), Params::default())
                         }),
                     generator: generator
                         .clone()
-                        .map(|(name, params)| (generators.get(&name).unwrap().clone(), params))
+                        .map(|(name, params)| {
+                            (
+                                generators
+                                    .get(&name)
+                                    .expect("cannot find specified generator")
+                                    .clone(),
+                                params,
+                            )
+                        })
                         .unwrap_or_else(|| {
                             (generators.get_default().unwrap().clone(), Params::default())
                         }),
@@ -314,9 +331,10 @@ impl Generator {
                     .iter()
                     .map(|spec| match spec {
                         LocalRegionSpec::Predefined(maze) => Some(maze.clone()),
-                        LocalRegionSpec::ToGenerate { generator, params: _ } => {
-                            generator.generate(mask.clone(), &mut rng, progress.split())
-                        }
+                        LocalRegionSpec::ToGenerate {
+                            generator,
+                            params: _,
+                        } => generator.generate(mask.clone(), &mut rng, progress.split()),
                     })
                     .collect::<Option<_>>()
                     .ok_or(GeneratorError)?;

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Datelike, Local, NaiveDate};
-use cmaze::dims::*;
-use model::SolveResult;
+use cmaze::algorithms::MazeSpec;
+use model::{GameDefinition, SolveResult};
 use ron::{de::from_reader, ser::to_writer};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -15,12 +15,29 @@ use crate::{
 };
 
 pub mod model {
+    use cmaze::{algorithms::MazeType, dims::Dims3D};
+
     use super::*;
 
     #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
     pub struct SolveResult {
         pub moves: i32,
         pub seconds: f32,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
+    pub struct GameDefinition {
+        pub size: Dims3D,
+        pub type_: MazeType,
+    }
+
+    impl GameDefinition {
+        pub fn from_spec(spec: &MazeSpec) -> Self {
+            GameDefinition {
+                size: spec.size,
+                type_: spec.maze_type.unwrap_or_default(),
+            }
+        }
     }
 }
 
@@ -29,7 +46,7 @@ pub struct SaveData {
     pub last_update_check: Option<DateTime<Local>>,
 
     #[serde(default)]
-    best_results: HashMap<MazeSpec, SolveResult>,
+    best_results: HashMap<GameDefinition, SolveResult>,
 
     #[serde(skip_serializing, skip_deserializing)]
     path: PathBuf,
@@ -101,21 +118,25 @@ impl SaveData {
             .unwrap_or(false)
     }
 
-    pub fn get_best_result(&self, mode: MazeSpec) -> Option<(i32, f32)> {
-        let result = self.best_results.get(&mode).copied()?;
+    pub fn get_best_result(&self, mode: &MazeSpec) -> Option<(i32, f32)> {
+        let result = self
+            .best_results
+            .get(&GameDefinition::from_spec(mode))
+            .copied()?;
         Some((result.moves, result.seconds))
     }
 
     pub fn set_best_result(
         &mut self,
-        mode: MazeSpec,
+        mode: &MazeSpec,
         moves: i32,
         seconds: f32,
     ) -> Result<(), ron::Error> {
-        let old = self.best_results.get(&mode).copied();
+        let def = GameDefinition::from_spec(mode);
+        let old = self.best_results.get(&def).copied();
         if old.map_or(true, |old| old.seconds > seconds && old.moves >= moves) {
             self.best_results
-                .insert(mode, SolveResult { moves, seconds });
+                .insert(def, SolveResult { moves, seconds });
         }
         self.write()
     }

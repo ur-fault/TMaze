@@ -2,7 +2,11 @@ mod attribute;
 pub mod theme;
 
 use cmaze::{
-    algorithms::{region_generator::{DepthFirstSearch, RndKruskals}, region_splitter::DefaultRegionSplitter, Generator},
+    algorithms::{
+        region_generator::{DepthFirstSearch, RndKruskals},
+        region_splitter::DefaultRegionSplitter,
+        Generator, MazeSpec, MazeSpecType,
+    },
     dims::{Dims, Offset},
 };
 use derivative::Derivative;
@@ -38,18 +42,42 @@ pub enum CameraMode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazePreset {
     pub title: String,
-    pub width: u16,
-    pub height: u16,
-    #[serde(default = "default_depth")]
-    pub depth: u16,
-    #[serde(default)]
-    pub tower: bool,
+    pub description: Option<String>,
+
     #[serde(default)]
     pub default: bool,
+
+    // TODO: make `serde(flatten)` once switched to JSON
+    pub maze_spec: MazeSpec,
 }
 
-fn default_depth() -> u16 {
-    1
+impl MazePreset {
+    pub fn short_desc(&self) -> String {
+        let (size, cells): (_, usize) = match &self.maze_spec.inner_spec {
+            MazeSpecType::Regions { regions, .. } => (
+                self.maze_spec.size,
+                regions.iter().map(|r| r.mask.enabled_count()).sum(),
+            ),
+            MazeSpecType::Simple { mask, .. } => {
+                let size = self.maze_spec.size;
+                (
+                    size,
+                    mask.as_ref()
+                        .map(|m| m.enabled_count())
+                        .unwrap_or(size.product() as usize),
+                )
+            }
+        };
+
+        if size.2 == 1 {
+            format!("{}: {}x{} ({} cells)", self.title, size.0, size.1, cells)
+        } else {
+            format!(
+                "{}: {}x{}x{} ({} cells)",
+                self.title, size.0, size.1, size.2, cells
+            )
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
@@ -60,16 +88,10 @@ pub enum MazeGenAlgo {
 }
 
 impl MazeGenAlgo {
-    pub fn to_generator(&self) -> Generator {
+    pub fn to_generator(&self) -> &'static str {
         match self {
-            MazeGenAlgo::RandomKruskals => Generator::new(
-                Box::new(RndKruskals),
-                Box::new(DefaultRegionSplitter::default()),
-            ),
-            MazeGenAlgo::DepthFirstSearch => Generator::new(
-                Box::new(DepthFirstSearch),
-                Box::new(DefaultRegionSplitter::default()),
-            ),
+            MazeGenAlgo::RandomKruskals => "random_kruskals",
+            MazeGenAlgo::DepthFirstSearch => "depth_first_search",
         }
     }
 }

@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
 
 use crate::gameboard::Maze;
 
@@ -10,7 +11,7 @@ pub type Params = HashMap<String, String>;
 /// Specific algorithm specification.
 pub type Algorithm = (String, Params);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazeSpec {
     /// Size of the maze.
     pub size: Dims3D,
@@ -93,7 +94,7 @@ impl MazeSpec {
 }
 
 /// Maze specification.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MazeSpecType {
     Regions {
         /// Specified regions.
@@ -129,7 +130,7 @@ pub enum MazeSpecType {
     },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Position {
     Pos(Dims3D),
     Region(u8),
@@ -139,14 +140,14 @@ pub enum Position {
 ///
 /// Is not exhaustive, but generators can report that they don't support the given maze type.
 #[non_exhaustive]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum MazeType {
     #[default]
     Normal,
     Tower,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazeRegionSpec {
     pub mask: CellMask,
     pub region_type: MazeRegionType,
@@ -171,7 +172,7 @@ impl MazeRegionSpec {
 ///
 /// Used in the preset files to define the regions of the maze. Mods will also be able to use this,
 /// once they are implemented.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MazeRegionType {
     /// Predefined maze region.
     ///
