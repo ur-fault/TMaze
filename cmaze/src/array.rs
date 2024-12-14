@@ -92,6 +92,10 @@ impl<T> Array3D<T> {
         })
     }
 
+    pub fn layers(&self) -> impl Iterator<Item = Array2DView<T>> + '_ {
+        (0..self.depth).map(move |z| self.layer(z).unwrap())
+    }
+
     pub fn mask(self, mask: &Array3D<bool>) -> Option<Array3D<Option<T>>> {
         if self.size() != mask.size() {
             return None;
@@ -215,6 +219,13 @@ impl<'a, T> Array2DView<'a, T> {
 
     pub fn iter_pos(&self) -> impl Iterator<Item = Dims> + '_ {
         (0..self.buf.len()).filter_map(move |i| self.idx_to_dim(i))
+    }
+
+    pub fn to_array(&self) -> Array3D<T>
+    where
+        T: Clone,
+    {
+        Array3D::from_buf(self.buf.to_vec(), self.width, self.height, 1)
     }
 }
 

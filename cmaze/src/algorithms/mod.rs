@@ -136,6 +136,10 @@ impl CellMask {
         self.0
     }
 
+    pub fn as_array3d(&self) -> &Array3D<bool> {
+        &self.0
+    }
+
     pub fn fill(&mut self, value: bool) {
         self.0.fill(value);
     }
@@ -165,6 +169,12 @@ impl ops::IndexMut<Dims3D> for CellMask {
         self.0
             .get_mut(index)
             .unwrap_or_else(|| panic!("Index out of bounds: {:?}", index))
+    }
+}
+
+impl From<Array3D<bool>> for CellMask {
+    fn from(array: Array3D<bool>) -> Self {
+        Self(array)
     }
 }
 
@@ -281,7 +291,7 @@ impl Generator {
                 let mut region_ids = Array3D::new_dims(None, *size).unwrap();
 
                 let region_specs = regions
-                    .into_iter()
+                    .iter()
                     .enumerate()
                     .map(|(region_id, MazeRegionSpec { mask, region_type })| {
                         for pos in mask.iter_enabled() {
@@ -307,7 +317,7 @@ impl Generator {
                         regions: region_ids,
                         region_specs,
                     },
-                    type_: MazeType::Normal,
+                    type_: maze_type.unwrap_or(MazeType::Normal),
                 }
             }
         }
@@ -350,49 +360,94 @@ impl Generator {
 
                 const SPLIT_COUNT: usize = 100;
 
-                let group_count =
-                    (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
-                let groups = splitter
-                    .split(&mask, &mut rng, progress.split())
-                    .ok_or(GeneratorError)?;
-                let masks = Self::split_to_masks(group_count, &groups, &mask);
+                let parts = match self.type_ {
+                    MazeType::Normal => vec![mask.clone()],
+                    MazeType::Tower => mask
+                        .as_array3d()
+                        .layers()
+                        .map(|l| l.to_array().into())
+                        .collect(),
+                };
 
-                if progress.is_stopped() {
-                    return Err(GeneratorError);
+                let mut groups = Array3D::new_dims(0, mask.size()).unwrap();
+                for (i, part) in parts.iter().enumerate() {
+                    for pos in part.iter_enabled() {
+                        groups[pos] = i.try_into().expect("too many parts (floors)");
+                    }
                 }
 
-                let progresses = masks
-                    .iter()
-                    .map(|mask| {
-                        let local = progress.split();
-                        local.lock().from = generator.guess_progress_complexity(mask);
-                        local
-                    })
-                    .collect::<Vec<_>>();
-                progress.lock().from = 0;
-
-                let rngs = masks
-                    .iter()
+                let rngs = (0..parts.len())
                     .map(|_| {
-                        rng.jump();
+                        rng.long_jump();
                         rng.clone()
                     })
                     .collect::<Vec<_>>();
 
-                let Some(regions) = masks
+                let parts = parts
                     .into_par_iter()
-                    .zip(progresses)
                     .zip(rngs)
-                    .map(|((mask, progress), mut rng)| generator.generate(mask, &mut rng, progress))
-                    .collect()
-                else {
-                    return Err(GeneratorError);
-                };
+                    .map(|(mask, mut rng)| {
+                        let group_count =
+                            (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
+                        let groups = splitter
+                            .split(&mask, &mut rng, progress.split())
+                            .ok_or(GeneratorError)?;
+                        let masks = Self::split_to_masks(group_count, &groups, &mask);
 
-                let connect_regions = Self::connect_regions(&groups, &mask, regions, &mut rng);
+                        if progress.is_stopped() {
+                            return Err(GeneratorError);
+                        }
+
+                        let progresses = masks
+                            .iter()
+                            .map(|mask| {
+                                let local = progress.split();
+                                local.lock().from = generator.guess_progress_complexity(mask);
+                                local
+                            })
+                            .collect::<Vec<_>>();
+                        progress.lock().from = 0;
+
+                        let rngs = masks
+                            .iter()
+                            .map(|_| {
+                                rng.jump();
+                                rng.clone()
+                            })
+                            .collect::<Vec<_>>();
+
+                        let Some(regions) = masks
+                            .into_par_iter()
+                            .zip(progresses)
+                            .zip(rngs)
+                            .map(|((mask, progress), mut rng)| {
+                                generator.generate(mask, &mut rng, progress)
+                            })
+                            .collect()
+                        else {
+                            return Err(GeneratorError);
+                        };
+
+                        Ok(Self::connect_regions(&groups, &mask, regions, &mut rng))
+                    })
+                    .collect::<Result<_, GeneratorError>>()?;
+
                 progress.lock().finish();
 
-                connect_regions
+                match self.type_ {
+                    MazeType::Normal => Self::connect_regions(&groups, mask, parts, &mut rng),
+                    MazeType::Tower => {
+                        let mut maze = Maze {
+                            cells: Array3D::new_dims(Cell::new(), mask.size()).unwrap(),
+                            type_: MazeType::Tower,
+                        };
+                        for pos in mask.iter_enabled() {
+                            maze.cells[pos] = parts[pos.2 as usize].cells[Dims3D(pos.0, pos.1, 0)];
+                        }
+
+                        maze
+                    }
+                }
             }
         })
     }
@@ -421,7 +476,7 @@ impl Generator {
         // We use a simple Kruskal's algorithm to connect the regions
 
         let mut walls = HashMap::new();
-        for (pair, (from, dir)) in Self::build_region_graph(&groups, mask) {
+        for (pair, (from, dir)) in Self::build_region_graph(groups, mask) {
             assert!(pair.0 < pair.1);
             walls.entry(pair).or_insert_with(Vec::new).push((from, dir));
         }
