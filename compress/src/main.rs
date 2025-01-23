@@ -185,22 +185,23 @@ mod audio {
     }
 
     pub(crate) fn read_wav(path: &Path) -> Result<(Header, Vec<i16>)> {
-        let mut file =
+        let file =
             File::open(path).with_context(|| format!("Cannot open wav at {}", path.display()))?;
 
-        let (header, samples) = wav::read(&mut file)
+        let reader = hound::WavReader::new(file)
             .with_context(|| format!("Cannot read wav at {}", path.display()))?;
 
         let header = Header {
-            channels: header.channel_count as u32,
-            sample_rate: header.sampling_rate as u32,
+            channels: reader.spec().channels as u32,
+            sample_rate: reader.spec().sample_rate,
         };
 
         Ok((
             header,
-            samples
-                .try_into_sixteen()
-                .expect("Only 16-bit samples are supported."),
+            reader
+                .into_samples()
+                .map(|sample| sample)
+                .collect::<Result<_, _>>()?,
         ))
     }
 
