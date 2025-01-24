@@ -687,7 +687,7 @@ pub type MenuAction<R> = Box<dyn Fn(&mut AppData) -> R>;
 macro_rules! menu_actions {
     ($($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
         {
-            let opts: Vec<(_, MenuAction<_>)> = vec![
+            let opts: Vec<(_, $crate::ui::menu::MenuAction<_>)> = vec![
                 $(
                     $(#[cfg(feature = $feature)])?
                     { ($crate::ui::menu::MenuItem::from($name), Box::new(|$data: &mut AppData| $action)) },

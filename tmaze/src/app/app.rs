@@ -5,9 +5,8 @@ use std::{
 
 use cmaze::{
     algorithms::{
-        region_generator::RndKruskals,
-        region_splitter::{DefaultRegionSplitter, RegionSplitter},
-        GeneratorRegistry, SplitterRegistry,
+        region_generator::RndKruskals, region_splitter::DefaultRegionSplitter, GeneratorRegistry,
+        SplitterRegistry,
     },
     dims::*,
 };
@@ -127,7 +126,7 @@ impl App {
         let renderer = Renderer::new().expect("failed to create renderer");
         let activities = Activities::empty();
 
-        let settings = Settings::load(settings_path(), read_only).expect("failed to load settings");
+        let settings = Settings::load_json(settings_path(), read_only).expect("failed to load settings");
         let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
         let jobs = Jobs::new();

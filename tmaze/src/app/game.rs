@@ -152,6 +152,7 @@ impl MainMenu {
                 lines.extend(disabled);
             }
         }
+        
 
         let popup = Popup::new("About".to_string(), lines);
 
@@ -205,7 +206,7 @@ impl MazePresetMenu {
         let mut menu_config = MenuConfig::new_from_strings(
             "Maze size".to_string(),
             settings
-                .get_mazes()
+                .get_presets()
                 .iter()
                 .map(|maze| maze.title.clone())
                 .collect::<Vec<_>>(),
@@ -213,7 +214,7 @@ impl MazePresetMenu {
 
         let default = app_state_data
             .last_selected_preset
-            .or_else(|| settings.get_mazes().iter().position(|maze| maze.default));
+            .or_else(|| settings.get_presets().iter().position(|maze| maze.default));
 
         if let Some(i) = default {
             menu_config = menu_config.default(i);
@@ -222,7 +223,7 @@ impl MazePresetMenu {
         let menu = Menu::new(menu_config);
 
         let presets = settings
-            .get_mazes()
+            .get_presets()
             .iter()
             .map(|maze| maze.clone())
             .collect::<Vec<_>>();
@@ -734,7 +735,7 @@ impl ActivityHandler for GameActivity {
                 CameraMode::CloseFollow => {
                     self.data.camera_pos = maze2screen_3d(self.data.game.get_player_pos());
                 }
-                CameraMode::EdgeFollow(xoff, yoff) => 'b: {
+                CameraMode::EdgeFollow { x: xoff, y: yoff } => 'b: {
                     self.data.camera_pos.2 = self.data.game.get_player_pos().2;
 
                     let (vp_size, does_fit) = self.viewport_size(data.screen_size);
@@ -818,7 +819,7 @@ impl Screen for GameActivity {
         let vp_rect = Rect::sized_at(vp_pos, vp_size).margin(Dims(-1, -1));
         vp_rect.render(frame, theme["game.viewport.border"]);
 
-        if let CameraMode::EdgeFollow(xoff, yoff) = self.camera_mode {
+        if let CameraMode::EdgeFollow { x: xoff, y: yoff } = self.camera_mode {
             if !does_fit && self.show_debug {
                 render_edge_follow_rulers((xoff, yoff), frame, vp_rect, theme);
             }

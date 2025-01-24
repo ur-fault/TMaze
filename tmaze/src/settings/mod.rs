@@ -10,7 +10,7 @@ use cmaze::{
     dims::{Dims, Offset},
 };
 use derivative::Derivative;
-use ron::{self, extensions::Extensions};
+// use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
@@ -30,13 +30,15 @@ use crate::{
 #[cfg(feature = "sound")]
 use crate::sound::create_audio_settings;
 
-const DEFAULT_SETTINGS: &str = include_str!("./default_settings.ron");
+const DEFAULT_SETTINGS_RON: &str = include_str!("./default_settings.ron");
+const DEFAULT_SETTINGS_JSON: &str = include_str!("./default_settings.json5");
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(tag = "mode")]
 pub enum CameraMode {
     #[default]
     CloseFollow,
-    EdgeFollow(Offset, Offset),
+    EdgeFollow { x: Offset, y: Offset },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +49,7 @@ pub struct MazePreset {
     #[serde(default)]
     pub default: bool,
 
-    // TODO: make `serde(flatten)` once switched to JSON
+    // TODO: make `serde(flatten)` once switched to TOML/JSON
     pub maze_spec: MazeSpec,
 }
 
@@ -170,9 +172,9 @@ pub struct SettingsInner {
     #[serde(default)]
     pub music_volume: Option<f32>,
 
-    // mazes
+    // presets
     #[serde(default)]
-    pub mazes: Option<Vec<MazePreset>>,
+    pub presets: Option<Vec<MazePreset>>,
     // TODO: it's not possible in RON to have a HashMap with flattened keys,
     // so we will support it in different way formats
     // once we support them - this would mean dropping RON support
@@ -182,7 +184,7 @@ pub struct SettingsInner {
 
 #[derive(Debug, Clone)]
 pub struct Settings {
-    inner: Arc<RwLock<SettingsInner>>,
+    shared: Arc<RwLock<SettingsInner>>,
     path: PathBuf,
     read_only: bool,
 }
@@ -191,7 +193,7 @@ impl Default for Settings {
     fn default() -> Self {
         let settings = SettingsInner::default();
         Self {
-            inner: Arc::new(RwLock::new(settings)),
+            shared: Arc::new(RwLock::new(settings)),
             path: settings_path(),
             read_only: false,
         }
@@ -213,11 +215,11 @@ impl Settings {
     }
 
     pub fn read(&self) -> std::sync::RwLockReadGuard<SettingsInner> {
-        self.inner.read().unwrap()
+        self.shared.read().unwrap()
     }
 
     pub fn write(&mut self) -> std::sync::RwLockWriteGuard<SettingsInner> {
-        self.inner.write().unwrap()
+        self.shared.write().unwrap()
     }
 }
 
@@ -438,57 +440,94 @@ impl Settings {
         self
     }
 
-    pub fn set_mazes(&mut self, value: Vec<MazePreset>) -> &mut Self {
-        self.write().mazes = Some(value);
+    pub fn set_presets(&mut self, value: Vec<MazePreset>) -> &mut Self {
+        self.write().presets = Some(value);
         self
     }
 
-    pub fn get_mazes(&self) -> Vec<MazePreset> {
-        self.read().mazes.clone().unwrap_or_default()
+    pub fn get_presets(&self) -> Vec<MazePreset> {
+        self.read().presets.clone().unwrap_or_default()
     }
 }
 
+// JSON
 impl Settings {
-    pub fn load(path: PathBuf, read_only: bool) -> io::Result<Self> {
-        let default_settings_string = DEFAULT_SETTINGS;
-
+    pub fn load_json(path: PathBuf, read_only: bool) -> io::Result<Self> {
         let settings_string = fs::read_to_string(&path);
-        let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
         let settings: SettingsInner = if let Ok(settings_string) = settings_string {
-            options
-                .from_str(&settings_string)
-                .expect("Could not parse settings file")
-        } else if !read_only {
-            fs::create_dir_all(path.parent().unwrap())?;
-            fs::write(&path, default_settings_string)?;
-            options.from_str(default_settings_string).unwrap()
+            json5::from_str(&settings_string)
+                .expect("Could not parse settings file: check the syntax")
         } else {
-            options.from_str(default_settings_string).unwrap()
+            if !read_only {
+                fs::create_dir_all(path.parent().unwrap())?;
+                fs::write(&path, DEFAULT_SETTINGS_JSON)?;
+            }
+            json5::from_str(DEFAULT_SETTINGS_JSON).unwrap()
         };
 
         Ok(Self {
-            inner: Arc::new(RwLock::new(settings)),
+            shared: Arc::new(RwLock::new(settings)),
             path,
             read_only,
         })
     }
 
-    pub fn reset(&mut self) {
-        let default_settings_string = DEFAULT_SETTINGS;
-        let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
-        *self.write() = options.from_str(default_settings_string).unwrap();
+    pub fn reset_json(&mut self) {
+        *self.write() = json5::from_str(DEFAULT_SETTINGS_JSON).unwrap();
 
         let path = settings_path();
-        fs::write(&path, default_settings_string).unwrap();
+        fs::write(&path, DEFAULT_SETTINGS_JSON).unwrap();
 
         self.path = path;
     }
 
-    pub fn reset_config(path: PathBuf) {
-        let default_settings_string = DEFAULT_SETTINGS;
-        fs::write(path, default_settings_string).unwrap();
+    pub fn reset_json_config(path: PathBuf) {
+        fs::write(path, DEFAULT_SETTINGS_JSON).unwrap();
     }
 }
+
+// RON
+// impl Settings {
+//     pub fn load(path: PathBuf, read_only: bool) -> io::Result<Self> {
+//         let default_settings_string = DEFAULT_SETTINGS;
+//
+//         let settings_string = fs::read_to_string(&path);
+//         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
+//         let settings: SettingsInner = if let Ok(settings_string) = settings_string {
+//             options
+//                 .from_str(&settings_string)
+//                 .expect("Could not parse settings file")
+//         } else if !read_only {
+//             fs::create_dir_all(path.parent().unwrap())?;
+//             fs::write(&path, default_settings_string)?;
+//             options.from_str(default_settings_string).unwrap()
+//         } else {
+//             options.from_str(default_settings_string).unwrap()
+//         };
+//
+//         Ok(Self {
+//             inner: Arc::new(RwLock::new(settings)),
+//             path,
+//             read_only,
+//         })
+//     }
+//
+//     pub fn reset(&mut self) {
+//         let default_settings_string = DEFAULT_SETTINGS;
+//         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
+//         *self.write() = options.from_str(default_settings_string).unwrap();
+//
+//         let path = settings_path();
+//         fs::write(&path, default_settings_string).unwrap();
+//
+//         self.path = path;
+//     }
+//
+//     pub fn reset_config(path: PathBuf) {
+//         let default_settings_string = DEFAULT_SETTINGS;
+//         fs::write(path, default_settings_string).unwrap();
+//     }
+// }
 
 struct OtherSettingsPopup(Popup, MouseGuard);
 
