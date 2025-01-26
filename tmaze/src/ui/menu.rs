@@ -36,6 +36,8 @@ pub struct SliderDef {
     pub val: i32,
     pub range: RangeInclusive<i32>,
     #[allow(clippy::type_complexity)]
+    // FIXME: take value instead of change direction (bool),
+    // this should allow for mouse support
     pub fun: Box<dyn FnMut(bool, &mut i32, &mut AppData)>,
     pub as_num: bool,
 }
@@ -44,6 +46,7 @@ pub struct OptionDef {
     pub text: MbyStaticStr,
     pub val: bool,
     #[allow(clippy::type_complexity)]
+    // FIXME: return the bool instead
     pub fun: Box<dyn FnMut(&mut bool, &mut AppData)>,
 }
 

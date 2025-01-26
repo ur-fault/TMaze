@@ -6,6 +6,7 @@ use crate::gameboard::Maze;
 use super::{CellMask, Dims3D};
 
 /// Parameters for different algorithms. Region splitter, region generator, etc.
+/// In the future, not only String will be allowed, but also other types.
 pub type Params = HashMap<String, String>;
 
 /// Specific algorithm specification.
@@ -17,6 +18,7 @@ pub struct MazeSpec {
     pub size: Dims3D,
 
     /// Specification of the maze.
+    #[serde(default, flatten)]
     pub inner_spec: MazeSpecType,
 
     /// Seed of the maze.
@@ -95,6 +97,7 @@ impl MazeSpec {
 
 /// Maze specification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MazeSpecType {
     Regions {
         /// Specified regions.
@@ -130,6 +133,18 @@ pub enum MazeSpecType {
     },
 }
 
+impl Default for MazeSpecType {
+    fn default() -> Self {
+        MazeSpecType::Simple {
+            start: None,
+            end: None,
+            mask: None,
+            splitter: None,
+            generator: None,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Position {
     Pos(Dims3D),
@@ -141,6 +156,7 @@ pub enum Position {
 /// Is not exhaustive, but generators can report that they don't support the given maze type.
 #[non_exhaustive]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MazeType {
     #[default]
     Normal,

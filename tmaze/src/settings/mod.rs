@@ -2,11 +2,7 @@ mod attribute;
 pub mod theme;
 
 use cmaze::{
-    algorithms::{
-        region_generator::{DepthFirstSearch, RndKruskals},
-        region_splitter::DefaultRegionSplitter,
-        Generator, MazeSpec, MazeSpecType,
-    },
+    algorithms::{MazeSpec, MazeSpecType},
     dims::{Dims, Offset},
 };
 use derivative::Derivative;
@@ -30,7 +26,6 @@ use crate::{
 #[cfg(feature = "sound")]
 use crate::sound::create_audio_settings;
 
-const DEFAULT_SETTINGS_RON: &str = include_str!("./default_settings.ron");
 const DEFAULT_SETTINGS_JSON: &str = include_str!("./default_settings.json5");
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
@@ -38,7 +33,10 @@ const DEFAULT_SETTINGS_JSON: &str = include_str!("./default_settings.json5");
 pub enum CameraMode {
     #[default]
     CloseFollow,
-    EdgeFollow { x: Offset, y: Offset },
+    EdgeFollow {
+        x: Offset,
+        y: Offset,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,6 +48,7 @@ pub struct MazePreset {
     pub default: bool,
 
     // TODO: make `serde(flatten)` once switched to TOML/JSON
+    #[serde(flatten)]
     pub maze_spec: MazeSpec,
 }
 
@@ -485,49 +484,6 @@ impl Settings {
         fs::write(path, DEFAULT_SETTINGS_JSON).unwrap();
     }
 }
-
-// RON
-// impl Settings {
-//     pub fn load(path: PathBuf, read_only: bool) -> io::Result<Self> {
-//         let default_settings_string = DEFAULT_SETTINGS;
-//
-//         let settings_string = fs::read_to_string(&path);
-//         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
-//         let settings: SettingsInner = if let Ok(settings_string) = settings_string {
-//             options
-//                 .from_str(&settings_string)
-//                 .expect("Could not parse settings file")
-//         } else if !read_only {
-//             fs::create_dir_all(path.parent().unwrap())?;
-//             fs::write(&path, default_settings_string)?;
-//             options.from_str(default_settings_string).unwrap()
-//         } else {
-//             options.from_str(default_settings_string).unwrap()
-//         };
-//
-//         Ok(Self {
-//             inner: Arc::new(RwLock::new(settings)),
-//             path,
-//             read_only,
-//         })
-//     }
-//
-//     pub fn reset(&mut self) {
-//         let default_settings_string = DEFAULT_SETTINGS;
-//         let options = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
-//         *self.write() = options.from_str(default_settings_string).unwrap();
-//
-//         let path = settings_path();
-//         fs::write(&path, default_settings_string).unwrap();
-//
-//         self.path = path;
-//     }
-//
-//     pub fn reset_config(path: PathBuf) {
-//         let default_settings_string = DEFAULT_SETTINGS;
-//         fs::write(path, default_settings_string).unwrap();
-//     }
-// }
 
 struct OtherSettingsPopup(Popup, MouseGuard);
 
