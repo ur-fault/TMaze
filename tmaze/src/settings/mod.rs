@@ -81,22 +81,6 @@ impl MazePreset {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
-pub enum MazeGenAlgo {
-    #[default]
-    RandomKruskals,
-    DepthFirstSearch,
-}
-
-impl MazeGenAlgo {
-    pub fn to_generator(&self) -> &'static str {
-        match self {
-            MazeGenAlgo::RandomKruskals => "random_kruskals",
-            MazeGenAlgo::DepthFirstSearch => "depth_first_search",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum UpdateCheckInterval {
     Never,
     #[default]
@@ -110,6 +94,7 @@ pub enum UpdateCheckInterval {
 #[derive(Debug, Derivative, Serialize, Deserialize)]
 #[derivative(Default)]
 #[serde(rename = "Settings")]
+// FIXME: separate sections into their own struct
 pub struct SettingsInner {
     // general
     #[serde(default)]
@@ -149,13 +134,8 @@ pub struct SettingsInner {
     #[serde(default)]
     pub enable_dpad_highlight: Option<bool>,
 
-    // game config
-    #[serde(default)]
-    pub default_maze_gen_algo: Option<MazeGenAlgo>,
-    #[serde(default)]
-    pub dont_ask_for_maze_algo: Option<bool>,
-    #[serde(default)]
     // update check
+    #[serde(default)]
     pub update_check_interval: Option<UpdateCheckInterval>,
     #[serde(default)]
     pub display_update_check_errors: Option<bool>,
@@ -364,24 +344,6 @@ impl Settings {
     pub fn set_enable_dpad_highlight(&mut self, value: bool) -> &mut Self {
         self.write().enable_dpad_highlight = Some(value);
         self
-    }
-
-    pub fn set_default_maze_gen_algo(&mut self, value: MazeGenAlgo) -> &mut Self {
-        self.write().default_maze_gen_algo = Some(value);
-        self
-    }
-
-    pub fn get_default_maze_gen_algo(&self) -> MazeGenAlgo {
-        self.read().default_maze_gen_algo.unwrap_or_default()
-    }
-
-    pub fn set_dont_ask_for_maze_algo(&mut self, value: bool) -> &mut Self {
-        self.write().dont_ask_for_maze_algo = Some(value);
-        self
-    }
-
-    pub fn get_dont_ask_for_maze_algo(&self) -> bool {
-        self.read().dont_ask_for_maze_algo.unwrap_or_default()
     }
 
     pub fn set_check_interval(&mut self, value: UpdateCheckInterval) -> &mut Self {
