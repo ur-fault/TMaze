@@ -6,7 +6,6 @@ use cmaze::{
     dims::{Dims, Offset},
 };
 use derivative::Derivative;
-// use ron::{self, extensions::Extensions};
 use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
