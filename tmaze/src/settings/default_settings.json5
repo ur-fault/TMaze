@@ -117,6 +117,9 @@
         //   - normal - normal maze
         //   - tower - tower
         // - default - selected by default in menu
+        // - type - type of the preset
+        //   - simple - basic generation config
+        //   - regions - specify generation regions or how to choose them
         {
             "title": "10x5",
             "size": [10, 5, 1],
