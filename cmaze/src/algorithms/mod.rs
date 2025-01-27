@@ -10,7 +10,7 @@ use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use region_splitter::RegionSplitter;
 
-use std::{ops, sync::Arc};
+use std::{iter, ops, sync::Arc};
 
 use crate::{
     array::Array3D,
@@ -179,7 +179,10 @@ impl From<Array3D<bool>> for CellMask {
 }
 
 #[derive(Debug)]
-pub struct GeneratorError;
+pub enum GeneratorError {
+    Unknown,
+    Validation,
+}
 
 #[derive(Debug, Clone)]
 enum LocalSplitterSpec {
@@ -211,21 +214,21 @@ pub struct Generator {
 }
 
 impl Generator {
-    pub fn new(
-        size: Dims3D,
-        generator: (Arc<dyn RegionGenerator>, Params),
-        splitter: (Arc<dyn RegionSplitter>, Params),
-    ) -> Self {
-        Self {
-            seed: None,
-            splitter: LocalSplitterSpec::ToGenerate {
-                mask: CellMask::new_dims(size).unwrap(),
-                splitter,
-                generator,
-            },
-            type_: MazeType::Normal,
-        }
-    }
+    // pub fn new(
+    //     size: Dims3D,
+    //     generator: (Arc<dyn RegionGenerator>, Params),
+    //     splitter: (Arc<dyn RegionSplitter>, Params),
+    // ) -> Self {
+    //     Self {
+    //         seed: None,
+    //         splitter: LocalSplitterSpec::ToGenerate {
+    //             mask: CellMask::new_dims(size).unwrap(),
+    //             splitter,
+    //             generator,
+    //         },
+    //         type_: MazeType::Normal,
+    //     }
+    // }
 
     pub fn from_maze_spec(
         spec: &MazeSpec,
@@ -240,49 +243,6 @@ impl Generator {
         } = spec;
 
         match inner_spec {
-            MazeSpecType::Simple {
-                start: _,
-                end: _,
-                mask,
-                splitter,
-                generator,
-            } => Self {
-                seed: *seed,
-                splitter: LocalSplitterSpec::ToGenerate {
-                    mask: mask
-                        .clone()
-                        .unwrap_or_else(|| CellMask::new_dims(*size).unwrap()),
-                    splitter: splitter
-                        .clone()
-                        .map(|(name, params)| {
-                            (
-                                splitters
-                                    .get(&name)
-                                    .expect("cannot find specified splitter")
-                                    .clone(),
-                                params,
-                            )
-                        })
-                        .unwrap_or_else(|| {
-                            (splitters.get_default().unwrap().clone(), Params::default())
-                        }),
-                    generator: generator
-                        .clone()
-                        .map(|(name, params)| {
-                            (
-                                generators
-                                    .get(&name)
-                                    .expect("cannot find specified generator")
-                                    .clone(),
-                                params,
-                            )
-                        })
-                        .unwrap_or_else(|| {
-                            (generators.get_default().unwrap().clone(), Params::default())
-                        }),
-                },
-                type_: maze_type.unwrap_or(MazeType::default()),
-            },
             MazeSpecType::Regions {
                 regions,
                 start: _,
@@ -320,6 +280,35 @@ impl Generator {
                     type_: maze_type.unwrap_or(MazeType::Normal),
                 }
             }
+            MazeSpecType::Simple {
+                start: _,
+                end: _,
+                mask,
+                splitter,
+                generator,
+            } => Self {
+                seed: *seed,
+                splitter: LocalSplitterSpec::ToGenerate {
+                    mask: mask
+                        .clone()
+                        .unwrap_or_else(|| CellMask::new_dims(*size).unwrap()),
+                    splitter: splitter
+                        .clone()
+                        .map(|(name, params)| (splitters.get(&name).unwrap().clone(), params))
+                        .unwrap_or_else(|| {
+                            (splitters.get_default().unwrap().clone(), Params::default())
+                        }),
+                    generator: generator
+                        .as_ref()
+                        .map(|(name, params)| {
+                            (generators.get(name).unwrap().clone(), params.clone())
+                        })
+                        .unwrap_or_else(|| {
+                            (generators.get_default().unwrap().clone(), Params::default())
+                        }),
+                },
+                type_: maze_type.unwrap_or(MazeType::default()),
+            },
         }
     }
 
@@ -336,6 +325,7 @@ impl Generator {
                 let mask = regions.clone().to_mask();
                 progress.lock().from = mask.enabled_count();
 
+                // FIXME: this ain't parallelized at all
                 let regions = regions.clone().map(|r| r.unwrap_or_default());
                 let generated_regions: Vec<_> = region_specs
                     .iter()
@@ -347,7 +337,7 @@ impl Generator {
                         } => generator.generate(mask.clone(), &mut rng, progress.split()),
                     })
                     .collect::<Option<_>>()
-                    .ok_or(GeneratorError)?;
+                    .ok_or(GeneratorError::Unknown)?;
 
                 Self::connect_regions(&regions, &mask, generated_regions, &mut rng)
             }
@@ -391,11 +381,11 @@ impl Generator {
                             (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
                         let groups = splitter
                             .split(&mask, &mut rng, progress.split())
-                            .ok_or(GeneratorError)?;
+                            .ok_or(GeneratorError::Unknown)?;
                         let masks = Self::split_to_masks(group_count, &groups, &mask);
 
                         if progress.is_stopped() {
-                            return Err(GeneratorError);
+                            return Err(GeneratorError::Unknown);
                         }
 
                         let progresses = masks
@@ -425,7 +415,7 @@ impl Generator {
                             })
                             .collect()
                         else {
-                            return Err(GeneratorError);
+                            return Err(GeneratorError::Unknown);
                         };
 
                         Ok(Self::connect_regions(&groups, &mask, regions, &mut rng))
@@ -476,12 +466,12 @@ impl Generator {
         // We use a simple Kruskal's algorithm to connect the regions
 
         let mut walls = HashMap::new();
-        for (pair, (from, dir)) in Self::build_region_graph(groups, mask) {
+        for (pair, way) in Self::build_region_graph(groups, mask) {
             assert!(pair.0 < pair.1);
-            walls.entry(pair).or_insert_with(Vec::new).push((from, dir));
+            walls.entry(pair).or_insert_with(Vec::new).push(way);
         }
 
-        // Choose only one wall from all of the options
+        // Choose only one wall from all of the pairs
         let mut walls: Vec<_> = walls
             .into_iter()
             .map(|(k, v)| (k, *v.choose(rng).unwrap()))
@@ -489,7 +479,7 @@ impl Generator {
         walls.shuffle(rng);
 
         let mut sets: Vec<HashSet<u8>> = (0..regions.len() as u8)
-            .map(|i| Some(i).into_iter().collect())
+            .map(|i| iter::once(i).collect())
             .collect();
 
         // Combine the regions, so we can start connecting them

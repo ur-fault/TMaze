@@ -4,7 +4,7 @@ use crate::{
     },
     dims::*,
     gameboard::{CellWall, Maze},
-    progress::{Flag, Progress, ProgressHandle},
+    progress::{Progress, ProgressHandle},
 };
 
 use pausable_clock::{PausableClock, PausableInstant};
@@ -72,7 +72,7 @@ impl RunningGame {
         spitter_registry: &SplitterRegistry,
     ) -> Result<RunningJob<Option<RunningGame>>, GeneratorError> {
         if !props.maze_spec.validate() {
-            return Err(GeneratorError);
+            return Err(GeneratorError::Validation);
         }
 
         let GameProperities {
@@ -83,8 +83,6 @@ impl RunningGame {
 
         let start = Dims3D(0, 0, 0);
         let goal = size - Dims3D::ONE;
-
-        let stop_flag = Flag::new();
 
         let progress = ProgressHandle::new();
         let progress_clone = progress.clone();

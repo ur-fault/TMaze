@@ -152,7 +152,6 @@ impl MainMenu {
                 lines.extend(disabled);
             }
         }
-        
 
         let popup = Popup::new("About".to_string(), lines);
 
@@ -295,7 +294,7 @@ impl ActivityHandler for MazeGenerationActivity {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
                     match code {
                         KeyCode::Esc | KeyCode::Char('q') => {
-                            let mut comm = Err(GeneratorError); // dummy value
+                            let mut comm = Err(GeneratorError::Unknown); // dummy value
                             mem::swap(&mut self.comm, &mut comm);
                             if let Ok(comm) = comm {
                                 comm.progress.stop();
@@ -312,7 +311,7 @@ impl ActivityHandler for MazeGenerationActivity {
 
         match self.comm {
             Ok(ref comm) if comm.handle.is_finished() => {
-                let mut comm = Err(GeneratorError); // dummy value
+                let mut comm = Err(GeneratorError::Unknown); // dummy value
                 mem::swap(&mut self.comm, &mut comm);
                 let res = comm
                     .ok()
@@ -357,12 +356,17 @@ impl ActivityHandler for MazeGenerationActivity {
             }
 
             Err(ref err) => {
-                const MSG: &str = "Unknown error while generating maze";
-                log::error!("{}: {:?}", MSG, err);
+                const UNKNOWN_MSG: &str = "Unknown error while generating maze";
+                const VALIDATION_MSG: &str = "Wrong maze preset, please check it";
+                let msg = match err {
+                    GeneratorError::Unknown => UNKNOWN_MSG,
+                    GeneratorError::Validation => VALIDATION_MSG,
+                };
+                log::error!("{}: {:?}", msg, err);
 
                 Some(Change::replace(Activity::new_base_boxed(
                     "game gen error",
-                    Popup::new("Error".to_string(), vec![MSG.to_string()]),
+                    Popup::new("Error".to_string(), vec![msg.to_string()]),
                 )))
             }
         }

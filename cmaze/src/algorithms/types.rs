@@ -57,6 +57,10 @@ impl MazeSpec {
                     }
                 }
 
+                if regions.is_empty() {
+                    return false;
+                }
+
                 if regions.iter().any(|r| !r.validate(self.size)) {
                     return false;
                 }
@@ -109,17 +113,21 @@ pub enum MazeSpecType {
         /// Player end position.
         end: Option<Position>,
     },
+    /// Simple maze specification.
+    ///
+    /// Used for basic mazes, mostly specified inside the user config. User can specify only the
+    /// size and the mask of the maze and used algorithms for splitting and generating the maze.
     Simple {
         /// Player start position.
         ///
-        /// We don't use [`Position`] here, because it's not possible to specify region as start in,
-        /// since the region is not yet generated.
+        /// We don't use [`Position`] here, because it's not possible to specify region to start in,
+        /// since the regions are not generated yet.
         start: Option<Dims3D>,
 
         /// Player end position.
         ///
-        /// We don't use [`Position`] here, because it's not possible to specify region as start in,
-        /// since the region is not yet generated.
+        /// We don't use [`Position`] here, because it's not possible to specify region to start in,
+        /// since the regions are not generated yet.
         end: Option<Dims3D>,
 
         /// Mask of the maze.
@@ -131,6 +139,8 @@ pub enum MazeSpecType {
         /// Region generator.
         generator: Option<Algorithm>,
     },
+    // TODO: Combined, where we can specify specific regions and mask of the rest, and it's handled
+    // automatically by the generator.
 }
 
 impl Default for MazeSpecType {
