@@ -1,6 +1,6 @@
 /target
 *~
-/.idea/
+/.idea
 .DS_Store
 Session.vim
 tmaze/themes

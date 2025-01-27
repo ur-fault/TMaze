@@ -172,6 +172,7 @@ impl Default for MazeSpecType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Position {
     Pos(Dims3D),
     Region(u8),
@@ -197,6 +198,10 @@ pub struct MazeRegionSpec {
 
 impl MazeRegionSpec {
     pub fn validate(&self, maze_size: Dims3D, generators: &GeneratorRegistry) -> bool {
+        if self.mask.size() != maze_size {
+            return false;
+        }
+
         match &self.region_type {
             MazeRegionType::Predefined { maze } => {
                 if maze.size() != self.mask.size() || maze.size() != maze_size {
@@ -221,6 +226,7 @@ impl MazeRegionSpec {
 /// Used in the preset files to define the regions of the maze. Mods will also be able to use this,
 /// once they are implemented.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum MazeRegionType {
     /// Predefined maze region.
     ///

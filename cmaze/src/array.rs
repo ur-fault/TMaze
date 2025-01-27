@@ -5,14 +5,15 @@ use serde::{Deserialize, Serialize};
 use crate::dims::{Dims, Dims3D};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Array3D<T> {
+#[serde(try_from = "Array3DSerde<T>", into = "Array3DSerde<T>")]
+pub struct Array3D<T: Clone> {
     buf: Vec<T>,
     width: usize,
     height: usize,
     depth: usize,
 }
 
-impl<T> Array3D<T> {
+impl<T: Clone> Array3D<T> {
     pub fn size(&self) -> Dims3D {
         Dims3D(self.width as i32, self.height as i32, self.depth as i32)
     }
@@ -54,7 +55,7 @@ impl<T> Array3D<T> {
     }
 }
 
-impl<T> Array3D<T> {
+impl<T: Clone> Array3D<T> {
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.buf.iter()
     }
@@ -67,7 +68,7 @@ impl<T> Array3D<T> {
         self.buf.iter().all(f)
     }
 
-    pub fn map<U>(self, f: impl Fn(T) -> U) -> Array3D<U> {
+    pub fn map<U: Clone>(self, f: impl Fn(T) -> U) -> Array3D<U> {
         Array3D {
             buf: self.buf.into_iter().map(f).collect(),
             width: self.width,
@@ -142,7 +143,7 @@ impl<T: Clone> Array3D<T> {
     }
 }
 
-impl<T> Array3D<T> {
+impl<T: Clone> Array3D<T> {
     pub fn from_buf(buf: Vec<T>, width: usize, height: usize, depth: usize) -> Self {
         Self {
             buf,
@@ -153,7 +154,7 @@ impl<T> Array3D<T> {
     }
 }
 
-impl<T> ops::Index<Dims3D> for Array3D<T> {
+impl<T: Clone> ops::Index<Dims3D> for Array3D<T> {
     type Output = T;
 
     fn index(&self, index: Dims3D) -> &Self::Output {
@@ -163,7 +164,7 @@ impl<T> ops::Index<Dims3D> for Array3D<T> {
     }
 }
 
-impl<T> ops::IndexMut<Dims3D> for Array3D<T> {
+impl<T: Clone> ops::IndexMut<Dims3D> for Array3D<T> {
     fn index_mut(&mut self, index: Dims3D) -> &mut Self::Output {
         self.dim_to_idx(index)
             .and_then(|i| self.buf.get_mut(i))
@@ -236,5 +237,85 @@ impl<T> ops::Index<Dims> for Array2DView<'_, T> {
         self.dim_to_idx(index)
             .and_then(|i| self.buf.get(i))
             .expect("Index out of bounds")
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum Array3DSerde<T: Clone> {
+    Flat { buf: Vec<T>, size: Dims3D },
+    Dim2D(Vec<Vec<T>>),
+    Dim3D(Vec<Vec<Vec<T>>>),
+}
+
+impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
+    type Error = &'static str;
+
+    fn try_from(value: Array3DSerde<T>) -> Result<Self, Self::Error> {
+        match value {
+            Array3DSerde::Flat { buf, size } => {
+                if !(size.all_non_negative()
+                    && buf.len() == size.0 as usize * size.1 as usize * size.2 as usize)
+                {
+                    return Err("Size mismatch");
+                }
+                Ok(Array3D {
+                    buf,
+                    width: size.0 as usize,
+                    height: size.1 as usize,
+                    depth: size.2 as usize,
+                })
+            }
+
+            Array3DSerde::Dim2D(buf) => {
+                let size = Dims3D(
+                    buf.get(0).map(|v| v.len()).unwrap_or(0) as i32,
+                    buf.len() as i32,
+                    1,
+                );
+                if buf.iter().any(|v| v.len() != size.1 as usize) {
+                    return Err("Size mismatch");
+                }
+                Ok(Array3D {
+                    buf: buf.into_iter().flatten().collect(),
+                    width: size.0 as usize,
+                    height: size.1 as usize,
+                    depth: size.2 as usize,
+                })
+            }
+
+            Array3DSerde::Dim3D(buf) => {
+                let size = Dims3D(
+                    buf.get(0)
+                        .and_then(|v| v.get(0))
+                        .map(|v| v.len())
+                        .unwrap_or(0) as i32,
+                    buf.get(0).map(|v| v.len()).unwrap_or(0) as i32,
+                    buf.len() as i32,
+                );
+                if buf.iter().any(|v| v.len() != size.1 as usize)
+                    || buf
+                        .iter()
+                        .any(|v| v.iter().any(|v| v.len() != size.0 as usize))
+                {
+                    return Err("Size mismatch");
+                }
+                Ok(Array3D {
+                    buf: buf.into_iter().flatten().flatten().collect(),
+                    width: size.0 as usize,
+                    height: size.1 as usize,
+                    depth: size.2 as usize,
+                })
+            }
+        }
+    }
+}
+
+impl<T: Clone> From<Array3D<T>> for Array3DSerde<T> {
+    fn from(value: Array3D<T>) -> Self {
+        Array3DSerde::Flat {
+            size: value.size(),
+            buf: value.buf,
+        }
     }
 }

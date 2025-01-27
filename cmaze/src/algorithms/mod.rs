@@ -149,7 +149,7 @@ impl CellMask {
     }
 }
 
-impl<T> Array3D<Option<T>> {
+impl<T: Clone> Array3D<Option<T>> {
     pub fn to_mask(self) -> CellMask {
         CellMask(self.map(|v| v.is_some()))
     }

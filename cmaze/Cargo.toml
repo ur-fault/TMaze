@@ -9,7 +9,7 @@ repository = "https://github.com/ur-fault/tmaze"
 
 [dependencies]
 rand = "^0.8.5"
-thiserror = "1.0.64"
+thiserror = "2"
 pausable_clock = "^1.0.1"
 rayon = "^1.10.0"
 hashbrown  = "0.14"
