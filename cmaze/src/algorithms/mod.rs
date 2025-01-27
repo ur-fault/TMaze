@@ -25,10 +25,10 @@ use region_generator::RegionGenerator;
 pub type Random = rand_xoshiro::Xoshiro256StarStar;
 
 /// Registry of the region generators.
-pub type GeneratorRegistry = Registry<Arc<dyn RegionGenerator>>;
+pub type GeneratorRegistry = Registry<dyn RegionGenerator>;
 
 /// Registry of the region splitters.
-pub type SplitterRegistry = Registry<Arc<dyn RegionSplitter>>;
+pub type SplitterRegistry = Registry<dyn RegionSplitter>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CellMask(Array3D<bool>);
@@ -235,6 +235,15 @@ impl Generator {
         generators: &GeneratorRegistry,
         splitters: &SplitterRegistry,
     ) -> Self {
+        fn get_from_registry<T: ?Sized>(
+            registry: &Registry<T>,
+            pair: Option<&(String, Params)>,
+        ) -> (Arc<T>, Params) {
+            pair.as_ref()
+                .map(|(name, params)| (registry.get(name).unwrap(), params.clone()))
+                .unwrap_or_else(|| (registry.get_default().unwrap(), Params::default()))
+        }
+
         let MazeSpec {
             size,
             inner_spec,
@@ -264,7 +273,7 @@ impl Generator {
                             MazeRegionType::Generated {
                                 generator: (generator, params),
                             } => LocalRegionSpec::ToGenerate {
-                                generator: generators.get(generator).unwrap().clone(),
+                                generator: generators.get(generator).unwrap(),
                                 params: params.clone(),
                             },
                         }
@@ -292,20 +301,8 @@ impl Generator {
                     mask: mask
                         .clone()
                         .unwrap_or_else(|| CellMask::new_dims(*size).unwrap()),
-                    splitter: splitter
-                        .clone()
-                        .map(|(name, params)| (splitters.get(&name).unwrap().clone(), params))
-                        .unwrap_or_else(|| {
-                            (splitters.get_default().unwrap().clone(), Params::default())
-                        }),
-                    generator: generator
-                        .as_ref()
-                        .map(|(name, params)| {
-                            (generators.get(name).unwrap().clone(), params.clone())
-                        })
-                        .unwrap_or_else(|| {
-                            (generators.get_default().unwrap().clone(), Params::default())
-                        }),
+                    splitter: get_from_registry(&splitters, splitter.as_ref()),
+                    generator: get_from_registry(&generators, generator.as_ref()),
                 },
                 type_: maze_type.unwrap_or(MazeType::default()),
             },
