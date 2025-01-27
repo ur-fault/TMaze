@@ -14,9 +14,8 @@ pub type Algorithm = (String, Params);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazeSpec {
-    /// Size of the maze.
-    pub size: Dims3D,
-
+    // /// Size of the maze.
+    // pub size: Dims3D,
     /// Specification of the maze.
     #[serde(default, flatten)]
     pub inner_spec: MazeSpecType,
@@ -61,7 +60,8 @@ impl MazeSpec {
                     return false;
                 }
 
-                if regions.iter().any(|r| !r.validate(self.size, generators)) {
+                let size = regions.first().unwrap().mask.size();
+                if regions.iter().any(|r| !r.validate(size, generators)) {
                     return false;
                 }
 
@@ -79,6 +79,7 @@ impl MazeSpec {
             }
 
             MazeSpecType::Simple {
+                size,
                 start,
                 end,
                 mask,
@@ -91,8 +92,12 @@ impl MazeSpec {
                     }
                 }
 
+                let Some(size) = size.or_else(|| mask.as_ref().map(|m| m.size())) else {
+                    return false;
+                };
+
                 if let Some(mask) = mask {
-                    if mask.size() != self.size {
+                    if mask.size() != size {
                         return false;
                     }
                 }
@@ -112,6 +117,15 @@ impl MazeSpec {
         }
 
         true
+    }
+
+    pub fn size(&self) -> Option<Dims3D> {
+        Some(match &self.inner_spec {
+            MazeSpecType::Regions { regions, .. } => regions.first()?.mask.size(),
+            MazeSpecType::Simple { size, mask, .. } => {
+                size.or_else(|| mask.as_ref().map(|m| m.size()))?
+            }
+        })
     }
 }
 
@@ -134,6 +148,11 @@ pub enum MazeSpecType {
     /// Used for basic mazes, mostly specified inside the user config. User can specify only the
     /// size and the mask of the maze and used algorithms for splitting and generating the maze.
     Simple {
+        /// Maze size.
+        ///
+        /// Can be ommited when the mask is specified.
+        size: Option<Dims3D>,
+
         /// Player start position.
         ///
         /// We don't use [`Position`] here, because it's not possible to specify region to start in,
@@ -159,17 +178,17 @@ pub enum MazeSpecType {
     // automatically by the generator.
 }
 
-impl Default for MazeSpecType {
-    fn default() -> Self {
-        MazeSpecType::Simple {
-            start: None,
-            end: None,
-            mask: None,
-            splitter: None,
-            generator: None,
-        }
-    }
-}
+// impl Default for MazeSpecType {
+//     fn default() -> Self {
+//         MazeSpecType::Simple {
+//             start: None,
+//             end: None,
+//             mask: None,
+//             splitter: None,
+//             generator: None,
+//         }
+//     }
+// }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(untagged)]

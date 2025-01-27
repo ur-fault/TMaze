@@ -203,7 +203,10 @@ impl TryFrom<CellMaskSerde> for CellMask {
         match mask {
             CellMaskSerde::Bool(array) => Ok(CellMask(array)),
             CellMaskSerde::Int(array) => Ok(CellMask(array.map(|v| v != 0))),
-            CellMaskSerde::Base64 { base64: bytes, size } => {
+            CellMaskSerde::Base64 {
+                base64: bytes,
+                size,
+            } => {
                 use base64::prelude::*;
                 let bits = base64::prelude::BASE64_STANDARD.decode(bytes)?;
 
@@ -288,7 +291,6 @@ impl Generator {
         }
 
         let MazeSpec {
-            size,
             inner_spec,
             seed,
             maze_type,
@@ -300,7 +302,8 @@ impl Generator {
                 start: _,
                 end: _,
             } => {
-                let mut region_ids = Array3D::new_dims(None, *size).unwrap();
+                let size = regions.first().unwrap().mask.size();
+                let mut region_ids = Array3D::new_dims(None, size).unwrap();
 
                 let region_specs = regions
                     .iter()
@@ -335,20 +338,24 @@ impl Generator {
             MazeSpecType::Simple {
                 start: _,
                 end: _,
+                size,
                 mask,
                 splitter,
                 generator,
-            } => Self {
-                seed: *seed,
-                splitter: LocalSplitterSpec::ToGenerate {
-                    mask: mask
-                        .clone()
-                        .unwrap_or_else(|| CellMask::new_dims(*size).unwrap()),
-                    splitter: get_from_registry(&splitters, splitter.as_ref()),
-                    generator: get_from_registry(&generators, generator.as_ref()),
-                },
-                type_: maze_type.unwrap_or(MazeType::default()),
-            },
+            } => {
+                let size = size.or_else(|| mask.as_ref().map(|m| m.size())).unwrap();
+                Self {
+                    seed: *seed,
+                    splitter: LocalSplitterSpec::ToGenerate {
+                        mask: mask
+                            .clone()
+                            .unwrap_or_else(|| CellMask::new_dims(size).unwrap()),
+                        splitter: get_from_registry(&splitters, splitter.as_ref()),
+                        generator: get_from_registry(&generators, generator.as_ref()),
+                    },
+                    type_: maze_type.unwrap_or(MazeType::default()),
+                }
+            }
         }
     }
 
@@ -470,6 +477,8 @@ impl Generator {
                         let mut maze = Maze {
                             cells: Array3D::new_dims(Cell::new(), mask.size()).unwrap(),
                             type_: MazeType::Tower,
+                            start: Dims3D::ZERO,
+                            end: Dims3D::ZERO,
                         };
                         for pos in mask.iter_enabled() {
                             maze.cells[pos] = parts[pos.2 as usize].cells[Dims3D(pos.0, pos.1, 0)];
@@ -526,6 +535,8 @@ impl Generator {
         let mut maze = Maze {
             cells: Array3D::new_dims(Cell::new(), groups.size()).unwrap(),
             type_: MazeType::Normal,
+            start: Dims3D::ZERO,
+            end: Dims3D::ZERO,
         };
         for cell in groups.iter_pos() {
             let group = groups[cell];

@@ -10,6 +10,8 @@ use crate::{
 pub struct Maze {
     pub(crate) cells: Array3D<Cell>,
     pub(crate) type_: MazeType,
+    pub start: Dims3D,
+    pub end: Dims3D,
 }
 
 impl Maze {

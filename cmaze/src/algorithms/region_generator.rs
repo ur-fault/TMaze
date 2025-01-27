@@ -31,6 +31,8 @@ impl RegionGenerator for DepthFirstSearch {
         let mut maze = Maze {
             cells,
             type_: MazeType::default(),
+            start: Dims3D::ZERO,
+            end: Dims3D::ZERO,
         };
 
         progress.lock().from = mask.enabled_count();
@@ -110,6 +112,8 @@ impl RegionGenerator for RndKruskals {
         let mut maze = Maze {
             cells,
             type_: MazeType::default(),
+            start: Dims3D::ZERO,
+            end: Dims3D::ZERO,
         };
 
         walls.shuffle(rng);

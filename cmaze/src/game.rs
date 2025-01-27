@@ -60,7 +60,6 @@ pub struct RunningGame {
     clock: Option<PausableClock>,
     start: Option<PausableInstant>,
     player_pos: Dims3D,
-    goal_pos: Dims3D,
     moves: Vec<(Dims3D, CellWall)>,
 }
 
@@ -75,14 +74,9 @@ impl RunningGame {
             return Err(GeneratorError::Validation);
         }
 
-        let GameProperities {
-            maze_spec: maze_spec @ MazeSpec { size, .. },
-        } = props;
+        let GameProperities { maze_spec } = props;
 
         let generator = Generator::from_maze_spec(&maze_spec, gen_registry, splitter_registry);
-
-        let start = Dims3D(0, 0, 0);
-        let goal = size - Dims3D::ONE;
 
         let progress = ProgressHandle::new();
         let progress_clone = progress.clone();
@@ -91,13 +85,12 @@ impl RunningGame {
             let maze = generator.generate(progress_clone).ok()?;
 
             Some(RunningGame {
+                player_pos: maze.start,
                 maze,
                 state: RunningGameState::NotStarted,
                 maze_spec,
                 clock: None,
                 start: None,
-                player_pos: start,
-                goal_pos: goal,
                 moves: vec![],
             })
         });
@@ -118,7 +111,7 @@ impl RunningGame {
     }
 
     pub fn get_goal_pos(&self) -> Dims3D {
-        self.goal_pos
+        self.maze.end
     }
 
     pub fn get_moves(&self) -> &Vec<(Dims3D, CellWall)> {
@@ -223,7 +216,7 @@ impl RunningGame {
             count += 1;
         }
 
-        if self.player_pos == self.goal_pos {
+        if self.player_pos == self.maze.end {
             self.state = RunningGameState::Finished;
             self.clock.as_mut().unwrap().pause();
         }

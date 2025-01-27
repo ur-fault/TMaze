@@ -55,11 +55,11 @@ impl MazePreset {
     pub fn short_desc(&self) -> String {
         let (size, cells): (_, usize) = match &self.maze_spec.inner_spec {
             MazeSpecType::Regions { regions, .. } => (
-                self.maze_spec.size,
+                self.maze_spec.size().unwrap(),
                 regions.iter().map(|r| r.mask.enabled_count()).sum(),
             ),
             MazeSpecType::Simple { mask, .. } => {
-                let size = self.maze_spec.size;
+                let size = self.maze_spec.size().unwrap();
                 (
                     size,
                     mask.as_ref()

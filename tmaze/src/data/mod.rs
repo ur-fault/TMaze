@@ -33,7 +33,8 @@ pub mod model {
     impl GameDefinition {
         pub fn from_spec(spec: &MazeSpec) -> Self {
             GameDefinition {
-                size: spec.size,
+                // player shouldn't be able to play without validating the preset first
+                size: spec.size().unwrap(),
                 type_: spec.maze_type.unwrap_or_default(),
             }
         }
