@@ -214,22 +214,6 @@ pub struct Generator {
 }
 
 impl Generator {
-    // pub fn new(
-    //     size: Dims3D,
-    //     generator: (Arc<dyn RegionGenerator>, Params),
-    //     splitter: (Arc<dyn RegionSplitter>, Params),
-    // ) -> Self {
-    //     Self {
-    //         seed: None,
-    //         splitter: LocalSplitterSpec::ToGenerate {
-    //             mask: CellMask::new_dims(size).unwrap(),
-    //             splitter,
-    //             generator,
-    //         },
-    //         type_: MazeType::Normal,
-    //     }
-    // }
-
     pub fn from_maze_spec(
         spec: &MazeSpec,
         generators: &GeneratorRegistry,
@@ -273,7 +257,7 @@ impl Generator {
                             MazeRegionType::Generated {
                                 generator: (generator, params),
                             } => LocalRegionSpec::ToGenerate {
-                                generator: generators.get(generator).unwrap(),
+                                generator: generators.get(generator).expect("unknown generator"),
                                 params: params.clone(),
                             },
                         }

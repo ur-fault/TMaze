@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::gameboard::Maze;
 
-use super::{CellMask, Dims3D};
+use super::{CellMask, Dims3D, GeneratorRegistry, SplitterRegistry};
 
 /// Parameters for different algorithms. Region splitter, region generator, etc.
 /// In the future, not only String will be allowed, but also other types.
@@ -31,7 +31,7 @@ pub struct MazeSpec {
 }
 
 impl MazeSpec {
-    pub fn validate(&self) -> bool {
+    pub fn validate(&self, generators: &GeneratorRegistry, splitters: &SplitterRegistry) -> bool {
         fn check_position(pos: Position, regions: &[MazeRegionSpec]) -> bool {
             match pos {
                 Position::Pos(pos) => {
@@ -61,7 +61,7 @@ impl MazeSpec {
                     return false;
                 }
 
-                if regions.iter().any(|r| !r.validate(self.size)) {
+                if regions.iter().any(|r| !r.validate(self.size, generators)) {
                     return false;
                 }
 
@@ -79,7 +79,11 @@ impl MazeSpec {
             }
 
             MazeSpecType::Simple {
-                start, end, mask, ..
+                start,
+                end,
+                mask,
+                generator,
+                splitter,
             } => {
                 if let (Some(start), Some(end)) = (start, end) {
                     if start == end {
@@ -89,6 +93,18 @@ impl MazeSpec {
 
                 if let Some(mask) = mask {
                     if mask.size() != self.size {
+                        return false;
+                    }
+                }
+
+                if let Some(generator) = generator {
+                    if !generators.is_registered(&generator.0) {
+                        return false;
+                    }
+                }
+
+                if let Some(splitter) = splitter {
+                    if !splitters.is_registered(&splitter.0) {
                         return false;
                     }
                 }
@@ -180,14 +196,20 @@ pub struct MazeRegionSpec {
 }
 
 impl MazeRegionSpec {
-    pub fn validate(&self, maze_size: Dims3D) -> bool {
+    pub fn validate(&self, maze_size: Dims3D, generators: &GeneratorRegistry) -> bool {
         match &self.region_type {
             MazeRegionType::Predefined { maze } => {
                 if maze.size() != self.mask.size() || maze.size() != maze_size {
                     return false;
                 }
             }
-            MazeRegionType::Generated { .. } => {}
+            MazeRegionType::Generated {
+                generator: (gen, _),
+            } => {
+                if !generators.is_registered(gen) {
+                    return false;
+                }
+            }
         }
 
         true

@@ -29,7 +29,7 @@ use crate::{
 use crate::sound::{track::MusicTrack, SoundPlayer};
 
 #[cfg(feature = "sound")]
-use rodio::Source;
+use rodio::{self, Source};
 
 use super::{
     activity::{Activities, Activity, ActivityResult, Change},
@@ -122,21 +122,27 @@ impl App {
     /// - initializes the sound player (if the feature is enabled),
     /// - initializes the logging system,
     /// - initializes the job queue,
+    /// - initializes the registries,
     pub fn empty(read_only: bool) -> Self {
         let renderer = Renderer::new().expect("failed to create renderer");
         let activities = Activities::empty();
 
-        let settings = Settings::load_json(settings_path(), read_only).expect("failed to load settings");
+        let settings =
+            Settings::load_json(settings_path(), read_only).expect("failed to load settings");
         let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
         let jobs = Jobs::new();
         let app_start = Instant::now();
         let frame_size = renderer.frame_size();
         let registries = Registries {
-            region_splitters: SplitterRegistry::with_default(Arc::new(
-                DefaultRegionSplitter::default(),
-            )),
-            region_generator: GeneratorRegistry::with_default(Arc::new(RndKruskals)),
+            region_splitters: SplitterRegistry::with_default(
+                Arc::new(DefaultRegionSplitter::default()),
+                "default",
+            ),
+            region_generator: GeneratorRegistry::with_default(
+                Arc::new(RndKruskals),
+                "rnd_kruskals",
+            ),
         };
 
         log::info!("Loading theme");

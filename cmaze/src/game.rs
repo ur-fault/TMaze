@@ -69,9 +69,9 @@ impl RunningGame {
     pub fn prepare(
         props: GameProperities,
         gen_registry: &GeneratorRegistry,
-        spitter_registry: &SplitterRegistry,
+        splitter_registry: &SplitterRegistry,
     ) -> Result<RunningJob<Option<RunningGame>>, GeneratorError> {
-        if !props.maze_spec.validate() {
+        if !props.maze_spec.validate(gen_registry, splitter_registry) {
             return Err(GeneratorError::Validation);
         }
 
@@ -79,7 +79,7 @@ impl RunningGame {
             maze_spec: maze_spec @ MazeSpec { size, .. },
         } = props;
 
-        let generator = Generator::from_maze_spec(&maze_spec, gen_registry, spitter_registry);
+        let generator = Generator::from_maze_spec(&maze_spec, gen_registry, splitter_registry);
 
         let start = Dims3D(0, 0, 0);
         let goal = size - Dims3D::ONE;

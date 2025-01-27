@@ -15,13 +15,6 @@ impl<T: ?Sized, K> Registry<T, K> {
         }
     }
 
-    pub fn with_default(default: Arc<T>) -> Self {
-        Self {
-            items: HashMap::new(),
-            default: Some(default),
-        }
-    }
-
     pub fn get_default(&self) -> Option<Arc<T>> {
         self.default.clone()
     }
@@ -31,6 +24,13 @@ impl<T: ?Sized, K> Registry<T, K>
 where
     K: Hash + Eq,
 {
+    pub fn with_default(default: Arc<T>, keyed: impl Into<K>) -> Self {
+        Self {
+            items: [(keyed.into(), default.clone())].into_iter().collect(),
+            default: Some(default),
+        }
+    }
+
     pub fn register(&mut self, key: K, item: Arc<T>) {
         self.items.insert(key, item);
     }
@@ -40,5 +40,9 @@ where
         Q: Hash + Equivalent<K>,
     {
         self.items.get(k).cloned()
+    }
+
+    pub fn is_registered(&self, k: &K) -> bool {
+        self.items.contains_key(k)
     }
 }
