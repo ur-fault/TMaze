@@ -122,6 +122,11 @@ impl Dims3D {
     pub fn product(self) -> i32 {
         self.0 * self.1 * self.2
     }
+
+    pub fn linear_index(&self, size: Dims3D) -> usize {
+        assert!(self.all_non_negative());
+        return (self.2 * size.0 * size.1 + self.1 * size.0 + self.0) as usize;
+    }
 }
 
 impl Add for Dims3D {

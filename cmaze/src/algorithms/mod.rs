@@ -3,6 +3,7 @@ pub mod region_splitter;
 pub mod types;
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 pub use types::*;
 
 use hashbrown::{HashMap, HashSet};
@@ -31,6 +32,7 @@ pub type GeneratorRegistry = Registry<dyn RegionGenerator>;
 pub type SplitterRegistry = Registry<dyn RegionSplitter>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "CellMaskSerde", into = "CellMaskSerde")]
 pub struct CellMask(Array3D<bool>);
 
 impl CellMask {
@@ -175,6 +177,63 @@ impl ops::IndexMut<Dims3D> for CellMask {
 impl From<Array3D<bool>> for CellMask {
     fn from(array: Array3D<bool>) -> Self {
         Self(array)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum CellMaskSerde {
+    Bool(Array3D<bool>),
+    Int(Array3D<u8>),
+    Base64 { base64: String, size: Dims3D },
+}
+
+#[derive(Debug, Error)]
+pub enum CellMaskSerdeError {
+    #[error("Invalid base64 data: {0}")]
+    Base64(#[from] base64::DecodeError),
+    #[error("Invalid size: {0}")]
+    InvalidSize(usize),
+}
+
+impl TryFrom<CellMaskSerde> for CellMask {
+    type Error = CellMaskSerdeError;
+
+    fn try_from(mask: CellMaskSerde) -> Result<Self, Self::Error> {
+        match mask {
+            CellMaskSerde::Bool(array) => Ok(CellMask(array)),
+            CellMaskSerde::Int(array) => Ok(CellMask(array.map(|v| v != 0))),
+            CellMaskSerde::Base64 { base64: bytes, size } => {
+                use base64::prelude::*;
+                let bits = base64::prelude::BASE64_STANDARD.decode(bytes)?;
+
+                if (size.product() as usize).div_ceil(8) != bits.len() {
+                    return Err(CellMaskSerdeError::InvalidSize(bits.len()));
+                }
+
+                // bit array -> byte array
+                let mut bools = vec![false; size.product() as usize];
+                for pos in Dims3D::iter_fill(Dims3D::ZERO, size) {
+                    let index = pos.linear_index(size);
+                    let byte = bits[index / 8];
+                    let bit = (byte >> (index % 8)) & 1;
+                    bools[index] = bit == 0; // for unknown fucking reason, the bits are inverted
+                }
+
+                Ok(CellMask(Array3D::from_buf(
+                    bools,
+                    size.0 as usize,
+                    size.1 as usize,
+                    size.2 as usize,
+                )))
+            }
+        }
+    }
+}
+
+impl From<CellMask> for CellMaskSerde {
+    fn from(mask: CellMask) -> Self {
+        CellMaskSerde::Bool(mask.0)
     }
 }
 

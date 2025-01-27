@@ -378,6 +378,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 name = "cmaze"
 version = "0.8.0"
 dependencies = [
+ "base64",
  "hashbrown 0.14.5",
  "log",
  "pausable_clock",

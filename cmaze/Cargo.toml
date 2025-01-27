@@ -17,3 +17,4 @@ log = "0.4"
 serde = { version = "^1", features = ["derive"] }
 rand_xoshiro = "^0.6.0"
 smallvec = { version = "1.13.2", features = ["const_generics"] }
+base64 = "0.22.1"
