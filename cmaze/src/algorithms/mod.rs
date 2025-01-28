@@ -375,13 +375,16 @@ impl Generator {
                 // FIXME: this ain't parallelized at all
                 let regions = regions.clone().map(|r| r.unwrap_or_default());
                 let generated_regions: Vec<_> = region_specs
-                    .iter()
-                    .map(|spec| match spec {
+                    .iter().enumerate()
+                    .map(|(i, spec)| match spec {
                         LocalRegionSpec::Predefined(maze) => Some(maze.clone()),
                         LocalRegionSpec::ToGenerate {
                             generator,
                             params: _,
-                        } => generator.generate(mask.clone(), &mut rng, progress.split()),
+                        } => {
+                            let region_mask = CellMask::from(regions.clone().map(|r| r == i as u8));
+                            generator.generate(region_mask, &mut rng, progress.split())
+                        }
                     })
                     .collect::<Option<_>>()
                     .ok_or(GeneratorError::Unknown)?;
@@ -471,7 +474,7 @@ impl Generator {
 
                 progress.lock().finish();
 
-                match self.type_ {
+                let maze = match self.type_ {
                     MazeType::Normal => Self::connect_regions(&groups, mask, parts, &mut rng),
                     MazeType::Tower => {
                         let mut maze = Maze {
@@ -486,7 +489,9 @@ impl Generator {
 
                         maze
                     }
-                }
+                };
+
+                maze
             }
         })
     }

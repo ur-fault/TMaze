@@ -977,7 +977,8 @@ impl MazeBoard {
         let goal_style = theme["game.goal"];
         let goal_pos = game.get_goal_pos();
 
-        frames[goal_pos.2 as usize].draw(maze2screen(goal_pos), '$', goal_style);
+        let frame = &mut frames[goal_pos.2 as usize];
+        frame.draw(maze2screen(goal_pos), '$', goal_style);
     }
 }
 
