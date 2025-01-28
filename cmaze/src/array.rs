@@ -244,8 +244,8 @@ impl<T> ops::Index<Dims> for Array2DView<'_, T> {
 #[serde(untagged)]
 enum Array3DSerde<T: Clone> {
     Flat { buf: Vec<T>, size: Dims3D },
-    Dim2D(Vec<Vec<T>>),
     Dim3D(Vec<Vec<Vec<T>>>),
+    Dim2D(Vec<Vec<T>>),
 }
 
 impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
@@ -261,23 +261,6 @@ impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
                 }
                 Ok(Array3D {
                     buf,
-                    width: size.0 as usize,
-                    height: size.1 as usize,
-                    depth: size.2 as usize,
-                })
-            }
-
-            Array3DSerde::Dim2D(buf) => {
-                let size = Dims3D(
-                    buf.get(0).map(|v| v.len()).unwrap_or(0) as i32,
-                    buf.len() as i32,
-                    1,
-                );
-                if buf.iter().any(|v| v.len() != size.1 as usize) {
-                    return Err("Size mismatch");
-                }
-                Ok(Array3D {
-                    buf: buf.into_iter().flatten().collect(),
                     width: size.0 as usize,
                     height: size.1 as usize,
                     depth: size.2 as usize,
@@ -302,6 +285,23 @@ impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
                 }
                 Ok(Array3D {
                     buf: buf.into_iter().flatten().flatten().collect(),
+                    width: size.0 as usize,
+                    height: size.1 as usize,
+                    depth: size.2 as usize,
+                })
+            }
+
+            Array3DSerde::Dim2D(buf) => {
+                let size = Dims3D(
+                    buf.get(0).map(|v| v.len()).unwrap_or(0) as i32,
+                    buf.len() as i32,
+                    1,
+                );
+                if buf.iter().any(|v| v.len() != size.0 as usize) {
+                    return Err("Size mismatch");
+                }
+                Ok(Array3D {
+                    buf: buf.into_iter().flatten().collect(),
                     width: size.0 as usize,
                     height: size.1 as usize,
                     depth: size.2 as usize,
