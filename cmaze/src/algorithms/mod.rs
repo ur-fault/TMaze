@@ -373,22 +373,25 @@ impl Generator {
                 progress.lock().from = mask.enabled_count();
 
                 // FIXME: this ain't parallelized at all
-                let regions = regions.clone().map(|r| r.unwrap_or_default());
+                let regions = regions.clone();
                 let generated_regions: Vec<_> = region_specs
-                    .iter().enumerate()
+                    .iter()
+                    .enumerate()
                     .map(|(i, spec)| match spec {
                         LocalRegionSpec::Predefined(maze) => Some(maze.clone()),
                         LocalRegionSpec::ToGenerate {
                             generator,
                             params: _,
                         } => {
-                            let region_mask = CellMask::from(regions.clone().map(|r| r == i as u8));
+                            let region_mask =
+                                CellMask::from(regions.clone().map(|r| r == Some(i as u8)));
                             generator.generate(region_mask, &mut rng, progress.split())
                         }
                     })
                     .collect::<Option<_>>()
                     .ok_or(GeneratorError::Unknown)?;
 
+                let regions = regions.map(|r| r.unwrap_or_default());
                 Self::connect_regions(&regions, &mask, generated_regions, &mut rng)
             }
             LocalSplitterSpec::ToGenerate {
@@ -581,14 +584,16 @@ impl Generator {
             use CellWall::*;
             for dir in [Right, Bottom, Down] {
                 let neighbor = cell + dir.to_coord();
+                if !mask[neighbor] {
+                    continue;
+                }
 
                 if let Some(&neighbor_group) = groups.get(neighbor) {
                     if neighbor_group != group {
-                        if group < neighbor_group {
-                            borders.push(((group, neighbor_group), (cell, dir)));
-                        } else {
-                            borders.push(((neighbor_group, group), (cell, dir)));
-                        }
+                        borders.push((
+                            (group.min(neighbor_group), group.max(neighbor_group)),
+                            (cell, dir),
+                        ));
                     }
                 }
             }
