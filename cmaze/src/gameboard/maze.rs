@@ -3,12 +3,16 @@ use smallvec::SmallVec;
 
 use self::CellWall::*;
 use crate::{
-    algorithms::MazeType, array::Array3D, dims::*, gameboard::cell::{Cell, CellWall}
+    algorithms::{CellMask, MazeType},
+    array::Array3D,
+    dims::*,
+    gameboard::cell::{Cell, CellWall},
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Maze {
     pub(crate) cells: Array3D<Cell>,
+    pub(crate) mask: CellMask,
     pub(crate) type_: MazeType,
     pub start: Dims3D,
     pub end: Dims3D,
@@ -57,17 +61,16 @@ impl Maze {
         }
     }
 
-    pub fn get_wall(&self, from: Dims3D, wall: CellWall) -> Option<bool> {
+    pub fn get_wall(&self, from: Dims3D, wall: CellWall) -> bool {
         let to = from + wall.to_coord();
-        if self.is_in_bounds(from) != self.is_in_bounds(to) {
-            return Some(true);
+
+        if !self.mask[from] || !self.mask[to] {
+            return self.mask[from] || self.mask[to];
         }
 
-        Some(
-            self.get_cell(from)
-                .map(|c| c.get_wall(wall))
-                .unwrap_or(false),
-        )
+        self.get_cell(from)
+            .map(|c| c.get_wall(wall))
+            .unwrap_or(false)
     }
 
     pub fn get_neighbors_pos(&self, cell: Dims3D) -> SmallVec<[Dims3D; 6]> {

@@ -30,17 +30,18 @@ impl RegionGenerator for DepthFirstSearch {
         let cells = Array3D::new_dims(Cell::new(), size).unwrap();
         let mut maze = Maze {
             cells,
+            mask,
             type_: MazeType::default(),
             start: Dims3D::ZERO,
             end: Dims3D::ZERO,
         };
 
-        progress.lock().from = mask.enabled_count();
+        progress.lock().from = maze.mask.enabled_count();
 
-        let mut visited = HashSet::with_capacity(mask.enabled_count());
+        let mut visited = HashSet::with_capacity(maze.mask.enabled_count());
         let mut stack = Vec::new();
 
-        let mut current = mask.random_cell(rng).unwrap();
+        let mut current = maze.mask.random_cell(rng).unwrap();
 
         visited.insert(current);
         stack.push(current);
@@ -49,7 +50,7 @@ impl RegionGenerator for DepthFirstSearch {
             let unvisited_neighbors = maze
                 .get_neighbors_pos(current)
                 .into_iter()
-                .filter(|cell| mask[*cell])
+                .filter(|cell| maze.mask[*cell])
                 .filter(|cell| !visited.contains(cell))
                 .collect::<SmallVec<[_; 6]>>();
 
@@ -111,6 +112,7 @@ impl RegionGenerator for RndKruskals {
 
         let mut maze = Maze {
             cells,
+            mask,
             type_: MazeType::default(),
             start: Dims3D::ZERO,
             end: Dims3D::ZERO,

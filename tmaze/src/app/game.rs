@@ -923,11 +923,11 @@ impl MazeBoard {
                 let cell_pos = Dims3D(x, y, floor);
                 let Dims(rx, ry) = maze2screen(cell_pos);
 
-                if maze.get_wall(cell_pos, CellWall::Right).unwrap() {
+                if maze.get_wall(cell_pos, CellWall::Right) {
                     draw((rx + 1, ry), LineDir::Vertical);
                 }
 
-                if maze.get_wall(cell_pos, CellWall::Bottom).unwrap() {
+                if maze.get_wall(cell_pos, CellWall::Bottom) {
                     draw((rx, ry + 1), LineDir::Horizontal);
                 }
 
@@ -935,10 +935,10 @@ impl MazeBoard {
                 let cp2 = cell_pos + Dims3D(1, 1, 0);
 
                 let dir = LineDir::from_bools(
-                    maze.get_wall(cp1, CellWall::Bottom).unwrap(),
-                    maze.get_wall(cp1, CellWall::Right).unwrap(),
-                    maze.get_wall(cp2, CellWall::Top).unwrap(),
-                    maze.get_wall(cp2, CellWall::Left).unwrap(),
+                    maze.get_wall(cp1, CellWall::Bottom),
+                    maze.get_wall(cp1, CellWall::Right),
+                    maze.get_wall(cp2, CellWall::Top),
+                    maze.get_wall(cp2, CellWall::Left),
                 );
 
                 draw((rx + 1, ry + 1), dir);

@@ -375,10 +375,19 @@ impl Generator {
                 // FIXME: this ain't parallelized at all
                 let regions = regions.clone();
                 let generated_regions: Vec<_> = region_specs
-                    .iter()
+                    .clone()
+                    .into_par_iter()
+                    .zip(
+                        (0..region_specs.len())
+                            .map(|_| {
+                                rng.long_jump();
+                                rng.clone()
+                            })
+                            .collect::<Vec<_>>(),
+                    )
                     .enumerate()
-                    .map(|(i, spec)| match spec {
-                        LocalRegionSpec::Predefined(maze) => Some(maze.clone()),
+                    .map(|(i, (spec, mut rng))| match spec {
+                        LocalRegionSpec::Predefined(maze) => Some(maze),
                         LocalRegionSpec::ToGenerate {
                             generator,
                             params: _,
@@ -419,16 +428,9 @@ impl Generator {
                     }
                 }
 
-                let rngs = (0..parts.len())
-                    .map(|_| {
-                        rng.long_jump();
-                        rng.clone()
-                    })
-                    .collect::<Vec<_>>();
-
                 let parts = parts
                     .into_par_iter()
-                    .zip(rngs)
+                    .zip(split_rng(&mut rng, SPLIT_COUNT))
                     .map(|(mask, mut rng)| {
                         let group_count =
                             (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
@@ -451,18 +453,10 @@ impl Generator {
                             .collect::<Vec<_>>();
                         progress.lock().from = 0;
 
-                        let rngs = masks
-                            .iter()
-                            .map(|_| {
-                                rng.jump();
-                                rng.clone()
-                            })
-                            .collect::<Vec<_>>();
-
                         let Some(regions) = masks
                             .into_par_iter()
                             .zip(progresses)
-                            .zip(rngs)
+                            .zip(split_rng(&mut rng, group_count as usize))
                             .map(|((mask, progress), mut rng)| {
                                 generator.generate(mask, &mut rng, progress)
                             })
@@ -482,6 +476,7 @@ impl Generator {
                     MazeType::Tower => {
                         let mut maze = Maze {
                             cells: Array3D::new_dims(Cell::new(), mask.size()).unwrap(),
+                            mask: mask.clone(),
                             type_: MazeType::Tower,
                             start: Dims3D::ZERO,
                             end: Dims3D::ZERO,
@@ -542,6 +537,7 @@ impl Generator {
         // Combine the regions, so we can start connecting them
         let mut maze = Maze {
             cells: Array3D::new_dims(Cell::new(), groups.size()).unwrap(),
+            mask: mask.clone(),
             type_: MazeType::Normal,
             start: Dims3D::ZERO,
             end: Dims3D::ZERO,
@@ -601,4 +597,15 @@ impl Generator {
 
         borders
     }
+}
+
+fn split_rng(
+    rng: &mut Random,
+    count: usize,
+) -> impl IndexedParallelIterator<Item = Random> + use<'_> {
+    (0..count).into_par_iter().map(|_| {
+        let mut rng = rng.clone();
+        rng.long_jump();
+        rng
+    })
 }

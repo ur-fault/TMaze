@@ -39,7 +39,7 @@ impl MazeSpec {
                 }
                 Position::Region(region) => {
                     // Is the region valid?
-                    regions.len() > region as usize
+                    (region as usize) < regions.len()
                 }
             }
         }
@@ -96,9 +96,29 @@ impl MazeSpec {
                     return false;
                 };
 
+                if !size.all_positive() {
+                    return false;
+                }
+
                 if let Some(mask) = mask {
                     if mask.size() != size {
                         return false;
+                    }
+
+                    if mask.is_empty() {
+                        return false;
+                    }
+
+                    if let Some(start) = start {
+                        if !mask[*start] {
+                            return false;
+                        }
+                    }
+
+                    if let Some(end) = end {
+                        if !mask[*end] {
+                            return false;
+                        }
                     }
                 }
 
