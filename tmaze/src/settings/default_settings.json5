@@ -16,7 +16,7 @@
     //  - error
     // 
     // messages in the UI
-    "logging_level": "info",
+    "logging_level": "warn",
     // messages in the UI if debug mode is enabled
     "debug_logging_level": "debug",
     // messages in the log file
