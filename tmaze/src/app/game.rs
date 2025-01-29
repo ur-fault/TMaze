@@ -357,7 +357,7 @@ impl ActivityHandler for MazeGenerationActivity {
 
             Err(ref err) => {
                 const UNKNOWN_MSG: &str = "Unknown error while generating maze";
-                const VALIDATION_MSG: &str = "Wrong maze preset, please check it";
+                const VALIDATION_MSG: &str = "Invalid maze preset, please check it";
                 let msg = match err {
                     GeneratorError::Unknown => UNKNOWN_MSG,
                     GeneratorError::Validation => VALIDATION_MSG,
