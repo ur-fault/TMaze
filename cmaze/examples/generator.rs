@@ -4,6 +4,7 @@ use std::hash::DefaultHasher;
 use std::hash::{Hash as _, Hasher as _};
 
 use cmaze::algorithms::region_splitter::{DefaultRegionSplitter, RegionCount, RegionSplitter as _};
+use cmaze::algorithms::Params;
 use cmaze::{
     algorithms::{CellMask, Random},
     array::Array3D,
@@ -41,10 +42,8 @@ fn main() {
 
     let progress = ProgressHandle::new();
     let mask = CellMask::new_dims(size).unwrap();
-    let splitter = DefaultRegionSplitter {
-        count: RegionCount::Exact(point_count),
-    };
-    let groups = splitter.split(&mask, &mut rng, progress).unwrap();
+    let splitter = DefaultRegionSplitter;
+    let groups = splitter.split(&mask, &mut rng, progress, &Params::default()).unwrap();
 
     show_array(
         &groups,

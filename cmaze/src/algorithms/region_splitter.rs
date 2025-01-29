@@ -2,14 +2,9 @@ use hashbrown::HashSet;
 use rand::seq::SliceRandom as _;
 use smallvec::SmallVec;
 
-use std::fmt;
+use std::{fmt, str::FromStr};
 
-use crate::{
-    array::Array3D,
-    dims::*,
-    gameboard::CellWall,
-    progress::ProgressHandle,
-};
+use crate::{array::Array3D, dims::*, gameboard::CellWall, progress::ProgressHandle};
 
 use super::{CellMask, Params, Random};
 
@@ -29,18 +24,21 @@ pub enum RegionCount {
     Exact(u8),
 }
 
-#[derive(Debug)]
-pub struct DefaultRegionSplitter {
-    pub count: RegionCount,
-}
+impl FromStr for RegionCount {
+    type Err = ();
 
-impl Default for DefaultRegionSplitter {
-    fn default() -> Self {
-        Self {
-            count: RegionCount::Per(100),
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let t = s.splitn(2, ':').collect::<Vec<_>>();
+        match t.as_slice() {
+            ["per", n] => n.parse().map(RegionCount::Per).map_err(|_| ()),
+            ["exact", n] | [n] => n.parse().map(RegionCount::Exact).map_err(|_| ()),
+            _ => Err(()),
         }
     }
 }
+
+#[derive(Debug, Default)]
+pub struct DefaultRegionSplitter;
 
 impl DefaultRegionSplitter {
     pub fn random_points(mask: &CellMask, count: u8, rng: &mut Random) -> Vec<Dims3D> {
@@ -134,7 +132,9 @@ impl RegionSplitter for DefaultRegionSplitter {
         progress: ProgressHandle,
         params: &Params,
     ) -> Option<Array3D<u8>> {
-        let region_count = match self.count {
+        let count = params.parsed_or_warn("count", RegionCount::Per(100));
+
+        let region_count = match count {
             RegionCount::Per(every) => mask.enabled_count() / every,
             RegionCount::Exact(count) => count as usize,
         }

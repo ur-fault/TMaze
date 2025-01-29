@@ -136,7 +136,7 @@ impl App {
         let frame_size = renderer.frame_size();
         let registries = Registries {
             region_splitters: SplitterRegistry::with_default(
-                Arc::new(DefaultRegionSplitter::default()),
+                Arc::new(DefaultRegionSplitter),
                 "default",
             ),
             region_generator: {
