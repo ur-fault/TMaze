@@ -98,27 +98,27 @@ impl CellMask {
         }
     }
 
-    pub fn is_connected(&self) -> bool {
-        let mut mask = self.clone();
+    fn dfs(&mut self, pos: Dims3D) {
+        let Dims3D(width, height, depth) = self.size();
 
-        fn dfs(mask: &mut CellMask, pos: Dims3D) {
-            let Dims3D(width, height, depth) = mask.size();
+        if (pos.0 < 0 || pos.0 >= width)
+            || (pos.1 < 0 || pos.1 >= height)
+            || (pos.2 < 0 || pos.2 >= depth)
+        {
+            return;
+        }
 
-            if (pos.0 < 0 || pos.0 >= width)
-                || (pos.1 < 0 || pos.1 >= height)
-                || (pos.2 < 0 || pos.2 >= depth)
-            {
-                return;
-            }
+        if self[pos] {
+            self[pos] = false;
 
-            if mask[pos] {
-                mask[pos] = false;
-
-                for dir in CellWall::get_in_order() {
-                    dfs(mask, pos + dir.to_coord());
-                }
+            for dir in CellWall::get_in_order() {
+                self.dfs(pos + dir.to_coord());
             }
         }
+    }
+
+    pub fn is_connected(&self) -> bool {
+        let mut mask = self.clone();
 
         if mask.is_empty() {
             return false;
@@ -126,12 +126,27 @@ impl CellMask {
 
         for pos in Dims3D::iter_fill(Dims3D::ZERO, self.size()) {
             if mask[pos] {
-                dfs(&mut mask, pos);
+                mask.dfs(pos);
                 break;
             }
         }
 
         mask.is_empty()
+    }
+
+    pub fn connactable(&self, from: Dims3D, to: Dims3D) -> bool {
+        if !self[from] || !self[to] {
+            return false;
+        }
+
+        if from == to {
+            return true;
+        }
+
+        let mut mask = self.clone();
+        mask.dfs(from);
+
+        !mask[to]
     }
 
     pub fn to_array3d(self) -> Array3D<bool> {
@@ -148,6 +163,47 @@ impl CellMask {
 
     pub fn iter_enabled(&self) -> impl Iterator<Item = Dims3D> + '_ {
         self.0.iter_pos().filter(move |&pos| self[pos])
+    }
+}
+
+impl CellMask {
+    pub fn combine(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self {
+        assert!(self.size() == other.size(),);
+
+        let (w, h, d) = self.size().into();
+        Self(Array3D::from_buf(
+            self.0
+                .to_slice()
+                .into_iter()
+                .zip(other.0.to_slice().iter())
+                .map(|(a, b)| op(*a, *b))
+                .collect(),
+            w as usize,
+            h as usize,
+            d as usize,
+        ))
+    }
+
+    pub fn or(&self, other: &Self) -> Self {
+        self.combine(other, |a, b| a || b)
+    }
+
+    pub fn and(&self, other: &Self) -> Self {
+        self.combine(other, |a, b| a && b)
+    }
+
+    pub fn xor(&self, other: &Self) -> Self {
+        self.combine(other, |a, b| a ^ b)
+    }
+
+    pub fn not(&self) -> Self {
+        let (w, h, d) = self.size().into();
+        Self(Array3D::from_buf(
+            self.0.to_slice().iter().map(|&b| !b).collect(),
+            w as usize,
+            h as usize,
+            d as usize,
+        ))
     }
 }
 

@@ -84,6 +84,15 @@ impl MazeSpec {
             }
         }
 
+        fn pos_to_dim(pos: Position, regions: &[MazeRegionSpec]) -> Dims3D {
+            match pos {
+                Position::Pos(pos) => pos,
+                Position::Region(region) => {
+                    regions[region as usize].mask.iter_enabled().next().unwrap()
+                }
+            }
+        }
+
         match &self.inner_spec {
             MazeSpecType::Regions {
                 regions,
@@ -105,6 +114,17 @@ impl MazeSpec {
                     return false;
                 }
 
+                let mut exclusion_check_mask = CellMask::new_dims_empty(size).unwrap();
+                for region in regions {
+                    for pos in region.mask.iter_enabled() {
+                        if exclusion_check_mask[pos] {
+                            return false;
+                        }
+
+                        exclusion_check_mask[pos] = true;
+                    }
+                }
+
                 if let Some(start) = *start {
                     if !check_position(start, regions) {
                         return false;
@@ -113,6 +133,17 @@ impl MazeSpec {
 
                 if let Some(end) = *end {
                     if !check_position(end, regions) {
+                        return false;
+                    }
+                }
+
+                if let (Some(start), Some(end)) = (start, end) {
+                    let union = regions
+                        .iter()
+                        .fold(CellMask::new_dims_empty(size).unwrap(), |a, b| {
+                            a.or(&b.mask)
+                        });
+                    if !union.connactable(pos_to_dim(*start, regions), pos_to_dim(*end, regions)) {
                         return false;
                     }
                 }
@@ -278,6 +309,10 @@ pub struct MazeRegionSpec {
 impl MazeRegionSpec {
     pub fn validate(&self, maze_size: Dims3D, generators: &GeneratorRegistry) -> bool {
         if self.mask.size() != maze_size {
+            return false;
+        }
+
+        if !self.mask.is_connected() {
             return false;
         }
 
