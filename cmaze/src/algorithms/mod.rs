@@ -4,12 +4,10 @@ pub mod types;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-pub use types::*;
 
 use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use region_splitter::RegionSplitter;
 
 use std::{iter, ops, sync::Arc};
 
@@ -21,6 +19,8 @@ use crate::{
     registry::Registry,
 };
 use region_generator::RegionGenerator;
+use region_splitter::RegionSplitter;
+pub use types::*;
 
 /// Random number generator used for anything, where determinism is required.
 pub type Random = rand_xoshiro::Xoshiro256StarStar;
@@ -265,6 +265,7 @@ enum LocalRegionSpec {
     ToGenerate {
         generator: Arc<dyn RegionGenerator>,
         params: Params,
+        seed: Option<u64>,
     },
 }
 
@@ -318,9 +319,11 @@ impl Generator {
                             }
                             MazeRegionType::Generated {
                                 generator: (generator, params),
+                                seed,
                             } => LocalRegionSpec::ToGenerate {
                                 generator: generators.get(generator).expect("unknown generator"),
                                 params: params.clone(),
+                                seed: *seed,
                             },
                         }
                     })
@@ -391,9 +394,13 @@ impl Generator {
                         LocalRegionSpec::ToGenerate {
                             generator,
                             params,
+                            seed,
                         } => {
                             let region_mask =
                                 CellMask::from(regions.clone().map(|r| r == Some(i as u8)));
+                            if let Some(seed) = seed {
+                                rng = Random::seed_from_u64(seed);
+                            }
                             generator.generate(region_mask, &mut rng, progress.split(), &params)
                         }
                     })

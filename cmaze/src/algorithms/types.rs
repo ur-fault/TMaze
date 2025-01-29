@@ -289,6 +289,7 @@ impl MazeRegionSpec {
             }
             MazeRegionType::Generated {
                 generator: (gen, _),
+                seed: _,
             } => {
                 if !generators.is_registered(gen) {
                     return false;
@@ -323,5 +324,9 @@ pub enum MazeRegionType {
         /// Name of the generator used to generate the maze.
         /// Must be registered in the generator registry.
         generator: Algorithm,
+
+        /// Optional seed for the region.
+        /// If not specified, it will be calculated from the maze seed.
+        seed: Option<u64>,
     },
 }
