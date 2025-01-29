@@ -5,7 +5,7 @@ use std::{
 
 use cmaze::{
     algorithms::{
-        region_generator::RndKruskals, region_splitter::DefaultRegionSplitter, GeneratorRegistry,
+        region_generator::{DepthFirstSearch, RndKruskals}, region_splitter::DefaultRegionSplitter, GeneratorRegistry,
         SplitterRegistry,
     },
     dims::*,
@@ -139,10 +139,11 @@ impl App {
                 Arc::new(DefaultRegionSplitter::default()),
                 "default",
             ),
-            region_generator: GeneratorRegistry::with_default(
-                Arc::new(RndKruskals),
-                "rnd_kruskals",
-            ),
+            region_generator: {
+                let mut reg = GeneratorRegistry::with_default(Arc::new(RndKruskals), "rnd_kruskals");
+                reg.register("dfs", Arc::new(DepthFirstSearch));
+                reg
+            },
         };
 
         log::info!("Loading theme");

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +9,45 @@ use super::{CellMask, Dims3D, GeneratorRegistry, SplitterRegistry};
 
 /// Parameters for different algorithms. Region splitter, region generator, etc.
 /// In the future, not only String will be allowed, but also other types.
-pub type Params = HashMap<String, String>;
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Params {
+    map: HashMap<String, String>,
+}
+
+impl Params {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.map.get(key).map(|s| s.as_str())
+    }
+
+    pub fn parsed<T: FromStr>(&self, key: &str) -> Option<Result<T, T::Err>> {
+        self.get(key).map(|s| s.parse())
+    }
+
+    pub fn parsed_or<T: FromStr>(&self, key: &str, default: T) -> T {
+        match self.parsed(key) {
+            None | Some(Err(_)) => default,
+            Some(Ok(v)) => v,
+        }
+    }
+
+    pub fn parsed_or_warn<T: FromStr>(&self, key: &str, default: T) -> T {
+        match self.parsed(key) {
+            None => default,
+            Some(Ok(v)) => v,
+            Some(Err(_)) => {
+                log::warn!("Invalid value for parameter '{}', using default value", key);
+                default
+            }
+        }
+    }
+}
 
 /// Specific algorithm specification.
 pub type Algorithm = (String, Params);

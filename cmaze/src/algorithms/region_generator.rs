@@ -10,10 +10,16 @@ use crate::{
     progress::ProgressHandle,
 };
 
-use super::{CellMask, Dims3D, MazeType, Random};
+use super::{CellMask, Dims3D, MazeType, Params, Random};
 
 pub trait RegionGenerator: fmt::Debug + Sync + Send {
-    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze>;
+    fn generate(
+        &self,
+        mask: CellMask,
+        rng: &mut Random,
+        progress: ProgressHandle,
+        params: &Params,
+    ) -> Option<Maze>;
 
     fn guess_progress_complexity(&self, mask: &CellMask) -> usize {
         mask.enabled_count()
@@ -24,7 +30,13 @@ pub trait RegionGenerator: fmt::Debug + Sync + Send {
 pub struct DepthFirstSearch;
 
 impl RegionGenerator for DepthFirstSearch {
-    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze> {
+    fn generate(
+        &self,
+        mask: CellMask,
+        rng: &mut Random,
+        progress: ProgressHandle,
+        params: &Params,
+    ) -> Option<Maze> {
         let size = mask.size();
 
         let cells = Array3D::new_dims(Cell::new(), size).unwrap();
@@ -36,12 +48,19 @@ impl RegionGenerator for DepthFirstSearch {
             end: Dims3D::ZERO,
         };
 
+        // Maybe write a funky macro on struct, that loads all fields from params ?
+        let no_rng = params.parsed_or_warn("no_rng", false);
+
         progress.lock().from = maze.mask.enabled_count();
 
         let mut visited = HashSet::with_capacity(maze.mask.enabled_count());
         let mut stack = Vec::new();
 
-        let mut current = maze.mask.random_cell(rng).unwrap();
+        let mut current = if no_rng {
+            maze.mask.iter_enabled().next().unwrap()
+        } else {
+            maze.mask.random_cell(rng).unwrap()
+        };
 
         visited.insert(current);
         stack.push(current);
@@ -56,7 +75,11 @@ impl RegionGenerator for DepthFirstSearch {
 
             if !unvisited_neighbors.is_empty() {
                 stack.push(current);
-                let next = *unvisited_neighbors.choose(rng).unwrap();
+                let next = if no_rng {
+                    unvisited_neighbors[0]
+                } else {
+                    unvisited_neighbors.choose(rng).unwrap().clone()
+                };
                 let chosen_wall = Maze::which_wall_between(current, next).unwrap();
                 maze.remove_wall(current, chosen_wall);
                 visited.insert(next);
@@ -79,7 +102,13 @@ impl RegionGenerator for DepthFirstSearch {
 pub struct RndKruskals;
 
 impl RegionGenerator for RndKruskals {
-    fn generate(&self, mask: CellMask, rng: &mut Random, progress: ProgressHandle) -> Option<Maze> {
+    fn generate(
+        &self,
+        mask: CellMask,
+        rng: &mut Random,
+        progress: ProgressHandle,
+        params: &Params,
+    ) -> Option<Maze> {
         let Dims3D(w, h, d) = mask.size();
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
@@ -118,7 +147,10 @@ impl RegionGenerator for RndKruskals {
             end: Dims3D::ZERO,
         };
 
-        walls.shuffle(rng);
+        if !params.parsed_or_warn("no_rng", false) {
+            walls.shuffle(rng);
+        }
+
         while let Some((from, wall)) = walls.pop() {
             let to = from + wall.to_coord();
 

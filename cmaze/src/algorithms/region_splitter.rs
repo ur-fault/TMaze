@@ -11,7 +11,7 @@ use crate::{
     progress::ProgressHandle,
 };
 
-use super::{CellMask, Random};
+use super::{CellMask, Params, Random};
 
 pub trait RegionSplitter: fmt::Debug + Sync + Send {
     fn split(
@@ -19,6 +19,7 @@ pub trait RegionSplitter: fmt::Debug + Sync + Send {
         mask: &CellMask,
         rng: &mut Random,
         progress: ProgressHandle,
+        params: &Params,
     ) -> Option<Array3D<u8>>;
 }
 
@@ -131,6 +132,7 @@ impl RegionSplitter for DefaultRegionSplitter {
         mask: &CellMask,
         rng: &mut Random,
         progress: ProgressHandle,
+        params: &Params,
     ) -> Option<Array3D<u8>> {
         let region_count = match self.count {
             RegionCount::Per(every) => mask.enabled_count() / every,

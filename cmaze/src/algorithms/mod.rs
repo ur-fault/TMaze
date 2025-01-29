@@ -390,11 +390,11 @@ impl Generator {
                         LocalRegionSpec::Predefined(maze) => Some(maze),
                         LocalRegionSpec::ToGenerate {
                             generator,
-                            params: _,
+                            params,
                         } => {
                             let region_mask =
                                 CellMask::from(regions.clone().map(|r| r == Some(i as u8)));
-                            generator.generate(region_mask, &mut rng, progress.split())
+                            generator.generate(region_mask, &mut rng, progress.split(), &params)
                         }
                     })
                     .collect::<Option<_>>()
@@ -405,8 +405,8 @@ impl Generator {
             }
             LocalSplitterSpec::ToGenerate {
                 mask,
-                splitter: (splitter, _),
-                generator: (generator, _),
+                splitter: (splitter, split_args),
+                generator: (generator, gen_args),
             } => {
                 progress.lock().from = generator.guess_progress_complexity(mask);
 
@@ -435,7 +435,7 @@ impl Generator {
                         let group_count =
                             (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
                         let groups = splitter
-                            .split(&mask, &mut rng, progress.split())
+                            .split(&mask, &mut rng, progress.split(), split_args)
                             .ok_or(GeneratorError::Unknown)?;
                         let masks = Self::split_to_masks(group_count, &groups, &mask);
 
@@ -458,7 +458,7 @@ impl Generator {
                             .zip(progresses)
                             .zip(split_rng(&mut rng, group_count as usize))
                             .map(|((mask, progress), mut rng)| {
-                                generator.generate(mask, &mut rng, progress)
+                                generator.generate(mask, &mut rng, progress, gen_args)
                             })
                             .collect()
                         else {

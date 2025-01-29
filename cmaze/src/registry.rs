@@ -31,8 +31,8 @@ where
         }
     }
 
-    pub fn register(&mut self, key: K, item: Arc<T>) {
-        self.items.insert(key, item);
+    pub fn register(&mut self, key: impl Into<K>, item: Arc<T>) {
+        self.items.insert(key.into(), item);
     }
 
     pub fn get<Q>(&self, k: &Q) -> Option<Arc<T>>
