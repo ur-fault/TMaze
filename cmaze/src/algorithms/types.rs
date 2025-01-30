@@ -191,6 +191,12 @@ impl MazeSpec {
                             return false;
                         }
                     }
+
+                    if let (Some(start), Some(end)) = (start, end) {
+                        if !mask.connactable(*start, *end) {
+                            return false;
+                        }
+                    }
                 }
 
                 if let Some(generator) = generator {
