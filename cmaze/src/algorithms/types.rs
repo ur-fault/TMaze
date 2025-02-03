@@ -1,11 +1,13 @@
-use std::str::FromStr;
+use std::{ops, str::FromStr};
 
 use hashbrown::HashMap;
+use rand::{seq::SliceRandom as _, Rng as _};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-use crate::gameboard::maze::MazeBoard;
+use crate::{array::Array3D, gameboard::{maze::MazeBoard, CellWall}};
 
-use super::{CellMask, Dims3D, GeneratorRegistry, SplitterRegistry};
+use super::{Dims3D, GeneratorRegistry, Random, SplitterRegistry};
 
 /// Parameters for different algorithms. Region splitter, region generator, etc.
 /// In the future, not only String will be allowed, but also other types.
@@ -358,4 +360,269 @@ pub enum MazeRegionType {
         /// If not specified, it will be calculated from the maze seed.
         seed: Option<u64>,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "CellMaskSerde", into = "CellMaskSerde")]
+pub struct CellMask(Array3D<bool>);
+
+impl CellMask {
+    pub fn new(width: usize, height: usize, depth: usize) -> Self {
+        Self(Array3D::new(true, width, height, depth))
+    }
+
+    pub fn new_dims(size: Dims3D) -> Option<Self> {
+        Some(Self(Array3D::new_dims(true, size)?))
+    }
+
+    pub fn new_dims_empty(size: Dims3D) -> Option<Self> {
+        Some(Self(Array3D::new_dims(false, size)?))
+    }
+
+    pub fn new_2d(width: usize, height: usize) -> Self {
+        Self::new(width, height, 1)
+    }
+
+    pub fn size(&self) -> Dims3D {
+        self.0.size()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.iter().all(|&b| !b)
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.0.iter().all(|&b| b)
+    }
+
+    pub fn enabled_count(&self) -> usize {
+        self.0.iter().filter(|&&b| b).count()
+    }
+
+    pub fn random_cell(&self, rng: &mut Random) -> Option<Dims3D> {
+        // If less then 10% of the cells are enabled, we can collect all of them and choose one,
+        // otherwise we can just choose random cell and check that it's enabled.
+
+        let enabled = self.enabled_count();
+        if enabled < self.0.len() / 10 {
+            let enabled = self
+                .0
+                .iter_pos()
+                .filter(|&pos| self[pos])
+                .collect::<Vec<_>>();
+            enabled.choose(rng).copied()
+        } else if enabled > 0 {
+            loop {
+                let size = self.size();
+                let pos = Dims3D(
+                    rng.gen_range(0..size.0),
+                    rng.gen_range(0..size.1),
+                    rng.gen_range(0..size.2),
+                );
+
+                if self[pos] {
+                    return Some(pos);
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    fn dfs(&mut self, pos: Dims3D) {
+        let Dims3D(width, height, depth) = self.size();
+
+        if (pos.0 < 0 || pos.0 >= width)
+            || (pos.1 < 0 || pos.1 >= height)
+            || (pos.2 < 0 || pos.2 >= depth)
+        {
+            return;
+        }
+
+        if self[pos] {
+            self[pos] = false;
+
+            for dir in CellWall::get_in_order() {
+                self.dfs(pos + dir.to_coord());
+            }
+        }
+    }
+
+    pub fn is_connected(&self) -> bool {
+        let mut mask = self.clone();
+
+        if mask.is_empty() {
+            return false;
+        }
+
+        for pos in Dims3D::iter_fill(Dims3D::ZERO, self.size()) {
+            if mask[pos] {
+                mask.dfs(pos);
+                break;
+            }
+        }
+
+        mask.is_empty()
+    }
+
+    pub fn connactable(&self, from: Dims3D, to: Dims3D) -> bool {
+        if !self[from] || !self[to] {
+            return false;
+        }
+
+        if from == to {
+            return true;
+        }
+
+        let mut mask = self.clone();
+        mask.dfs(from);
+
+        !mask[to]
+    }
+
+    pub fn to_array3d(self) -> Array3D<bool> {
+        self.0
+    }
+
+    pub fn as_array3d(&self) -> &Array3D<bool> {
+        &self.0
+    }
+
+    pub fn fill(&mut self, value: bool) {
+        self.0.fill(value);
+    }
+
+    pub fn iter_enabled(&self) -> impl Iterator<Item = Dims3D> + '_ {
+        self.0.iter_pos().filter(move |&pos| self[pos])
+    }
+}
+
+impl CellMask {
+    pub fn combine(&self, other: &Self, op: impl Fn(bool, bool) -> bool) -> Self {
+        assert!(self.size() == other.size(),);
+
+        let (w, h, d) = self.size().into();
+        Self(Array3D::from_buf(
+            self.0
+                .to_slice()
+                .iter()
+                .zip(other.0.to_slice().iter())
+                .map(|(a, b)| op(*a, *b))
+                .collect(),
+            w as usize,
+            h as usize,
+            d as usize,
+        ))
+    }
+
+    pub fn or(&self, other: &Self) -> Self {
+        self.combine(other, |a, b| a || b)
+    }
+
+    pub fn and(&self, other: &Self) -> Self {
+        self.combine(other, |a, b| a && b)
+    }
+
+    pub fn xor(&self, other: &Self) -> Self {
+        self.combine(other, |a, b| a ^ b)
+    }
+
+    pub fn not(&self) -> Self {
+        let (w, h, d) = self.size().into();
+        Self(Array3D::from_buf(
+            self.0.to_slice().iter().map(|&b| !b).collect(),
+            w as usize,
+            h as usize,
+            d as usize,
+        ))
+    }
+}
+
+impl<T: Clone> Array3D<Option<T>> {
+    pub fn to_mask(self) -> CellMask {
+        CellMask(self.map(|v| v.is_some()))
+    }
+}
+
+impl ops::Index<Dims3D> for CellMask {
+    type Output = bool;
+
+    /// Returns the value at the given index, or `false` if the index is out of bounds.
+    fn index(&self, index: Dims3D) -> &Self::Output {
+        self.0.get(index).unwrap_or(&false)
+    }
+}
+
+impl ops::IndexMut<Dims3D> for CellMask {
+    fn index_mut(&mut self, index: Dims3D) -> &mut Self::Output {
+        self.0
+            .get_mut(index)
+            .unwrap_or_else(|| panic!("Index out of bounds: {:?}", index))
+    }
+}
+
+impl From<Array3D<bool>> for CellMask {
+    fn from(array: Array3D<bool>) -> Self {
+        Self(array)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum CellMaskSerde {
+    Bool(Array3D<bool>),
+    Int(Array3D<u8>),
+    Base64 { base64: String, size: Dims3D },
+}
+
+#[derive(Debug, Error)]
+pub enum CellMaskSerdeError {
+    #[error("Invalid base64 data: {0}")]
+    Base64(#[from] base64::DecodeError),
+    #[error("Invalid size: {0}")]
+    InvalidSize(usize),
+}
+
+impl TryFrom<CellMaskSerde> for CellMask {
+    type Error = CellMaskSerdeError;
+
+    fn try_from(mask: CellMaskSerde) -> Result<Self, Self::Error> {
+        match mask {
+            CellMaskSerde::Bool(array) => Ok(CellMask(array)),
+            CellMaskSerde::Int(array) => Ok(CellMask(array.map(|v| v != 0))),
+            CellMaskSerde::Base64 {
+                base64: bytes,
+                size,
+            } => {
+                use base64::prelude::*;
+                let bits = base64::prelude::BASE64_STANDARD.decode(bytes)?;
+
+                if (size.product() as usize).div_ceil(8) != bits.len() {
+                    return Err(CellMaskSerdeError::InvalidSize(bits.len()));
+                }
+
+                // bit array -> byte array
+                let mut bools = vec![false; size.product() as usize];
+                for pos in Dims3D::iter_fill(Dims3D::ZERO, size) {
+                    let index = pos.linear_index(size);
+                    let byte = bits[index / 8];
+                    let bit = (byte >> (index % 8)) & 1;
+                    bools[index] = bit == 0; // for unknown fucking reason, the bits are inverted
+                }
+
+                Ok(CellMask(Array3D::from_buf(
+                    bools,
+                    size.0 as usize,
+                    size.1 as usize,
+                    size.2 as usize,
+                )))
+            }
+        }
+    }
+}
+
+impl From<CellMask> for CellMaskSerde {
+    fn from(mask: CellMask) -> Self {
+        CellMaskSerde::Bool(mask.0)
+    }
 }
