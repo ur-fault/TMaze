@@ -10,15 +10,12 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Maze {
+pub struct MazeBoard {
     pub(crate) cells: Array3D<Cell>,
     pub(crate) mask: CellMask,
-    pub(crate) type_: MazeType,
-    pub start: Dims3D,
-    pub end: Dims3D,
 }
 
-impl Maze {
+impl MazeBoard {
     pub fn size(&self) -> Dims3D {
         self.cells.size()
     }
@@ -103,11 +100,7 @@ impl Maze {
     }
 
     pub fn get_cell(&self, pos: Dims3D) -> Option<&Cell> {
-        if self.is_in_bounds(pos) {
-            Some(&self.cells[pos])
-        } else {
-            None
-        }
+        self.cells.get(pos)
     }
 
     pub fn get_cell_mut(&mut self, pos: Dims3D) -> Option<&mut Cell> {
@@ -116,6 +109,20 @@ impl Maze {
         } else {
             None
         }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Maze {
+    pub board: MazeBoard,
+    pub(crate) type_: MazeType,
+    pub start: Dims3D,
+    pub end: Dims3D,
+}
+
+impl Maze {
+    pub fn size(&self) -> Dims3D {
+        self.board.size()
     }
 
     pub fn is_tower(&self) -> bool {

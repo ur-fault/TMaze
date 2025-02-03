@@ -14,7 +14,7 @@ use std::{iter, ops, sync::Arc};
 use crate::{
     array::Array3D,
     dims::*,
-    gameboard::{Cell, CellWall, Maze},
+    gameboard::{maze::MazeBoard, Cell, CellWall, Maze},
     progress::ProgressHandle,
     registry::Registry,
 };
@@ -174,7 +174,7 @@ impl CellMask {
         Self(Array3D::from_buf(
             self.0
                 .to_slice()
-                .into_iter()
+                .iter()
                 .zip(other.0.to_slice().iter())
                 .map(|(a, b)| op(*a, *b))
                 .collect(),
@@ -317,7 +317,7 @@ enum LocalSplitterSpec {
 
 #[derive(Debug, Clone)]
 enum LocalRegionSpec {
-    Predefined(Maze),
+    Predefined(MazeBoard),
     ToGenerate {
         generator: Arc<dyn RegionGenerator>,
         params: Params,
@@ -370,8 +370,8 @@ impl Generator {
                             region_ids[pos] = Some(region_id as u8);
                         }
                         match region_type {
-                            MazeRegionType::Predefined { maze } => {
-                                LocalRegionSpec::Predefined(maze.clone())
+                            MazeRegionType::Predefined { board } => {
+                                LocalRegionSpec::Predefined(board.clone())
                             }
                             MazeRegionType::Generated {
                                 generator: (generator, params),
@@ -409,8 +409,8 @@ impl Generator {
                         mask: mask
                             .clone()
                             .unwrap_or_else(|| CellMask::new_dims(size).unwrap()),
-                        splitter: get_from_registry(&splitters, splitter.as_ref()),
-                        generator: get_from_registry(&generators, generator.as_ref()),
+                        splitter: get_from_registry(splitters, splitter.as_ref()),
+                        generator: get_from_registry(generators, generator.as_ref()),
                     },
                     type_: maze_type.unwrap_or(MazeType::default()),
                 }
@@ -464,7 +464,13 @@ impl Generator {
                     .ok_or(GeneratorError::Unknown)?;
 
                 let regions = regions.map(|r| r.unwrap_or_default());
-                Self::connect_regions(&regions, &mask, generated_regions, &mut rng)
+                let board = Self::connect_regions(&regions, &mask, generated_regions, &mut rng);
+                Maze {
+                    board,
+                    type_: self.type_,
+                    start: Dims3D::ZERO,
+                    end: Dims3D::ZERO,
+                }
             }
             LocalSplitterSpec::ToGenerate {
                 mask,
@@ -534,25 +540,27 @@ impl Generator {
 
                 progress.lock().finish();
 
-                let maze = match self.type_ {
+                let board = match self.type_ {
                     MazeType::Normal => Self::connect_regions(&groups, mask, parts, &mut rng),
                     MazeType::Tower => {
-                        let mut maze = Maze {
+                        let mut board = MazeBoard {
                             cells: Array3D::new_dims(Cell::new(), mask.size()).unwrap(),
                             mask: mask.clone(),
-                            type_: MazeType::Tower,
-                            start: Dims3D::ZERO,
-                            end: Dims3D::ZERO,
                         };
                         for pos in mask.iter_enabled() {
-                            maze.cells[pos] = parts[pos.2 as usize].cells[Dims3D(pos.0, pos.1, 0)];
+                            board.cells[pos] = parts[pos.2 as usize].cells[Dims3D(pos.0, pos.1, 0)];
                         }
 
-                        maze
+                        board
                     }
                 };
 
-                maze
+                Maze {
+                    board,
+                    type_: self.type_,
+                    start: Dims3D::ZERO,
+                    end: Dims3D::ZERO,
+                }
             }
         })
     }
@@ -574,9 +582,9 @@ impl Generator {
     pub fn connect_regions(
         groups: &Array3D<u8>,
         mask: &CellMask,
-        regions: Vec<Maze>,
+        regions: Vec<MazeBoard>,
         rng: &mut Random,
-    ) -> Maze {
+    ) -> MazeBoard {
         // Disclaimer: this implementation can be slow af, since there is a maximum of a 256 groups
         // We use a simple Kruskal's algorithm to connect the regions
 
@@ -598,17 +606,14 @@ impl Generator {
             .collect();
 
         // Combine the regions, so we can start connecting them
-        let mut maze = Maze {
+        let mut board = MazeBoard {
             cells: Array3D::new_dims(Cell::new(), groups.size()).unwrap(),
             mask: mask.clone(),
-            type_: MazeType::Normal,
-            start: Dims3D::ZERO,
-            end: Dims3D::ZERO,
         };
         for cell in groups.iter_pos() {
             let group = groups[cell];
             let region = &regions[group as usize];
-            maze.cells[cell] = region.cells[cell];
+            board.cells[cell] = region.cells[cell];
         }
 
         #[allow(unused_variables)]
@@ -621,14 +626,14 @@ impl Generator {
             if from_set.1.contains(&to_g) {
                 continue;
             }
-            maze.remove_wall(from, dir);
+            board.remove_wall(from, dir);
 
             let from_set = sets.swap_remove(from_set.0);
             let to_set = sets.iter_mut().find(|set| set.contains(&to_g)).unwrap();
             to_set.extend(from_set);
         }
 
-        maze
+        board
     }
 
     pub fn build_region_graph(

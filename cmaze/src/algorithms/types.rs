@@ -3,7 +3,7 @@ use std::str::FromStr;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::gameboard::Maze;
+use crate::gameboard::maze::MazeBoard;
 
 use super::{CellMask, Dims3D, GeneratorRegistry, SplitterRegistry};
 
@@ -311,8 +311,8 @@ impl MazeRegionSpec {
         }
 
         match &self.region_type {
-            MazeRegionType::Predefined { maze } => {
-                if maze.size() != self.mask.size() || maze.size() != maze_size {
+            MazeRegionType::Predefined { board } => {
+                if board.size() != self.mask.size() || board.size() != maze_size {
                     return false;
                 }
             }
@@ -343,7 +343,7 @@ pub enum MazeRegionType {
     /// maze or if it's pregenerated externally.
     Predefined {
         /// Maze of this region.
-        maze: Maze,
+        board: MazeBoard,
     },
 
     /// Generated maze region.

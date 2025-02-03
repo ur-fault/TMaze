@@ -221,11 +221,7 @@ impl MazePresetMenu {
 
         let menu = Menu::new(menu_config);
 
-        let presets = settings
-            .get_presets()
-            .iter()
-            .map(|maze| maze.clone())
-            .collect::<Vec<_>>();
+        let presets = settings.get_presets().to_vec();
 
         Self { menu, presets }
     }
@@ -590,7 +586,7 @@ impl GameActivity {
 
         let game = &self.data.game;
         for (move_pos, _) in game.get_moves() {
-            let cell = game.get_maze().get_cell(*move_pos).unwrap();
+            let cell = game.get_maze().board.get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
                 let real_pos = maze2screen(*move_pos) + maze_pos;
                 frame.draw(real_pos, '.', theme["game.visited"]); // FIXME: move out of the
@@ -610,6 +606,7 @@ impl GameActivity {
         let player_draw_pos = maze_pos + player.into();
         let cell = game
             .get_maze()
+            .board
             .get_cell(self.data.game.get_player_pos())
             .unwrap();
         if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
@@ -908,26 +905,26 @@ impl MazeBoard {
     }
 
     fn render_floor(game: &RunningGame, floor: i32, theme: &Theme) -> Frame {
-        let maze = game.get_maze();
+        let board = &game.get_maze().board;
         let normals = theme["game.walls"];
 
-        let size = maze_render_size(maze);
+        let size = maze_render_size(board);
 
         let mut frame = Frame::new(size);
         frame.fill(renderer::Cell::styled(' ', theme["game.background"]));
 
         let mut draw = |pos, l: LineDir| frame.draw(Dims::from(pos), l.double(), normals);
 
-        for y in -1..maze.size().1 {
-            for x in -1..maze.size().0 {
+        for y in -1..board.size().1 {
+            for x in -1..board.size().0 {
                 let cell_pos = Dims3D(x, y, floor);
                 let Dims(rx, ry) = maze2screen(cell_pos);
 
-                if maze.get_wall(cell_pos, CellWall::Right) {
+                if board.get_wall(cell_pos, CellWall::Right) {
                     draw((rx + 1, ry), LineDir::Vertical);
                 }
 
-                if maze.get_wall(cell_pos, CellWall::Bottom) {
+                if board.get_wall(cell_pos, CellWall::Bottom) {
                     draw((rx, ry + 1), LineDir::Horizontal);
                 }
 
@@ -935,18 +932,18 @@ impl MazeBoard {
                 let cp2 = cell_pos + Dims3D(1, 1, 0);
 
                 let dir = LineDir::from_bools(
-                    maze.get_wall(cp1, CellWall::Bottom),
-                    maze.get_wall(cp1, CellWall::Right),
-                    maze.get_wall(cp2, CellWall::Top),
-                    maze.get_wall(cp2, CellWall::Left),
+                    board.get_wall(cp1, CellWall::Bottom),
+                    board.get_wall(cp1, CellWall::Right),
+                    board.get_wall(cp2, CellWall::Top),
+                    board.get_wall(cp2, CellWall::Left),
                 );
 
                 draw((rx + 1, ry + 1), dir);
             }
         }
 
-        let layer = maze.get_cells().layer(floor as usize).unwrap();
-        Self::render_stairs(&mut frame, layer, maze.is_tower(), theme);
+        let layer = board.get_cells().layer(floor as usize).unwrap();
+        Self::render_stairs(&mut frame, layer, game.get_maze().is_tower(), theme);
 
         frame
     }

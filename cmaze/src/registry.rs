@@ -20,6 +20,12 @@ impl<T: ?Sized, K> Registry<T, K> {
     }
 }
 
+impl<T: ?Sized, K> Default for Registry<T, K> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: ?Sized, K> Registry<T, K>
 where
     K: Hash + Eq,

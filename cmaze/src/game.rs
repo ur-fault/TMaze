@@ -127,7 +127,7 @@ impl RunningGame {
     }
 
     pub fn get_available_moves(&self) -> [bool; 6] {
-        let cell = &self.maze.get_cell(self.player_pos).unwrap();
+        let cell = &self.maze.board.get_cell(self.player_pos).unwrap();
         CellWall::get_in_order().map(|wall| !cell.get_wall(wall))
     }
 
@@ -161,7 +161,13 @@ impl RunningGame {
 
         match move_mode {
             MoveMode::Slow => {
-                return if self.maze.get_cell(self.player_pos).unwrap().get_wall(dir) {
+                return if self
+                    .maze
+                    .board
+                    .get_cell(self.player_pos)
+                    .unwrap()
+                    .get_wall(dir)
+                {
                     Ok((self.player_pos, 0))
                 } else {
                     self.moves.push((self.player_pos, dir));
@@ -171,7 +177,13 @@ impl RunningGame {
             }
 
             MoveMode::Fast => {
-                while !self.maze.get_cell(self.player_pos).unwrap().get_wall(dir) {
+                while !self
+                    .maze
+                    .board
+                    .get_cell(self.player_pos)
+                    .unwrap()
+                    .get_wall(dir)
+                {
                     self.moves.push((self.player_pos, dir));
                     self.player_pos += dir.to_coord();
                     count += 1;
@@ -179,7 +191,7 @@ impl RunningGame {
             }
 
             MoveMode::Normal => loop {
-                let mut cell = self.maze.get_cell(self.player_pos).unwrap();
+                let mut cell = self.maze.board.get_cell(self.player_pos).unwrap();
 
                 if cell.get_wall(dir) {
                     break;
@@ -190,7 +202,7 @@ impl RunningGame {
                 self.moves.push((self.player_pos, dir));
                 self.player_pos += dir.to_coord();
 
-                cell = self.maze.get_cell(self.player_pos).unwrap();
+                cell = self.maze.board.get_cell(self.player_pos).unwrap();
 
                 let perps = dir.perpendicular_walls();
                 if !cell.get_wall(perps.0)
@@ -207,6 +219,7 @@ impl RunningGame {
             && self.maze.type_ == MazeType::Tower
             && !self
                 .maze
+                .board
                 .get_cell(self.player_pos)
                 .unwrap()
                 .get_wall(CellWall::Up)

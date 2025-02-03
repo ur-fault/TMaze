@@ -6,11 +6,11 @@ use smallvec::SmallVec;
 
 use crate::{
     array::Array3D,
-    gameboard::{Cell, CellWall, Maze},
+    gameboard::{maze::MazeBoard, Cell, CellWall},
     progress::ProgressHandle,
 };
 
-use super::{CellMask, Dims3D, MazeType, Params, Random};
+use super::{CellMask, Dims3D,  Params, Random};
 
 pub trait RegionGenerator: fmt::Debug + Sync + Send {
     fn generate(
@@ -19,7 +19,7 @@ pub trait RegionGenerator: fmt::Debug + Sync + Send {
         rng: &mut Random,
         progress: ProgressHandle,
         params: &Params,
-    ) -> Option<Maze>;
+    ) -> Option<MazeBoard>;
 
     fn guess_progress_complexity(&self, mask: &CellMask) -> usize {
         mask.enabled_count()
@@ -36,40 +36,34 @@ impl RegionGenerator for DepthFirstSearch {
         rng: &mut Random,
         progress: ProgressHandle,
         params: &Params,
-    ) -> Option<Maze> {
+    ) -> Option<MazeBoard> {
         let size = mask.size();
 
         let cells = Array3D::new_dims(Cell::new(), size).unwrap();
-        let mut maze = Maze {
-            cells,
-            mask,
-            type_: MazeType::default(),
-            start: Dims3D::ZERO,
-            end: Dims3D::ZERO,
-        };
+        let mut board = MazeBoard { cells, mask };
 
         // Maybe write a funky macro on struct, that loads all fields from params ?
         let no_rng = params.parsed_or_warn("no_rng", false);
 
-        progress.lock().from = maze.mask.enabled_count();
+        progress.lock().from = board.mask.enabled_count();
 
-        let mut visited = HashSet::with_capacity(maze.mask.enabled_count());
+        let mut visited = HashSet::with_capacity(board.mask.enabled_count());
         let mut stack = Vec::new();
 
         let mut current = if no_rng {
-            maze.mask.iter_enabled().next().unwrap()
+            board.mask.iter_enabled().next().unwrap()
         } else {
-            maze.mask.random_cell(rng).unwrap()
+            board.mask.random_cell(rng).unwrap()
         };
 
         visited.insert(current);
         stack.push(current);
         while !stack.is_empty() {
             current = stack.pop().unwrap();
-            let unvisited_neighbors = maze
+            let unvisited_neighbors = board
                 .get_neighbors_pos(current)
                 .into_iter()
-                .filter(|cell| maze.mask[*cell])
+                .filter(|cell| board.mask[*cell])
                 .filter(|cell| !visited.contains(cell))
                 .collect::<SmallVec<[_; 6]>>();
 
@@ -78,10 +72,10 @@ impl RegionGenerator for DepthFirstSearch {
                 let next = if no_rng {
                     unvisited_neighbors[0]
                 } else {
-                    unvisited_neighbors.choose(rng).unwrap().clone()
+                    *unvisited_neighbors.choose(rng).unwrap()
                 };
-                let chosen_wall = Maze::which_wall_between(current, next).unwrap();
-                maze.remove_wall(current, chosen_wall);
+                let chosen_wall = MazeBoard::which_wall_between(current, next).unwrap();
+                board.remove_wall(current, chosen_wall);
                 visited.insert(next);
                 stack.push(next);
             }
@@ -94,7 +88,7 @@ impl RegionGenerator for DepthFirstSearch {
 
         progress.lock().finish();
 
-        Some(maze)
+        Some(board)
     }
 }
 
@@ -108,7 +102,7 @@ impl RegionGenerator for RndKruskals {
         rng: &mut Random,
         progress: ProgressHandle,
         params: &Params,
-    ) -> Option<Maze> {
+    ) -> Option<MazeBoard> {
         let Dims3D(w, h, d) = mask.size();
         let (wu, hu, du) = (w as usize, h as usize, d as usize);
 
@@ -139,13 +133,7 @@ impl RegionGenerator for RndKruskals {
 
         let cells: Array3D<Cell> = Array3D::new(Cell::new(), wu, hu, du);
 
-        let mut maze = Maze {
-            cells,
-            mask,
-            type_: MazeType::default(),
-            start: Dims3D::ZERO,
-            end: Dims3D::ZERO,
-        };
+        let mut maze = MazeBoard { cells, mask };
 
         if !params.parsed_or_warn("no_rng", false) {
             walls.shuffle(rng);

@@ -277,11 +277,11 @@ impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
 
             Array3DSerde::Dim3D(buf) => {
                 let size = Dims3D(
-                    buf.get(0)
-                        .and_then(|v| v.get(0))
+                    buf.first()
+                        .and_then(|v| v.first())
                         .map(|v| v.len())
                         .unwrap_or(0) as i32,
-                    buf.get(0).map(|v| v.len()).unwrap_or(0) as i32,
+                    buf.first().map(|v| v.len()).unwrap_or(0) as i32,
                     buf.len() as i32,
                 );
                 if buf.iter().any(|v| v.len() != size.1 as usize)
@@ -301,7 +301,7 @@ impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
 
             Array3DSerde::Dim2D(buf) => {
                 let size = Dims3D(
-                    buf.get(0).map(|v| v.len()).unwrap_or(0) as i32,
+                    buf.first().map(|v| v.len()).unwrap_or(0) as i32,
                     buf.len() as i32,
                     1,
                 );
