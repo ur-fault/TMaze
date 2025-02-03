@@ -57,6 +57,10 @@ enum LocalRegionSpec {
     },
 }
 
+/// Main struct of this module.
+///
+/// It generates the complete maze from specification and from the optional seed. For more info
+/// check out [`LocalSplitterSpec`], [`LocalRegionSpec`] and [`MazeType`].
 #[derive(Debug, Clone)]
 pub struct Generator {
     seed: Option<u64>,
@@ -150,7 +154,6 @@ impl Generator {
         }
     }
 
-    // TODO: Custom error type
     pub fn generate(&self, progress: ProgressHandle) -> Result<Maze, GeneratorError> {
         let seed = self.seed.unwrap_or_else(|| thread_rng().gen());
         let mut rng = Random::seed_from_u64(seed);
