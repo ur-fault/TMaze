@@ -160,7 +160,7 @@ impl RegionSplitter for DefaultRegionSplitter {
         let mut cycle = 0usize;
 
         loop {
-            if groups.all(|group| group.is_some()) {
+            if groups.iter_pos().all(|pos| groups[pos].is_some() || !mask[pos]) {
                 break;
             }
 
@@ -195,6 +195,6 @@ impl RegionSplitter for DefaultRegionSplitter {
 
         progress.lock().finish();
 
-        Some(groups.map(|group| group.unwrap().0))
+        Some(groups.map(|group| group.unwrap_or_default().0))
     }
 }
