@@ -182,6 +182,14 @@ impl MazeSpec {
                         return false;
                     }
 
+                    if mask.enabled_count() < 2 {
+                        return false;
+                    }
+
+                    if !mask.is_connected() {
+                        return false;
+                    }
+
                     if let Some(start) = start {
                         if !mask[*start] {
                             return false;

@@ -118,6 +118,12 @@ impl<T: Clone> Array3D<T> {
 
 impl<T: Clone> Array3D<T> {
     pub fn new(item: T, width: usize, height: usize, depth: usize) -> Self {
+        // Check for overflow
+        assert!(width
+            .checked_mul(height)
+            .and_then(|v| v.checked_mul(depth))
+            .is_some());
+
         Self {
             buf: vec![item.clone(); width * height * depth],
             width,

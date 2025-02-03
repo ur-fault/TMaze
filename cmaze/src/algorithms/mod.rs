@@ -57,6 +57,27 @@ enum LocalRegionSpec {
     },
 }
 
+#[derive(Debug, Clone)]
+enum PosInMaze {
+    Region(u8),
+    Cell(Dims3D),
+}
+
+impl From<Position> for PosInMaze {
+    fn from(pos: Position) -> Self {
+        match pos {
+            Position::Region(id) => PosInMaze::Region(id),
+            Position::Pos(pos) => PosInMaze::Cell(pos),
+        }
+    }
+}
+
+impl From<Dims3D> for PosInMaze {
+    fn from(pos: Dims3D) -> Self {
+        PosInMaze::Cell(pos)
+    }
+}
+
 /// Main struct of this module.
 ///
 /// It generates the complete maze from specification and from the optional seed. For more info
@@ -66,6 +87,8 @@ pub struct Generator {
     seed: Option<u64>,
     splitter: LocalSplitterSpec,
     type_: MazeType,
+    start: Option<PosInMaze>,
+    end: Option<PosInMaze>,
 }
 
 impl Generator {
@@ -92,8 +115,8 @@ impl Generator {
         match inner_spec {
             MazeSpecType::Regions {
                 regions,
-                start: _,
-                end: _,
+                start,
+                end,
             } => {
                 let size = regions.first().unwrap().mask.size();
                 let mut region_ids = Array3D::new_dims(None, size).unwrap();
@@ -128,11 +151,13 @@ impl Generator {
                         region_specs,
                     },
                     type_: maze_type.unwrap_or(MazeType::Normal),
+                    start: start.map(Into::into),
+                    end: end.map(Into::into),
                 }
             }
             MazeSpecType::Simple {
-                start: _,
-                end: _,
+                start,
+                end,
                 size,
                 mask,
                 splitter,
@@ -149,6 +174,8 @@ impl Generator {
                         generator: get_from_registry(generators, generator.as_ref()),
                     },
                     type_: maze_type.unwrap_or(MazeType::default()),
+                    start: start.map(Into::into),
+                    end: end.map(Into::into),
                 }
             }
         }
@@ -167,17 +194,11 @@ impl Generator {
                 progress.lock().from = mask.enabled_count();
 
                 let regions = regions.clone();
+                let region_count = region_specs.len();
                 let generated_regions: Vec<_> = region_specs
                     .clone()
                     .into_par_iter()
-                    .zip(
-                        (0..region_specs.len())
-                            .map(|_| {
-                                rng.long_jump();
-                                rng.clone()
-                            })
-                            .collect::<Vec<_>>(),
-                    )
+                    .zip(split_rng(&mut rng, region_count))
                     .enumerate()
                     .map(|(i, (spec, mut rng))| match spec {
                         LocalRegionSpec::Predefined(maze) => Some(maze),
@@ -199,11 +220,28 @@ impl Generator {
 
                 let regions = regions.map(|r| r.unwrap_or_default());
                 let board = Self::connect_regions(&regions, &mask, generated_regions, &mut rng);
+
+                let start = match self.start {
+                    None => mask.iter_enabled().next().unwrap(),
+                    Some(PosInMaze::Region(id)) => Self::mask_of_region(id, &regions, &mask)
+                        .random_cell(&mut rng)
+                        .unwrap(),
+                    Some(PosInMaze::Cell(pos)) => pos,
+                };
+
+                let end = match self.end {
+                    None => mask.iter_enabled().last().unwrap(),
+                    Some(PosInMaze::Region(id)) => Self::mask_of_region(id, &regions, &mask)
+                        .random_cell(&mut rng)
+                        .unwrap(),
+                    Some(PosInMaze::Cell(pos)) => pos,
+                };
+
                 Maze {
                     board,
                     type_: self.type_,
-                    start: Dims3D::ZERO,
-                    end: Dims3D::ZERO,
+                    start,
+                    end,
                 }
             }
             LocalSplitterSpec::ToGenerate {
@@ -289,11 +327,23 @@ impl Generator {
                     }
                 };
 
+                let start = match self.start {
+                    None => mask.iter_enabled().next().unwrap(),
+                    Some(PosInMaze::Region(_)) => return Err(GeneratorError::Validation),
+                    Some(PosInMaze::Cell(pos)) => pos,
+                };
+
+                let end = match self.end {
+                    None => mask.iter_enabled().last().unwrap(),
+                    Some(PosInMaze::Region(_)) => return Err(GeneratorError::Validation),
+                    Some(PosInMaze::Cell(pos)) => pos,
+                };
+
                 Maze {
                     board,
                     type_: self.type_,
-                    start: Dims3D::ZERO,
-                    end: Dims3D::ZERO,
+                    start,
+                    end,
                 }
             }
         })
@@ -311,6 +361,19 @@ impl Generator {
         }
 
         masks
+    }
+
+    // Get mask of the single region
+    pub fn mask_of_region(region: u8, groups: &Array3D<u8>, mask: &CellMask) -> CellMask {
+        let mut reg_mask = CellMask::new_dims_empty(groups.size()).unwrap();
+
+        for (cell, &group) in groups.iter_pos().zip(groups.iter()) {
+            if group == region && mask[cell] {
+                reg_mask[cell] = true;
+            }
+        }
+
+        reg_mask
     }
 
     pub fn connect_regions(
