@@ -96,6 +96,7 @@ impl MenuItem {
         match self {
             MenuItem::Text(text) => text.as_ref_cow(),
             MenuItem::Option(OptionDef { text, val, .. }) => {
+                // TODO: this is not a prefix tho ?!?
                 let prefix = if *val { "[▪]" } else { "[ ]" };
                 let text_w = text.width();
                 format!("{text} {prefix:>width$}", width = width - text_w - 1).into()
@@ -168,6 +169,7 @@ pub struct MenuConfig {
     pub default: Option<usize>,
     pub counted: bool,
     pub q_to_quit: bool,
+    pub auto_select_single: bool,
     pub styles: MenuStyles,
 }
 
@@ -189,6 +191,7 @@ impl MenuConfig {
             default: None,
             counted: false,
             q_to_quit: true,
+            auto_select_single: false,
             styles: MenuStyles::default(),
         }
     }
@@ -210,6 +213,11 @@ impl MenuConfig {
 
     pub fn no_q(mut self) -> Self {
         self.q_to_quit = false;
+        self
+    }
+
+    pub fn auto_select_single(mut self) -> Self {
+        self.auto_select_single = true;
         self
     }
 
@@ -389,8 +397,8 @@ impl ActivityHandler for Menu {
             .map_options(|opt| !matches!(opt, MenuItem::Separator))
             .count() as isize;
 
-        if non_sep_count == 1 {
-            log::warn!("Menu with only one option, returning that");
+        if non_sep_count == 1 && self.config.auto_select_single {
+            log::info!("Menu with only one option, returning that");
             let first_non_separator = self
                 .config
                 .options
