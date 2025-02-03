@@ -275,18 +275,6 @@ pub enum MazeSpecType {
     // automatically by the generator.
 }
 
-// impl Default for MazeSpecType {
-//     fn default() -> Self {
-//         MazeSpecType::Simple {
-//             start: None,
-//             end: None,
-//             mask: None,
-//             splitter: None,
-//             generator: None,
-//         }
-//     }
-// }
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Position {
