@@ -166,7 +166,6 @@ impl Generator {
                 let mask = regions.clone().to_mask();
                 progress.lock().from = mask.enabled_count();
 
-                // FIXME: this ain't parallelized at all
                 let regions = regions.clone();
                 let generated_regions: Vec<_> = region_specs
                     .clone()
