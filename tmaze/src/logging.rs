@@ -68,7 +68,7 @@ pub struct LogsIter<'a> {
     min_level: log::Level,
 }
 
-impl<'a> Iterator for LogsIter<'a> {
+impl Iterator for LogsIter<'_> {
     type Item = Message;
 
     fn next(&mut self) -> Option<Self::Item> {

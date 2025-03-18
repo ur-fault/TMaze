@@ -192,7 +192,7 @@ pub struct Array2DView<'a, T> {
     height: usize,
 }
 
-impl<'a, T> Array2DView<'a, T> {
+impl<T> Array2DView<'_, T> {
     pub fn size(&self) -> Dims {
         Dims(self.width as i32, self.height as i32)
     }

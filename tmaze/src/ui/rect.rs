@@ -38,7 +38,11 @@ impl Rect {
     }
 
     // TODO: make it generic over `Borrow`
-    pub fn trim_absolute<'a>(&'a self, text: &'a impl AsRef<str>, mut pos: Dims) -> (&str, Dims) {
+    pub fn trim_absolute<'a>(
+        &'a self,
+        text: &'a impl AsRef<str>,
+        mut pos: Dims,
+    ) -> (&'a str, Dims) {
         let mut text = text.as_ref();
         let size = self.size();
 
@@ -61,7 +65,7 @@ impl Rect {
         (text, pos)
     }
 
-    pub fn trim_relative<'a>(&'a self, text: &'a impl AsRef<str>, pos: Dims) -> (&str, Dims) {
+    pub fn trim_relative<'a>(&'a self, text: &'a impl AsRef<str>, pos: Dims) -> (&'a str, Dims) {
         let (text, pos) = self.trim_absolute(text, pos + self.start);
         (text, pos - self.start)
     }

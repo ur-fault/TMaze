@@ -20,7 +20,7 @@ impl Drawable<Style> for String {
     }
 }
 
-impl<'a> Drawable<Style> for &'a str {
+impl Drawable<Style> for &'_ str {
     fn draw(&self, pos: Dims, frame: &mut Frame, style: Style) {
         let mut x = 0;
         for character in self.chars() {
