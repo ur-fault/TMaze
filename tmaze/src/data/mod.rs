@@ -142,7 +142,7 @@ impl SaveData {
     ) -> Result<(), SaveDataError> {
         let def = GameDefinition::from_spec(mode);
         let old = self.best_results.get(&def).copied();
-        if old.map_or(true, |old| old.seconds > seconds && old.moves >= moves) {
+        if old.is_none_or(|old| old.seconds > seconds && old.moves >= moves) {
             self.best_results
                 .insert(def, SolveResult { moves, seconds });
         }
