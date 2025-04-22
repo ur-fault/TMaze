@@ -6,7 +6,10 @@ use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
-use std::{iter, sync::Arc};
+use std::{
+    iter,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     array::Array3D,
@@ -323,6 +326,19 @@ impl Generator {
                             board.cells[pos] = parts[pos.2 as usize].cells[Dims3D(pos.0, pos.1, 0)];
                         }
 
+                        // connect the floors
+                        // TODO: this implementation has a bug, when each floor is not fully connected
+                        for (floor, window) in parts.windows(2).enumerate() {
+                            let [from, to] = window else {
+                                unreachable!("windows should be long 2");
+                            };
+                            let mask = from.mask.or(&to.mask);
+
+                            let rnd_cell = mask.random_cell(&mut rng).unwrap();
+                            board.cells[Dims3D(rnd_cell.0, rnd_cell.1, floor as i32)]
+                                .remove_wall(CellWall::Up);
+                        }
+
                         board
                     }
                 };
@@ -468,9 +484,10 @@ fn split_rng(
     rng: &mut Random,
     count: usize,
 ) -> impl IndexedParallelIterator<Item = Random> + use<'_> {
-    (0..count).into_par_iter().map(|_| {
-        let mut rng = rng.clone();
+    let rng = Mutex::new(rng);
+    (0..count).into_par_iter().map(move |_| {
+        let mut rng = rng.lock().unwrap();
         rng.long_jump();
-        rng
+        rng.clone()
     })
 }

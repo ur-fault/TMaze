@@ -5,7 +5,10 @@ use rand::{seq::SliceRandom as _, Rng as _};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{array::Array3D, gameboard::{maze::MazeBoard, CellWall}};
+use crate::{
+    array::Array3D,
+    gameboard::{maze::MazeBoard, CellWall},
+};
 
 use super::{Dims3D, GeneratorRegistry, Random, SplitterRegistry};
 
@@ -572,6 +575,18 @@ impl ops::IndexMut<Dims3D> for CellMask {
 impl From<Array3D<bool>> for CellMask {
     fn from(array: Array3D<bool>) -> Self {
         Self(array)
+    }
+}
+
+impl From<CellMask> for Array3D<bool> {
+    fn from(mask: CellMask) -> Self {
+        mask.0
+    }
+}
+
+impl AsRef<Array3D<bool>> for CellMask {
+    fn as_ref(&self) -> &Array3D<bool> {
+        &self.0
     }
 }
 
