@@ -5,7 +5,7 @@
     //
     // Othwerwise, you can specify your own theme file, which will be loaded
     // from the <game config>/themes directory. It can be either .json[5] or .toml format.
-    "theme": "theme.json",
+    "theme": "default_theme.json5",
 
     // logging levels for different logging mechanisms in the game.
     // - valid levels:
@@ -152,8 +152,8 @@
             "type": "simple",
         },
         {
-            "title": "10x10x5 Tower",
-            "size": [10, 10, 5],
+            "title": "12x6x5 Tower",
+            "size": [12, 6, 5],
             "maze_type": "tower",
             "type": "simple",
         },
