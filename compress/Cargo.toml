@@ -8,7 +8,7 @@ publish = false
 
 [dependencies]
 clap = { version = "4.5.20", features = ["derive"] }
-mp3lame-encoder = { version = "0.1.5", features = ["std"] }
+mp3lame-encoder = { version = "0.2.1", features = ["std"] }
 walkdir = "2.5.0"
 wav = "1.0.1"
 dunce = "1.0.5"

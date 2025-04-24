@@ -62,7 +62,7 @@ fn main() {
 }
 
 fn show_array(
-    groups: &Array3D<u8>,
+    groups: &Array3D<i32>,
     mask: Array3D<bool>,
     base_hash: u64,
     size: Dims3D,
