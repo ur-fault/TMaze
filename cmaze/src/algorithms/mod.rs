@@ -5,6 +5,7 @@ pub mod types;
 use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 
 use std::{
     iter,
@@ -42,6 +43,7 @@ enum LocalSplitterSpec {
     Predefined {
         regions: Array3D<Option<u8>>,
         region_specs: Vec<LocalRegionSpec>,
+        active_region_heuristic: Option<RegionChooseHeuristic>,
     },
     ToGenerate {
         mask: CellMask,
@@ -80,6 +82,9 @@ impl From<Dims3D> for PosInMaze {
         PosInMaze::Cell(pos)
     }
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum RegionChooseHeuristic {}
 
 /// Main struct of this module.
 ///
@@ -120,6 +125,7 @@ impl Generator {
                 regions,
                 start,
                 end,
+                active_region_heuristic,
             } => {
                 let size = regions.first().unwrap().mask.size();
                 let mut region_ids = Array3D::new_dims(None, size).unwrap();
@@ -152,6 +158,7 @@ impl Generator {
                     splitter: LocalSplitterSpec::Predefined {
                         regions: region_ids,
                         region_specs,
+                        active_region_heuristic: *active_region_heuristic,
                     },
                     type_: maze_type.unwrap_or(MazeType::Normal),
                     start: start.map(Into::into),
@@ -192,6 +199,7 @@ impl Generator {
             LocalSplitterSpec::Predefined {
                 regions,
                 region_specs,
+                active_region_heuristic,
             } => {
                 let mask = regions.clone().to_mask();
                 progress.lock().from = mask.enabled_count();

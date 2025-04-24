@@ -10,7 +10,7 @@ use crate::{
     gameboard::{maze::MazeBoard, CellWall},
 };
 
-use super::{Dims3D, GeneratorRegistry, Random, SplitterRegistry};
+use super::{Dims3D, GeneratorRegistry, Random, RegionChooseHeuristic, SplitterRegistry};
 
 /// Parameters for different algorithms. Region splitter, region generator, etc.
 /// In the future, not only String will be allowed, but also other types.
@@ -100,6 +100,7 @@ impl MazeSpec {
                 regions,
                 start,
                 end,
+                active_region_heuristic: _,
             } => {
                 if let (Some(Position::Pos(start)), Some(Position::Pos(end))) = (start, end) {
                     if start == end {
@@ -248,6 +249,9 @@ pub enum MazeSpecType {
 
         /// Player end position.
         end: Option<Position>,
+
+        /// Heuristic for choosing the active region.
+        active_region_heuristic: Option<RegionChooseHeuristic>,
     },
     /// Simple maze specification.
     ///
