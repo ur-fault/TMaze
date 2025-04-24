@@ -13,6 +13,7 @@ use crate::{
 use super::{Dims3D, GeneratorRegistry, Random, SplitterRegistry};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum RegionChooseHeuristic {
     #[default]
     /// Choose the region with the most cells. If there are multiple regions with the same

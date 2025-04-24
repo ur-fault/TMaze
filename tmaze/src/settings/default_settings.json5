@@ -114,12 +114,25 @@
         // - title - title of the preset
         // - size - array of 3 integers, width, height, depth
         // - maze_type - type of the maze
-        //   - normal - normal maze
-        //   - tower - tower
+        //   - "normal" - normal maze
+        //   - "tower" - tower
         // - default - selected by default in menu
         // - type - type of the preset
-        //   - simple - basic generation config
-        //   - regions - specify generation regions or how to choose them
+        //   - "simple" - basic generation config
+        //   - "regions" - specify generation regions or how to choose them
+        // - regions - array of regions containing mask and parameters, used when `type` is "regions"
+        //   - mask - mask of the region, can have formats:
+        //      - base64:   { "size": [width, height, depth], "base64": "<base64 of bit array>" }
+        //      - 2d array: [[bool | int, bool | int, ...], [bool | int, bool | int, ...], ...]
+        //      - 3d array: [[[bool | int, bool | int, ...], [bool | int, bool | int, ...], ...], ...]
+        //   - region_type - type of the region
+        //     - generator - ["<generator_name>", { "param1": value1, ... }]
+        //     - seed - optional seed for the generator, int
+        // - active_region_heuristic - when neither `start` nor `end` are specified, this heuristic will be used to choose the region, can be either:
+        //   - "biggest"
+        //   - "random"
+        //   - "first"
+        //   - "last"
         {
             "title": "10x5",
             "size": [10, 5, 1],
