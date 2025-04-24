@@ -263,12 +263,12 @@ pub struct MazeGenerationActivity {
 
 impl MazeGenerationActivity {
     pub fn new(preset: MazePreset, registries: &Registries) -> Self {
-        let text = preset.short_desc();
+        let desc = preset.short_desc().unwrap_or("Unknown".to_string());
         let game_props = GameProperities {
             maze_spec: preset.maze_spec.clone(),
         };
 
-        let progress_bar = ProgressBar::new(format!("Generating maze: {}", text));
+        let progress_bar = ProgressBar::new(format!("Generating maze: {}", desc));
 
         Self {
             comm: RunningGame::prepare(

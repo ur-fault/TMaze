@@ -52,14 +52,14 @@ pub struct MazePreset {
 }
 
 impl MazePreset {
-    pub fn short_desc(&self) -> String {
+    pub fn short_desc(&self) -> Option<String> {
         let (size, cells): (_, usize) = match &self.maze_spec.inner_spec {
             MazeSpecType::Regions { regions, .. } => (
-                self.maze_spec.size().unwrap(),
+                self.maze_spec.size()?,
                 regions.iter().map(|r| r.mask.enabled_count()).sum(),
             ),
             MazeSpecType::Simple { mask, .. } => {
-                let size = self.maze_spec.size().unwrap();
+                let size = self.maze_spec.size()?;
                 (
                     size,
                     mask.as_ref()
@@ -70,12 +70,15 @@ impl MazePreset {
         };
 
         if size.2 == 1 {
-            format!("{}: {}x{} ({} cells)", self.title, size.0, size.1, cells)
+            Some(format!(
+                "{}: {}x{} ({} cells)",
+                self.title, size.0, size.1, cells
+            ))
         } else {
-            format!(
+            Some(format!(
                 "{}: {}x{}x{} ({} cells)",
                 self.title, size.0, size.1, size.2, cells
-            )
+            ))
         }
     }
 }

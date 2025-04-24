@@ -76,12 +76,9 @@ pub struct MazeSpec {
 
 impl MazeSpec {
     pub fn validate(&self, generators: &GeneratorRegistry, splitters: &SplitterRegistry) -> bool {
-        fn check_position(pos: Position, regions: &[MazeRegionSpec]) -> bool {
+        fn check_position(pos: Position, regions: &[MazeRegionSpec], mask: &CellMask) -> bool {
             match pos {
-                Position::Pos(pos) => {
-                    // Is the position at least in one region?
-                    regions.iter().any(|r| r.mask[pos])
-                }
+                Position::Pos(pos) => mask[pos],
                 Position::Region(region) => {
                     // Is the region valid?
                     (region as usize) < regions.len()
@@ -119,35 +116,34 @@ impl MazeSpec {
                     return false;
                 }
 
-                let mut exclusion_check_mask = CellMask::new_dims_empty(size).unwrap();
+                let mut union = CellMask::new_dims_empty(size).unwrap();
                 for region in regions {
                     for pos in region.mask.iter_enabled() {
-                        if exclusion_check_mask[pos] {
+                        if union[pos] {
                             return false;
                         }
 
-                        exclusion_check_mask[pos] = true;
+                        union[pos] = true;
                     }
                 }
 
+                if union.enabled_count() < 2 {
+                    return false;
+                }
+
                 if let Some(start) = *start {
-                    if !check_position(start, regions) {
+                    if !check_position(start, regions, &union) {
                         return false;
                     }
                 }
 
                 if let Some(end) = *end {
-                    if !check_position(end, regions) {
+                    if !check_position(end, regions, &union) {
                         return false;
                     }
                 }
 
                 if let (Some(start), Some(end)) = (start, end) {
-                    let union = regions
-                        .iter()
-                        .fold(CellMask::new_dims_empty(size).unwrap(), |a, b| {
-                            a.or(&b.mask)
-                        });
                     if !union.connactable(pos_to_dim(*start, regions), pos_to_dim(*end, regions)) {
                         return false;
                     }
