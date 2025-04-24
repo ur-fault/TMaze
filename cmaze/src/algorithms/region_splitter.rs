@@ -15,7 +15,7 @@ pub trait RegionSplitter: fmt::Debug + Sync + Send {
         rng: &mut Random,
         progress: ProgressHandle,
         params: &Params,
-    ) -> Option<Array3D<u8>>;
+    ) -> Option<Array3D<i32>>;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -131,7 +131,7 @@ impl RegionSplitter for DefaultRegionSplitter {
         rng: &mut Random,
         progress: ProgressHandle,
         params: &Params,
-    ) -> Option<Array3D<u8>> {
+    ) -> Option<Array3D<i32>> {
         let count = params.parsed_or_warn("count", RegionCount::Per(100));
 
         let region_count = match count {
@@ -149,7 +149,7 @@ impl RegionSplitter for DefaultRegionSplitter {
 
         // assign initial groups
         for (i, point) in points.into_iter().enumerate() {
-            groups[point] = Some((i as u8, usize::MAX));
+            groups[point] = Some((i as i32, usize::MAX));
         }
 
         // This algorithm uses simple flood with diamond shaped search and randomized group order

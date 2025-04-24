@@ -311,7 +311,7 @@ pub enum MazeSpecType {
 #[serde(untagged)]
 pub enum Position {
     Pos(Dims3D),
-    Region(u8),
+    Region(i32),
 }
 
 /// Maze type.

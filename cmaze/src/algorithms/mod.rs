@@ -40,7 +40,7 @@ pub enum GeneratorError {
 #[derive(Debug, Clone)]
 enum LocalSplitterSpec {
     Predefined {
-        regions: Array3D<Option<u8>>,
+        regions: Array3D<Option<i32>>,
         region_specs: Vec<LocalRegionSpec>,
         active_region_heuristic: Option<RegionChooseHeuristic>,
     },
@@ -63,7 +63,7 @@ enum LocalRegionSpec {
 
 #[derive(Debug, Clone, Copy)]
 enum PosInMaze {
-    Region(u8),
+    Region(i32),
     Cell(Dims3D),
 }
 
@@ -131,7 +131,7 @@ impl Generator {
                     .enumerate()
                     .map(|(region_id, MazeRegionSpec { mask, region_type })| {
                         for pos in mask.iter_enabled() {
-                            region_ids[pos] = Some(region_id as u8);
+                            region_ids[pos] = Some(region_id as i32);
                         }
                         match region_type {
                             MazeRegionType::Predefined { board } => {
@@ -215,7 +215,7 @@ impl Generator {
                             seed,
                         } => {
                             let region_mask =
-                                CellMask::from(regions.clone().map(|r| r == Some(i as u8)));
+                                CellMask::from(regions.clone().map(|r| r == Some(i as i32)));
                             if let Some(seed) = seed {
                                 rng = Random::seed_from_u64(seed);
                             }
@@ -345,7 +345,7 @@ impl Generator {
                     .zip(split_rng(&mut rng, SPLIT_COUNT))
                     .map(|(mask, mut rng)| {
                         let group_count =
-                            (mask.enabled_count() / SPLIT_COUNT).clamp(1, u8::MAX as usize) as u8;
+                            (mask.enabled_count() / SPLIT_COUNT).clamp(1, i32::MAX as usize) as i32;
                         let groups = splitter
                             .split(&mask, &mut rng, progress.split(), split_args)
                             .ok_or(GeneratorError::Unknown)?;
@@ -444,7 +444,11 @@ impl Generator {
     }
 
     // Split groups into masks, ready for maze generation
-    pub fn split_to_masks(group_count: u8, groups: &Array3D<u8>, mask: &CellMask) -> Vec<CellMask> {
+    pub fn split_to_masks(
+        group_count: i32,
+        groups: &Array3D<i32>,
+        mask: &CellMask,
+    ) -> Vec<CellMask> {
         let mut masks =
             vec![CellMask::new_dims_empty(groups.size()).unwrap(); group_count as usize];
 
@@ -458,7 +462,7 @@ impl Generator {
     }
 
     // Get mask of the single region
-    pub fn mask_of_region(region: u8, groups: &Array3D<u8>, mask: &CellMask) -> CellMask {
+    pub fn mask_of_region(region: i32, groups: &Array3D<i32>, mask: &CellMask) -> CellMask {
         let mut reg_mask = CellMask::new_dims_empty(groups.size()).unwrap();
 
         for (cell, &group) in groups.iter_pos().zip(groups.iter()) {
@@ -473,14 +477,14 @@ impl Generator {
     fn random_in_region(
         rng: &mut rand_xoshiro::Xoshiro256StarStar,
         mask: &CellMask,
-        regions: &Array3D<u8>,
-        region_id: u8,
+        regions: &Array3D<i32>,
+        region_id: i32,
     ) -> Option<Dims3D> {
         Self::mask_of_region(region_id, regions, mask).random_cell(rng)
     }
 
     pub fn connect_regions(
-        groups: &Array3D<u8>,
+        groups: &Array3D<i32>,
         mask: &CellMask,
         regions: Vec<MazeBoard>,
         rng: &mut Random,
@@ -501,7 +505,7 @@ impl Generator {
             .collect();
         walls.shuffle(rng);
 
-        let mut sets: Vec<HashSet<u8>> = (0..regions.len() as u8)
+        let mut sets: Vec<HashSet<_>> = (0..regions.len() as i32)
             .map(|i| iter::once(i).collect())
             .collect();
 
@@ -537,9 +541,9 @@ impl Generator {
     }
 
     pub fn build_region_graph(
-        groups: &Array3D<u8>,
+        groups: &Array3D<i32>,
         mask: &CellMask,
-    ) -> Vec<((u8, u8), (Dims3D, CellWall))> {
+    ) -> Vec<((i32, i32), (Dims3D, CellWall))> {
         let mut borders = vec![];
 
         for cell in mask.iter_enabled() {
