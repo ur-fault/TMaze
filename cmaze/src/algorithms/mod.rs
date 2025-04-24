@@ -60,7 +60,7 @@ enum LocalRegionSpec {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum PosInMaze {
     Region(u8),
     Cell(Dims3D),
@@ -224,20 +224,71 @@ impl Generator {
                 let regions = regions.map(|r| r.unwrap_or_default());
                 let board = Self::connect_regions(&regions, &mask, generated_regions, &mut rng);
 
-                let start = match self.start {
-                    None => mask.iter_enabled().next().unwrap(),
-                    Some(PosInMaze::Region(id)) => Self::mask_of_region(id, &regions, &mask)
-                        .random_cell(&mut rng)
-                        .unwrap(),
-                    Some(PosInMaze::Cell(pos)) => pos,
-                };
-
-                let end = match self.end {
-                    None => mask.iter_enabled().last().unwrap(),
-                    Some(PosInMaze::Region(id)) => Self::mask_of_region(id, &regions, &mask)
-                        .random_cell(&mut rng)
-                        .unwrap(),
-                    Some(PosInMaze::Cell(pos)) => pos,
+                let (start, end) = match (self.start, self.end) {
+                    (Some(PosInMaze::Cell(start)), Some(PosInMaze::Cell(end))) => (start, end),
+                    (Some(PosInMaze::Cell(start)), None) => {
+                        if start != mask.last().unwrap() {
+                            (start, mask.last().unwrap())
+                        } else {
+                            (start, mask.first().unwrap())
+                        }
+                    }
+                    (None, Some(PosInMaze::Cell(end))) => {
+                        if end != mask.first().unwrap() {
+                            (mask.first().unwrap(), end)
+                        } else {
+                            (mask.last().unwrap(), end)
+                        }
+                    }
+                    (Some(PosInMaze::Region(id1)), Some(PosInMaze::Region(id2))) => {
+                        if id1 != id2 {
+                            (
+                                Self::random_in_region(&mut rng, &mask, &regions, id1).unwrap(),
+                                Self::random_in_region(&mut rng, &mask, &regions, id2).unwrap(),
+                            )
+                        } else {
+                            let mut tmp_mask = Self::mask_of_region(id1, &regions, &mask);
+                            let start = tmp_mask.random_cell(&mut rng).unwrap();
+                            tmp_mask[start] = false;
+                            (
+                                start,
+                                tmp_mask
+                                    .random_cell(&mut rng)
+                                    .ok_or(GeneratorError::Validation)?,
+                            )
+                        }
+                    }
+                    (Some(PosInMaze::Region(id)), end @ (None | Some(PosInMaze::Cell(_)))) => {
+                        let mut region_mask = Self::mask_of_region(id, &regions, &mask);
+                        let end = match end {
+                            Some(PosInMaze::Cell(end)) => end,
+                            None => mask.last().unwrap(),
+                            _ => unreachable!("end should be a cell or none"),
+                        };
+                        region_mask[end] = false;
+                        (
+                            region_mask
+                                .random_cell(&mut rng)
+                                .ok_or(GeneratorError::Validation)?,
+                            end,
+                        )
+                    }
+                    (start @ (None | Some(PosInMaze::Cell(_))), Some(PosInMaze::Region(id))) => {
+                        let mut region_mask = Self::mask_of_region(id, &regions, &mask);
+                        let start = match start {
+                            Some(PosInMaze::Cell(start)) => start,
+                            None => mask.first().unwrap(),
+                            _ => unreachable!("start should be a cell or none"),
+                        };
+                        region_mask[start] = false;
+                        (
+                            start,
+                            region_mask
+                                .random_cell(&mut rng)
+                                .ok_or(GeneratorError::Validation)?,
+                        )
+                    }
+                    (None, None) => (mask.first().unwrap(), mask.last().unwrap()),
                 };
 
                 Maze {
@@ -343,16 +394,26 @@ impl Generator {
                     }
                 };
 
-                let start = match self.start {
-                    None => mask.iter_enabled().next().unwrap(),
-                    Some(PosInMaze::Region(_)) => return Err(GeneratorError::Validation),
-                    Some(PosInMaze::Cell(pos)) => pos,
-                };
-
-                let end = match self.end {
-                    None => mask.iter_enabled().last().unwrap(),
-                    Some(PosInMaze::Region(_)) => return Err(GeneratorError::Validation),
-                    Some(PosInMaze::Cell(pos)) => pos,
+                let (start, end) = match (self.start, self.end) {
+                    (Some(PosInMaze::Cell(start)), Some(PosInMaze::Cell(end))) => (start, end),
+                    (Some(PosInMaze::Cell(start)), None) => {
+                        if start != mask.last().unwrap() {
+                            (start, mask.last().unwrap())
+                        } else {
+                            (start, mask.first().unwrap())
+                        }
+                    }
+                    (None, Some(PosInMaze::Cell(end))) => {
+                        if end != mask.first().unwrap() {
+                            (mask.first().unwrap(), end)
+                        } else {
+                            (mask.last().unwrap(), end)
+                        }
+                    }
+                    (None, None) => (mask.first().unwrap(), mask.last().unwrap()),
+                    _ => {
+                        return Err(GeneratorError::Validation);
+                    }
                 };
 
                 Maze {
@@ -390,6 +451,15 @@ impl Generator {
         }
 
         reg_mask
+    }
+
+    fn random_in_region(
+        rng: &mut rand_xoshiro::Xoshiro256StarStar,
+        mask: &CellMask,
+        regions: &Array3D<u8>,
+        region_id: u8,
+    ) -> Option<Dims3D> {
+        Self::mask_of_region(region_id, regions, mask).random_cell(rng)
     }
 
     pub fn connect_regions(

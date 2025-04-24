@@ -60,7 +60,7 @@ impl<T: Clone> Array3D<T> {
         self.buf.iter()
     }
 
-    pub fn iter_pos(&self) -> impl Iterator<Item = Dims3D> + use<'_, T> {
+    pub fn iter_pos(&self) -> impl DoubleEndedIterator<Item = Dims3D> + use<'_, T> {
         (0..self.buf.len()).filter_map(move |i| self.idx_to_dim(i))
     }
 
@@ -257,7 +257,7 @@ impl<T> ops::Index<Dims> for Array2DView<'_, T> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 enum Array3DSerde<T: Clone> {
-    Flat { buf: Vec<T>, size: Dims3D },
+    Flat { size: Dims3D, buf: Vec<T> },
     Dim3D(Vec<Vec<Vec<T>>>),
     Dim2D(Vec<Vec<T>>),
 }
@@ -271,7 +271,7 @@ impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
                 if !(size.all_non_negative()
                     && buf.len() == size.0 as usize * size.1 as usize * size.2 as usize)
                 {
-                    return Err("Size mismatch");
+                    return Err("size mismatch");
                 }
                 Ok(Array3D {
                     buf,
@@ -295,7 +295,7 @@ impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
                         .iter()
                         .any(|v| v.iter().any(|v| v.len() != size.0 as usize))
                 {
-                    return Err("Size mismatch");
+                    return Err("size mismatch");
                 }
                 Ok(Array3D {
                     buf: buf.into_iter().flatten().flatten().collect(),
@@ -312,7 +312,7 @@ impl<T: Clone> TryFrom<Array3DSerde<T>> for Array3D<T> {
                     1,
                 );
                 if buf.iter().any(|v| v.len() != size.0 as usize) {
-                    return Err("Size mismatch");
+                    return Err("size mismatch");
                 }
                 Ok(Array3D {
                     buf: buf.into_iter().flatten().collect(),

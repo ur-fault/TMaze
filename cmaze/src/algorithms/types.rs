@@ -503,8 +503,16 @@ impl CellMask {
         self.0.fill(value);
     }
 
-    pub fn iter_enabled(&self) -> impl Iterator<Item = Dims3D> + '_ {
+    pub fn iter_enabled(&self) -> impl DoubleEndedIterator<Item = Dims3D> + '_ {
         self.0.iter_pos().filter(move |&pos| self[pos])
+    }
+
+    pub fn first(&self) -> Option<Dims3D> {
+        self.iter_enabled().next()
+    }
+
+    pub fn last(&self) -> Option<Dims3D> {
+        self.iter_enabled().next_back()
     }
 }
 
@@ -595,7 +603,7 @@ impl AsRef<Array3D<bool>> for CellMask {
 enum CellMaskSerde {
     Bool(Array3D<bool>),
     Int(Array3D<u8>),
-    Base64 { base64: String, size: Dims3D },
+    Base64 { size: Dims3D, base64: String },
 }
 
 #[derive(Debug, Error)]
