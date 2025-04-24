@@ -10,7 +10,16 @@ use crate::{
     gameboard::{maze::MazeBoard, CellWall},
 };
 
-use super::{Dims3D, GeneratorRegistry, Random, RegionChooseHeuristic, SplitterRegistry};
+use super::{Dims3D, GeneratorRegistry, Random, SplitterRegistry};
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
+pub enum RegionChooseHeuristic {
+    #[default]
+    Biggest,
+    Random,
+    First,
+    Last,
+}
 
 /// Parameters for different algorithms. Region splitter, region generator, etc.
 /// In the future, not only String will be allowed, but also other types.

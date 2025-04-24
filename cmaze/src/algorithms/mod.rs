@@ -5,7 +5,6 @@ pub mod types;
 use hashbrown::{HashMap, HashSet};
 use rand::{seq::SliceRandom as _, thread_rng, Rng as _, SeedableRng as _};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use serde::{Deserialize, Serialize};
 
 use std::{
     iter,
@@ -82,9 +81,6 @@ impl From<Dims3D> for PosInMaze {
         PosInMaze::Cell(pos)
     }
 }
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum RegionChooseHeuristic {}
 
 /// Main struct of this module.
 ///
@@ -231,6 +227,13 @@ impl Generator {
 
                 let regions = regions.map(|r| r.unwrap_or_default());
                 let board = Self::connect_regions(&regions, &mask, generated_regions, &mut rng);
+
+                let mask = match active_region_heuristic.unwrap_or_default() {
+                    RegionChooseHeuristic::Biggest => mask.disjoint_parts().into_iter().max_by_key(|m| m.enabled_count()).unwrap(),
+                    RegionChooseHeuristic::Random => mask.disjoint_parts().choose(&mut rng).cloned().unwrap(),
+                    RegionChooseHeuristic::First => mask.connected(mask.first().unwrap()),
+                    RegionChooseHeuristic::Last => mask.connected(mask.last().unwrap()),
+                };
 
                 let (start, end) = match (self.start, self.end) {
                     (Some(PosInMaze::Cell(start)), Some(PosInMaze::Cell(end))) => (start, end),
