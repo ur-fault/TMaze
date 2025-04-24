@@ -229,8 +229,14 @@ impl Generator {
                 let board = Self::connect_regions(&regions, &mask, generated_regions, &mut rng);
 
                 let mask = match active_region_heuristic.unwrap_or_default() {
-                    RegionChooseHeuristic::Biggest => mask.disjoint_parts().into_iter().max_by_key(|m| m.enabled_count()).unwrap(),
-                    RegionChooseHeuristic::Random => mask.disjoint_parts().choose(&mut rng).cloned().unwrap(),
+                    RegionChooseHeuristic::Biggest => mask
+                        .disjoint_parts()
+                        .into_iter()
+                        .max_by_key(|m| m.enabled_count())
+                        .unwrap(),
+                    RegionChooseHeuristic::Random => {
+                        mask.disjoint_parts().choose(&mut rng).cloned().unwrap()
+                    }
                     RegionChooseHeuristic::First => mask.connected(mask.first().unwrap()),
                     RegionChooseHeuristic::Last => mask.connected(mask.last().unwrap()),
                 };

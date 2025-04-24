@@ -15,9 +15,18 @@ use super::{Dims3D, GeneratorRegistry, Random, SplitterRegistry};
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub enum RegionChooseHeuristic {
     #[default]
+    /// Choose the region with the most cells. If there are multiple regions with the same
+    /// size, then the way of choosing among them is unspecified. But now it is the last one.
     Biggest,
+
+    /// Choose the region randomly, but if possible must have at least 2 cells (for the start and
+    /// end).
     Random,
+
+    /// Choose the first region.
     First,
+
+    /// Choose the last region.
     Last,
 }
 
