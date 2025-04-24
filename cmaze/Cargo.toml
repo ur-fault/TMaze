@@ -12,7 +12,7 @@ rand = "^0.8.5"
 thiserror = "2"
 pausable_clock = "^1.0.1"
 rayon = "^1.10.0"
-hashbrown  = "0.14"
+hashbrown = { version = "0.14", features = ["serde"] }
 log = "0.4"
 serde = { version = "^1", features = ["derive"] }
 rand_xoshiro = "^0.6.0"

@@ -487,6 +487,25 @@ impl CellMask {
         !mask[to]
     }
 
+    pub fn connected(&self, pos: Dims3D) -> CellMask {
+        let mut mask = self.clone();
+        mask.dfs(pos);
+        self.except(&mask)
+    }
+
+    pub fn disjoint_parts(&self) -> Vec<CellMask> {
+        let mut parts = vec![];
+        let mut mask = self.clone();
+
+        while let Some(pos) = mask.first() {
+            let connected_mask = mask.connected(pos);
+            mask = mask.except(&connected_mask);
+            parts.push(connected_mask);
+        }
+
+        parts
+    }
+
     pub fn to_array3d(self) -> Array3D<bool> {
         self.0
     }
@@ -540,6 +559,10 @@ impl CellMask {
 
     pub fn xor(&self, other: &Self) -> Self {
         self.combine(other, |a, b| a ^ b)
+    }
+
+    pub fn except(&self, other: &Self) -> Self {
+        self.combine(other, |a, b| a && !b)
     }
 
     pub fn not(&self) -> Self {
