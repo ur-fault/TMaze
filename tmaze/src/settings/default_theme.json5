@@ -1,5 +1,5 @@
 {
-    // Some metadata about your theme. Currently they are *NOT* used by the game,
+    // Some metadata about your theme. Currently, they are *NOT* used by the game,
     // but a plan is to have a theme manager, where you can see all the themes
     // and their metadata, so you can choose the one you like the most.
     "meta": {
@@ -22,7 +22,7 @@
 
         // # General architecture of themes
         //
-        // Styles are defined in a hiearchy, so if you do not define a style
+        // Styles are defined in a hierarchy, so if you do not define a style
         // it will inherit from the parent style.
         // For example, "text" will inherit from the "default" style.
         // And "ui.menu.text" will inherit from the "text" style.
@@ -51,7 +51,7 @@
         //
         // Really cool feature is that you can define your own styles/keys,
         // which won't be used by the game, but you can reference them by other styles.
-        // Basically custom constants, which can be resued in other styles.
-        // For example you could create a color pallete and then use that in your theme.
+        // Basically custom constants, which can be reused in other styles.
+        // For example you could create a color palette and then use that in your theme.
     }
 }
