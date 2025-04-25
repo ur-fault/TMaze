@@ -219,7 +219,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TARGET: x86_64-unknown-linux-gnu
-      TARGET_NAME: x64_64
+      TARGET_NAME: x86_64
       # Emit backtraces on panics.
       RUST_BACKTRACE: 1
 
