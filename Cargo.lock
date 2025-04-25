@@ -398,9 +398,9 @@ dependencies = [
  "anyhow",
  "clap",
  "dunce",
- "mp3lame-encoder",
+ "hound",
+ "mp3lame-encoder 0.2.1",
  "walkdir",
- "wav",
 ]
 
 [[package]]
@@ -1309,6 +1309,16 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "mp3lame-encoder"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc8c8b5cdbe788ccd1098c3d3635298a011cffdebdd3460c9ca5060a7551557b"
+dependencies = [
+ "libc",
+ "mp3lame-sys",
 ]
 
 [[package]]
