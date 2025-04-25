@@ -1,6 +1,6 @@
 [package]
 name = "tmaze"
-version = "1.16.0"
+version = "1.17.0"
 edition = "2021"
 authors = ["ur-fault"]
 description = "Simple multiplatform maze solving game for terminal written entirely in Rust"
@@ -13,7 +13,7 @@ exclude = [
 
 [dependencies]
 better-panic = "0.3.0"
-cmaze = { path = "../cmaze", version = "0.8.0" }
+cmaze = { path = "../cmaze", version = "0.9.0" }
 crossterm = { version = "^0.28.1", features = ["serde"] }
 substring = "^1.4.5"
 serde = { version = "^1", features = ["derive"] }

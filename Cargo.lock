@@ -361,7 +361,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "cmaze"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "base64",
  "hashbrown 0.14.5",
@@ -2338,7 +2338,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tmaze"
-version = "1.16.0"
+version = "1.17.0"
 dependencies = [
  "better-panic",
  "chrono",
