@@ -325,7 +325,7 @@ pub struct AppStateData {
     pub show_debug: bool,
 }
 
-fn init_theme_resolver() -> ThemeResolver {
+pub fn init_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
 
     resolver
