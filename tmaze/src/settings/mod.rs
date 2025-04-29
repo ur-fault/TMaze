@@ -206,23 +206,23 @@ impl Settings {
 
 impl Settings {
     pub fn get_theme(&self) -> ThemeDefinition {
-        let theme_name = self.read().theme.clone();
-        if let Some(theme_name) = theme_name {
-            match ThemeDefinition::load_by_name(&theme_name) {
-                Ok(theme) => theme,
-                Err(err) => {
-                    log::error!("Could not load theme {}: {}", theme_name, err);
-                    ThemeDefinition::parse_default()
-                }
+        let name = self.read().theme.clone();
+        let maybe_theme = match &name {
+            Some(theme_name) => ThemeDefinition::load_by_name(theme_name),
+            None => ThemeDefinition::load_default(self.read_only),
+        };
+
+        match maybe_theme {
+            Ok(theme) => theme,
+            Err(err) if name.is_some() => {
+                log::error!("Could not load the theme: {}", err);
+                ThemeDefinition::parse_default()
             }
-        } else {
-            match ThemeDefinition::load_default(self.read_only) {
-                Ok(theme) => theme,
-                Err(err) => {
-                    log::error!("Could not load default theme: {}", err);
-                    ThemeDefinition::parse_default()
-                }
+            Err(err) if name.is_none() => {
+                log::error!("Could not load the default theme: {}", err);
+                ThemeDefinition::parse_default()
             }
+            _ => unreachable!("`is_none` and `is_some` handle all cases"),
         }
     }
 
