@@ -303,7 +303,7 @@ pub enum NamedColor {
     Grey,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ThemeResolver(HashMap<String, String>);
 
 #[allow(dead_code)]
@@ -362,6 +362,10 @@ impl ThemeResolver {
     pub fn extend(&mut self, other: Self) -> &mut Self {
         self.0.extend(other.0);
         self
+    }
+
+    pub fn to_map(self) -> HashMap<String, String> {
+        self.0
     }
 }
 
@@ -461,7 +465,10 @@ mod tests {
     fn parse_color() {
         assert_eq!(json5::from_str(r##""#FF0000""##), Ok(Color::Hex(255, 0, 0)));
         assert_eq!(json5::from_str(r##""#F00""##), Ok(Color::Hex(255, 0, 0)));
-        assert_eq!(json5::from_str::<Color>(r##""#123""##), json5::from_str(r##""#112233""##));
+        assert_eq!(
+            json5::from_str::<Color>(r##""#123""##),
+            json5::from_str(r##""#112233""##)
+        );
         assert!(json5::from_str::<Color>(r###""##23""###).is_err());
         assert!(json5::from_str::<Color>(r###""123""###).is_err());
         assert!(json5::from_str::<Color>(r###""#12""###).is_err());
