@@ -35,6 +35,11 @@ struct Args {
         help = "Print available theme options and quit"
     )]
     print_theme_options: Option<Option<StylesPrintMode>>,
+    #[clap(
+        long = "count-styles",
+        help = "When printing styles, prefix with their sequence number"
+    )]
+    counted_styles: bool,
     // TODO: styles don't have descriptions yet
     // #[clap(long = "style-desc", help = "When printing styles, show descriptions")]
     // style_desc: bool,
@@ -77,7 +82,7 @@ fn main() -> Result<(), GameError> {
     }
 
     if let Some(mode) = _args.print_theme_options {
-        print_style_options(mode.unwrap_or_default());
+        print_style_options(mode.unwrap_or_default(), _args.counted_styles);
         return Ok(());
     }
 
@@ -96,7 +101,7 @@ fn main() -> Result<(), GameError> {
     Ok(())
 }
 
-fn print_style_options(mode: StylesPrintMode) {
+fn print_style_options(mode: StylesPrintMode, counted: bool) {
     const TREE_INDENT: usize = 4;
 
     match mode {
@@ -129,10 +134,15 @@ fn print_style_options(mode: StylesPrintMode) {
                     }
                 }
 
-                fn print(&self, depth: usize) {
+                fn print(&self, depth: usize, show_no: bool, no: &mut usize) {
                     for (key, node) in &self.0 {
-                        println!("{}{}", " ".repeat(depth), key);
-                        node.print(depth + TREE_INDENT);
+                        if show_no {
+                            println!("{no:<depth$}{key}", depth = depth);
+                        } else {
+                            println!("{:<depth$}{key}", ' ', depth = depth);
+                        }
+                        node.print(depth + TREE_INDENT, show_no, no);
+                        *no += 1;
                     }
                 }
             }
@@ -143,7 +153,12 @@ fn print_style_options(mode: StylesPrintMode) {
                 let segs = style.split('.').collect::<Vec<_>>();
                 node.add(&segs);
             }
-            node.print(0);
+            let node_count = theme_resolver.len();
+            if counted {
+                node.print(node_count.to_string().len() + 1, true, &mut 1);
+            } else {
+                node.print(0, false, &mut 1);
+            }
         }
     }
 }
