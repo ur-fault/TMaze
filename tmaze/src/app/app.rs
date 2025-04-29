@@ -129,6 +129,15 @@ impl App {
 
         let settings =
             Settings::load_json(settings_path(), read_only).expect("failed to load settings");
+
+        let (logger, logs) = AppLogger::new_with_options(
+            settings.get_logging_level(),
+            LoggerOptions::default()
+                .read_only(read_only)
+                .file_level(settings.get_file_logging_level()),
+        );
+        logger.init();
+
         let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
         let jobs = Jobs::new();
@@ -150,14 +159,6 @@ impl App {
         let resolver = init_theme_resolver();
         let theme_def = settings.get_theme();
         let theme = resolver.resolve(&theme_def);
-
-        let (logger, logs) = AppLogger::new_with_options(
-            settings.get_logging_level(),
-            LoggerOptions::default()
-                .read_only(read_only)
-                .file_level(settings.get_file_logging_level()),
-        );
-        logger.init();
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());

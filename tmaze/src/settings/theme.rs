@@ -2,7 +2,7 @@ use std::{fmt::Display, ops, path::PathBuf};
 
 use crossterm::style::{Attributes, ContentStyle};
 use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
+use serde::{de::Error, Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
@@ -56,19 +56,34 @@ const DEFAULT_THEME_NAME: &str = default_theme_name!();
 const DEFAULT_THEME: &str = include_str!(concat!("./", default_theme_name!()));
 
 impl ThemeDefinition {
+    pub fn parse_default() -> Self {
+        json5::from_str(DEFAULT_THEME).expect("default theme should be always valid")
+    }
+
     pub fn load_default(read_only: bool) -> Result<Self, LoadError> {
+        if read_only {
+            return Ok(Self::parse_default());
+        }
+
+        let result = Self::prepare_default_theme();
+        match result {
+            Ok(theme) => Ok(theme),
+            Err(e) => {
+                log::error!("Failed to prepare default theme: {}", e);
+                Err(e)
+            }
+        }
+    }
+
+    fn prepare_default_theme() -> Result<Self, LoadError> {
         let path = theme_file_path(DEFAULT_THEME_NAME);
 
-        if !read_only {
-            std::fs::create_dir_all(path.parent().unwrap())?;
-            if !path.exists() {
-                std::fs::write(&path, DEFAULT_THEME)?;
-            }
-
-            Self::load_by_path(path)
-        } else {
-            Ok(json5::from_str(DEFAULT_THEME)?)
+        std::fs::create_dir_all(path.parent().unwrap())?;
+        if !path.exists() {
+            std::fs::write(&path, DEFAULT_THEME)?;
         }
+
+        Self::load_by_path(path)
     }
 
     pub fn load_by_name(path: &str) -> Result<Self, LoadError> {
@@ -237,14 +252,18 @@ where
 {
     let s = String::deserialize(deserializer)?;
     if !(s.len() == 7 || s.len() == 4) {
-        panic!("invalid hex color, expected length 7 or 4: {:?}", s);
+        return Err(D::Error::custom(format!(
+            "invalid hex color, expected length 7 or 4: {:?}",
+            s
+        )));
     }
     let s = s.trim_start_matches('#');
-    assert!(
-        s.len() == 6 || s.len() == 3,
-        "invalid hex color, too many '#': {:?}",
-        s
-    );
+    if !(s.len() == 6 || s.len() == 3) {
+        return Err(D::Error::custom(format!(
+            "invalid hex color, too many '#': {:?}",
+            s
+        )));
+    }
 
     let r = u8::from_str_radix(&s[0..2], 16).map_err(serde::de::Error::custom)?;
     let g = u8::from_str_radix(&s[2..4], 16).map_err(serde::de::Error::custom)?;
@@ -421,5 +440,10 @@ mod tests {
         let result = panic::catch_unwind(|| resolver.resolve(&definition));
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_default_theme() {
+        assert!(json5::from_str::<ThemeDefinition>(DEFAULT_THEME).is_ok());
     }
 }
