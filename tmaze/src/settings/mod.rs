@@ -218,8 +218,8 @@ impl Settings {
         } else {
             match ThemeDefinition::load_default(self.read_only) {
                 Ok(theme) => theme,
-                Err(b) => {
-                    log::error!("Could not load default theme: {}", b);
+                Err(err) => {
+                    log::error!("Could not load default theme: {}", err);
                     ThemeDefinition::parse_default()
                 }
             }
