@@ -253,21 +253,31 @@ where
     let s = String::deserialize(deserializer)?;
     if !(s.len() == 7 || s.len() == 4) {
         return Err(D::Error::custom(format!(
-            "invalid hex color, expected length 7 or 4: {:?}",
+            "invalid hex color, expected format `#RGB` or `#RRGGBB`: {:?}",
             s
         )));
     }
     let s = s.trim_start_matches('#');
     if !(s.len() == 6 || s.len() == 3) {
         return Err(D::Error::custom(format!(
-            "invalid hex color, too many '#': {:?}",
+            "invalid hex color, expected format `#RGB` or `#RRGGBB`: {:?}",
             s
         )));
     }
 
-    let r = u8::from_str_radix(&s[0..2], 16).map_err(serde::de::Error::custom)?;
-    let g = u8::from_str_radix(&s[2..4], 16).map_err(serde::de::Error::custom)?;
-    let b = u8::from_str_radix(&s[4..6], 16).map_err(serde::de::Error::custom)?;
+    let (r, g, b) = if s.len() == 6 {
+        (
+            u8::from_str_radix(&s[0..2], 16).map_err(D::Error::custom)?,
+            u8::from_str_radix(&s[2..4], 16).map_err(D::Error::custom)?,
+            u8::from_str_radix(&s[4..6], 16).map_err(D::Error::custom)?,
+        )
+    } else {
+        (
+            u8::from_str_radix(&s[0..1], 16).map_err(D::Error::custom)? * 17,
+            u8::from_str_radix(&s[1..2], 16).map_err(D::Error::custom)? * 17,
+            u8::from_str_radix(&s[2..3], 16).map_err(D::Error::custom)? * 17,
+        )
+    };
 
     Ok((r, g, b))
 }
@@ -445,5 +455,16 @@ mod tests {
     #[test]
     fn test_default_theme() {
         assert!(json5::from_str::<ThemeDefinition>(DEFAULT_THEME).is_ok());
+    }
+
+    #[test]
+    fn parse_color() {
+        assert_eq!(json5::from_str(r##""#FF0000""##), Ok(Color::Hex(255, 0, 0)));
+        assert_eq!(json5::from_str(r##""#F00""##), Ok(Color::Hex(255, 0, 0)));
+        assert_eq!(json5::from_str::<Color>(r##""#123""##), json5::from_str(r##""#112233""##));
+        assert!(json5::from_str::<Color>(r###""##23""###).is_err());
+        assert!(json5::from_str::<Color>(r###""123""###).is_err());
+        assert!(json5::from_str::<Color>(r###""#12""###).is_err());
+        assert!(json5::from_str::<Color>(r###""#1234""###).is_err());
     }
 }
