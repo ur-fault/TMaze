@@ -1,9 +1,7 @@
-use std::collections::BTreeMap;
-
 use tmaze::{
     app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
     helpers::constants::paths::{save_data_path, settings_path},
-    settings::Settings,
+    settings::{theme::StyleNode, Settings},
 };
 
 #[cfg(feature = "updates")]
@@ -115,39 +113,7 @@ fn print_style_options(mode: StylesPrintMode, counted: bool) {
         }
         StylesPrintMode::Deps => todo!(),
         StylesPrintMode::Logical => {
-            #[derive(Debug)]
-            struct Node<'a>(BTreeMap<&'a str, Node<'a>>);
-
-            impl<'a> Node<'a> {
-                fn new() -> Self {
-                    Self(BTreeMap::new())
-                }
-
-                fn add(&mut self, rem_segs: &[&'a str]) {
-                    if rem_segs.is_empty() {
-                        return;
-                    }
-                    let seg = rem_segs[0];
-                    let node = self.0.entry(seg).or_insert_with(Node::new);
-                    if rem_segs.len() > 1 {
-                        node.add(&rem_segs[1..]);
-                    }
-                }
-
-                fn print(&self, depth: usize, show_no: bool, no: &mut usize) {
-                    for (key, node) in &self.0 {
-                        if show_no {
-                            println!("{no:<depth$}{key}", depth = depth);
-                        } else {
-                            println!("{:<depth$}{key}", ' ', depth = depth);
-                        }
-                        node.print(depth + TREE_INDENT, show_no, no);
-                        *no += 1;
-                    }
-                }
-            }
-
-            let mut node = Node::new();
+            let mut node = StyleNode::new();
             let theme_resolver = init_theme_resolver().to_map();
             for style in theme_resolver.keys() {
                 let segs = style.split('.').collect::<Vec<_>>();
@@ -155,9 +121,9 @@ fn print_style_options(mode: StylesPrintMode, counted: bool) {
             }
             let node_count = theme_resolver.len();
             if counted {
-                node.print(node_count.to_string().len() + 1, true, &mut 1);
+                node.print(TREE_INDENT, node_count.to_string().len() + 1, true, &mut 1);
             } else {
-                node.print(0, false, &mut 1);
+                node.print(TREE_INDENT, 0, false, &mut 1);
             }
         }
     }
