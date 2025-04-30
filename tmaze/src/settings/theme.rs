@@ -363,29 +363,59 @@ impl ThemeResolver {
         self.0.extend(other.0);
         self
     }
+}
 
+impl ThemeResolver {
     pub fn to_map(self) -> HashMap<String, String> {
         self.0
+    }
+
+    pub fn as_map(&self) -> &HashMap<String, String> {
+        &self.0
+    }
+
+    pub fn to_logical_tree(&self) -> StyleNode<'_> {
+        fn add<'a>(node: &mut StyleNode<'a>, segs: &[&'a str]) {
+            if segs.is_empty() {
+                return;
+            }
+            let seg = segs[0];
+            let child = node.0.entry(seg).or_insert_with(StyleNode::new);
+            add(child, &segs[1..]);
+        }
+
+        let mut node = StyleNode::new();
+        let theme_resolver = self.as_map();
+        for style in theme_resolver.keys() {
+            let segs = style.split('.').collect::<Vec<_>>();
+            add(&mut node, &segs);
+        }
+
+        node
+    }
+
+    pub fn to_deps_tree(&self) -> StyleNode<'_> {
+        fn add<'a>(node: &mut StyleNode<'a>, map: &'a ThemeResolver, key: &str) {
+            for (key, _) in map.0.iter().filter(|(_, v)| *v == key) {
+                let mut new_node = StyleNode::new();
+                add(&mut new_node, map, key);
+                node.0.insert(key, new_node);
+            }
+        }
+
+        let mut node = StyleNode::new();
+        add(&mut node, self, "");
+        node
     }
 }
 
 #[derive(Debug)]
 pub struct StyleNode<'a>(pub BTreeMap<&'a str, StyleNode<'a>>);
 
-impl<'a> StyleNode<'a> {
+#[allow(clippy::new_without_default)]
+impl StyleNode<'_> {
     pub fn new() -> Self {
         Self(BTreeMap::new())
-    }
-
-    pub fn add(&mut self, rem_segs: &[&'a str]) {
-        if rem_segs.is_empty() {
-            return;
-        }
-        let seg = rem_segs[0];
-        let node = self.0.entry(seg).or_insert_with(StyleNode::new);
-        if rem_segs.len() > 1 {
-            node.add(&rem_segs[1..]);
-        }
     }
 
     pub fn print(&self, indent: usize, depth: usize, show_no: bool, no: &mut usize) {
