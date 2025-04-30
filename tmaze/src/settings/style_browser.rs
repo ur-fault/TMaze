@@ -42,15 +42,15 @@ impl StyleBrowser {
     fn use_list(&mut self, app_data: &mut AppData) {
         let mut list: Vec<_> = app_data.theme_resolver.as_map().keys().collect();
         list.sort();
-        let list = list
-            .into_iter()
-            .cloned()
-            .map(|x| Item {
-                payload: x.clone(),
-                style: Some(x),
-            })
-            .collect();
-        self.mode = Mode::List(list);
+        self.mode = Mode::List(
+            list.into_iter()
+                .cloned()
+                .map(|x| Item {
+                    payload: x.clone(),
+                    style: Some(x),
+                })
+                .collect(),
+        );
     }
 
     fn use_logical(&mut self, app_data: &mut AppData) {
