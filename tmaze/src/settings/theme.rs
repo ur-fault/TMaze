@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops, path::PathBuf};
+use std::{collections::BTreeMap, fmt::Display, ops, path::PathBuf};
 
 use crossterm::style::{Attributes, ContentStyle};
 use hashbrown::HashMap;
@@ -209,7 +209,7 @@ impl ops::BitOr for Style {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Color {
-    // TODO: 256
+    // TODO: 256 (ansi)
     RGB(u8, u8, u8),
     Named(NamedColor),
     #[serde(deserialize_with = "deserialize_hex")]
@@ -366,6 +366,38 @@ impl ThemeResolver {
 
     pub fn to_map(self) -> HashMap<String, String> {
         self.0
+    }
+}
+
+#[derive(Debug)]
+pub struct StyleNode<'a>(pub BTreeMap<&'a str, StyleNode<'a>>);
+
+impl<'a> StyleNode<'a> {
+    pub fn new() -> Self {
+        Self(BTreeMap::new())
+    }
+
+    pub fn add(&mut self, rem_segs: &[&'a str]) {
+        if rem_segs.is_empty() {
+            return;
+        }
+        let seg = rem_segs[0];
+        let node = self.0.entry(seg).or_insert_with(StyleNode::new);
+        if rem_segs.len() > 1 {
+            node.add(&rem_segs[1..]);
+        }
+    }
+
+    pub fn print(&self, indent: usize, depth: usize, show_no: bool, no: &mut usize) {
+        for (key, node) in &self.0 {
+            if show_no {
+                println!("{no:<depth$}{key}", depth = depth);
+            } else {
+                println!("{:<depth$}{key}", "", depth = depth);
+            }
+            node.print(indent, depth + indent, show_no, no);
+            *no += 1;
+        }
     }
 }
 
