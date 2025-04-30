@@ -1,7 +1,7 @@
 use tmaze::{
     app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
     helpers::constants::paths::{save_data_path, settings_path},
-    settings::{theme::StyleNode, Settings},
+    settings::Settings,
 };
 
 #[cfg(feature = "updates")]
@@ -103,27 +103,31 @@ fn print_style_options(mode: StylesPrintMode, counted: bool) {
     const TREE_INDENT: usize = 4;
 
     match mode {
-        StylesPrintMode::List => {
-            let theme_resolver = init_theme_resolver().to_map();
-            let mut styles = theme_resolver.keys().collect::<Vec<_>>();
-            styles.sort();
-            for style in styles {
-                println!("{}", style);
-            }
-        }
-        StylesPrintMode::Deps => todo!(),
         StylesPrintMode::Logical => {
-            let mut node = StyleNode::new();
-            let theme_resolver = init_theme_resolver().to_map();
-            for style in theme_resolver.keys() {
-                let segs = style.split('.').collect::<Vec<_>>();
-                node.add(&segs);
-            }
-            let node_count = theme_resolver.len();
+            let theme_resolver = init_theme_resolver();
+            let node = theme_resolver.to_logical_tree();
+            let node_count = theme_resolver.as_map().len();
             if counted {
                 node.print(TREE_INDENT, node_count.to_string().len() + 1, true, &mut 1);
             } else {
                 node.print(TREE_INDENT, 0, false, &mut 1);
+            }
+        }
+        StylesPrintMode::Deps => {
+            let theme_resolver = init_theme_resolver();
+            let node = theme_resolver.to_deps_tree();
+            let node_count = theme_resolver.as_map().len();
+            if counted {
+                node.print(TREE_INDENT, node_count.to_string().len() + 1, true, &mut 1);
+            } else {
+                node.print(TREE_INDENT, 0, false, &mut 1);
+            }
+        }
+        StylesPrintMode::List => { let theme_resolver = init_theme_resolver().to_map();
+            let mut styles = theme_resolver.keys().collect::<Vec<_>>();
+            styles.sort();
+            for style in styles {
+                println!("{}", style);
             }
         }
     }
