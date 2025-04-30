@@ -14,6 +14,7 @@ pub mod popup;
 pub mod progressbar;
 pub mod rect;
 pub mod usecase;
+pub mod redirect_menu;
 
 pub use button::*;
 pub use draw_fn::*;
@@ -22,6 +23,7 @@ pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
 pub use rect::*;
+pub use redirect_menu::*;
 
 pub trait Screen {
     fn draw(&self, frame: &mut Frame, theme: &Theme) -> io::Result<()>;

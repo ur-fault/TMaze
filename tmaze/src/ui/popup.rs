@@ -26,7 +26,6 @@ impl Popup {
 impl ActivityHandler for Popup {
     fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
         for event in events {
-            #[allow(clippy::single_match)] // for more events to come
             match event {
                 Event::Term(event) => match event {
                     TermEvent::Key(KeyEvent { code, kind, .. }) => {

@@ -18,6 +18,7 @@ use crate::{
     renderer::{self, Frame},
     settings::{
         self,
+        style_browser::StyleBrowser,
         theme::{Theme, ThemeResolver},
         CameraMode, MazePreset, Settings, SettingsActivity,
     },
@@ -26,7 +27,7 @@ use crate::{
         helpers::format_duration,
         multisize_duration_format, split_menu_actions,
         usecase::dpad::{DPad, DPadType},
-        Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, Screen,
+        Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, RedirectMenu, Screen,
     },
 };
 
@@ -82,6 +83,7 @@ impl MainMenu {
             "New Game" -> data => Self::start_new_game(&data.settings, &data.use_data),
             "Settings" -> _ => Self::show_settings_screen(),
             "Controls" -> _ => Self::show_controls_popup(),
+            "Info" -> _ => Self::show_info_menu(),
             "About" -> _ => Self::show_about_popup(),
             "Quit" -> _ => Change::pop_top(),
         );
@@ -156,6 +158,28 @@ impl MainMenu {
         let popup = Popup::new("About".to_string(), lines);
 
         Change::push(Activity::new_base_boxed("about".to_string(), popup))
+    }
+
+    fn show_info_menu() -> Change {
+        let options = menu_actions!(
+            "Style options browser" -> data => Change::Push(
+                Activity::new_base_boxed(
+                    "style options browser".to_string(),
+                    StyleBrowser::new(&data.theme_resolver)
+                )
+            ),
+            "Back" -> _ => Change::pop_top(),
+        );
+
+        let (options, actions) = split_menu_actions(options);
+
+        Change::Push(
+            RedirectMenu {
+                menu: Menu::new(MenuConfig::new("TMaze", options).counted()),
+                actions,
+            }
+            .to_activity("info menu"),
+        )
     }
 
     fn start_new_game(settings: &Settings, use_data: &AppStateData) -> Change {

@@ -375,20 +375,29 @@ impl ThemeResolver {
     }
 
     pub fn to_logical_tree(&self) -> StyleNode<'_> {
-        fn add<'a>(node: &mut StyleNode<'a>, segs: &[&'a str]) {
+        fn add<'a, 'b>(
+            node: &'b mut StyleNode<'a>,
+            segs: &[&'a str],
+        ) -> Option<&'b mut StyleNode<'a>> {
             if segs.is_empty() {
-                return;
+                return None;
             }
             let seg = segs[0];
-            let child = node.0.entry(seg).or_insert_with(StyleNode::new);
-            add(child, &segs[1..]);
+            let child = node.map.entry(seg).or_insert_with(StyleNode::new);
+            if segs.len() == 1 {
+                return Some(child);
+            }
+            add(child, &segs[1..])
         }
 
         let mut node = StyleNode::new();
         let theme_resolver = self.as_map();
         for style in theme_resolver.keys() {
             let segs = style.split('.').collect::<Vec<_>>();
-            add(&mut node, &segs);
+            // if let Some(node) = add(&mut node, &segs) {
+            //     node.style = Some(style);
+            // }
+            add(&mut node, &segs).unwrap().style = Some(style);
         }
 
         node
@@ -399,7 +408,7 @@ impl ThemeResolver {
             for (key, _) in map.0.iter().filter(|(_, v)| *v == key) {
                 let mut new_node = StyleNode::new();
                 add(&mut new_node, map, key);
-                node.0.insert(key, new_node);
+                node.map.insert(key, new_node);
             }
         }
 
@@ -410,16 +419,29 @@ impl ThemeResolver {
 }
 
 #[derive(Debug)]
-pub struct StyleNode<'a>(pub BTreeMap<&'a str, StyleNode<'a>>);
+pub struct StyleNode<'a> {
+    pub map: BTreeMap<&'a str, StyleNode<'a>>,
+    pub style: Option<&'a str>,
+}
 
 #[allow(clippy::new_without_default)]
-impl StyleNode<'_> {
+impl<'a> StyleNode<'a> {
     pub fn new() -> Self {
-        Self(BTreeMap::new())
+        Self {
+            map: BTreeMap::new(),
+            style: None,
+        }
+    }
+
+    pub fn new_styled(style: &'a str) -> Self {
+        Self {
+            map: BTreeMap::new(),
+            style: Some(style),
+        }
     }
 
     pub fn print(&self, indent: usize, depth: usize, show_no: bool, no: &mut usize) {
-        for (key, node) in &self.0 {
+        for (key, node) in &self.map {
             if show_no {
                 println!("{no:<depth$}{key}", depth = depth);
             } else {
