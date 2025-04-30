@@ -5,8 +5,9 @@ use std::{
 
 use cmaze::{
     algorithms::{
-        region_generator::{DepthFirstSearch, RndKruskals}, region_splitter::DefaultRegionSplitter, GeneratorRegistry,
-        SplitterRegistry,
+        region_generator::{DepthFirstSearch, RndKruskals},
+        region_splitter::DefaultRegionSplitter,
+        GeneratorRegistry, SplitterRegistry,
     },
     dims::*,
 };
@@ -51,6 +52,7 @@ pub struct AppData {
     pub use_data: AppStateData,
     pub screen_size: Dims,
     pub theme: Theme,
+    pub theme_resolver: ThemeResolver,
     pub logs: UiLogs,
     pub registries: Registries,
     jobs: Jobs,
@@ -149,7 +151,8 @@ impl App {
                 "default",
             ),
             region_generator: {
-                let mut reg = GeneratorRegistry::with_default(Arc::new(RndKruskals), "rnd_kruskals");
+                let mut reg =
+                    GeneratorRegistry::with_default(Arc::new(RndKruskals), "rnd_kruskals");
                 reg.register("dfs", Arc::new(DepthFirstSearch));
                 reg
             },
@@ -174,6 +177,7 @@ impl App {
                 screen_size: frame_size,
                 jobs,
                 theme,
+                theme_resolver: resolver,
                 logs,
                 registries,
 
