@@ -20,7 +20,6 @@ pub struct StyleBrowser {
 
 impl StyleBrowser {
     pub fn new(resolver: ThemeResolver) -> Self {
-        // panic!("{:#?}", resolver.to_logical_tree());
         let mut new = Self {
             mode: Mode::List(vec![]),
             resolver: resolver.clone(),
@@ -177,8 +176,9 @@ impl Screen for StyleBrowser {
                 pos,
                 node.item
                     .as_ref()
-                    .map(|item| item.payload.as_str())
-                    .unwrap_or("<root>"),
+                    .expect("non-root node must have payload")
+                    .payload
+                    .as_str(),
                 style,
             );
             let mut yoff = 0;
@@ -227,6 +227,12 @@ struct NodeItem {
     children: Vec<NodeItem>,
 }
 
+#[derive(Debug)]
+struct Item {
+    payload: String,
+    style: Option<String>,
+}
+
 impl NodeItem {
     fn from_style_node(root: Option<Item>, style_node: StyleNode<'_>) -> NodeItem {
         let mut node = NodeItem {
@@ -265,12 +271,6 @@ impl NodeItem {
 
         !self.hidden
     }
-}
-
-#[derive(Debug)]
-struct Item {
-    payload: String,
-    style: Option<String>,
 }
 
 #[cfg(test)]
