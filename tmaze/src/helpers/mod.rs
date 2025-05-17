@@ -139,6 +139,10 @@ pub fn is_release(k: KeyEventKind) -> bool {
     k == KeyEventKind::Release
 }
 
+pub fn not_release(k: KeyEventKind) -> bool {
+    k != KeyEventKind::Release
+}
+
 pub trait ToDebug: fmt::Debug {
     fn to_debug(&self) -> String {
         format!("{:?}", self)
