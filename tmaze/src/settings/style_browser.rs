@@ -65,8 +65,11 @@ impl StyleBrowser {
 
     fn update_search(&mut self) {
         match &mut self.mode {
-            Mode::Logical(node) | Mode::Deps(node) => {
-                node.match_search_pattern(&self.search);
+            Mode::Logical(node) => {
+                node.match_search_pattern(&self.search, Some(false));
+            }
+            Mode::Deps(node) => {
+                node.match_search_pattern(&self.search, None);
             }
             Mode::List(items) => {
                 for (item, hidden) in items {
@@ -134,8 +137,6 @@ impl Screen for StyleBrowser {
             } else {
                 inner_frame.draw(Dims(1, 0), self.search.as_str(), text);
             }
-
-            // , 
 
             const TABS: &[(&str, fn(&Mode) -> bool)] = &[
                 ("By name", |x| matches!(x, Mode::Logical(_))),
@@ -260,7 +261,7 @@ impl NodeItem {
         node
     }
 
-    fn match_search_pattern(&mut self, pattern: &str) -> bool {
+    fn match_search_pattern(&mut self, pattern: &str, propagade_down: Option<bool>) -> bool {
         self.hidden = true;
         if let Some(item) = &self.item {
             if item.payload.contains(pattern) {
@@ -268,13 +269,17 @@ impl NodeItem {
             }
         }
 
+        let to_propagade = propagade_down.map(|down| !self.hidden || down);
         for child in &mut self.children {
-            if child.match_search_pattern(pattern) {
+            if child.match_search_pattern(pattern, to_propagade) {
                 self.hidden = false;
             }
         }
 
-        !self.hidden
+        let show_primary = !self.hidden;
+        self.hidden = self.hidden && !propagade_down.unwrap_or(false);
+
+        show_primary
     }
 }
 
