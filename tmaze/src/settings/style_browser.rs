@@ -4,6 +4,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
+    helpers::not_release,
     renderer::{drawable::Drawable, Frame},
     settings::theme::Style,
     ui::{Rect, Screen},
@@ -61,20 +62,22 @@ impl ActivityHandler for StyleBrowser {
     fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
         for event in events {
             match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, .. })) => match code {
-                    KeyCode::Esc => return Some(Change::pop_top()),
-                    KeyCode::Tab => match &self.mode {
-                        Mode::Logical(_) => self.use_deps(),
-                        Mode::Deps(_) => self.use_list(),
-                        Mode::List(_) => self.use_logical(),
-                    },
-                    KeyCode::BackTab => match &self.mode {
-                        Mode::Logical(_) => self.use_list(),
-                        Mode::Deps(_) => self.use_logical(),
-                        Mode::List(_) => self.use_deps(),
-                    },
-                    _ => {}
-                },
+                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if not_release(kind) => {
+                    match code {
+                        KeyCode::Esc => return Some(Change::pop_top()),
+                        KeyCode::Tab => match &self.mode {
+                            Mode::Logical(_) => self.use_deps(),
+                            Mode::Deps(_) => self.use_list(),
+                            Mode::List(_) => self.use_logical(),
+                        },
+                        KeyCode::BackTab => match &self.mode {
+                            Mode::Logical(_) => self.use_list(),
+                            Mode::Deps(_) => self.use_logical(),
+                            Mode::List(_) => self.use_deps(),
+                        },
+                        _ => {}
+                    }
+                }
                 _ => {}
             }
         }
