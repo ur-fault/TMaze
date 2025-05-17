@@ -2,10 +2,12 @@ use std::time::Duration;
 
 use cmaze::dims::Dims;
 use crossterm::style::{Attribute, Color, ContentStyle};
+use unicode_width::UnicodeWidthStr;
 
 use crate::{
     helpers::{self, strings::multisize_string},
-    renderer::helpers::term_size,
+    renderer::{drawable::Drawable, helpers::term_size},
+    settings::theme::Style,
 };
 
 pub fn center_box_in_screen(box_dims: Dims) -> Dims {
@@ -74,5 +76,15 @@ pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyl
     ContentStyle {
         attributes: style.attributes | attr,
         ..style
+    }
+}
+
+pub struct CapsuleText(pub String);
+
+impl Drawable<Style> for CapsuleText {
+    fn draw(&self, pos: Dims, frame: &mut crate::renderer::Frame, style: Style) {
+        frame.draw(pos + Dims(0, 0), '', style.invert());
+        frame.draw(pos + Dims(1, 0), self.0.as_str(), style);
+        frame.draw(pos + Dims(self.0.width() as i32 + 1, 0), '', style.invert());
     }
 }

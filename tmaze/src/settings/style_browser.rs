@@ -7,7 +7,7 @@ use crate::{
     helpers::{not_release, LineDir},
     renderer::{drawable::Drawable, Frame},
     settings::theme::Style,
-    ui::{Rect, Screen},
+    ui::{CapsuleText, Rect, Screen},
 };
 
 use super::theme::{StyleNode, Theme, ThemeResolver};
@@ -135,27 +135,32 @@ impl Screen for StyleBrowser {
                 inner_frame.draw(Dims(1, 0), self.search.as_str(), text);
             }
 
+            // , 
+
             const TABS: &[(&str, fn(&Mode) -> bool)] = &[
-                ("Logical", |x| matches!(x, Mode::Logical(_))),
+                ("By name", |x| matches!(x, Mode::Logical(_))),
                 ("Inheritance", |x| matches!(x, Mode::Deps(_))),
                 ("List", |x| matches!(x, Mode::List(_))),
             ];
 
             let tabs_width = TABS
                 .iter()
-                .map(|(name, _)| name.width() as i32 + 2)
+                .map(|(name, _)| name.width() as i32 + 3)
                 .sum::<i32>();
 
             // i've no why -2 is needed here, but it's cutoff without it
-            let mut xoof = inner_frame.size.0 - tabs_width - 2;
+            let mut xoof = inner_frame.size.0 - tabs_width - 6;
             for (name, is_mode) in TABS {
-                let style = if is_mode(&self.mode) {
-                    text.invert()
+                if is_mode(&self.mode) {
+                    inner_frame.draw(
+                        Dims(xoof, 0),
+                        CapsuleText(format!(" {name} ")),
+                        text.invert(),
+                    );
                 } else {
-                    text
+                    inner_frame.draw(Dims(xoof, 0), format!("  {name}  "), text);
                 };
-                inner_frame.draw(Dims(xoof, 0), format!(" {name} "), style);
-                xoof += name.width() as i32 + 3;
+                xoof += name.width() as i32 + 5;
             }
         }
 
