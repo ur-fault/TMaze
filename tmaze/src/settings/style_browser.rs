@@ -333,10 +333,10 @@ mod tests {
             ],
         };
 
-        assert!(node.match_search_pattern("test"));
-        assert!(node.match_search_pattern("example"));
-        assert!(node.match_search_pattern("child"));
-        assert!(node.match_search_pattern(""));
-        assert!(!node.match_search_pattern("unknown"));
+        assert!(node.match_search_pattern("test", None));
+        assert!(node.match_search_pattern("example", None));
+        assert!(node.match_search_pattern("child", None));
+        assert!(node.match_search_pattern("", None));
+        assert!(!node.match_search_pattern("unknown", None));
     }
 }
