@@ -13,34 +13,30 @@ use super::theme::{StyleNode, Theme, ThemeResolver};
 
 pub struct StyleBrowser {
     mode: Mode,
+    resolver: ThemeResolver,
 }
 
 impl StyleBrowser {
-    pub fn new(resolver: &ThemeResolver) -> Self {
+    pub fn new(resolver: ThemeResolver) -> Self {
         // panic!("{:#?}", resolver.to_logical_tree());
-        Self {
-            mode: Mode::Logical(NodeItem::from_style_node(
-                Item {
-                    payload: "<root>".into(),
-                    style: None,
-                },
-                resolver.to_logical_tree(),
-            )),
-        }
+        let mut new = Self {
+            mode: Mode::List(vec![]),
+            resolver: resolver.clone(),
+        };
+
+        new.use_logical();
+        new
     }
 
-    fn use_deps(&mut self, app_data: &mut AppData) {
+    fn use_deps(&mut self) {
         self.mode = Mode::Deps(NodeItem::from_style_node(
-            Item {
-                payload: "<root>".into(),
-                style: None,
-            },
-            app_data.theme_resolver.to_deps_tree(),
+            None,
+            self.resolver.to_deps_tree(),
         ));
     }
 
-    fn use_list(&mut self, app_data: &mut AppData) {
-        let mut list: Vec<_> = app_data.theme_resolver.as_map().keys().collect();
+    fn use_list(&mut self) {
+        let mut list: Vec<_> = self.resolver.as_map().keys().collect();
         list.sort();
         self.mode = Mode::List(
             list.into_iter()
@@ -53,32 +49,29 @@ impl StyleBrowser {
         );
     }
 
-    fn use_logical(&mut self, app_data: &mut AppData) {
+    fn use_logical(&mut self) {
         self.mode = Mode::Logical(NodeItem::from_style_node(
-            Item {
-                payload: "<root>".into(),
-                style: None,
-            },
-            app_data.theme_resolver.to_logical_tree(),
+            None,
+            self.resolver.to_logical_tree(),
         ));
     }
 }
 
 impl ActivityHandler for StyleBrowser {
-    fn update(&mut self, events: Vec<Event>, app_data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, .. })) => match code {
                     KeyCode::Esc => return Some(Change::pop_top()),
                     KeyCode::Tab => match &self.mode {
-                        Mode::Logical(_) => self.use_deps(app_data),
-                        Mode::Deps(_) => self.use_list(app_data),
-                        Mode::List(_) => self.use_logical(app_data),
+                        Mode::Logical(_) => self.use_deps(),
+                        Mode::Deps(_) => self.use_list(),
+                        Mode::List(_) => self.use_logical(),
                     },
                     KeyCode::BackTab => match &self.mode {
-                        Mode::Logical(_) => self.use_list(app_data),
-                        Mode::Deps(_) => self.use_logical(app_data),
-                        Mode::List(_) => self.use_deps(app_data),
+                        Mode::Logical(_) => self.use_list(),
+                        Mode::Deps(_) => self.use_logical(),
+                        Mode::List(_) => self.use_deps(),
                     },
                     _ => {}
                 },
@@ -112,8 +105,8 @@ impl Screen for StyleBrowser {
             ];
 
             let mut xoof = 0;
-            for (name, mode) in &TABS {
-                let style = if mode(&self.mode) {
+            for (name, is_mode) in &TABS {
+                let style = if is_mode(&self.mode) {
                     text.invert()
                 } else {
                     text
@@ -126,7 +119,14 @@ impl Screen for StyleBrowser {
         let mut inner_frame = Frame::new(frame.size - margin * 2 - Dims(2, 2));
         {
             fn print_node(frame: &mut Frame, node: &NodeItem, pos: Dims, style: Style) -> i32 {
-                frame.draw(pos, node.item.payload.as_str(), style);
+                frame.draw(
+                    pos,
+                    node.item
+                        .as_ref()
+                        .map(|item| item.payload.as_str())
+                        .unwrap_or("<root>"),
+                    style,
+                );
                 let mut yoff = 0;
                 for child in &node.children {
                     yoff += print_node(frame, child, pos + Dims(INDENT, yoff + 1), style);
@@ -163,30 +163,48 @@ enum Mode {
 
 #[derive(Debug)]
 struct NodeItem {
-    item: Item,
-    children: Vec<NodeItem>,
+    item: Option<Item>,
     hidden: bool,
+    children: Vec<NodeItem>,
 }
 
 impl NodeItem {
-    fn from_style_node(root: Item, style_node: StyleNode<'_>) -> NodeItem {
+    fn from_style_node(root: Option<Item>, style_node: StyleNode<'_>) -> NodeItem {
         let mut node = NodeItem {
             item: root,
             children: Vec::new(),
             hidden: false,
         };
 
+        node.children.reserve(style_node.map.len());
         for (key, value) in style_node.map {
             node.children.push(Self::from_style_node(
-                Item {
+                Some(Item {
                     payload: key.to_string(),
                     style: value.style.map(Into::into),
-                },
+                }),
                 value,
             ));
         }
 
         node
+    }
+
+    fn match_search_pattern(&mut self, pattern: &str) -> bool {
+        self.hidden = true;
+        if let Some(item) = &self.item {
+            if item.payload.contains(pattern) {
+                self.hidden = false;
+            }
+        }
+
+        for child in &mut self.children {
+            if child.match_search_pattern(pattern) {
+                self.hidden = false;
+            }
+        }
+
+        !self.hidden
     }
 }
 
@@ -194,4 +212,62 @@ impl NodeItem {
 struct Item {
     payload: String,
     style: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::theme::ThemeResolver;
+
+    #[test]
+    fn style_browser_general() {
+        let resolver = ThemeResolver::new();
+        let mut style_browser = StyleBrowser::new(resolver);
+        style_browser.use_logical();
+        style_browser.use_deps();
+        style_browser.use_list();
+    }
+
+    #[test]
+    fn style_browser_node_item_search() {
+        let resolver = ThemeResolver::new();
+        let mut style_browser = StyleBrowser::new(resolver);
+        style_browser.use_logical();
+
+        let mut node = NodeItem {
+            item: None,
+            hidden: false,
+            children: vec![
+                NodeItem {
+                    item: Some(Item {
+                        payload: "test".to_string(),
+                        style: None,
+                    }),
+                    children: vec![NodeItem {
+                        item: Some(Item {
+                            payload: "test.child".to_string(),
+                            style: None,
+                        }),
+                        children: vec![],
+                        hidden: false,
+                    }],
+                    hidden: false,
+                },
+                NodeItem {
+                    item: Some(Item {
+                        payload: "example".to_string(),
+                        style: None,
+                    }),
+                    children: vec![],
+                    hidden: false,
+                },
+            ],
+        };
+
+        assert!(node.match_search_pattern("test"));
+        assert!(node.match_search_pattern("example"));
+        assert!(node.match_search_pattern("child"));
+        assert!(node.match_search_pattern(""));
+        assert!(!node.match_search_pattern("unknown"));
+    }
 }

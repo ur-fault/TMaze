@@ -1,5 +1,5 @@
 use tmaze::{
-    app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
+    app::{app::init_theme_resolver, Activity, App, GameError},
     helpers::constants::paths::{save_data_path, settings_path},
     settings::{style_browser::StyleBrowser, Settings},
 };
@@ -93,7 +93,7 @@ fn main() -> Result<(), GameError> {
     let resolver = app.data().theme_resolver.clone();
     app.activities_mut().push(Activity::new_base_boxed(
         "style browser",
-        StyleBrowser::new(&resolver),
+        StyleBrowser::new(resolver.clone()),
     ));
 
     #[cfg(feature = "updates")]
