@@ -165,7 +165,7 @@ impl MainMenu {
             "Style options browser" -> data => Change::Push(
                 Activity::new_base_boxed(
                     "style options browser".to_string(),
-                    StyleBrowser::new(&data.theme_resolver)
+                    StyleBrowser::new(data.theme_resolver.clone())
                 )
             ),
             "Back" -> _ => Change::pop_top(),
