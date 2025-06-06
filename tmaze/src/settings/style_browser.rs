@@ -40,20 +40,20 @@ impl StyleBrowser {
     fn use_list(&mut self) {
         let mut list: Vec<_> = self.resolver.as_map().keys().collect();
         list.sort();
-        self.mode = Mode::List(
-            list.into_iter()
-                .cloned()
-                .map(|x| {
-                    (
-                        Item {
-                            payload: x.clone(),
-                            style: Some(x),
-                        },
-                        false,
-                    )
-                })
-                .collect(),
-        );
+        let style_list = list
+            .into_iter()
+            .cloned()
+            .map(|x| {
+                (
+                    Item {
+                        payload: x.clone(),
+                        style: Some(x),
+                    },
+                    false,
+                )
+            })
+            .collect();
+        self.mode = Mode::List(style_list);
     }
 
     fn use_logical(&mut self) {
@@ -180,6 +180,18 @@ impl Screen for StyleBrowser {
             border,
         );
 
+        fn render_style(style: &str, theme: &Theme) -> (String, Style, i32) {
+            let style = theme.get(style);
+            let text = match (style.fg, style.bg) {
+                (Some(fg), Some(gb)) => format!("{} on {}", fg.as_text(), gb.as_text()),
+                (Some(fg), None) => format!("{fg}", fg = fg.as_text()),
+                (None, Some(bg)) => format!("on {bg}", bg = bg.as_text()),
+                (None, None) => String::new(),
+            };
+            let width = text.width() as i32;
+            (text, style, width)
+        }
+
         fn print_node(
             frame: &mut Frame,
             node: &NodeItem,
@@ -201,14 +213,7 @@ impl Screen for StyleBrowser {
             );
 
             if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
-                let node_style = theme.get(node_style);
-                let style_text = match (node_style.fg, node_style.bg) {
-                    (Some(fg), Some(gb)) => format!("{} on {}", fg.as_text(), gb.as_text()),
-                    (Some(fg), None) => format!("{fg}", fg = fg.as_text()),
-                    (None, Some(bg)) => format!("on {bg}", bg = bg.as_text()),
-                    (None, None) => String::new(),
-                };
-                let width = style_text.width() as i32 + 1;
+                let (style_text, node_style, width) = render_style(node_style, theme);
 
                 frame.draw(
                     Dims(frame.size.0 - width, pos.1),
@@ -240,6 +245,15 @@ impl Screen for StyleBrowser {
             }
             Mode::List(items) => {
                 for (i, (item, _)) in items.iter().filter(|(_, h)| !h).enumerate() {
+                    if let Some(item_style) = item.style.as_ref() {
+                        let (style_text, node_style, width) = render_style(&item_style, theme);
+
+                        inner_frame.draw(
+                            Dims(inner_frame.size.0 - width - 1, i as i32 + yoff),
+                            style_text.as_str(),
+                            node_style,
+                        );
+                    }
                     inner_frame.draw(
                         Dims(LEFT_MARGIN, i as i32 + yoff),
                         item.payload.as_str(),
