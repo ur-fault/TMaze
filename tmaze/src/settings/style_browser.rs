@@ -216,7 +216,7 @@ impl Screen for StyleBrowser {
                 let (style_text, node_style, width) = render_style(node_style, theme);
 
                 frame.draw(
-                    Dims(frame.size.0 - width, pos.1),
+                    Dims(frame.size.0 - width - 1, pos.1),
                     style_text.as_str(),
                     node_style,
                 );
