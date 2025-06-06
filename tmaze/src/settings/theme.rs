@@ -216,6 +216,15 @@ pub enum Color {
     Hex(u8, u8, u8),
 }
 
+impl Color {
+    pub fn as_text(&self) -> String {
+        match self {
+            Color::Named(named) => format!("{named:?}"),
+            Color::RGB(r, g, b) | Color::Hex(r, g, b) => format!("#{:02X}{:02X}{:02X}", r, g, b),
+        }
+    }
+}
+
 impl From<Color> for crossterm::style::Color {
     fn from(value: Color) -> Self {
         use crossterm::style::Color as CsColor;

@@ -5,7 +5,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::{not_release, LineDir},
-    renderer::{drawable::Drawable, Frame},
+    renderer::{drawable::Drawable, Cell, CellContent, Frame},
     settings::theme::Style,
     ui::{CapsuleText, Rect, Screen},
 };
@@ -125,12 +125,18 @@ impl Screen for StyleBrowser {
     fn draw(&self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
         const INDENT: i32 = 4;
 
-        let [border, text, dim] = theme.extract(["border", "text", "dim"]);
+        let [border, text, dim, background] =
+            theme.extract(["sb.border", "sb.text", "sb.dim", "sb.background"]);
 
         let margin = Dims(4, 1);
         Rect::new(margin, frame.size - margin - Dims(1, 1)).draw(Dims(0, 0), frame, border);
 
         let mut inner_frame = Frame::new(frame.size - margin * 2 - Dims(2, 2));
+        inner_frame.fill(Cell::Content(CellContent {
+            character: ' ',
+            width: 1,
+            style: background.into(),
+        }));
         {
             if self.search.is_empty() {
                 inner_frame.draw(Dims(1, 0), "<Search>", dim);
@@ -174,7 +180,13 @@ impl Screen for StyleBrowser {
             border,
         );
 
-        fn print_node(frame: &mut Frame, node: &NodeItem, pos: Dims, style: Style) -> i32 {
+        fn print_node(
+            frame: &mut Frame,
+            node: &NodeItem,
+            pos: Dims,
+            style: Style,
+            theme: &Theme,
+        ) -> i32 {
             if node.hidden {
                 return 0;
             }
@@ -187,9 +199,29 @@ impl Screen for StyleBrowser {
                     .as_str(),
                 style,
             );
+
+            if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
+                let node_style = theme.get(node_style);
+                let style_text = match (node_style.fg, node_style.bg) {
+                    (Some(fg), Some(gb)) => {
+                        format!("{fg} on {bg}", fg = fg.as_text(), bg = gb.as_text())
+                    }
+                    (Some(fg), None) => format!("{fg}", fg = fg.as_text()),
+                    (None, Some(bg)) => format!("on {bg}", bg = bg.as_text()),
+                    (None, None) => String::new(),
+                };
+                let width = style_text.width() as i32 + 1;
+
+                frame.draw(
+                    Dims(frame.size.0 - width, pos.1),
+                    style_text.as_str(),
+                    node_style,
+                );
+            }
+
             let mut yoff = 0;
             for child in &node.children {
-                yoff += print_node(frame, child, pos + Dims(INDENT, yoff + 1), style);
+                yoff += print_node(frame, child, pos + Dims(INDENT, yoff + 1), style, theme);
             }
             yoff + 1
         }
@@ -199,7 +231,13 @@ impl Screen for StyleBrowser {
         match &self.mode {
             Mode::Logical(node) | Mode::Deps(node) => {
                 for child in &node.children {
-                    yoff += print_node(&mut inner_frame, child, Dims(LEFT_MARGIN, yoff), text);
+                    yoff += print_node(
+                        &mut inner_frame,
+                        child,
+                        Dims(LEFT_MARGIN, yoff),
+                        text,
+                        theme,
+                    );
                 }
             }
             Mode::List(items) => {
@@ -281,6 +319,16 @@ impl NodeItem {
 
         show_primary
     }
+}
+
+pub fn style_browser_theme_resolver() -> ThemeResolver {
+    let mut resolver = ThemeResolver::new();
+    resolver
+        .link("sb.border", "border")
+        .link("sb.text", "text")
+        .link("sb.dim", "dim")
+        .link("sb.background", "background");
+    resolver
 }
 
 #[cfg(test)]
