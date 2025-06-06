@@ -416,6 +416,7 @@ impl ThemeResolver {
         fn add<'a>(node: &mut StyleNode<'a>, map: &'a ThemeResolver, key: &str) {
             for (key, _) in map.0.iter().filter(|(_, v)| *v == key) {
                 let mut new_node = StyleNode::new();
+                new_node.style = Some(key);
                 add(&mut new_node, map, key);
                 node.map.insert(key, new_node);
             }
