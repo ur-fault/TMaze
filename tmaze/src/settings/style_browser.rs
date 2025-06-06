@@ -203,9 +203,7 @@ impl Screen for StyleBrowser {
             if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
                 let node_style = theme.get(node_style);
                 let style_text = match (node_style.fg, node_style.bg) {
-                    (Some(fg), Some(gb)) => {
-                        format!("{fg} on {bg}", fg = fg.as_text(), bg = gb.as_text())
-                    }
+                    (Some(fg), Some(gb)) => format!("{} on {}", fg.as_text(), gb.as_text()),
                     (Some(fg), None) => format!("{fg}", fg = fg.as_text()),
                     (None, Some(bg)) => format!("on {bg}", bg = bg.as_text()),
                     (None, None) => String::new(),
