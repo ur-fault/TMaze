@@ -261,7 +261,7 @@ impl NodeItem {
         node
     }
 
-    fn match_search_pattern(&mut self, pattern: &str, propagade_down: Option<bool>) -> bool {
+    fn match_search_pattern(&mut self, pattern: &str, propagate_down: Option<bool>) -> bool {
         self.hidden = true;
         if let Some(item) = &self.item {
             if item.payload.contains(pattern) {
@@ -269,15 +269,15 @@ impl NodeItem {
             }
         }
 
-        let to_propagade = propagade_down.map(|down| !self.hidden || down);
+        let to_propagate = propagate_down.map(|down| !self.hidden || down);
         for child in &mut self.children {
-            if child.match_search_pattern(pattern, to_propagade) {
+            if child.match_search_pattern(pattern, to_propagate) {
                 self.hidden = false;
             }
         }
 
         let show_primary = !self.hidden;
-        self.hidden = self.hidden && !propagade_down.unwrap_or(false);
+        self.hidden = self.hidden && !propagate_down.unwrap_or(false);
 
         show_primary
     }
