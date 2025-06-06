@@ -286,13 +286,13 @@ impl MenuStyles {
 impl Default for MenuStyles {
     fn default() -> Self {
         Self {
-            title: "ui_menu_title",
-            subtitle: "ui_menu_subtitle",
-            text: "ui_menu_text",
-            border: "ui_menu_border",
-            separator: "ui_menu_separator",
-            selector: "ui_menu_selector",
-            number: "ui_menu_number",
+            title: "ui.menu.title",
+            subtitle: "ui.menu.subtitle",
+            text: "ui.menu.text",
+            border: "ui.menu.border",
+            separator: "ui.menu.separator",
+            selector: "ui.menu.selector",
+            number: "ui.menu.number",
         }
     }
 }
@@ -327,7 +327,7 @@ impl Menu {
     }
 
     pub fn into_activity(self) -> Activity {
-        Activity::new("tmaze", "menu", Box::new(self))
+        Activity::new_base("menu", Box::new(self))
     }
 
     fn select(&mut self, down: bool) {
@@ -720,13 +720,13 @@ pub fn menu_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();
 
     resolver
-        .link("ui_menu_border", "border")
-        .link("ui_menu_text", "text")
-        .link("ui_menu_title", "ui_menu_text")
-        .link("ui_menu_subtitle", "ui_menu_text")
-        .link("ui_menu_separator", "ui_menu_border")
-        .link("ui_menu_selector", "ui_menu_text")
-        .link("ui_menu_number", "ui_menu_text");
+        .link("ui.menu.border", "border")
+        .link("ui.menu.text", "text")
+        .link("ui.menu.title", "ui.menu.text")
+        .link("ui.menu.subtitle", "ui.menu.text")
+        .link("ui.menu.separator", "ui.menu.border")
+        .link("ui.menu.selector", "ui.menu.text")
+        .link("ui.menu.number", "ui.menu.text");
 
     resolver
 }
