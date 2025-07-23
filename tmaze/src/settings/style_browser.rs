@@ -3,6 +3,7 @@ use crossterm::{
     event::{Event as TermEvent, KeyCode, KeyEvent},
     style::{Attribute, Attributes},
 };
+use log::debug;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
@@ -23,7 +24,7 @@ pub struct StyleBrowser {
     mode: Mode,
     resolver: ThemeResolver,
     search: String,
-    selected: i32,
+    selected_index: usize,
     scroll: i32,
     list_height: i32,
 }
@@ -34,7 +35,7 @@ impl StyleBrowser {
             mode: Mode::List(vec![]),
             resolver: resolver.clone(),
             search: String::new(),
-            selected: 0,
+            selected_index: 0,
             scroll: 0,
             list_height: 0,
         };
@@ -87,9 +88,102 @@ impl StyleBrowser {
                 node.match_search_pattern(&self.search, None);
             }
             Mode::List(items) => {
-                for (item, hidden) in items {
+                for (item, hidden) in items.iter_mut() {
                     *hidden = !item.payload.contains(&self.search);
                 }
+
+                // find closest item index to selected
+                if items
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, (_, hidden))| !hidden)
+                    .filter(|(index, (_, _))| *index == self.selected_index)
+                    .next()
+                    .is_none()
+                {
+                    match items
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, (_, hidden))| !hidden)
+                        .map(|(index, _)| {
+                            ((index as i32).abs_diff(self.selected_index as i32), index)
+                        })
+                        .min_by_key(|(diff, _)| *diff)
+                    {
+                        Some((_, index)) => self.selected_index = index,
+                        None => {
+                            self.selected_index = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        self.scroll_to_selected();
+    }
+
+    fn update_selected(&mut self, up: bool) {
+        match &self.mode {
+            Mode::Logical(node_item) => todo!(),
+            Mode::Deps(node_item) => todo!(),
+            Mode::List(items) => {
+                if items.is_empty() {
+                    self.selected_index = 0;
+                    return;
+                }
+
+                if !up {
+                    self.selected_index = items
+                        .iter()
+                        .enumerate()
+                        .skip(self.selected_index + 1)
+                        .find(|(_, (_, hidden))| !hidden)
+                        .map_or(self.selected_index, |(index, _)| index);
+                } else {
+                    self.selected_index = items
+                        .iter()
+                        .enumerate()
+                        .rev()
+                        .skip(items.len() - self.selected_index)
+                        .find(|(_, (_, hidden))| !hidden)
+                        .map_or(self.selected_index, |(index, _)| index);
+                }
+            }
+        }
+
+        self.scroll_to_selected();
+    }
+
+    fn scroll_to_selected(&mut self) {
+        let window = (self.scroll, self.scroll + self.list_height);
+        match &self.mode {
+            Mode::Logical(_) => todo!(),
+            Mode::Deps(_) => todo!(),
+            Mode::List(items) => {
+                let visible_index = items
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, (_, hidden))| !hidden)
+                    .map(|(index, _)| index)
+                    .position(|index| index == self.selected_index);
+
+                if visible_index.is_none() {
+                    self.scroll = 0;
+                    return;
+                }
+
+                let Some(visible_index) = visible_index else {
+                    self.scroll = 0;
+                    return;
+                };
+
+                if visible_index < window.0 as usize {
+                    self.scroll = visible_index as i32;
+                } else if visible_index >= window.1 as usize {
+                    self.scroll = visible_index as i32 - self.list_height + 1;
+                }
+
+                debug!("scroll: {}, selected index: {}, visible index: {visible_index}, window: {window:?}", self.scroll, self.selected_index);
             }
         }
     }
@@ -99,6 +193,14 @@ impl StyleBrowser {
             Mode::Logical(node) => node.count(),
             Mode::Deps(node) => node.count(),
             Mode::List(items) => items.len(),
+        }
+    }
+
+    fn visible_count(&self) -> usize {
+        match &self.mode {
+            Mode::Logical(_) => todo!(),
+            Mode::Deps(_) => todo!(),
+            Mode::List(items) => items.iter().filter(|(_, hidden)| !hidden).count(),
         }
     }
 }
@@ -128,35 +230,8 @@ impl ActivityHandler for StyleBrowser {
                             self.search.pop();
                             self.update_search();
                         }
-                        KeyCode::Up => {
-                            if self.selected > 0 {
-                                self.selected -= 1;
-                            }
-
-                            if self.selected < self.scroll {
-                                self.scroll = self.selected;
-                            }
-                            log::debug!(
-                                "selected: {}, scroll: {}, list_height: {}",
-                                self.selected,
-                                self.scroll,
-                                self.list_height
-                            );
-                        }
-                        KeyCode::Down => {
-                            if self.selected < self.count() as i32 - 1 {
-                                self.selected += 1;
-                            }
-                            if self.selected >= self.scroll + self.list_height {
-                                self.scroll = self.selected - self.list_height + 1;
-                            }
-
-                            log::debug!(
-                                "selected: {}, scroll: {}, list_height: {}",
-                                self.selected,
-                                self.scroll,
-                                self.list_height
-                            );
+                        KeyCode::Down | KeyCode::Up => {
+                            self.update_selected(matches!(code, KeyCode::Up));
                         }
                         _ => {}
                     }
@@ -303,34 +378,34 @@ impl Screen for StyleBrowser {
                 // by this simple hack, we made logic in this code absolutely horrendous and
                 // absolutely unreadable
                 // God help us
-                let mut i = -self.scroll;
-                for (item, _) in items.iter().filter(|(_, h)| !h) {
-                    if i < 0 {
-                        i += 1;
+                // let mut i = -self.scroll;
+                let mut current = 0;
+                for (index, (item, hidden)) in items.iter().enumerate() {
+                    if *hidden || index < self.scroll as usize {
                         continue;
                     }
 
-                    let selected = self.selected == i as i32 + self.scroll;
+                    let selected = self.selected_index == index;
 
                     if let Some(item_style) = item.style.as_ref() {
                         let (style_text, node_style, width) = render_style(&item_style, theme);
 
                         inner_frame.draw(
-                            Dims(inner_frame.size.0 - width - RIGHT_MARGIN, i as i32 + yoff),
+                            Dims(inner_frame.size.0 - width - RIGHT_MARGIN, current + yoff),
                             style_text.as_str(),
                             node_style,
                         );
                     }
 
                     inner_frame.draw(
-                        Dims(LEFT_MARGIN, i as i32 + yoff),
+                        Dims(LEFT_MARGIN, current + yoff),
                         item.payload.as_str(),
                         text,
                     );
 
                     if selected {
                         for x in 0..inner_frame.size.0 {
-                            if let Some(cell) = inner_frame.try_get_mut(Dims(x, i as i32 + yoff)) {
+                            if let Some(cell) = inner_frame.try_get_mut(Dims(x, current + yoff)) {
                                 match cell {
                                     c @ Cell::Empty => {
                                         *c = Cell::Content(CellContent {
@@ -350,7 +425,7 @@ impl Screen for StyleBrowser {
                         }
                     }
 
-                    i += 1;
+                    current += 1;
                 }
             }
         }
