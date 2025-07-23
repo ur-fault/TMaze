@@ -375,10 +375,6 @@ impl Screen for StyleBrowser {
                 }
             }
             Mode::List(items) => {
-                // by this simple hack, we made logic in this code absolutely horrendous and
-                // absolutely unreadable
-                // God help us
-                // let mut i = -self.scroll;
                 let mut current = 0;
                 for (index, (item, hidden)) in items.iter().enumerate() {
                     if *hidden || index < self.scroll as usize {
