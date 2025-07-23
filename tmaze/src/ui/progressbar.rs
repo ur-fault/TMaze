@@ -27,7 +27,7 @@ impl ProgressBar {
 }
 
 impl Screen for ProgressBar {
-    fn draw(&self, frame: &mut Frame, theme: &Theme) -> io::Result<()> {
+    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> io::Result<()> {
         let progress_size = Dims(self.title.width() as i32 + 2 + 2, 4);
         let pos = center_box_in_screen(progress_size);
 

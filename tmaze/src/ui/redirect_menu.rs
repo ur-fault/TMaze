@@ -31,7 +31,7 @@ impl ActivityHandler for RedirectMenu {
         }
     }
 
-    fn screen(&self) -> &dyn Screen {
-        &self.menu
+    fn screen(&mut self) -> &mut dyn Screen {
+        &mut self.menu
     }
 }

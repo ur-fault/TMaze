@@ -214,8 +214,8 @@ impl ActivityHandler for MainMenu {
         }
     }
 
-    fn screen(&self) -> &dyn ui::Screen {
-        &self.menu
+    fn screen(&mut self) -> &mut dyn ui::Screen {
+        &mut self.menu
     }
 }
 
@@ -274,8 +274,8 @@ impl ActivityHandler for MazePresetMenu {
         }
     }
 
-    fn screen(&self) -> &dyn ui::Screen {
-        &self.menu
+    fn screen(&mut self) -> &mut dyn ui::Screen {
+        &mut self.menu
     }
 }
 
@@ -392,8 +392,8 @@ impl ActivityHandler for MazeGenerationActivity {
         }
     }
 
-    fn screen(&self) -> &dyn ui::Screen {
-        &self.progress_bar
+    fn screen(&mut self) -> &mut dyn ui::Screen {
+        &mut self.progress_bar
     }
 }
 
@@ -436,8 +436,8 @@ impl ActivityHandler for PauseMenu {
         }
     }
 
-    fn screen(&self) -> &dyn Screen {
-        &self.menu
+    fn screen(&mut self) -> &mut dyn Screen {
+        &mut self.menu
     }
 }
 
@@ -483,8 +483,8 @@ impl ActivityHandler for EndGamePopup {
         }
     }
 
-    fn screen(&self) -> &dyn Screen {
-        &self.popup
+    fn screen(&mut self) -> &mut dyn Screen {
+        &mut self.popup
     }
 }
 
@@ -805,13 +805,13 @@ impl ActivityHandler for GameActivity {
         None
     }
 
-    fn screen(&self) -> &dyn ui::Screen {
+    fn screen(&mut self) -> &mut dyn ui::Screen {
         self
     }
 }
 
 impl Screen for GameActivity {
-    fn draw(&self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
+    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
         let maze_frame = self.current_floor_frame();
         let game = &self.data.game;
 

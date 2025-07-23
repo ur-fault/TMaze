@@ -1,5 +1,8 @@
 use cmaze::dims::Dims;
-use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
+use crossterm::{
+    event::{Event as TermEvent, KeyCode, KeyEvent},
+    style::{Attribute, Attributes},
+};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
@@ -12,10 +15,17 @@ use crate::{
 
 use super::theme::{StyleNode, Theme, ThemeResolver};
 
+const CONTENT_MARGIN: Dims = Dims(4, 1);
+const LEFT_MARGIN: i32 = 1;
+const RIGHT_MARGIN: i32 = 1;
+
 pub struct StyleBrowser {
     mode: Mode,
     resolver: ThemeResolver,
     search: String,
+    selected: i32,
+    scroll: i32,
+    list_height: i32,
 }
 
 impl StyleBrowser {
@@ -24,6 +34,9 @@ impl StyleBrowser {
             mode: Mode::List(vec![]),
             resolver: resolver.clone(),
             search: String::new(),
+            selected: 0,
+            scroll: 0,
+            list_height: 0,
         };
 
         new.use_logical();
@@ -34,6 +47,7 @@ impl StyleBrowser {
         self.mode = Mode::Deps(NodeItem::from_style_node(
             None,
             self.resolver.to_deps_tree(),
+            0,
         ));
     }
 
@@ -60,6 +74,7 @@ impl StyleBrowser {
         self.mode = Mode::Logical(NodeItem::from_style_node(
             None,
             self.resolver.to_logical_tree(),
+            0,
         ));
     }
 
@@ -78,10 +93,18 @@ impl StyleBrowser {
             }
         }
     }
+
+    fn count(&self) -> usize {
+        match &self.mode {
+            Mode::Logical(node) => node.count(),
+            Mode::Deps(node) => node.count(),
+            Mode::List(items) => items.len(),
+        }
+    }
 }
 
 impl ActivityHandler for StyleBrowser {
-    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if not_release(kind) => {
@@ -105,7 +128,36 @@ impl ActivityHandler for StyleBrowser {
                             self.search.pop();
                             self.update_search();
                         }
+                        KeyCode::Up => {
+                            if self.selected > 0 {
+                                self.selected -= 1;
+                            }
 
+                            if self.selected < self.scroll {
+                                self.scroll = self.selected;
+                            }
+                            log::debug!(
+                                "selected: {}, scroll: {}, list_height: {}",
+                                self.selected,
+                                self.scroll,
+                                self.list_height
+                            );
+                        }
+                        KeyCode::Down => {
+                            if self.selected < self.count() as i32 - 1 {
+                                self.selected += 1;
+                            }
+                            if self.selected >= self.scroll + self.list_height {
+                                self.scroll = self.selected - self.list_height + 1;
+                            }
+
+                            log::debug!(
+                                "selected: {}, scroll: {}, list_height: {}",
+                                self.selected,
+                                self.scroll,
+                                self.list_height
+                            );
+                        }
                         _ => {}
                     }
                 }
@@ -116,27 +168,32 @@ impl ActivityHandler for StyleBrowser {
         None
     }
 
-    fn screen(&self) -> &dyn Screen {
+    fn screen(&mut self) -> &mut dyn Screen {
         self
     }
 }
 
 impl Screen for StyleBrowser {
-    fn draw(&self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
+    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
         const INDENT: i32 = 4;
 
         let [border, text, dim, background] =
             theme.extract(["sb.border", "sb.text", "sb.dim", "sb.background"]);
 
-        let margin = Dims(4, 1);
-        Rect::new(margin, frame.size - margin - Dims(1, 1)).draw(Dims(0, 0), frame, border);
+        Rect::new(CONTENT_MARGIN, frame.size - CONTENT_MARGIN - Dims(1, 1)).draw(
+            Dims(0, 0),
+            frame,
+            border,
+        );
 
-        let mut inner_frame = Frame::new(frame.size - margin * 2 - Dims(2, 2));
+        let mut inner_frame = Frame::new(frame.size - CONTENT_MARGIN * 2 - Dims(2, 2));
         inner_frame.fill(Cell::Content(CellContent {
             character: ' ',
             width: 1,
             style: background.into(),
         }));
+        self.list_height = inner_frame.size.1 - 2;
+
         {
             if self.search.is_empty() {
                 inner_frame.draw(Dims(1, 0), "<Search>", dim);
@@ -144,7 +201,7 @@ impl Screen for StyleBrowser {
                 inner_frame.draw(Dims(1, 0), self.search.as_str(), text);
             }
 
-            const TABS: &[(&str, fn(&Mode) -> bool)] = &[
+            const TABS: [(&str, fn(&Mode) -> bool); 3] = [
                 ("By name", |x| matches!(x, Mode::Logical(_))),
                 ("Inheritance", |x| matches!(x, Mode::Deps(_))),
                 ("List", |x| matches!(x, Mode::List(_))),
@@ -155,7 +212,7 @@ impl Screen for StyleBrowser {
                 .map(|(name, _)| name.width() as i32 + 3)
                 .sum::<i32>();
 
-            // i've no why -2 is needed here, but it's cutoff without it
+            // i've no why -2 is needed here, but it's cut off without it
             let mut xoof = inner_frame.size.0 - tabs_width - 6;
             for (name, is_mode) in TABS {
                 if is_mode(&self.mode) {
@@ -216,7 +273,7 @@ impl Screen for StyleBrowser {
                 let (style_text, node_style, width) = render_style(node_style, theme);
 
                 frame.draw(
-                    Dims(frame.size.0 - width - 1, pos.1),
+                    Dims(frame.size.0 - width - RIGHT_MARGIN, pos.1),
                     style_text.as_str(),
                     node_style,
                 );
@@ -230,7 +287,6 @@ impl Screen for StyleBrowser {
         }
 
         let mut yoff = 2;
-        const LEFT_MARGIN: i32 = 1;
         match &self.mode {
             Mode::Logical(node) | Mode::Deps(node) => {
                 for child in &node.children {
@@ -244,26 +300,62 @@ impl Screen for StyleBrowser {
                 }
             }
             Mode::List(items) => {
-                for (i, (item, _)) in items.iter().filter(|(_, h)| !h).enumerate() {
+                // by this simple hack, we made logic in this code absolutely horrendous and
+                // absolutely unreadable
+                // God help us
+                let mut i = -self.scroll;
+                for (item, _) in items.iter().filter(|(_, h)| !h) {
+                    if i < 0 {
+                        i += 1;
+                        continue;
+                    }
+
+                    let selected = self.selected == i as i32 + self.scroll;
+
                     if let Some(item_style) = item.style.as_ref() {
                         let (style_text, node_style, width) = render_style(&item_style, theme);
 
                         inner_frame.draw(
-                            Dims(inner_frame.size.0 - width - 1, i as i32 + yoff),
+                            Dims(inner_frame.size.0 - width - RIGHT_MARGIN, i as i32 + yoff),
                             style_text.as_str(),
                             node_style,
                         );
                     }
+
                     inner_frame.draw(
                         Dims(LEFT_MARGIN, i as i32 + yoff),
                         item.payload.as_str(),
                         text,
                     );
+
+                    if selected {
+                        for x in 0..inner_frame.size.0 {
+                            if let Some(cell) = inner_frame.try_get_mut(Dims(x, i as i32 + yoff)) {
+                                match cell {
+                                    c @ Cell::Empty => {
+                                        *c = Cell::Content(CellContent {
+                                            character: ' ',
+                                            width: 1,
+                                            style: crossterm::style::ContentStyle {
+                                                attributes: Attributes::from(Attribute::Underlined),
+                                                ..crossterm::style::ContentStyle::default()
+                                            },
+                                        })
+                                    }
+                                    Cell::Content(c) => {
+                                        c.style.attributes.extend(Attribute::Underlined.into())
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    i += 1;
                 }
             }
         }
 
-        frame.draw(margin + Dims(1, 1), &inner_frame, ());
+        frame.draw(CONTENT_MARGIN + Dims(1, 1), &inner_frame, ());
 
         Ok(())
     }
@@ -281,6 +373,7 @@ struct NodeItem {
     item: Option<Item>,
     hidden: bool,
     children: Vec<NodeItem>,
+    item_index: usize,
 }
 
 #[derive(Debug)]
@@ -290,12 +383,19 @@ struct Item {
 }
 
 impl NodeItem {
-    fn from_style_node(root: Option<Item>, style_node: StyleNode<'_>) -> NodeItem {
+    fn from_style_node(
+        root: Option<Item>,
+        style_node: StyleNode<'_>,
+        mut index: usize,
+    ) -> NodeItem {
         let mut node = NodeItem {
             item: root,
             children: Vec::new(),
             hidden: false,
+            item_index: index,
         };
+
+        index += 1;
 
         node.children.reserve(style_node.map.len());
         for (key, value) in style_node.map {
@@ -305,7 +405,10 @@ impl NodeItem {
                     style: value.style.map(Into::into),
                 }),
                 value,
+                index,
             ));
+
+            index = node.children.last().map_or(index, |n| n.item_index + 1);
         }
 
         node
@@ -330,6 +433,14 @@ impl NodeItem {
         self.hidden = self.hidden && !propagate_down.unwrap_or(false);
 
         show_primary
+    }
+
+    fn count(&self) -> usize {
+        let mut count = 1; // count this node
+        for child in &self.children {
+            count += child.count();
+        }
+        count
     }
 }
 
@@ -366,29 +477,33 @@ mod tests {
         let mut node = NodeItem {
             item: None,
             hidden: false,
+            item_index: 0,
             children: vec![
                 NodeItem {
                     item: Some(Item {
                         payload: "test".to_string(),
                         style: None,
                     }),
+                    hidden: false,
+                    item_index: 1,
                     children: vec![NodeItem {
                         item: Some(Item {
                             payload: "test.child".to_string(),
                             style: None,
                         }),
-                        children: vec![],
                         hidden: false,
+                        item_index: 2,
+                        children: vec![],
                     }],
-                    hidden: false,
                 },
                 NodeItem {
                     item: Some(Item {
                         payload: "example".to_string(),
                         style: None,
                     }),
-                    children: vec![],
                     hidden: false,
+                    item_index: 3,
+                    children: vec![],
                 },
             ],
         };

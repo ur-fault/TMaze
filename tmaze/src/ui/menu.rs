@@ -513,13 +513,13 @@ impl ActivityHandler for Menu {
         None
     }
 
-    fn screen(&self) -> &dyn Screen {
+    fn screen(&mut self) -> &mut dyn Screen {
         self
     }
 }
 
 impl Screen for Menu {
-    fn draw(&self, frame: &mut Frame, theme: &Theme) -> Result<(), io::Error> {
+    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> Result<(), io::Error> {
         let MenuConfig { title, counted, .. } = &self.config;
 
         let AppliedStyles {

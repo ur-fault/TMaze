@@ -486,8 +486,8 @@ impl ActivityHandler for OtherSettingsPopup {
         self.0.update(events, data)
     }
 
-    fn screen(&self) -> &dyn Screen {
-        &self.0
+    fn screen(&mut self) -> &mut dyn Screen {
+        &mut self.0
     }
 }
 
@@ -543,8 +543,8 @@ impl ActivityHandler for SettingsActivity {
         }
     }
 
-    fn screen(&self) -> &dyn Screen {
-        &self.menu
+    fn screen(&mut self) -> &mut dyn Screen {
+        &mut self.menu
     }
 }
 

@@ -250,6 +250,7 @@ impl Cell {
 
 pub struct Frame {
     buffer: Vec<Vec<Cell>>,
+    // TODO: make `size` private and provide a getter
     pub(crate) size: Dims,
 }
 
@@ -294,7 +295,18 @@ impl Frame {
     }
 
     pub fn set(&mut self, pos: Dims, cell: Cell) {
-        self.buffer[pos.1 as usize][pos.0 as usize] = cell;
+        *self.ref_mut(pos) = cell;
+    }
+
+    pub fn ref_mut(&mut self, pos: Dims) -> &mut Cell {
+        &mut self.buffer[pos.1 as usize][pos.0 as usize]
+    }
+
+    pub fn try_get_mut(&mut self, pos: Dims) -> Option<&mut Cell> {
+        if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
+            return None;
+        }
+        Some(self.ref_mut(pos))
     }
 
     pub fn draw<D: Drawable<S>, S>(&mut self, pos: Dims, content: D, styles: S) {

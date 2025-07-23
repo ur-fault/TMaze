@@ -265,7 +265,7 @@ impl App {
                 .fill(Cell::styled(' ', self.data.theme.get("background")));
 
             self.activities
-                .active()
+                .active_mut()
                 .expect("No active active")
                 .screen()
                 .draw(self.renderer.frame(), &self.data.theme)
