@@ -48,13 +48,13 @@ impl ActivityHandler for Popup {
         None
     }
 
-    fn screen(&self) -> &dyn Screen {
+    fn screen(&mut self) -> &mut dyn Screen {
         self
     }
 }
 
 impl Screen for Popup {
-    fn draw(&self, frame: &mut Frame, theme: &Theme) -> io::Result<()> {
+    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> io::Result<()> {
         let box_size = popup_size(&self.title, &self.texts);
         let title_pos = center_box_in_screen(Dims(self.title.width() as i32, 1)).0;
         let pos = center_box_in_screen(box_size);

@@ -216,5 +216,5 @@ pub trait ActivityHandler {
     #[must_use]
     fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change>;
 
-    fn screen(&self) -> &dyn Screen;
+    fn screen(&mut self) -> &mut dyn Screen;
 }

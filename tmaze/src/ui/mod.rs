@@ -29,7 +29,7 @@ pub use rect::*;
 pub use redirect_menu::*;
 
 pub trait Screen {
-    fn draw(&self, frame: &mut Frame, theme: &Theme) -> io::Result<()>;
+    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> io::Result<()>;
 }
 
 pub fn theme_resolver() -> ThemeResolver {
