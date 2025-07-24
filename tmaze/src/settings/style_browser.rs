@@ -513,6 +513,76 @@ impl NodeItem {
         }
         count
     }
+
+    fn iter(&self) -> NodeItemIter {
+        NodeItemIter {
+            node: self,
+            index: 0,
+            child: None,
+            root: true,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct NodeItemIter<'a> {
+    node: &'a NodeItem,
+    index: usize,
+    child: Option<Box<NodeItemIter<'a>>>,
+    root: bool,
+}
+
+impl<'a> Iterator for NodeItemIter<'a> {
+    type Item = &'a NodeItem;
+
+    fn next(&mut self) -> Option<&'a NodeItem> {
+        // TODO: this implementation should not allocate on every non-leaf node
+
+        if self.node.children.is_empty() {
+            if self.index == 0 {
+                self.index = 1;
+                if !self.root {
+                    return Some(self.node);
+                }
+            }
+
+            return None;
+        }
+
+        let child = match self.child {
+            Some(ref mut child) => child,
+            None => {
+                self.child = Some(Box::new(NodeItemIter {
+                    node: &self.node.children[0],
+                    index: 0,
+                    child: None,
+                    root: false,
+                }));
+                match self.root {
+                    true => self.child.as_mut().unwrap(),
+                    false => return Some(self.node),
+                }
+            }
+        };
+
+        if let Some(next) = child.next() {
+            return Some(next);
+        }
+
+        self.index += 1;
+        if self.index >= self.node.children.len() {
+            return None;
+        }
+
+        let next_child = &self.node.children[self.index];
+        self.child = Some(Box::new(NodeItemIter {
+            node: next_child,
+            index: 0,
+            child: None,
+            root: false,
+        }));
+        return self.child.as_mut().unwrap().next();
+    }
 }
 
 pub fn style_browser_theme_resolver() -> ThemeResolver {
@@ -584,5 +654,60 @@ mod tests {
         assert!(node.match_search_pattern("child", None));
         assert!(node.match_search_pattern("", None));
         assert!(!node.match_search_pattern("unknown", None));
+    }
+
+    #[test]
+    fn style_browser_node_item_iter() {
+        let resolver = ThemeResolver::new();
+        let mut style_browser = StyleBrowser::new(resolver);
+        style_browser.use_logical();
+
+        let node = NodeItem {
+            item: None,
+            hidden: false,
+            item_index: 0,
+            children: vec![
+                NodeItem {
+                    item: Some(Item {
+                        payload: "test".to_string(),
+                        style: None,
+                    }),
+                    hidden: false,
+                    item_index: 1,
+                    children: vec![NodeItem {
+                        item: Some(Item {
+                            payload: "test.child".to_string(),
+                            style: None,
+                        }),
+                        hidden: false,
+                        item_index: 2,
+                        children: vec![],
+                    }],
+                },
+                NodeItem {
+                    item: Some(Item {
+                        payload: "example".to_string(),
+                        style: None,
+                    }),
+                    hidden: false,
+                    item_index: 3,
+                    children: vec![],
+                },
+            ],
+        };
+
+        dbg!(node.iter().collect::<Vec<_>>());
+        let mut iter = node.iter();
+
+        assert_eq!(iter.next().unwrap().item.as_ref().unwrap().payload, "test");
+        assert_eq!(
+            iter.next().unwrap().item.as_ref().unwrap().payload,
+            "test.child"
+        );
+        assert_eq!(
+            iter.next().unwrap().item.as_ref().unwrap().payload,
+            "example"
+        );
+        assert!(iter.next().is_none());
     }
 }
