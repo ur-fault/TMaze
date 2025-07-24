@@ -124,30 +124,30 @@ impl StyleBrowser {
 
     fn update_selected(&mut self, up: bool) {
         match &self.mode {
-            Mode::Logical(node_item) => todo!(),
-            Mode::Deps(node_item) => todo!(),
+            Mode::Logical(node) | Mode::Deps(node) => {
+                if node.is_empty() {
+                    self.selected_index = 0;
+                    return;
+                }
+            }
             Mode::List(items) => {
                 if items.is_empty() {
                     self.selected_index = 0;
                     return;
                 }
 
-                if !up {
-                    self.selected_index = items
-                        .iter()
-                        .enumerate()
-                        .skip(self.selected_index + 1)
+                let iter = items.iter().enumerate();
+
+                let iter = if !up {
+                    iter.skip(self.selected_index + 1)
                         .find(|(_, (_, hidden))| !hidden)
-                        .map_or(self.selected_index, |(index, _)| index);
                 } else {
-                    self.selected_index = items
-                        .iter()
-                        .enumerate()
-                        .rev()
+                    iter.rev()
                         .skip(items.len() - self.selected_index)
                         .find(|(_, (_, hidden))| !hidden)
-                        .map_or(self.selected_index, |(index, _)| index);
-                }
+                };
+
+                self.selected_index = iter.map_or(self.selected_index, |(index, _)| index);
             }
         }
 
@@ -188,18 +188,16 @@ impl StyleBrowser {
         }
     }
 
-    fn count(&self) -> usize {
+    fn len(&self) -> usize {
         match &self.mode {
-            Mode::Logical(node) => node.count(),
-            Mode::Deps(node) => node.count(),
+            Mode::Logical(node) | Mode::Deps(node) => node.len(),
             Mode::List(items) => items.len(),
         }
     }
 
     fn visible_count(&self) -> usize {
         match &self.mode {
-            Mode::Logical(_) => todo!(),
-            Mode::Deps(_) => todo!(),
+            Mode::Logical(node) | Mode::Deps(node) => node.iter().filter(|n| !n.hidden).count(),
             Mode::List(items) => items.iter().filter(|(_, hidden)| !hidden).count(),
         }
     }
@@ -506,12 +504,20 @@ impl NodeItem {
         show_primary
     }
 
-    fn count(&self) -> usize {
-        let mut count = 1; // count this node
-        for child in &self.children {
-            count += child.count();
+    fn len(&self) -> usize {
+        fn inner(node: &NodeItem) -> usize {
+            let mut count = 1; // count this node
+            for child in &node.children {
+                count += child.len();
+            }
+            count
         }
-        count
+
+        inner(self) - if self.item.is_none() { 1 } else { 0 }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.children.is_empty() && self.item.is_none()
     }
 
     fn iter(&self) -> NodeItemIter {
@@ -582,6 +588,10 @@ impl<'a> Iterator for NodeItemIter<'a> {
             root: false,
         }));
         return self.child.as_mut().unwrap().next();
+    }
+
+    fn count(self) -> usize {
+        self.node.len()
     }
 }
 
@@ -709,5 +719,8 @@ mod tests {
             "example"
         );
         assert!(iter.next().is_none());
+
+        assert_eq!(node.len(), 3);
+        assert_eq!(node.iter().count(), 3);
     }
 }
