@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::{not_release, LineDir},
-    renderer::{drawable::Drawable, Cell, CellContent, Frame},
+    renderer::{drawable::Drawable, Cell, CellContent, Frame as _, FrameBuffer},
     settings::theme::Style,
     ui::{CapsuleText, Rect, Screen},
 };
@@ -283,7 +283,7 @@ impl ActivityHandler for StyleBrowser {
 }
 
 impl Screen for StyleBrowser {
-    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> std::io::Result<()> {
         const INDENT: i32 = 4;
 
         let [border, text, search, background] =
@@ -295,7 +295,7 @@ impl Screen for StyleBrowser {
             border,
         );
 
-        let mut inner_frame = Frame::new(frame.size() - CONTENT_MARGIN * 2 - Dims(2, 2));
+        let mut inner_frame = FrameBuffer::new(frame.size() - CONTENT_MARGIN * 2 - Dims(2, 2));
         inner_frame.fill(Cell::Content(CellContent {
             character: ' ',
             width: 1,
@@ -386,7 +386,7 @@ impl Screen for StyleBrowser {
 
                     if self.selected_index == node.item_index {
                         for x in 0..inner_frame.size().0 {
-                            if let Some(cell) = inner_frame.try_get_mut(Dims(x, pos.1)) {
+                            if let Some(cell) = inner_frame.try_ref_mut(Dims(x, pos.1)) {
                                 match cell {
                                     c @ Cell::Empty => {
                                         *c = Cell::Content(CellContent {
@@ -437,7 +437,7 @@ impl Screen for StyleBrowser {
                     if self.selected_index == index {
                         for x in 0..inner_frame.size().0 {
                             if let Some(cell) =
-                                inner_frame.try_get_mut(Dims(x, current as i32 + yoff))
+                                inner_frame.try_ref_mut(Dims(x, current as i32 + yoff))
                             {
                                 match cell {
                                     c @ Cell::Empty => {

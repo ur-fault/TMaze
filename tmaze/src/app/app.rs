@@ -18,7 +18,7 @@ use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
-    renderer::{drawable::Drawable, Cell, Renderer},
+    renderer::{drawable::Drawable, Cell, Frame as _, Renderer},
     settings::{
         theme::{Theme, ThemeResolver},
         Settings,

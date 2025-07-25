@@ -8,7 +8,7 @@ use crate::{
     app::app::AppData,
     helpers::line_center,
     make_even, make_odd,
-    renderer::Frame,
+    renderer::FrameBuffer,
     settings::theme::{Theme, ThemeResolver},
     ui::{Button, ButtonStyles, Rect},
 };
@@ -95,7 +95,7 @@ impl DPad {
         self.for_mut_buttons(|button| button.disable_highlight = disable_highlight);
     }
 
-    pub fn render(&self, frame: &mut Frame, theme: &Theme) {
+    pub fn render(&self, frame: &mut FrameBuffer, theme: &Theme) {
         self.for_buttons(|button| button.draw_colored(frame, theme));
     }
 

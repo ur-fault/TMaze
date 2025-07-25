@@ -15,7 +15,7 @@ use crate::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
     lerp, menu_actions,
-    renderer::{self, Frame},
+    renderer::{self, Frame as _, FrameBuffer},
     settings::{
         self,
         style_browser::StyleBrowser,
@@ -550,11 +550,11 @@ impl GameActivity {
         (if does_fit { floor_size } else { vp_size }, does_fit)
     }
 
-    fn current_floor_frame(&self) -> &Frame {
+    fn current_floor_frame(&self) -> &FrameBuffer {
         &self.maze_board.frames[self.data.camera_pos.2 as usize]
     }
 
-    fn render_meta_texts(&self, frame: &mut Frame, theme: &Theme, vp: Rect) {
+    fn render_meta_texts(&self, frame: &mut FrameBuffer, theme: &Theme, vp: Rect) {
         let max_width = (vp.size().0 / 2 + 1) as usize;
 
         let pl_pos = self.data.game.get_player_pos() + Dims3D(1, 1, 1);
@@ -605,7 +605,7 @@ impl GameActivity {
         draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
     }
 
-    pub fn render_visited_places(&self, frame: &mut Frame, maze_pos: Dims, theme: &Theme) {
+    pub fn render_visited_places(&self, frame: &mut FrameBuffer, maze_pos: Dims, theme: &Theme) {
         use CellWall::{Down, Up};
 
         let game = &self.data.game;
@@ -623,7 +623,7 @@ impl GameActivity {
         &self,
         maze_pos: Dims,
         game: &RunningGame,
-        viewport: &mut Frame,
+        viewport: &mut FrameBuffer,
         theme: &Theme,
     ) {
         let player = self.sm_player_pos;
@@ -811,7 +811,7 @@ impl ActivityHandler for GameActivity {
 }
 
 impl Screen for GameActivity {
-    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> std::io::Result<()> {
         let maze_frame = self.current_floor_frame();
         let game = &self.data.game;
 
@@ -828,7 +828,7 @@ impl Screen for GameActivity {
         };
 
         // TODO: reuse the viewport between frames and resize it when needed
-        let mut viewport = Frame::new(vp_size);
+        let mut viewport = FrameBuffer::new(vp_size);
 
         // maze
         viewport.draw(maze_pos, maze_frame, ());
@@ -856,7 +856,7 @@ impl Screen for GameActivity {
 
         // touch controls
         if let Some(ref touch_controls) = self.touch_controls {
-            let mut dpad_frame = Frame::new(self.dpad_rect.unwrap().size());
+            let mut dpad_frame = FrameBuffer::new(self.dpad_rect.unwrap().size());
 
             touch_controls.render(&mut dpad_frame, theme);
             frame.draw(self.dpad_rect.unwrap().start, &dpad_frame, ());
@@ -875,7 +875,7 @@ impl Screen for GameActivity {
 }
 
 #[inline]
-fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut Frame, vp: Rect, theme: &Theme) {
+fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut FrameBuffer, vp: Rect, theme: &Theme) {
     let [s_start, s_end] = theme.extract(["debug.rulers.start", "debug.rulers.end"]);
 
     let vps = vp.size();
@@ -912,7 +912,7 @@ fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut Frame, vp: Re
 }
 
 pub struct MazeBoard {
-    frames: Vec<Frame>,
+    frames: Vec<FrameBuffer>,
 }
 
 impl MazeBoard {
@@ -928,13 +928,13 @@ impl MazeBoard {
         Self { frames }
     }
 
-    fn render_floor(game: &RunningGame, floor: i32, theme: &Theme) -> Frame {
+    fn render_floor(game: &RunningGame, floor: i32, theme: &Theme) -> FrameBuffer {
         let board = &game.get_maze().board;
         let normals = theme["game.walls"];
 
         let size = maze_render_size(board);
 
-        let mut frame = Frame::new(size);
+        let mut frame = FrameBuffer::new(size);
         frame.fill(renderer::Cell::styled(' ', theme["game.background"]));
 
         let mut draw = |pos, l: LineDir| frame.draw(Dims::from(pos), l.double(), normals);
@@ -972,7 +972,7 @@ impl MazeBoard {
         frame
     }
 
-    fn render_stairs(frame: &mut Frame, floors: Array2DView<Cell>, tower: bool, theme: &Theme) {
+    fn render_stairs(frame: &mut FrameBuffer, floors: Array2DView<Cell>, tower: bool, theme: &Theme) {
         let s_stairs_up = theme["game.stairs.up"];
         let s_stairs_down = theme["game.stairs.down"];
         let s_stairs_both = theme["game.stairs.both"];
@@ -994,7 +994,7 @@ impl MazeBoard {
         }
     }
 
-    fn render_special(frames: &mut [Frame], game: &RunningGame, theme: &Theme) {
+    fn render_special(frames: &mut [FrameBuffer], game: &RunningGame, theme: &Theme) {
         let goal_style = theme["game.goal"];
         let goal_pos = game.get_goal_pos();
 

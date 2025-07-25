@@ -3,7 +3,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     helpers::strings,
-    renderer::{Cell, Frame},
+    renderer::{Cell, Frame as _, FrameBuffer},
     settings::theme::{Style, Theme, ThemeResolver},
 };
 
@@ -120,7 +120,7 @@ impl Button {
 }
 
 impl Button {
-    pub fn draw_colored(&self, frame: &mut Frame, theme: &Theme) {
+    pub fn draw_colored(&self, frame: &mut FrameBuffer, theme: &Theme) {
         // let set = self.set && !self.disabled && !self.disable_highlight;
 
         let AppliedStyles { normal, content } = self.apply_styles(theme);
