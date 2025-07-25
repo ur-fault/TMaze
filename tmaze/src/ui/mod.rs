@@ -2,7 +2,7 @@ use std::io;
 pub use std::time::Duration;
 
 use crate::{
-    renderer::Frame,
+    renderer::FrameBuffer,
     settings::{
         style_browser,
         theme::{Theme, ThemeResolver},
@@ -29,7 +29,7 @@ pub use rect::*;
 pub use redirect_menu::*;
 
 pub trait Screen {
-    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> io::Result<()>;
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> io::Result<()>;
 }
 
 pub fn theme_resolver() -> ThemeResolver {

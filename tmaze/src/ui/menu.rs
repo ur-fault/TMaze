@@ -21,7 +21,7 @@ use crate::{
         event::Event,
     },
     helpers::{is_release, strings::MbyStaticStr, LineDir},
-    renderer::Frame,
+    renderer::{Frame as _, FrameBuffer},
     settings::theme::{Style, Theme, ThemeResolver},
 };
 
@@ -519,7 +519,7 @@ impl ActivityHandler for Menu {
 }
 
 impl Screen for Menu {
-    fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> Result<(), io::Error> {
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), io::Error> {
         let MenuConfig { title, counted, .. } = &self.config;
 
         let AppliedStyles {
