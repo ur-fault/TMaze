@@ -321,18 +321,18 @@ impl Screen for StyleBrowser {
                 .sum::<i32>();
 
             // i've no why -2 is needed here, but it's cut off without it
-            let mut xoof = inner_frame.size.0 - tabs_width - 6;
+            let mut xoff = inner_frame.size.0 - tabs_width - 6;
             for (name, is_mode) in TABS {
                 if is_mode(&self.mode) {
                     inner_frame.draw(
-                        Dims(xoof, 0),
+                        Dims(xoff, 0),
                         CapsuleText(format!(" {name} ")),
                         text.invert(),
                     );
                 } else {
-                    inner_frame.draw(Dims(xoof, 0), format!("  {name}  "), text);
+                    inner_frame.draw(Dims(xoff, 0), format!("  {name}  "), text);
                 };
-                xoof += name.width() as i32 + 5;
+                xoff += name.width() as i32 + 5;
             }
         }
 
