@@ -144,7 +144,7 @@ impl Drawable<&Theme> for UiLogs {
             let y = pos.1 + i as i32;
             let len = log.source.width() + 4 + log.message.width();
 
-            let src_x = frame.size.0 - len as i32 - 2;
+            let src_x = frame.size().0 - len as i32 - 2;
             let msg_x = src_x + log.source.width() as i32 + 4;
             let src_pos = Dims(src_x, y);
             let msg_pos = Dims(msg_x, y);
@@ -154,7 +154,7 @@ impl Drawable<&Theme> for UiLogs {
             log.source.draw(src_pos, frame, source_style);
             "->".draw(Dims(msg_x - 3, y), frame, extra);
             log.message.draw(msg_pos, frame, msg_style);
-            INDICATOR_CHAR.draw(Dims(frame.size.0 - 1, y), frame, indicator_style);
+            INDICATOR_CHAR.draw(Dims(frame.size().0 - 1, y), frame, indicator_style);
         }
     }
 }
