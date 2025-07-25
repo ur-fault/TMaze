@@ -3,7 +3,7 @@ use std::hash::DefaultHasher;
 
 use std::hash::{Hash as _, Hasher as _};
 
-use cmaze::algorithms::region_splitter::{DefaultRegionSplitter, RegionCount, RegionSplitter as _};
+use cmaze::algorithms::region_splitter::{DefaultRegionSplitter, RegionSplitter as _};
 use cmaze::algorithms::Params;
 use cmaze::{
     algorithms::{CellMask, Random},
@@ -38,12 +38,13 @@ fn main() {
     let base_hash = rng.gen::<u64>();
 
     let size = Dims3D(args[0] as i32, args[1] as i32, 1);
-    let point_count = args[2] as u8;
 
     let progress = ProgressHandle::new();
     let mask = CellMask::new_dims(size).unwrap();
     let splitter = DefaultRegionSplitter;
-    let groups = splitter.split(&mask, &mut rng, progress, &Params::default()).unwrap();
+    let groups = splitter
+        .split(&mask, &mut rng, progress, &Params::default())
+        .unwrap();
 
     show_array(
         &groups,

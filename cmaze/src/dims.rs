@@ -101,6 +101,11 @@ impl From<Dims3D> for Dims {
     }
 }
 
+impl Dims {
+    pub const ZERO: Dims = Dims(0, 0);
+    pub const ONE: Dims = Dims(1, 1);
+}
+
 impl Dims3D {
     pub const ZERO: Dims3D = Dims3D(0, 0, 0);
     pub const ONE: Dims3D = Dims3D(1, 1, 1);

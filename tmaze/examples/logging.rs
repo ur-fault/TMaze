@@ -3,7 +3,7 @@ use std::io;
 use tmaze::{
     app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
-    renderer::Frame,
+    renderer::FrameBuffer,
     settings::theme::Theme,
     ui::Screen,
 };
@@ -46,13 +46,13 @@ impl ActivityHandler for MyActivity {
         None
     }
 
-    fn screen(&self) -> &dyn Screen {
+    fn screen(&mut self) -> &mut dyn Screen {
         self
     }
 }
 
 impl Screen for MyActivity {
-    fn draw(&self, _: &mut Frame, _: &Theme) -> io::Result<()> {
+    fn draw(&mut self, _: &mut FrameBuffer, _: &Theme) -> io::Result<()> {
         Ok(())
     }
 }

@@ -4,6 +4,18 @@ use cmaze::dims::*;
 pub use substring::Substring;
 
 pub fn draw_box(frame: &mut impl Frame, pos: Dims, size: Dims, style: Style) {
+    if size.0 == 1 && size.1 > 1 {
+        // vertical line
+        draw_line(frame, pos, true, size.1 as usize, style);
+        return;
+    }
+
+    if size.1 == 1 && size.0 > 1 {
+        // horizontal line
+        draw_line(frame, pos, false, size.0 as usize, style);
+        return;
+    }
+
     draw_char(frame, pos.0, pos.1, '╭', style);
     draw_line(
         frame,

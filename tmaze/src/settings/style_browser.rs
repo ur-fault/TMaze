@@ -1,4 +1,4 @@
-use cmaze::dims::Dims;
+use cmaze::dims::{Dims, Offset};
 use crossterm::{
     event::{Event as TermEvent, KeyCode, KeyEvent},
     style::{Attribute, Attributes},
@@ -8,10 +8,10 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
-    helpers::{not_release, LineDir},
-    renderer::{drawable::Drawable, Cell, CellContent, Frame as _, FrameBuffer},
+    helpers::not_release,
+    renderer::{Cell, CellContent, Frame as _, FrameBuffer, Padding},
     settings::theme::Style,
-    ui::{CapsuleText, Rect, Screen},
+    ui::{CapsuleText, Screen},
 };
 
 use super::theme::{StyleNode, Theme, ThemeResolver};
@@ -289,64 +289,6 @@ impl Screen for StyleBrowser {
         let [border, text, search, background] =
             theme.extract(["sb.border", "sb.text", "sb.search", "sb.background"]);
 
-        Rect::new(CONTENT_MARGIN, frame.size() - CONTENT_MARGIN - Dims(1, 1)).draw(
-            Dims(0, 0),
-            frame,
-            border,
-        );
-
-        let mut inner_frame = FrameBuffer::new(frame.size() - CONTENT_MARGIN * 2 - Dims(2, 2));
-        inner_frame.fill(Cell::Content(CellContent {
-            character: ' ',
-            width: 1,
-            style: background.into(),
-        }));
-        self.list_height = inner_frame.size().1 as usize - 2;
-
-        {
-            if self.search.is_empty() {
-                inner_frame.draw(Dims(1, 0), "<Search>", search);
-            } else {
-                inner_frame.draw(Dims(1, 0), self.search.as_str(), text);
-            }
-
-            type Tab = (&'static str, fn(&Mode) -> bool);
-            const TABS: [Tab; 3] = [
-                ("By name", |x| matches!(x, Mode::Logical(_))),
-                ("Inheritance", |x| matches!(x, Mode::Deps(_))),
-                ("List", |x| matches!(x, Mode::List(_))),
-            ];
-
-            let tabs_width = TABS
-                .iter()
-                .map(|(name, _)| name.width() as i32 + 3)
-                .sum::<i32>();
-
-            // i've no why -2 is needed here, but it's cut off without it
-            let mut xoff = inner_frame.size().0 - tabs_width - 6;
-            for (name, is_mode) in TABS {
-                if is_mode(&self.mode) {
-                    inner_frame.draw(
-                        Dims(xoff, 0),
-                        CapsuleText(format!(" {name} ")),
-                        text.invert(),
-                    );
-                } else {
-                    inner_frame.draw(Dims(xoff, 0), format!("  {name}  "), text);
-                };
-                xoff += name.width() as i32 + 5;
-            }
-        }
-
-        inner_frame.draw(
-            Dims(0, 1),
-            LineDir::Horizontal
-                .round()
-                .to_string()
-                .repeat(inner_frame.size().0 as usize),
-            border,
-        );
-
         fn render_style(style: &str, theme: &Theme) -> (String, Style, i32) {
             let style = theme.get(style);
             let text = match (style.fg, style.bg) {
@@ -359,109 +301,170 @@ impl Screen for StyleBrowser {
             (text, style, width)
         }
 
-        let yoff = 2;
-        match &self.mode {
-            Mode::Logical(node) | Mode::Deps(node) => {
-                for (index, (node, depth)) in node.iter_visible().skip(self.scroll).enumerate() {
-                    let pos = Dims(LEFT_MARGIN + depth as i32 * INDENT, yoff + index as i32);
-                    inner_frame.draw(
-                        pos,
-                        node.item
-                            .as_ref()
-                            .expect("non-root node must have payload")
-                            .payload
-                            .as_str(),
-                        text,
-                    );
+        // new impl
 
-                    if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
-                        let (style_text, node_style, width) = render_style(node_style, theme);
+        frame.pad(CONTENT_MARGIN.into(), |f| {
+            f.border(border).inside(|f| {
+                f.fill(Cell::Content(CellContent {
+                    character: ' ',
+                    width: 1,
+                    style: background.into(),
+                }));
 
-                        inner_frame.draw(
-                            Dims(inner_frame.size().0 - width - RIGHT_MARGIN, pos.1),
-                            style_text.as_str(),
-                            node_style,
-                        );
-                    }
+                // search and tabs
+                f.split(
+                    Offset::Abs(2),
+                    true,
+                    |f| {
+                        f.pad(Padding::hor(1), |f| {
+                            if self.search.is_empty() {
+                                f.draw(Dims::ZERO, "<Search>", search);
+                            } else {
+                                f.draw(Dims::ZERO, self.search.as_str(), text);
+                            }
 
-                    if self.selected_index == node.item_index {
-                        for x in 0..inner_frame.size().0 {
-                            if let Some(cell) = inner_frame.try_ref_mut(Dims(x, pos.1)) {
-                                match cell {
-                                    c @ Cell::Empty => {
-                                        *c = Cell::Content(CellContent {
-                                            character: ' ',
-                                            width: 1,
-                                            style: crossterm::style::ContentStyle {
-                                                attributes: Attributes::from(Attribute::Underlined),
-                                                ..crossterm::style::ContentStyle::default()
-                                            },
-                                        })
+                            type Tab = (&'static str, fn(&Mode) -> bool);
+                            const TABS: [Tab; 3] = [
+                                ("By name", |x| matches!(x, Mode::Logical(_))),
+                                ("Inheritance", |x| matches!(x, Mode::Deps(_))),
+                                ("List", |x| matches!(x, Mode::List(_))),
+                            ];
+
+                            let tabs_width = TABS
+                                .iter()
+                                .map(|(name, _)| name.width() as i32 + 5)
+                                .sum::<i32>()
+                                - 1;
+
+                            let mut xoff = f.size().0 - tabs_width;
+                            for (name, is_active) in TABS {
+                                if is_active(&self.mode) {
+                                    f.draw(
+                                        Dims(xoff, 0),
+                                        CapsuleText(format!(" {name} ")),
+                                        text.invert(),
+                                    );
+                                } else {
+                                    f.draw(Dims(xoff, 0), format!("  {name}  "), text);
+                                };
+                                xoff += name.width() as i32 + 5;
+                            }
+                        });
+
+                        // separator line
+                        f.bottom(1, |f| {
+                            f.border(border);
+                        });
+                    },
+                    |f| {
+                        self.list_height = f.size().1 as usize;
+                        match &self.mode {
+                            Mode::Logical(node) | Mode::Deps(node) => {
+                                for (index, (node, depth)) in
+                                    node.iter_visible().skip(self.scroll).enumerate()
+                                    {
+                                        let pos = Dims(LEFT_MARGIN + depth as i32 * INDENT, index as i32);
+                                        f.draw(
+                                            pos,
+                                            node.item
+                                            .as_ref()
+                                            .expect("non-root node must have payload")
+                                            .payload
+                                            .as_str(),
+                                            text,
+                                        );
+
+                                        if let Some(node_style) =
+                                            node.item.as_ref().and_then(|i| i.style.as_ref())
+                                        {
+                                            let (style_text, node_style, width) =
+                                                render_style(node_style, theme);
+
+                                            f.draw(
+                                                Dims(f.size().0 - width - RIGHT_MARGIN, pos.1),
+                                                style_text.as_str(),
+                                                node_style,
+                                            );
+                                        }
+
+                                        if self.selected_index == node.item_index {
+                                            for x in 0..f.size().0 {
+                                                if let Some(cell) = f.try_ref_mut(Dims(x, pos.1)) {
+                                                    match cell {
+                                                        c @ Cell::Empty => {
+                                                            *c = Cell::Content(CellContent {
+                                                                character: ' ',
+                                                                width: 1,
+                                                                style: crossterm::style::ContentStyle {
+                                                                    attributes: Attributes::from(Attribute::Underlined),
+                                                                    ..crossterm::style::ContentStyle::default()
+                                                                },
+                                                            })
+                                                        }
+                                                        Cell::Content(c) => {
+                                                            c.style.attributes.extend(Attribute::Underlined.into())
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
-                                    Cell::Content(c) => {
-                                        c.style.attributes.extend(Attribute::Underlined.into())
+                            }
+                            Mode::List(items) => {
+                                for (current, (index, (item, _))) in items
+                                    .iter()
+                                    .enumerate()
+                                    .skip(self.scroll)
+                                    .filter(|(_, (_, hidden))| !hidden)
+                                    .enumerate()
+                                {
+                                    if let Some(item_style) = item.style.as_ref() {
+                                        let (style_text, node_style, width) =
+                                            render_style(item_style, theme);
+
+                                        f.draw(
+                                            Dims(f.size().0 - width - RIGHT_MARGIN, current as i32),
+                                            style_text.as_str(),
+                                            node_style,
+                                        );
+                                    }
+
+                                    f.draw(
+                                        Dims(LEFT_MARGIN, current as i32),
+                                        item.payload.as_str(),
+                                        text,
+                                    );
+
+                                    if self.selected_index == index {
+                                        for x in 0..f.size().0 {
+                                            if let Some(cell) =
+                                                f.try_ref_mut(Dims(x, current as i32))
+                                            {
+                                                match cell {
+                                                    c @ Cell::Empty => {
+                                                        *c = Cell::Content(CellContent {
+                                                            character: ' ',
+                                                            width: 1,
+                                                            style: crossterm::style::ContentStyle {
+                                                                attributes: Attributes::from(Attribute::Underlined),
+                                                                ..crossterm::style::ContentStyle::default()
+                                                            },
+                                                        })
+                                                    }
+                                                    Cell::Content(c) => {
+                                                        c.style.attributes.extend(Attribute::Underlined.into())
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                }
-            }
-            Mode::List(items) => {
-                for (current, (index, (item, _))) in items
-                    .iter()
-                    .enumerate()
-                    .skip(self.scroll)
-                    .filter(|(_, (_, hidden))| !hidden)
-                    .enumerate()
-                {
-                    if let Some(item_style) = item.style.as_ref() {
-                        let (style_text, node_style, width) = render_style(item_style, theme);
-
-                        inner_frame.draw(
-                            Dims(
-                                inner_frame.size().0 - width - RIGHT_MARGIN,
-                                current as i32 + yoff,
-                            ),
-                            style_text.as_str(),
-                            node_style,
-                        );
-                    }
-
-                    inner_frame.draw(
-                        Dims(LEFT_MARGIN, current as i32 + yoff),
-                        item.payload.as_str(),
-                        text,
-                    );
-
-                    if self.selected_index == index {
-                        for x in 0..inner_frame.size().0 {
-                            if let Some(cell) =
-                                inner_frame.try_ref_mut(Dims(x, current as i32 + yoff))
-                            {
-                                match cell {
-                                    c @ Cell::Empty => {
-                                        *c = Cell::Content(CellContent {
-                                            character: ' ',
-                                            width: 1,
-                                            style: crossterm::style::ContentStyle {
-                                                attributes: Attributes::from(Attribute::Underlined),
-                                                ..crossterm::style::ContentStyle::default()
-                                            },
-                                        })
-                                    }
-                                    Cell::Content(c) => {
-                                        c.style.attributes.extend(Attribute::Underlined.into())
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        frame.draw(CONTENT_MARGIN + Dims(1, 1), &inner_frame, ());
+                    },
+                );
+            });
+        });
 
         Ok(())
     }

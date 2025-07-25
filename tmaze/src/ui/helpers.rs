@@ -85,6 +85,10 @@ impl Drawable<Style> for CapsuleText {
     fn draw(&self, pos: Dims, frame: &mut impl crate::renderer::Frame, style: Style) {
         frame.draw(pos + Dims(0, 0), '', style.invert());
         frame.draw(pos + Dims(1, 0), self.0.as_str(), style);
-        frame.draw(pos + Dims(self.0.width() as i32 + 1, 0), '', style.invert());
+        frame.draw(
+            pos + Dims(self.0.width() as i32 + 1, 0),
+            '',
+            style.invert(),
+        );
     }
 }
