@@ -25,8 +25,8 @@ pub struct StyleBrowser {
     resolver: ThemeResolver,
     search: String,
     selected_index: usize,
-    scroll: i32,
-    list_height: i32,
+    scroll: usize,
+    list_height: usize,
 }
 
 impl StyleBrowser {
@@ -205,10 +205,10 @@ impl StyleBrowser {
                     return;
                 };
 
-                if visible_index < window.0 as usize {
-                    self.scroll = visible_index as i32;
-                } else if visible_index >= window.1 as usize {
-                    self.scroll = visible_index as i32 - self.list_height + 1;
+                if visible_index < window.0 {
+                    self.scroll = visible_index;
+                } else if visible_index >= window.1 {
+                    self.scroll = visible_index - self.list_height + 1;
                 }
 
                 debug!("scroll: {}, selected index: {}, visible index: {visible_index}, window: {window:?}", self.scroll, self.selected_index);
@@ -226,10 +226,10 @@ impl StyleBrowser {
                     return;
                 };
 
-                if visible_index < window.0 as usize {
-                    self.scroll = visible_index as i32;
-                } else if visible_index >= window.1 as usize {
-                    self.scroll = visible_index as i32 - self.list_height + 1;
+                if visible_index < window.0 {
+                    self.scroll = visible_index;
+                } else if visible_index >= window.1 {
+                    self.scroll = visible_index - self.list_height + 1;
                 }
 
                 debug!("scroll: {}, selected index: {}, visible index: {visible_index}, window: {window:?}", self.scroll, self.selected_index);
@@ -286,8 +286,8 @@ impl Screen for StyleBrowser {
     fn draw(&mut self, frame: &mut Frame, theme: &Theme) -> std::io::Result<()> {
         const INDENT: i32 = 4;
 
-        let [border, text, dim, background] =
-            theme.extract(["sb.border", "sb.text", "sb.dim", "sb.background"]);
+        let [border, text, search, background] =
+            theme.extract(["sb.border", "sb.text", "sb.search", "sb.background"]);
 
         Rect::new(CONTENT_MARGIN, frame.size - CONTENT_MARGIN - Dims(1, 1)).draw(
             Dims(0, 0),
@@ -301,11 +301,11 @@ impl Screen for StyleBrowser {
             width: 1,
             style: background.into(),
         }));
-        self.list_height = inner_frame.size.1 - 2;
+        self.list_height = inner_frame.size.1 as usize - 2;
 
         {
             if self.search.is_empty() {
-                inner_frame.draw(Dims(1, 0), "<Search>", dim);
+                inner_frame.draw(Dims(1, 0), "<Search>", search);
             } else {
                 inner_frame.draw(Dims(1, 0), self.search.as_str(), text);
             }
@@ -362,11 +362,7 @@ impl Screen for StyleBrowser {
         let yoff = 2;
         match &self.mode {
             Mode::Logical(node) | Mode::Deps(node) => {
-                for (index, (node, depth)) in node
-                    .iter_visible()
-                    .skip(self.scroll.max(0) as usize)
-                    .enumerate()
-                {
+                for (index, (node, depth)) in node.iter_visible().skip(self.scroll).enumerate() {
                     let pos = Dims(LEFT_MARGIN + depth as i32 * INDENT, yoff + index as i32);
                     inner_frame.draw(
                         pos,
@@ -412,31 +408,37 @@ impl Screen for StyleBrowser {
                 }
             }
             Mode::List(items) => {
-                let mut current = 0;
-                for (index, (item, hidden)) in items.iter().enumerate() {
-                    if *hidden || index < self.scroll as usize {
-                        continue;
-                    }
-
+                for (current, (index, (item, _))) in items
+                    .iter()
+                    .enumerate()
+                    .skip(self.scroll)
+                    .filter(|(_, (_, hidden))| !hidden)
+                    .enumerate()
+                {
                     if let Some(item_style) = item.style.as_ref() {
                         let (style_text, node_style, width) = render_style(item_style, theme);
 
                         inner_frame.draw(
-                            Dims(inner_frame.size.0 - width - RIGHT_MARGIN, current + yoff),
+                            Dims(
+                                inner_frame.size.0 - width - RIGHT_MARGIN,
+                                current as i32 + yoff,
+                            ),
                             style_text.as_str(),
                             node_style,
                         );
                     }
 
                     inner_frame.draw(
-                        Dims(LEFT_MARGIN, current + yoff),
+                        Dims(LEFT_MARGIN, current as i32 + yoff),
                         item.payload.as_str(),
                         text,
                     );
 
                     if self.selected_index == index {
                         for x in 0..inner_frame.size.0 {
-                            if let Some(cell) = inner_frame.try_get_mut(Dims(x, current + yoff)) {
+                            if let Some(cell) =
+                                inner_frame.try_get_mut(Dims(x, current as i32 + yoff))
+                            {
                                 match cell {
                                     c @ Cell::Empty => {
                                         *c = Cell::Content(CellContent {
@@ -455,8 +457,6 @@ impl Screen for StyleBrowser {
                             }
                         }
                     }
-
-                    current += 1;
                 }
             }
         }
@@ -691,7 +691,7 @@ pub fn style_browser_theme_resolver() -> ThemeResolver {
     resolver
         .link("sb.border", "border")
         .link("sb.text", "text")
-        .link("sb.dim", "dim")
+        .link("sb.search", "dim")
         .link("sb.background", "background");
     resolver
 }
