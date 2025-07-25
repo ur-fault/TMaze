@@ -310,7 +310,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> {
                 if x < 0 || x >= self.size().0 || y < 0 || y >= self.size().1 {
                     continue;
                 }
-                self[Dims(x, y)] =cell;
+                self[Dims(x, y)] = cell;
             }
         }
     }
@@ -335,59 +335,6 @@ impl FrameBuffer {
         FrameBuffer { buffer, size }
     }
 
-    // pub fn size(&self) -> Dims {
-    //     self.size
-    // }
-    //
-    // pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: Style) -> usize {
-    //     if x < 0 || self.size.0 <= x || y < 0 || self.size.1 <= y {
-    //         return 0;
-    //     }
-    //
-    //     let width = character.width().unwrap_or(1) as i32;
-    //     if width == 0 {
-    //         return 0;
-    //     }
-    //
-    //     let cell = Cell::styled(character, style);
-    //
-    //     self.buffer[y as usize][x as usize] = cell;
-    //
-    //     for i in x + 1..x + width {
-    //         self.buffer[y as usize][i as usize] = Cell::Empty;
-    //     }
-    //
-    //     width as usize
-    // }
-    //
-    // pub fn try_set(&mut self, pos: Dims, cell: Cell) -> bool {
-    //     if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
-    //         return false;
-    //     }
-    //
-    //     self.set(pos, cell);
-    //     true
-    // }
-    //
-    // pub fn set(&mut self, pos: Dims, cell: Cell) {
-    //     *self.ref_mut(pos) = cell;
-    // }
-
-    // pub fn ref_mut(&mut self, pos: Dims) -> &mut Cell {
-    //     &mut self.buffer[pos.1 as usize][pos.0 as usize]
-    // }
-    //
-    // pub fn try_get_mut(&mut self, pos: Dims) -> Option<&mut Cell> {
-    //     if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
-    //         return None;
-    //     }
-    //     Some(self.ref_mut(pos))
-    // }
-
-    // pub fn draw<D: Drawable<S>, S>(&mut self, pos: Dims, content: D, styles: S) {
-    //     content.draw(pos, self, styles);
-    // }
-
     pub fn resize(&mut self, size: Dims) {
         if self.size == size {
             return;
@@ -406,33 +353,6 @@ impl FrameBuffer {
         }
         Some(())
     }
-
-    // pub fn clear(&mut self) {
-    //     for row in self.buffer.iter_mut() {
-    //         for cell in row.iter_mut() {
-    //             *cell = Cell::new(' ');
-    //         }
-    //     }
-    // }
-    //
-    // pub fn fill(&mut self, cell: Cell) {
-    //     for row in self.buffer.iter_mut() {
-    //         for c in row.iter_mut() {
-    //             *c = cell;
-    //         }
-    //     }
-    // }
-    //
-    // pub fn fill_rect(&mut self, pos: Dims, size: Dims, cell: Cell) {
-    //     for y in pos.1..pos.1 + size.1 {
-    //         for x in pos.0..pos.0 + size.0 {
-    //             if x < 0 || x >= self.size.0 || y < 0 || y >= self.size.1 {
-    //                 continue;
-    //             }
-    //             self.buffer[y as usize][x as usize] = cell;
-    //         }
-    //     }
-    // }
 }
 
 impl Frame for FrameBuffer {
