@@ -48,8 +48,9 @@ impl StyleBrowser {
         self.mode = Mode::Deps(NodeItem::from_style_node(
             None,
             self.resolver.to_deps_tree(),
-            0,
+            &mut 0,
         ));
+        self.reset_selected();
     }
 
     fn use_list(&mut self) {
@@ -69,23 +70,51 @@ impl StyleBrowser {
             })
             .collect();
         self.mode = Mode::List(style_list);
+        self.reset_selected();
     }
 
     fn use_logical(&mut self) {
         self.mode = Mode::Logical(NodeItem::from_style_node(
             None,
             self.resolver.to_logical_tree(),
-            0,
+            &mut 0,
         ));
+        self.reset_selected();
+    }
+
+    fn reset_selected(&mut self) {
+        self.selected_index = 0;
+        self.scroll = 0;
     }
 
     fn update_search(&mut self) {
+        fn select_closest_node(index: usize, node: &NodeItem) -> usize {
+            if node
+                .iter_visible()
+                .filter(|(n, _)| n.item_index == index)
+                .next()
+                .is_some()
+            {
+                return index;
+            }
+
+            match node
+                .iter_visible()
+                .map(|(n, _)| ((n.item_index as i32).abs_diff(index as i32), n.item_index))
+                .min_by_key(|(diff, _)| *diff)
+            {
+                Some((_, index)) => index,
+                None => 0,
+            }
+        }
         match &mut self.mode {
             Mode::Logical(node) => {
                 node.match_search_pattern(&self.search, Some(false));
+                self.selected_index = select_closest_node(self.selected_index, node);
             }
             Mode::Deps(node) => {
                 node.match_search_pattern(&self.search, None);
+                self.selected_index = select_closest_node(self.selected_index, node);
             }
             Mode::List(items) => {
                 for (item, hidden) in items.iter_mut() {
@@ -129,6 +158,21 @@ impl StyleBrowser {
                     self.selected_index = 0;
                     return;
                 }
+
+                let iter = node.iter();
+
+                let iter = if !up {
+                    iter.skip(self.selected_index + 1).find(|(n, _)| !n.hidden)
+                } else {
+                    // oh boy, this is a pretty ugly hack
+                    iter.collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .skip(node.len() - self.selected_index)
+                        .find(|(n, _)| !n.hidden)
+                };
+
+                self.selected_index = iter.map_or(self.selected_index, |(n, _)| n.item_index);
             }
             Mode::List(items) => {
                 if items.is_empty() {
@@ -157,8 +201,24 @@ impl StyleBrowser {
     fn scroll_to_selected(&mut self) {
         let window = (self.scroll, self.scroll + self.list_height);
         match &self.mode {
-            Mode::Logical(_) => todo!(),
-            Mode::Deps(_) => todo!(),
+            Mode::Logical(node) | Mode::Deps(node) => {
+                let visible_index = node
+                    .iter_visible()
+                    .position(|(n, _)| n.item_index == self.selected_index);
+
+                let Some(visible_index) = visible_index else {
+                    self.scroll = 0;
+                    return;
+                };
+
+                if visible_index < window.0 as usize {
+                    self.scroll = visible_index as i32;
+                } else if visible_index >= window.1 as usize {
+                    self.scroll = visible_index as i32 - self.list_height + 1;
+                }
+
+                debug!("scroll: {}, selected index: {}, visible index: {visible_index}, window: {window:?}", self.scroll, self.selected_index);
+            }
             Mode::List(items) => {
                 let visible_index = items
                     .iter()
@@ -166,11 +226,6 @@ impl StyleBrowser {
                     .filter(|(_, (_, hidden))| !hidden)
                     .map(|(index, _)| index)
                     .position(|index| index == self.selected_index);
-
-                if visible_index.is_none() {
-                    self.scroll = 0;
-                    return;
-                }
 
                 let Some(visible_index) = visible_index else {
                     self.scroll = 0;
@@ -195,9 +250,9 @@ impl StyleBrowser {
         }
     }
 
-    fn visible_count(&self) -> usize {
+    fn visible_len(&self) -> usize {
         match &self.mode {
-            Mode::Logical(node) | Mode::Deps(node) => node.iter().filter(|n| !n.hidden).count(),
+            Mode::Logical(node) | Mode::Deps(node) => node.visible_len(),
             Mode::List(items) => items.iter().filter(|(_, hidden)| !hidden).count(),
         }
     }
@@ -322,54 +377,60 @@ impl Screen for StyleBrowser {
             (text, style, width)
         }
 
-        fn print_node(
-            frame: &mut Frame,
-            node: &NodeItem,
-            pos: Dims,
-            style: Style,
-            theme: &Theme,
-        ) -> i32 {
-            if node.hidden {
-                return 0;
-            }
-            frame.draw(
-                pos,
-                node.item
-                    .as_ref()
-                    .expect("non-root node must have payload")
-                    .payload
-                    .as_str(),
-                style,
-            );
-
-            if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
-                let (style_text, node_style, width) = render_style(node_style, theme);
-
-                frame.draw(
-                    Dims(frame.size.0 - width - RIGHT_MARGIN, pos.1),
-                    style_text.as_str(),
-                    node_style,
-                );
-            }
-
-            let mut yoff = 0;
-            for child in &node.children {
-                yoff += print_node(frame, child, pos + Dims(INDENT, yoff + 1), style, theme);
-            }
-            yoff + 1
-        }
-
-        let mut yoff = 2;
+        let yoff = 2;
         match &self.mode {
             Mode::Logical(node) | Mode::Deps(node) => {
-                for child in &node.children {
-                    yoff += print_node(
-                        &mut inner_frame,
-                        child,
-                        Dims(LEFT_MARGIN, yoff),
-                        text,
-                        theme,
+                for (index, (node, depth)) in node
+                    .iter_visible()
+                    .skip(self.scroll.max(0) as usize)
+                    .enumerate()
+                {
+                    let pos = Dims(LEFT_MARGIN + depth as i32 * INDENT, yoff + index as i32);
+                    inner_frame.draw(
+                        pos,
+                        format!(
+                            "{}:{}",
+                            node.item_index,
+                            node.item
+                                .as_ref()
+                                .expect("non-root node must have payload")
+                                .payload
+                                .as_str(),
+                        ),
+                        if node.hidden { dim } else { text },
                     );
+
+                    if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
+                        let (style_text, node_style, width) = render_style(node_style, theme);
+
+                        inner_frame.draw(
+                            Dims(frame.size.0 - width - RIGHT_MARGIN, pos.1),
+                            style_text.as_str(),
+                            node_style,
+                        );
+                    }
+
+                    if self.selected_index == node.item_index {
+                        for x in 0..inner_frame.size.0 {
+                            if let Some(cell) = inner_frame.try_get_mut(Dims(x, pos.1)) {
+                                match cell {
+                                    c @ Cell::Empty => {
+                                        *c = Cell::Content(CellContent {
+                                            character: ' ',
+                                            width: 1,
+                                            style: crossterm::style::ContentStyle {
+                                                attributes: Attributes::from(Attribute::Underlined),
+                                                ..crossterm::style::ContentStyle::default()
+                                            },
+                                        })
+                                    }
+                                    Cell::Content(c) => {
+                                        c.style.attributes.extend(Attribute::Underlined.into())
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             Mode::List(items) => {
@@ -378,8 +439,6 @@ impl Screen for StyleBrowser {
                     if *hidden || index < self.scroll as usize {
                         continue;
                     }
-
-                    let selected = self.selected_index == index;
 
                     if let Some(item_style) = item.style.as_ref() {
                         let (style_text, node_style, width) = render_style(&item_style, theme);
@@ -397,7 +456,7 @@ impl Screen for StyleBrowser {
                         text,
                     );
 
-                    if selected {
+                    if self.selected_index == index {
                         for x in 0..inner_frame.size.0 {
                             if let Some(cell) = inner_frame.try_get_mut(Dims(x, current + yoff)) {
                                 match cell {
@@ -455,16 +514,18 @@ impl NodeItem {
     fn from_style_node(
         root: Option<Item>,
         style_node: StyleNode<'_>,
-        mut index: usize,
+        index: &mut usize,
     ) -> NodeItem {
         let mut node = NodeItem {
             item: root,
             children: Vec::new(),
             hidden: false,
-            item_index: index,
+            item_index: *index,
         };
 
-        index += 1;
+        if node.item.is_some() {
+            *index += 1;
+        }
 
         node.children.reserve(style_node.map.len());
         for (key, value) in style_node.map {
@@ -476,8 +537,6 @@ impl NodeItem {
                 value,
                 index,
             ));
-
-            index = node.children.last().map_or(index, |n| n.item_index + 1);
         }
 
         node
@@ -516,6 +575,26 @@ impl NodeItem {
         inner(self) - if self.item.is_none() { 1 } else { 0 }
     }
 
+    fn visible_len(&self) -> usize {
+        fn inner(node: &NodeItem) -> usize {
+            if node.hidden {
+                return 0;
+            }
+            let mut count = 1; // count this node
+            for child in &node.children {
+                count += inner(child);
+            }
+            count
+        }
+
+        inner(self)
+            - if self.item.is_none() && !self.hidden {
+                1
+            } else {
+                0
+            }
+    }
+
     fn is_empty(&self) -> bool {
         self.children.is_empty() && self.item.is_none()
     }
@@ -526,6 +605,17 @@ impl NodeItem {
             index: 0,
             child: None,
             root: true,
+            visible_only: false,
+        }
+    }
+
+    fn iter_visible(&self) -> NodeItemIter {
+        NodeItemIter {
+            node: self,
+            index: 0,
+            child: None,
+            root: true,
+            visible_only: true,
         }
     }
 }
@@ -536,19 +626,24 @@ struct NodeItemIter<'a> {
     index: usize,
     child: Option<Box<NodeItemIter<'a>>>,
     root: bool,
+    visible_only: bool,
 }
 
 impl<'a> Iterator for NodeItemIter<'a> {
-    type Item = &'a NodeItem;
+    type Item = (&'a NodeItem, usize);
 
-    fn next(&mut self) -> Option<&'a NodeItem> {
+    fn next(&mut self) -> Option<Self::Item> {
         // TODO: this implementation should not allocate on every non-leaf node
+
+        if self.visible_only && self.node.hidden {
+            return None;
+        }
 
         if self.node.children.is_empty() {
             if self.index == 0 {
                 self.index = 1;
                 if !self.root {
-                    return Some(self.node);
+                    return Some((self.node, 0));
                 }
             }
 
@@ -563,35 +658,54 @@ impl<'a> Iterator for NodeItemIter<'a> {
                     index: 0,
                     child: None,
                     root: false,
+                    visible_only: self.visible_only,
                 }));
                 match self.root {
                     true => self.child.as_mut().unwrap(),
-                    false => return Some(self.node),
+                    false => return Some((self.node, 0)),
                 }
             }
         };
 
-        if let Some(next) = child.next() {
-            return Some(next);
+        if let Some((next, depth)) = child.next() {
+            return Some((next, depth + if self.root { 0 } else { 1 }));
         }
 
-        self.index += 1;
-        if self.index >= self.node.children.len() {
-            return None;
-        }
+        // to handle visible children after hidden ones, we need this loop
+        loop {
+            self.index += 1;
+            if self.index >= self.node.children.len() {
+                return None;
+            }
 
-        let next_child = &self.node.children[self.index];
-        self.child = Some(Box::new(NodeItemIter {
-            node: next_child,
-            index: 0,
-            child: None,
-            root: false,
-        }));
-        return self.child.as_mut().unwrap().next();
+            let next_child = &self.node.children[self.index];
+            self.child = Some(Box::new(NodeItemIter {
+                node: next_child,
+                index: 0,
+                child: None,
+                root: false,
+                visible_only: self.visible_only,
+            }));
+
+            match self
+                .child
+                .as_mut()
+                .unwrap()
+                .next()
+                .map(|(n, d)| (n, d + if self.root { 0 } else { 1 }))
+            {
+                Some(item) => return Some(item),
+                None => {}
+            }
+        }
     }
 
     fn count(self) -> usize {
-        self.node.len()
+        if self.visible_only {
+            self.node.visible_len()
+        } else {
+            self.node.len()
+        }
     }
 }
 
@@ -621,10 +735,6 @@ mod tests {
 
     #[test]
     fn style_browser_node_item_search() {
-        let resolver = ThemeResolver::new();
-        let mut style_browser = StyleBrowser::new(resolver);
-        style_browser.use_logical();
-
         let mut node = NodeItem {
             item: None,
             hidden: false,
@@ -658,6 +768,26 @@ mod tests {
                 },
             ],
         };
+
+        node.match_search_pattern("test", Some(false));
+        assert!(!node.hidden);
+        assert!(!node.children[0].hidden);
+        assert!(node.children[1].hidden);
+
+        node.match_search_pattern("child", Some(false));
+        assert!(!node.hidden);
+        assert!(!node.children[0].hidden);
+        assert!(node.children[1].hidden);
+
+        node.match_search_pattern("example", Some(false));
+        assert!(!node.hidden);
+        assert!(node.children[0].hidden);
+        assert!(!node.children[1].hidden);
+
+        node.match_search_pattern("fail", Some(false));
+        assert!(node.hidden);
+        assert!(node.children[0].hidden);
+        assert!(node.children[1].hidden);
 
         assert!(node.match_search_pattern("test", None));
         assert!(node.match_search_pattern("example", None));
@@ -709,18 +839,81 @@ mod tests {
         dbg!(node.iter().collect::<Vec<_>>());
         let mut iter = node.iter();
 
-        assert_eq!(iter.next().unwrap().item.as_ref().unwrap().payload, "test");
-        assert_eq!(
-            iter.next().unwrap().item.as_ref().unwrap().payload,
-            "test.child"
-        );
-        assert_eq!(
-            iter.next().unwrap().item.as_ref().unwrap().payload,
-            "example"
-        );
+        fn transform_next(next: Option<(&NodeItem, usize)>) -> (usize, &str) {
+            next.map(|(node, depth)| (depth, node.item.as_ref().unwrap().payload.as_str()))
+                .unwrap()
+        }
+
+        assert_eq!(transform_next(iter.next()), (0, "test"));
+        assert_eq!(transform_next(iter.next()), (1, "test.child"));
+        assert_eq!(transform_next(iter.next()), (0, "example"));
         assert!(iter.next().is_none());
 
         assert_eq!(node.len(), 3);
         assert_eq!(node.iter().count(), 3);
+    }
+
+    #[test]
+    fn style_browser_node_item_iter_visible() {
+        let resolver = ThemeResolver::new();
+        let mut style_browser = StyleBrowser::new(resolver);
+        style_browser.use_logical();
+
+        let node = NodeItem {
+            item: None,
+            hidden: false,
+            item_index: 0,
+            children: vec![
+                NodeItem {
+                    item: Some(Item {
+                        payload: "visible".to_string(),
+                        style: None,
+                    }),
+                    hidden: false,
+                    item_index: 1,
+                    children: vec![NodeItem {
+                        item: Some(Item {
+                            payload: "visible.child".to_string(),
+                            style: None,
+                        }),
+                        hidden: false,
+                        item_index: 2,
+                        children: vec![],
+                    }],
+                },
+                NodeItem {
+                    item: Some(Item {
+                        payload: "hidden".to_string(),
+                        style: None,
+                    }),
+                    hidden: true,
+                    item_index: 3,
+                    children: vec![NodeItem {
+                        item: Some(Item {
+                            payload: "hidden.child".to_string(),
+                            style: None,
+                        }),
+                        hidden: true,
+                        item_index: 4,
+                        children: vec![],
+                    }],
+                },
+            ],
+        };
+
+        dbg!(node.iter_visible().collect::<Vec<_>>());
+        let mut iter = node.iter_visible();
+
+        fn transform_next(next: Option<(&NodeItem, usize)>) -> (usize, &str) {
+            next.map(|(node, depth)| (depth, node.item.as_ref().unwrap().payload.as_str()))
+                .unwrap()
+        }
+
+        assert_eq!(transform_next(iter.next()), (0, "visible"));
+        assert_eq!(transform_next(iter.next()), (1, "visible.child"));
+        assert!(iter.next().is_none());
+
+        assert_eq!(node.len(), 4);
+        assert_eq!(node.visible_len(), 2);
     }
 }
