@@ -89,12 +89,7 @@ impl StyleBrowser {
 
     fn update_search(&mut self) {
         fn select_closest_node(index: usize, node: &NodeItem) -> usize {
-            if node
-                .iter_visible()
-                .filter(|(n, _)| n.item_index == index)
-                .next()
-                .is_some()
-            {
+            if node.iter_visible().any(|(n, _)| n.item_index == index) {
                 return index;
             }
 
@@ -126,9 +121,7 @@ impl StyleBrowser {
                     .iter()
                     .enumerate()
                     .filter(|(_, (_, hidden))| !hidden)
-                    .filter(|(index, (_, _))| *index == self.selected_index)
-                    .next()
-                    .is_none()
+                    .any(|(index, (_, _))| index == self.selected_index)
                 {
                     match items
                         .iter()
@@ -242,24 +235,10 @@ impl StyleBrowser {
             }
         }
     }
-
-    fn len(&self) -> usize {
-        match &self.mode {
-            Mode::Logical(node) | Mode::Deps(node) => node.len(),
-            Mode::List(items) => items.len(),
-        }
-    }
-
-    fn visible_len(&self) -> usize {
-        match &self.mode {
-            Mode::Logical(node) | Mode::Deps(node) => node.visible_len(),
-            Mode::List(items) => items.iter().filter(|(_, hidden)| !hidden).count(),
-        }
-    }
 }
 
 impl ActivityHandler for StyleBrowser {
-    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
         for event in events {
             match event {
                 Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if not_release(kind) => {
@@ -329,7 +308,8 @@ impl Screen for StyleBrowser {
                 inner_frame.draw(Dims(1, 0), self.search.as_str(), text);
             }
 
-            const TABS: [(&str, fn(&Mode) -> bool); 3] = [
+            type Tab = (&'static str, fn(&Mode) -> bool);
+            const TABS: [Tab; 3] = [
                 ("By name", |x| matches!(x, Mode::Logical(_))),
                 ("Inheritance", |x| matches!(x, Mode::Deps(_))),
                 ("List", |x| matches!(x, Mode::List(_))),
@@ -369,7 +349,7 @@ impl Screen for StyleBrowser {
             let style = theme.get(style);
             let text = match (style.fg, style.bg) {
                 (Some(fg), Some(gb)) => format!("{} on {}", fg.as_text(), gb.as_text()),
-                (Some(fg), None) => format!("{fg}", fg = fg.as_text()),
+                (Some(fg), None) => fg.as_text().to_string(),
                 (None, Some(bg)) => format!("on {bg}", bg = bg.as_text()),
                 (None, None) => String::new(),
             };
@@ -441,7 +421,7 @@ impl Screen for StyleBrowser {
                     }
 
                     if let Some(item_style) = item.style.as_ref() {
-                        let (style_text, node_style, width) = render_style(&item_style, theme);
+                        let (style_text, node_style, width) = render_style(item_style, theme);
 
                         inner_frame.draw(
                             Dims(inner_frame.size.0 - width - RIGHT_MARGIN, current + yoff),
@@ -687,15 +667,14 @@ impl<'a> Iterator for NodeItemIter<'a> {
                 visible_only: self.visible_only,
             }));
 
-            match self
+            if let Some(item) = self
                 .child
                 .as_mut()
                 .unwrap()
                 .next()
                 .map(|(n, d)| (n, d + if self.root { 0 } else { 1 }))
             {
-                Some(item) => return Some(item),
-                None => {}
+                return Some(item);
             }
         }
     }
