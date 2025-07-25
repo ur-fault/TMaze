@@ -6,7 +6,8 @@ use cmaze::dims::Dims;
 use super::{draw_fn::*, *};
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
-    helpers::is_release, renderer::Frame as _,
+    helpers::is_release,
+    renderer::Frame as _,
 };
 
 pub struct Popup {

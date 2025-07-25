@@ -875,7 +875,12 @@ impl Screen for GameActivity {
 }
 
 #[inline]
-fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut FrameBuffer, vp: Rect, theme: &Theme) {
+fn render_edge_follow_rulers(
+    rulers: (Offset, Offset),
+    frame: &mut FrameBuffer,
+    vp: Rect,
+    theme: &Theme,
+) {
     let [s_start, s_end] = theme.extract(["debug.rulers.start", "debug.rulers.end"]);
 
     let vps = vp.size();
@@ -972,7 +977,12 @@ impl MazeBoard {
         frame
     }
 
-    fn render_stairs(frame: &mut FrameBuffer, floors: Array2DView<Cell>, tower: bool, theme: &Theme) {
+    fn render_stairs(
+        frame: &mut FrameBuffer,
+        floors: Array2DView<Cell>,
+        tower: bool,
+        theme: &Theme,
+    ) {
         let s_stairs_up = theme["game.stairs.up"];
         let s_stairs_down = theme["game.stairs.down"];
         let s_stairs_both = theme["game.stairs.both"];

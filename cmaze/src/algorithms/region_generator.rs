@@ -10,7 +10,7 @@ use crate::{
     progress::ProgressHandle,
 };
 
-use super::{CellMask, Dims3D,  Params, Random};
+use super::{CellMask, Dims3D, Params, Random};
 
 pub trait RegionGenerator: fmt::Debug + Sync + Send {
     fn generate(

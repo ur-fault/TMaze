@@ -44,7 +44,7 @@ impl ActivityHandler for MyActivity {
         self.1.update(events, data)
     }
 
-    fn screen(&self) -> &dyn tmaze::ui::Screen {
-        &self.1
+    fn screen(&mut self) -> &mut dyn tmaze::ui::Screen {
+        &mut self.1
     }
 }

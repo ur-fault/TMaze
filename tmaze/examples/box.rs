@@ -4,7 +4,7 @@ use cmaze::dims::Dims;
 use tmaze::{
     app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
-    renderer::{Cell, Frame},
+    renderer::{Cell, FrameBuffer},
     settings::theme::Theme,
     ui::Screen,
 };
@@ -35,16 +35,16 @@ impl ActivityHandler for MyActivity {
         None
     }
 
-    fn screen(&self) -> &dyn Screen {
+    fn screen(&mut self) -> &mut dyn Screen {
         self
     }
 }
 
 impl Screen for MyActivity {
-    fn draw(&self, frame: &mut Frame, _: &Theme) -> io::Result<()> {
+    fn draw(&mut self, frame: &mut FrameBuffer, _: &Theme) -> io::Result<()> {
         for y in 0..5 {
             for x in 0..5 {
-                frame.set(Dims(x, y), Cell::new('█'));
+                frame[Dims(x, y)] = Cell::new('█');
             }
         }
 
