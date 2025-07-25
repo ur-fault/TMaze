@@ -102,6 +102,7 @@ impl StyleBrowser {
                 None => 0,
             }
         }
+
         match &mut self.mode {
             Mode::Logical(node) => {
                 node.match_search_pattern(&self.search, Some(false));
@@ -368,15 +369,11 @@ impl Screen for StyleBrowser {
                     let pos = Dims(LEFT_MARGIN + depth as i32 * INDENT, yoff + index as i32);
                     inner_frame.draw(
                         pos,
-                        format!(
-                            "{}:{}",
-                            node.item_index,
-                            node.item
-                                .as_ref()
-                                .expect("non-root node must have payload")
-                                .payload
-                                .as_str(),
-                        ),
+                        node.item
+                            .as_ref()
+                            .expect("non-root node must have payload")
+                            .payload
+                            .as_str(),
                         if node.hidden { dim } else { text },
                     );
 
