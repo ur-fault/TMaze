@@ -266,6 +266,7 @@ impl ActivityHandler for StyleBrowser {
                         KeyCode::Down | KeyCode::Up => {
                             self.update_selected(matches!(code, KeyCode::Up));
                         }
+                        KeyCode::Enter => panic!("{:#?}", self.mode),
                         _ => {}
                     }
                 }
@@ -374,14 +375,14 @@ impl Screen for StyleBrowser {
                             .expect("non-root node must have payload")
                             .payload
                             .as_str(),
-                        if node.hidden { dim } else { text },
+                        text,
                     );
 
                     if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
                         let (style_text, node_style, width) = render_style(node_style, theme);
 
                         inner_frame.draw(
-                            Dims(frame.size.0 - width - RIGHT_MARGIN, pos.1),
+                            Dims(inner_frame.size.0 - width - RIGHT_MARGIN, pos.1),
                             style_text.as_str(),
                             node_style,
                         );
