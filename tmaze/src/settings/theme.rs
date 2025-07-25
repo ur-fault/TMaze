@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Display, ops, path::PathBuf};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Display, ops, path::PathBuf};
 
 use crossterm::style::{Attributes, ContentStyle};
 use hashbrown::HashMap;
@@ -387,26 +387,35 @@ impl ThemeResolver {
         fn add<'a, 'b>(
             node: &'b mut StyleNode<'a>,
             segs: &[&'a str],
+            root: bool,
         ) -> Option<&'b mut StyleNode<'a>> {
             if segs.is_empty() {
                 return None;
             }
             let seg = segs[0];
-            let child = node.map.entry(seg).or_insert_with(StyleNode::new);
+            let child = if !root {
+                let key = format!(".{}", seg);
+                node.map
+                    .entry(Cow::Owned(key))
+                    .or_insert_with(StyleNode::new)
+            } else {
+                node.map
+                    .entry(Cow::from(seg))
+                    .or_insert_with(StyleNode::new)
+            };
+
             if segs.len() == 1 {
                 return Some(child);
             }
-            add(child, &segs[1..])
+
+            add(child, &segs[1..], false)
         }
 
         let mut node = StyleNode::new();
         let theme_resolver = self.as_map();
         for style in theme_resolver.keys() {
             let segs = style.split('.').collect::<Vec<_>>();
-            // if let Some(node) = add(&mut node, &segs) {
-            //     node.style = Some(style);
-            // }
-            add(&mut node, &segs).unwrap().style = Some(style);
+            add(&mut node, &segs, true).unwrap().style = Some(style);
         }
 
         node
@@ -418,7 +427,7 @@ impl ThemeResolver {
                 let mut new_node = StyleNode::new();
                 new_node.style = Some(key);
                 add(&mut new_node, map, key);
-                node.map.insert(key, new_node);
+                node.map.insert(Cow::Borrowed(key), new_node);
             }
         }
 
@@ -430,7 +439,7 @@ impl ThemeResolver {
 
 #[derive(Debug)]
 pub struct StyleNode<'a> {
-    pub map: BTreeMap<&'a str, StyleNode<'a>>,
+    pub map: BTreeMap<Cow<'a, str>, StyleNode<'a>>,
     pub style: Option<&'a str>,
 }
 
