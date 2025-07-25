@@ -1,7 +1,7 @@
 use tmaze::{
     app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
     helpers::constants::paths::{save_data_path, settings_path},
-    settings::{style_browser::StyleBrowser, Settings},
+    settings::Settings,
 };
 
 #[cfg(feature = "updates")]
@@ -87,15 +87,9 @@ fn main() -> Result<(), GameError> {
     better_panic::install();
 
     let mut app = App::empty(_args.read_only);
-    // let menu = MainMenu::new();
-    // app.activities_mut()
-    //     .push(Activity::new_base_boxed("main menu", menu));
-
-    let resolver = app.data().theme_resolver.clone();
-    app.activities_mut().push(Activity::new_base_boxed(
-        "style browser",
-        StyleBrowser::new(resolver.clone()),
-    ));
+    let menu = MainMenu::new();
+    app.activities_mut()
+        .push(Activity::new_base_boxed("main menu", menu));
 
     #[cfg(feature = "updates")]
     updates::check(app.data_mut());
