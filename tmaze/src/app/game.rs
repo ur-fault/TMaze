@@ -543,7 +543,7 @@ impl GameActivity {
         let vp_size = screen_size - self.margins * 2;
 
         let maze_frame = &self.maze_board.frames[self.data.game.get_player_pos().2 as usize];
-        let floor_size = maze_frame.size;
+        let floor_size = maze_frame.size();
 
         let does_fit = floor_size.0 <= vp_size.0 && floor_size.1 <= vp_size.1;
 

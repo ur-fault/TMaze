@@ -250,8 +250,7 @@ impl Cell {
 
 pub struct Frame {
     buffer: Vec<Vec<Cell>>,
-    // TODO: make `size` private and provide a getter
-    pub(crate) size: Dims,
+    size: Dims,
 }
 
 impl Frame {
@@ -262,6 +261,10 @@ impl Frame {
             buffer.push(vec![Cell::new(' '); size.0 as usize]);
         }
         Frame { buffer, size }
+    }
+
+    pub fn size(&self) -> Dims {
+        self.size
     }
 
     pub fn put_char_styled(&mut self, Dims(x, y): Dims, character: char, style: Style) -> usize {

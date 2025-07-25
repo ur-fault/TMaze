@@ -289,19 +289,19 @@ impl Screen for StyleBrowser {
         let [border, text, search, background] =
             theme.extract(["sb.border", "sb.text", "sb.search", "sb.background"]);
 
-        Rect::new(CONTENT_MARGIN, frame.size - CONTENT_MARGIN - Dims(1, 1)).draw(
+        Rect::new(CONTENT_MARGIN, frame.size() - CONTENT_MARGIN - Dims(1, 1)).draw(
             Dims(0, 0),
             frame,
             border,
         );
 
-        let mut inner_frame = Frame::new(frame.size - CONTENT_MARGIN * 2 - Dims(2, 2));
+        let mut inner_frame = Frame::new(frame.size() - CONTENT_MARGIN * 2 - Dims(2, 2));
         inner_frame.fill(Cell::Content(CellContent {
             character: ' ',
             width: 1,
             style: background.into(),
         }));
-        self.list_height = inner_frame.size.1 as usize - 2;
+        self.list_height = inner_frame.size().1 as usize - 2;
 
         {
             if self.search.is_empty() {
@@ -323,7 +323,7 @@ impl Screen for StyleBrowser {
                 .sum::<i32>();
 
             // i've no why -2 is needed here, but it's cut off without it
-            let mut xoff = inner_frame.size.0 - tabs_width - 6;
+            let mut xoff = inner_frame.size().0 - tabs_width - 6;
             for (name, is_mode) in TABS {
                 if is_mode(&self.mode) {
                     inner_frame.draw(
@@ -343,7 +343,7 @@ impl Screen for StyleBrowser {
             LineDir::Horizontal
                 .round()
                 .to_string()
-                .repeat(inner_frame.size.0 as usize),
+                .repeat(inner_frame.size().0 as usize),
             border,
         );
 
@@ -378,14 +378,14 @@ impl Screen for StyleBrowser {
                         let (style_text, node_style, width) = render_style(node_style, theme);
 
                         inner_frame.draw(
-                            Dims(inner_frame.size.0 - width - RIGHT_MARGIN, pos.1),
+                            Dims(inner_frame.size().0 - width - RIGHT_MARGIN, pos.1),
                             style_text.as_str(),
                             node_style,
                         );
                     }
 
                     if self.selected_index == node.item_index {
-                        for x in 0..inner_frame.size.0 {
+                        for x in 0..inner_frame.size().0 {
                             if let Some(cell) = inner_frame.try_get_mut(Dims(x, pos.1)) {
                                 match cell {
                                     c @ Cell::Empty => {
@@ -420,7 +420,7 @@ impl Screen for StyleBrowser {
 
                         inner_frame.draw(
                             Dims(
-                                inner_frame.size.0 - width - RIGHT_MARGIN,
+                                inner_frame.size().0 - width - RIGHT_MARGIN,
                                 current as i32 + yoff,
                             ),
                             style_text.as_str(),
@@ -435,7 +435,7 @@ impl Screen for StyleBrowser {
                     );
 
                     if self.selected_index == index {
-                        for x in 0..inner_frame.size.0 {
+                        for x in 0..inner_frame.size().0 {
                             if let Some(cell) =
                                 inner_frame.try_get_mut(Dims(x, current as i32 + yoff))
                             {
