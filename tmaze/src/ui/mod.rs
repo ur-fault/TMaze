@@ -12,6 +12,7 @@ use crate::{
 pub mod button;
 pub mod draw_fn;
 pub mod helpers;
+pub mod layout;
 pub mod menu;
 pub mod popup;
 pub mod progressbar;
@@ -22,6 +23,7 @@ pub mod usecase;
 pub use button::*;
 pub use draw_fn::*;
 pub use helpers::*;
+pub use layout::*;
 pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
