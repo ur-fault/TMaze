@@ -894,13 +894,8 @@ fn render_edge_follow_rulers(
     const V: char = Vertical.round();
     const H: char = Horizontal.round();
 
-    let mut draw = |pos, dir, end| {
-        let style = match end {
-            false => s_start,
-            true => s_end,
-        };
-        frame.draw(frame_pos + pos, dir, style)
-    };
+    let mut draw =
+        |pos, dir, end| frame.draw(frame_pos + pos, dir, if end { s_end } else { s_start });
 
     #[rustfmt::skip]
     {
