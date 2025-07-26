@@ -323,6 +323,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
 
     // These methods are used to create views of the frame, allowing for more complex layouts.
 
+    #[inline]
     fn centered(&mut self, size: Dims, content: impl FnOnce(FrameView<'_, Self>)) -> &mut Self {
         let start_x = (self.size().0 - size.0) / 2;
         let start_y = (self.size().1 - size.1) / 2;
@@ -333,6 +334,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn top(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let size = Dims(self.size().0, len);
         content(&mut FrameView {
@@ -342,6 +344,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn bottom(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let start_y = self.size().1 - len;
         let size = Dims(self.size().0, len);
@@ -352,6 +355,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn left(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let size = Dims(len, self.size().1);
         content(&mut FrameView {
@@ -361,6 +365,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn right(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let start_x = self.size().0 - len;
         let size = Dims(len, self.size().1);
@@ -371,6 +376,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn off_top(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let start_y = by;
         let size = Dims(self.size().0, self.size().1 - by);
@@ -381,6 +387,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn off_bottom(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let start_y = self.size().1 - by;
         let size = Dims(self.size().0, self.size().1 - by);
@@ -391,6 +398,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn off_left(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let start_x = by;
         let size = Dims(self.size().0 - by, self.size().1);
@@ -401,6 +409,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn off_right(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let start_x = self.size().0 - by;
         let size = Dims(self.size().0 - by, self.size().1);
@@ -411,6 +420,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
+    #[inline]
     fn pad(&mut self, padding: Padding, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         let size = self.size();
         let start_x = padding.left;
@@ -427,12 +437,14 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self
     }
 
-    fn split(
+    #[inline]
+    fn split<T>(
         &mut self,
         ratio: Offset,
         vertical: bool,
-        first: impl FnOnce(&mut FrameView<Self>),
-        second: impl FnOnce(&mut FrameView<Self>),
+        payload: &mut T, // to allow passing &mut T to the closures, e.g. &mut self
+        first: impl FnOnce(&mut FrameView<Self>, &mut T),
+        second: impl FnOnce(&mut FrameView<Self>, &mut T),
     ) -> &mut Self {
         let (f, s) = if vertical {
             Rect::sized(self.size()).split_y(ratio)
@@ -443,20 +455,22 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         first(&mut FrameView {
             frame: self,
             bounds: f,
-        });
+        }, payload);
         second(&mut FrameView {
             frame: self,
             bounds: s,
-        });
+        }, payload);
 
         self
     }
 
+    #[inline]
     fn inside(&mut self, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
         self.pad(Padding::from(1), content);
         self
     }
 
+    #[inline]
     fn border(&mut self, style: Style) -> &mut Self {
         Rect::sized(self.size()).render(self, style);
         self
