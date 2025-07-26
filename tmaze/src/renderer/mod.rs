@@ -9,6 +9,7 @@ use std::{
 
 use cmaze::dims::{Dims, Offset};
 use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
+use drawable::{Align, SizedDrawable};
 use unicode_width::UnicodeWidthChar;
 
 use crate::{settings::theme::Style, ui::Rect};
@@ -289,11 +290,12 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         width as usize
     }
 
-    fn draw<S>(&mut self, pos: Dims, content: impl Drawable<S>, styles: S)
-    where
-        Self: Sized,
-    {
+    fn draw<S>(&mut self, pos: Dims, content: impl Drawable<S>, styles: S) {
         content.draw(pos, self, styles);
+    }
+
+    fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S) {
+        content.draw_aligned(align, self, styles);
     }
 
     fn fill(&mut self, cell: Cell) {
