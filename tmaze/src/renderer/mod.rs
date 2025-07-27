@@ -463,6 +463,14 @@ impl FrameViewMut<'_> {
     {
         content.draw_aligned(align, self, styles);
     }
+    #[inline]
+    pub fn bounds(&mut self, bounds: Rect, content: impl FnOnce(FrameViewMut<'_>)) -> &mut Self {
+        content(FrameViewMut {
+            frame: self.frame,
+            bounds,
+        });
+        self
+    }
 
     #[inline]
     pub fn centered(&mut self, size: Dims, content: impl FnOnce(FrameViewMut<'_>)) -> &mut Self {
