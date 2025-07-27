@@ -125,7 +125,7 @@ impl UiLogs {
 }
 
 impl Drawable<&Theme> for UiLogs {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, theme: &Theme) {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, theme: &Theme) {
         let [msg_style, source_style, extra] =
             theme.extract(["log.message", "log.source", "log.extra"]);
 

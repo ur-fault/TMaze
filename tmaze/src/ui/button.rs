@@ -126,7 +126,7 @@ impl Button {
         let AppliedStyles { normal, content } = self.apply_styles(theme);
 
         // Box
-        frame.draw(self.pos, Rect::sized(self.size), normal);
+        frame.view().draw(self.pos, Rect::sized(self.size), normal);
 
         // Background
         frame.fill_rect(
@@ -141,7 +141,7 @@ impl Button {
         let text = strings::trim_center(self.text.as_str(), text_rect.size().0 as usize);
         let style = content;
 
-        frame.draw(text_rect.start, text, style);
+        frame.view().draw(text_rect.start, text, style);
     }
 
     pub fn detect_over(&self, pos: Dims) -> bool {

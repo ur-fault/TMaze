@@ -238,7 +238,7 @@ impl StyleBrowser {
     }
 
     fn search_bar(&mut self, border: Style, text: Style, search: Style, f: &mut impl Frame) {
-        f.pad(Padding::hor(1), |f| {
+        f.view().pad(Padding::hor(1), |f| {
             if self.search.is_empty() {
                 f.draw(Dims::ZERO, "<Search>", search);
             } else {
@@ -274,7 +274,7 @@ impl StyleBrowser {
         });
 
         // separator line
-        f.bottom(1, |f| {
+        f.view().bottom(1, |f| {
             f.border(border);
         });
     }
@@ -299,7 +299,7 @@ impl StyleBrowser {
             Mode::Logical(node) | Mode::Deps(node) => {
                 for (index, (node, depth)) in node.iter_visible().skip(self.scroll).enumerate() {
                     let pos = Dims(LEFT_MARGIN + depth as i32 * INDENT, index as i32);
-                    f.draw(
+                    f.view().draw(
                         pos,
                         node.item
                             .as_ref()
@@ -312,8 +312,9 @@ impl StyleBrowser {
                     if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
                         let (style_text, node_style, width) = render_style(node_style, theme);
 
-                        f.draw(
-                            Dims(f.size().0 - width - RIGHT_MARGIN, pos.1),
+                        let size = f.size();
+                        f.view().draw(
+                            Dims(size.0 - width - RIGHT_MARGIN, pos.1),
                             style_text.as_str(),
                             node_style,
                         );
@@ -353,14 +354,15 @@ impl StyleBrowser {
                     if let Some(item_style) = item.style.as_ref() {
                         let (style_text, node_style, width) = render_style(item_style, theme);
 
-                        f.draw(
-                            Dims(f.size().0 - width - RIGHT_MARGIN, current as i32),
+                        let size = f.size();
+                        f.view().draw(
+                            Dims(size.0 - width - RIGHT_MARGIN, current as i32),
                             style_text.as_str(),
                             node_style,
                         );
                     }
 
-                    f.draw(
+                    f.view().draw(
                         Dims(LEFT_MARGIN, current as i32),
                         item.payload.as_str(),
                         text,
@@ -442,7 +444,7 @@ impl Screen for StyleBrowser {
         let [border, text, search, background] =
             theme.extract(["sb.border", "sb.text", "sb.search", "sb.background"]);
 
-        frame.pad(CONTENT_MARGIN.into(), |f| {
+        frame.view().pad(CONTENT_MARGIN.into(), |f| {
             f.border(border).inside(|f| {
                 f.fill(Cell::Content(CellContent {
                     character: ' ',

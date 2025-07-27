@@ -559,6 +559,7 @@ impl Screen for Menu {
 
         draw_box(frame, pos, size, border_style);
 
+        let mut frame = frame.view();
         frame.draw(title_pos, title.as_str(), title_style);
 
         for (i, subtitle) in self.config.subtitles.iter().enumerate() {
@@ -571,10 +572,7 @@ impl Screen for Menu {
 
         frame.draw(
             items_pos - Dims(0, 1),
-            LineDir::Horizontal
-                .round()
-                .to_string()
-                .repeat(size.0 as usize - 2),
+            Rect::sized(Dims(size.0 - 2, 1)),
             separator_style,
         );
 

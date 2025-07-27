@@ -153,7 +153,7 @@ impl Rect {
 }
 
 impl Drawable<Style> for Rect {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, style: Style) {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, style: Style) {
         draw_box(frame, pos + self.start, self.size(), style);
     }
 }

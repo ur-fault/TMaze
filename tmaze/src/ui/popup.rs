@@ -66,6 +66,7 @@ impl Screen for Popup {
         let title_style = theme["ui.popup.title"];
 
         draw_box(frame, pos, box_size, box_style);
+        let mut frame = frame.view();
         frame.draw(Dims(title_pos, pos.1 + 1), self.title.as_str(), title_style);
 
         if !self.texts.is_empty() {

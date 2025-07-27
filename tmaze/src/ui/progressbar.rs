@@ -40,6 +40,7 @@ impl Screen for ProgressBar {
         let prg_style = theme["ui.progressbar.progress"];
 
         draw_box(frame, pos, progress_size, box_style);
+        let mut frame = frame.view();
         frame.draw(pos + Dims(2, 1), self.title.as_str(), text_style);
         frame.draw(pos + Dims(2, 2), prg, prg_style);
 
