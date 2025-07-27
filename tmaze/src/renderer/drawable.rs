@@ -6,32 +6,38 @@ use crate::settings::theme::Style;
 use super::{Cell, Frame};
 
 pub trait Drawable<S = ()> {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, styles: S);
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: S);
+}
+
+impl<D: Drawable> Drawable for &D {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: ()) {
+        (**self).draw(pos, frame, styles);
+    }
 }
 
 impl Drawable<Style> for char {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, style: Style) {
-        frame.put_char(pos, *self, style);
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: Style) {
+        frame.put_char(pos, *self, styles);
     }
 }
 
 impl Drawable<Style> for String {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, style: Style) {
-        self.as_str().draw(pos, frame, style);
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: Style) {
+        self.as_str().draw(pos, frame, styles);
     }
 }
 
 impl Drawable<Style> for &'_ str {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, style: Style) {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: Style) {
         let mut x = 0;
         for character in self.chars() {
-            x += frame.put_char(Dims(pos.0 + x as i32, pos.1), character, style);
+            x += frame.put_char(Dims(pos.0 + x as i32, pos.1), character, styles);
         }
     }
 }
 
 impl Drawable for Cell {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, _: ()) {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _styles: ()) {
         frame[pos] = *self;
     }
 }
@@ -51,11 +57,11 @@ pub enum Align {
 pub trait SizedDrawable<S = ()>: Drawable<S> {
     fn size(&self) -> Dims;
 
-    fn draw_aligned(&self, align: Align, frame: &mut impl Frame, styles: S) {
+    fn align(&self, align: Align, frame_size: Dims) -> Dims {
+        let Dims(width, height) = frame_size;
         let size = self.size();
-        let Dims(width, height) = frame.size();
 
-        let pos = match align {
+        match align {
             Align::TopLeft => Dims(0, 0),
             Align::TopCenter => Dims((width - size.0) / 2, 0),
             Align::TopRight => Dims(width - size.0, 0),
@@ -65,8 +71,11 @@ pub trait SizedDrawable<S = ()>: Drawable<S> {
             Align::BottomLeft => Dims(0, height - size.1),
             Align::BottomCenter => Dims((width - size.0) / 2, height - size.1),
             Align::BottomRight => Dims(width - size.0, height - size.1),
-        };
+        }
+    }
 
+    fn draw_aligned(&self, align: Align, frame: &mut dyn Frame, styles: S) {
+        let pos = self.align(align, frame.size());
         self.draw(pos, frame, styles);
     }
 }
@@ -92,5 +101,19 @@ impl SizedDrawable<Style> for &'_ str {
 impl SizedDrawable for Cell {
     fn size(&self) -> Dims {
         Dims::ONE
+    }
+}
+
+pub struct Styled<T, S>(pub T, pub S);
+
+impl<T: Drawable<S>, S: Clone> Drawable for Styled<T, S> {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
+        self.0.draw(pos, frame, self.1.clone());
+    }
+}
+
+impl<T: SizedDrawable<S>, S: Clone> SizedDrawable for Styled<T, S> {
+    fn size(&self) -> Dims {
+        self.0.size()
     }
 }

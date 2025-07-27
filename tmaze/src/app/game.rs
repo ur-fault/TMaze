@@ -597,7 +597,7 @@ impl GameActivity {
         let br = vp.start + vp.size();
 
         let style = theme["text"];
-        let mut draw = |text: &str, pos| frame.draw(pos, text, style);
+        let mut draw = |text: &str, pos| frame.view().draw(pos, text, style);
 
         draw(&pos_text, tl);
         draw(view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
@@ -613,8 +613,7 @@ impl GameActivity {
             let cell = game.get_maze().board.get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
                 let real_pos = maze2screen(*move_pos) + maze_pos;
-                frame.draw(real_pos, '.', theme["game.visited"]); // FIXME: move out of the
-                                                                  // loop
+                frame.view().draw(real_pos, '.', theme["game.visited"]); // FIXME: move out of the loop
             }
         }
     }
@@ -640,7 +639,9 @@ impl GameActivity {
                 .style
                 .foreground_color = theme["game.player"].to_cross().foreground_color;
         } else {
-            viewport.draw(player_draw_pos, self.data.player_char, theme["game.player"]);
+            viewport
+                .view()
+                .draw(player_draw_pos, self.data.player_char, theme["game.player"]);
         }
     }
 
@@ -831,7 +832,7 @@ impl Screen for GameActivity {
         let mut viewport = FrameBuffer::new(vp_size);
 
         // maze
-        viewport.draw(maze_pos, maze_frame, ());
+        viewport.view().draw(maze_pos, maze_frame.imview(), ());
         self.render_visited_places(&mut viewport, maze_pos, theme);
 
         // player
@@ -852,14 +853,16 @@ impl Screen for GameActivity {
 
         self.render_meta_texts(frame, theme, vp_rect);
 
-        frame.draw(vp_pos, &viewport, ());
+        frame.view().draw(vp_pos, viewport.view(), ());
 
         // touch controls
         if let Some(ref touch_controls) = self.touch_controls {
             let mut dpad_frame = FrameBuffer::new(self.dpad_rect.unwrap().size());
 
             touch_controls.render(&mut dpad_frame, theme);
-            frame.draw(self.dpad_rect.unwrap().start, &dpad_frame, ());
+            frame
+                .view()
+                .draw(self.dpad_rect.unwrap().start, dpad_frame.view(), ());
         }
 
         if self.show_debug {
@@ -894,8 +897,11 @@ fn render_edge_follow_rulers(
     const V: char = Vertical.round();
     const H: char = Horizontal.round();
 
-    let mut draw =
-        |pos, dir, end| frame.draw(frame_pos + pos, dir, if end { s_end } else { s_start });
+    let mut draw = |pos, dir, end| {
+        frame
+            .view()
+            .draw(frame_pos + pos, dir, if end { s_end } else { s_start })
+    };
 
     #[rustfmt::skip]
     {
@@ -937,7 +943,7 @@ impl MazeBoard {
         let mut frame = FrameBuffer::new(size);
         frame.fill(renderer::Cell::styled(' ', theme["game.background"]));
 
-        let mut draw = |pos, l: LineDir| frame.draw(Dims::from(pos), l.double(), normals);
+        let mut draw = |pos, l: LineDir| frame.view().draw(Dims::from(pos), l.double(), normals);
 
         for y in -1..board.size().1 {
             for x in -1..board.size().0 {
@@ -995,7 +1001,7 @@ impl MazeBoard {
 
             let style = if tower && up { s_stairs_up_tower } else { st };
             let pos = maze2screen(pos);
-            frame.draw(pos, ch, style);
+            frame.view().draw(pos, ch, style);
         }
     }
 
@@ -1004,7 +1010,7 @@ impl MazeBoard {
         let goal_pos = game.get_goal_pos();
 
         let frame = &mut frames[goal_pos.2 as usize];
-        frame.draw(maze2screen(goal_pos), '$', goal_style);
+        frame.view().draw(maze2screen(goal_pos), '$', goal_style);
     }
 }
 

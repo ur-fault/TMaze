@@ -250,7 +250,7 @@ impl Cell {
     }
 }
 
-pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
+pub trait Frame: IndexMut<Dims, Output = Cell> {
     fn size(&self) -> Dims;
 
     // These 2 methods are used as a source of truth for the frame. Ideally, all other methods
@@ -290,14 +290,6 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         width as usize
     }
 
-    fn draw<S>(&mut self, pos: Dims, content: impl Drawable<S>, styles: S) {
-        content.draw(pos, self, styles);
-    }
-
-    fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S) {
-        content.draw_aligned(align, self, styles);
-    }
-
     fn fill(&mut self, cell: Cell) {
         for y in 0..self.size().1 {
             for x in 0..self.size().0 {
@@ -321,164 +313,15 @@ pub trait Frame: IndexMut<Dims, Output = Cell> + Sized {
         self.fill(Cell::new(' '));
     }
 
-    // These methods are used to create views of the frame, allowing for more complex layouts.
+    fn imview(&self) -> FrameView<'_>;
 
-    #[inline]
-    fn centered(&mut self, size: Dims, content: impl FnOnce(FrameView<'_, Self>)) -> &mut Self {
-        let start_x = (self.size().0 - size.0) / 2;
-        let start_y = (self.size().1 - size.1) / 2;
-        content(FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, start_y), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn top(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let size = Dims(self.size().0, len);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, 0), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn bottom(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let start_y = self.size().1 - len;
-        let size = Dims(self.size().0, len);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, start_y), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn left(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let size = Dims(len, self.size().1);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, 0), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn right(&mut self, len: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let start_x = self.size().0 - len;
-        let size = Dims(len, self.size().1);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, 0), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn off_top(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let start_y = by;
-        let size = Dims(self.size().0, self.size().1 - by);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, start_y), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn off_bottom(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let start_y = self.size().1 - by;
-        let size = Dims(self.size().0, self.size().1 - by);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, start_y), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn off_left(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let start_x = by;
-        let size = Dims(self.size().0 - by, self.size().1);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, 0), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn off_right(&mut self, by: i32, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let start_x = self.size().0 - by;
-        let size = Dims(self.size().0 - by, self.size().1);
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, 0), size),
-        });
-        self
-    }
-
-    #[inline]
-    fn pad(&mut self, padding: Padding, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        let size = self.size();
-        let start_x = padding.left;
-        let start_y = padding.top;
-        let inner_size = Dims(
-            size.0 - padding.left - padding.right,
-            size.1 - padding.top - padding.bottom,
-        );
-
-        content(&mut FrameView {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, start_y), inner_size),
-        });
-        self
-    }
-
-    #[inline]
-    fn split<T>(
-        &mut self,
-        ratio: Offset,
-        vertical: bool,
-        payload: &mut T, // to allow passing &mut T to the closures, e.g. &mut self
-        first: impl FnOnce(&mut FrameView<Self>, &mut T),
-        second: impl FnOnce(&mut FrameView<Self>, &mut T),
-    ) -> &mut Self {
-        let (f, s) = if vertical {
-            Rect::sized(self.size()).split_y(ratio)
-        } else {
-            Rect::sized(self.size()).split_x(ratio)
-        };
-
-        first(&mut FrameView {
-            frame: self,
-            bounds: f,
-        }, payload);
-        second(&mut FrameView {
-            frame: self,
-            bounds: s,
-        }, payload);
-
-        self
-    }
-
-    #[inline]
-    fn inside(&mut self, content: impl FnOnce(&mut FrameView<Self>)) -> &mut Self {
-        self.pad(Padding::from(1), content);
-        self
-    }
-
-    #[inline]
-    fn border(&mut self, style: Style) -> &mut Self {
-        Rect::sized(self.size()).render(self, style);
-        self
-    }
+    fn view(&mut self) -> FrameViewMut<'_>;
 }
 
-impl<F: Frame> Drawable for &F {
-    fn draw(&self, pos: Dims, frame: &mut impl Frame, _: ()) {
+// These methods are used to create views of the frame, allowing for more complex layouts.
+
+impl Drawable for FrameViewMut<'_> {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
         for y in 0..self.size().1 {
             for x in 0..self.size().0 {
                 frame.try_set(Dims(pos.0 + x, pos.1 + y), self[Dims(x, y)]);
@@ -536,6 +379,19 @@ impl Frame for FrameBuffer {
         self.check_pos(pos)?;
         Some(&mut self.buffer[pos.1 as usize][pos.0 as usize])
     }
+
+    fn imview<'a>(&'a self) -> FrameView<'a> {
+        FrameView {
+            bounds: Rect::sized_at(Dims(0, 0), self.size()),
+            frame: self,
+        }
+    }
+    fn view<'a>(&'a mut self) -> FrameViewMut<'a> {
+        FrameViewMut {
+            bounds: Rect::sized_at(Dims(0, 0), self.size()),
+            frame: self,
+        }
+    }
 }
 
 impl std::ops::Index<Dims> for FrameBuffer {
@@ -560,13 +416,215 @@ impl std::ops::Index<i32> for FrameBuffer {
     }
 }
 
-pub struct FrameView<'a, F: Frame> {
-    frame: &'a mut F,
+#[derive(Clone, Copy)]
+pub struct FrameView<'a> {
+    frame: &'a dyn Frame,
+    bounds: Rect,
+}
+
+impl FrameView<'_> {
+    pub fn size(&self) -> Dims {
+        self.bounds.size()
+    }
+}
+
+impl std::ops::Index<Dims> for FrameView<'_> {
+    type Output = Cell;
+
+    fn index(&self, pos: Dims) -> &Self::Output {
+        self.frame.try_ref(pos + self.bounds.start).unwrap()
+    }
+}
+
+impl Drawable for FrameView<'_> {
+    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
+        for y in 0..self.size().1 {
+            for x in 0..self.size().0 {
+                frame.try_set(Dims(pos.0 + x, pos.1 + y), self[Dims(x, y)]);
+            }
+        }
+    }
+}
+
+pub struct FrameViewMut<'a> {
+    frame: &'a mut dyn Frame,
     bounds: Rect,
     // TODO: clip: bool,
 }
 
-impl<F: Frame> Frame for FrameView<'_, F> {
+impl FrameViewMut<'_> {
+    pub fn draw<S>(&mut self, pos: Dims, content: impl Drawable<S>, styles: S) {
+        content.draw(pos, self, styles);
+    }
+
+    pub fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S)
+    where
+        Self: Sized,
+    {
+        content.draw_aligned(align, self, styles);
+    }
+
+    #[inline]
+    pub fn centered(&mut self, size: Dims, content: impl FnOnce(FrameViewMut<'_>)) -> &mut Self {
+        let start_x = (self.size().0 - size.0) / 2;
+        let start_y = (self.size().1 - size.1) / 2;
+        content(FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(start_x, start_y), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn top(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let size = Dims(self.size().0, len);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(0, 0), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn bottom(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let start_y = self.size().1 - len;
+        let size = Dims(self.size().0, len);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(0, start_y), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn left(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let size = Dims(len, self.size().1);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(0, 0), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn right(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let start_x = self.size().0 - len;
+        let size = Dims(len, self.size().1);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(start_x, 0), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn off_top(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let start_y = by;
+        let size = Dims(self.size().0, self.size().1 - by);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(0, start_y), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn off_bottom(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let start_y = self.size().1 - by;
+        let size = Dims(self.size().0, self.size().1 - by);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(0, start_y), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn off_left(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let start_x = by;
+        let size = Dims(self.size().0 - by, self.size().1);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(start_x, 0), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn off_right(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let start_x = self.size().0 - by;
+        let size = Dims(self.size().0 - by, self.size().1);
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(start_x, 0), size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn pad(&mut self, padding: Padding, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let size = self.size();
+        let start_x = padding.left;
+        let start_y = padding.top;
+        let inner_size = Dims(
+            size.0 - padding.left - padding.right,
+            size.1 - padding.top - padding.bottom,
+        );
+
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized_at(Dims(start_x, start_y), inner_size),
+        });
+        self
+    }
+
+    #[inline]
+    pub fn split<T>(
+        &mut self,
+        ratio: Offset,
+        vertical: bool,
+        payload: &mut T, // to allow passing &mut T to the closures, e.g. &mut self
+        first: impl FnOnce(&mut FrameViewMut, &mut T),
+        second: impl FnOnce(&mut FrameViewMut, &mut T),
+    ) -> &mut Self {
+        let (f, s) = if vertical {
+            Rect::sized(self.size()).split_y(ratio)
+        } else {
+            Rect::sized(self.size()).split_x(ratio)
+        };
+
+        first(
+            &mut FrameViewMut {
+                frame: self,
+                bounds: f,
+            },
+            payload,
+        );
+        second(
+            &mut FrameViewMut {
+                frame: self,
+                bounds: s,
+            },
+            payload,
+        );
+
+        self
+    }
+
+    #[inline]
+    pub fn inside(&mut self, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        self.pad(Padding::from(1), content);
+        self
+    }
+
+    #[inline]
+    pub fn border(&mut self, style: Style) -> &mut Self {
+        Rect::sized(self.size()).render(self, style);
+        self
+    }
+}
+
+impl Frame for FrameViewMut<'_> {
     fn size(&self) -> Dims {
         self.bounds.size()
     }
@@ -586,9 +644,23 @@ impl<F: Frame> Frame for FrameView<'_, F> {
         }
         self.frame.try_ref_mut(pos)
     }
+
+    fn imview(&self) -> FrameView<'_> {
+        FrameView {
+            bounds: self.bounds,
+            frame: self.frame,
+        }
+    }
+
+    fn view<'a>(&'a mut self) -> FrameViewMut<'a> {
+        FrameViewMut {
+            bounds: self.bounds,
+            frame: self.frame,
+        }
+    }
 }
 
-impl<F: Frame> std::ops::Index<Dims> for FrameView<'_, F> {
+impl std::ops::Index<Dims> for FrameViewMut<'_> {
     type Output = Cell;
 
     fn index(&self, pos: Dims) -> &Self::Output {
@@ -596,7 +668,7 @@ impl<F: Frame> std::ops::Index<Dims> for FrameView<'_, F> {
     }
 }
 
-impl<F: Frame> std::ops::IndexMut<Dims> for FrameView<'_, F> {
+impl std::ops::IndexMut<Dims> for FrameViewMut<'_> {
     fn index_mut(&mut self, pos: Dims) -> &mut Self::Output {
         self.try_ref_mut(pos).expect("Position out of bounds")
     }
