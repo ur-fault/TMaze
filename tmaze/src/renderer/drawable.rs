@@ -58,19 +58,20 @@ pub trait SizedDrawable<S = ()>: Drawable<S> {
     fn size(&self) -> Dims;
 
     fn align(&self, align: Align, frame_size: Dims) -> Dims {
-        let Dims(width, height) = frame_size;
-        let size = self.size();
+        let Dims(fw, fh) = frame_size;
+        let Dims(sw, sh) = self.size();
 
+        use Align::*;
         match align {
-            Align::TopLeft => Dims(0, 0),
-            Align::TopCenter => Dims((width - size.0) / 2, 0),
-            Align::TopRight => Dims(width - size.0, 0),
-            Align::CenterLeft => Dims(0, (height - size.1) / 2),
-            Align::Center => Dims((width - size.0) / 2, (height - size.1) / 2),
-            Align::CenterRight => Dims(width - size.0, (height - size.1) / 2),
-            Align::BottomLeft => Dims(0, height - size.1),
-            Align::BottomCenter => Dims((width - size.0) / 2, height - size.1),
-            Align::BottomRight => Dims(width - size.0, height - size.1),
+            TopLeft => Dims(0, 0),
+            TopCenter => Dims((fw - sw) / 2, 0),
+            TopRight => Dims(fw - sw, 0),
+            CenterLeft => Dims(0, (fh - sh) / 2),
+            Center => Dims((fw - sw) / 2, (fh - sh) / 2),
+            CenterRight => Dims(fw - sw, (fh - sh) / 2),
+            BottomLeft => Dims(0, fh - sh),
+            BottomCenter => Dims((fw - sw) / 2, fh - sh),
+            BottomRight => Dims(fw - sw, fh - sh),
         }
     }
 

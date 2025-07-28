@@ -8,7 +8,7 @@ use crate::{
     app::app::AppData,
     helpers::line_center,
     make_even, make_odd,
-    renderer::FrameBuffer,
+    renderer::{FrameBuffer, FrameViewMut},
     settings::theme::{Theme, ThemeResolver},
     ui::{Button, ButtonStyles, Rect},
 };
@@ -95,13 +95,17 @@ impl DPad {
         self.for_mut_buttons(|button| button.disable_highlight = disable_highlight);
     }
 
-    pub fn render(&self, frame: &mut FrameBuffer, theme: &Theme) {
+    pub fn render(&self, frame: &mut FrameViewMut, theme: &Theme) {
         self.for_buttons(|button| button.draw_colored(frame, theme));
     }
 
     /// Splits the screen into space for the viewport and the dpad.
     ///
-    /// Returns the rects for the viewport and dpad, respectively.
+    /// Returns a tuple containing:
+    /// - Whether the dpad is vertical
+    /// - Whether the dpad is on the left side
+    /// - The split offset
+    // pub fn split_screen(screen_size: Dims, on_left: bool) -> (bool, bool, Offset) {
     pub fn split_screen(data: &AppData) -> (Rect, Rect) {
         let screen_size = data.screen_size;
         let screen_ratio = (screen_size.0 as f32 / 2.0) / screen_size.1 as f32;
@@ -126,7 +130,8 @@ impl DPad {
                 let (dpad, vp) = screen_rect.split_x(offset);
                 (vp, dpad)
             } else {
-                screen_rect.split_x_end(offset)
+                let (r1, r2) = screen_rect.split_x_end(offset);
+                (r2, r1)
             }
         }
     }

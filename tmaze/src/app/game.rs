@@ -15,11 +15,11 @@ use crate::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
     lerp, menu_actions,
-    renderer::{self, Frame as _, FrameBuffer},
+    renderer::{self, drawable::Align, Frame as _, FrameBuffer, FrameView, FrameViewMut, Padding},
     settings::{
         self,
         style_browser::StyleBrowser,
-        theme::{Theme, ThemeResolver},
+        theme::{Style, Theme, ThemeResolver},
         CameraMode, MazePreset, Settings, SettingsActivity,
     },
     ui::{
@@ -498,6 +498,7 @@ pub struct GameActivity {
     margins: Dims,
     viewport_rect: Rect,
     dpad_rect: Option<Rect>,
+    // dpad_margin: Dims,
 
     // smooth
     sm_camera_pos: Dims3D,
@@ -554,8 +555,8 @@ impl GameActivity {
         &self.maze_board.frames[self.data.camera_pos.2 as usize]
     }
 
-    fn render_meta_texts(&self, frame: &mut FrameBuffer, theme: &Theme, vp: Rect) {
-        let max_width = (vp.size().0 / 2 + 1) as usize;
+    fn render_meta_texts(&self, frame: &mut FrameViewMut, theme: &Theme) {
+        let max_width = (frame.size().0 / 2 + 1) as usize;
 
         let pl_pos = self.data.game.get_player_pos() + Dims3D(1, 1, 1);
 
@@ -593,19 +594,16 @@ impl GameActivity {
         let view_mode = self.data.view_mode;
         let view_mode = strings::multisize_string(view_mode.to_multisize_strings(), max_width);
 
-        let tl = vp.start - Dims(0, 1);
-        let br = vp.start + vp.size();
-
         let style = theme["text"];
-        let mut draw = |text: &str, pos| frame.view().draw(pos, text, style);
+        let mut draw = |text: &str, align| frame.draw_aligned(align, text, style);
 
-        draw(&pos_text, tl);
-        draw(view_mode, Dims(br.0 - view_mode.len() as i32, tl.1));
-        draw(&move_count, Dims(tl.0, br.1));
-        draw(&from_start, Dims(br.0 - from_start.len() as i32, br.1));
+        draw(&pos_text, Align::TopLeft);
+        draw(&view_mode, Align::TopRight);
+        draw(&move_count, Align::BottomLeft);
+        draw(&from_start, Align::BottomRight);
     }
 
-    pub fn render_visited_places(&self, frame: &mut FrameBuffer, maze_pos: Dims, theme: &Theme) {
+    pub fn render_visited_places(&self, frame: &mut FrameViewMut, maze_pos: Dims, theme: &Theme) {
         use CellWall::{Down, Up};
 
         let game = &self.data.game;
@@ -622,7 +620,7 @@ impl GameActivity {
         &self,
         maze_pos: Dims,
         game: &RunningGame,
-        viewport: &mut FrameBuffer,
+        viewport: &mut FrameViewMut,
         theme: &Theme,
     ) {
         let player = self.sm_player_pos;
@@ -687,7 +685,7 @@ impl GameActivity {
         }
 
         if self.is_dpad_enabled() {
-            let dpad = self.touch_controls.as_mut().expect("dpad not set");
+            let dpad = self.touch_controls.as_mut().unwrap();
 
             dpad.swap_up_down = data.settings.get_dpad_swap_up_down();
             dpad.disable_highlight(!data.settings.get_enable_dpad_highlight());
@@ -828,49 +826,36 @@ impl Screen for GameActivity {
             false => vp_size / 2 - self.sm_camera_pos.into(),
         };
 
-        // TODO: reuse the viewport between frames and resize it when needed
-        let mut viewport = FrameBuffer::new(vp_size);
+        let mut view = frame.view();
+        view.bounds(self.viewport_rect, |f| {
+            f.centered(vp_size + Dims(2, 4), |f| {
+                self.render_meta_texts(f, theme);
+                f.pad(Padding::ver(1), |f| {
+                    f.border(theme["game.viewport.border"])
+                        .pad(Padding::all(1), |f| {
+                            f.draw(maze_pos, maze_frame.imview(), ());
+                            self.render_visited_places(f, maze_pos, theme);
 
-        // maze
-        viewport.view().draw(maze_pos, maze_frame.imview(), ());
-        self.render_visited_places(&mut viewport, maze_pos, theme);
+                            if (self.data.game.get_player_pos().2) == self.sm_camera_pos.2 {
+                                self.render_player(maze_pos, game, f, theme);
+                            }
+                        });
+                    if let CameraMode::EdgeFollow { x: xoff, y: yoff } = self.camera_mode {
+                        if !does_fit && self.show_debug {
+                            render_edge_follow_rulers((xoff, yoff), f, theme);
+                        }
+                    }
+                });
+            });
+        });
 
-        // player
-        if (self.data.game.get_player_pos().2) == self.sm_camera_pos.2 {
-            self.render_player(maze_pos, game, &mut viewport, theme);
-        }
-
-        // show viewport box
-        let vp_pos = (game_view_size - vp_size) / 2 + self.viewport_rect.start;
-        let vp_rect = Rect::sized_at(vp_pos, vp_size).margin(Dims(-1, -1));
-        vp_rect.render(frame, theme["game.viewport.border"]);
-
-        if let CameraMode::EdgeFollow { x: xoff, y: yoff } = self.camera_mode {
-            if !does_fit && self.show_debug {
-                render_edge_follow_rulers((xoff, yoff), frame, vp_rect, theme);
-            }
-        }
-
-        self.render_meta_texts(frame, theme, vp_rect);
-
-        frame.view().draw(vp_pos, viewport.view(), ());
-
-        // touch controls
-        if let Some(ref touch_controls) = self.touch_controls {
-            let mut dpad_frame = FrameBuffer::new(self.dpad_rect.unwrap().size());
-
-            touch_controls.render(&mut dpad_frame, theme);
-            frame
-                .view()
-                .draw(self.dpad_rect.unwrap().start, dpad_frame.view(), ());
-        }
-
-        if self.show_debug {
-            if let Some(dpad_rect) = self.dpad_rect {
-                dpad_rect.render(frame, theme["debug.border"]);
-            }
-
-            self.viewport_rect.render(frame, theme["debug.border"]);
+        if let Some(dpad_rect) = self.dpad_rect {
+            view.bounds(dpad_rect, |f| {
+                self.touch_controls.as_ref().unwrap().render(f, theme);
+                if self.show_debug {
+                    f.border(theme["debug.border"]);
+                }
+            });
         }
 
         Ok(())
@@ -878,20 +863,13 @@ impl Screen for GameActivity {
 }
 
 #[inline]
-fn render_edge_follow_rulers(
-    rulers: (Offset, Offset),
-    frame: &mut FrameBuffer,
-    vp: Rect,
-    theme: &Theme,
-) {
+fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut FrameViewMut, theme: &Theme) {
     let [s_start, s_end] = theme.extract(["debug.rulers.start", "debug.rulers.end"]);
 
-    let vps = vp.size();
+    let vps = frame.size();
 
     let xo = rulers.0.to_abs(vps.0);
     let yo = rulers.1.to_abs(vps.1);
-
-    let frame_pos = vp.start;
 
     use LineDir::{Horizontal, Vertical};
     const V: char = Vertical.round();
@@ -900,7 +878,7 @@ fn render_edge_follow_rulers(
     let mut draw = |pos, dir, end| {
         frame
             .view()
-            .draw(frame_pos + pos, dir, if end { s_end } else { s_start })
+            .draw(pos, dir, if end { s_end } else { s_start })
     };
 
     #[rustfmt::skip]
