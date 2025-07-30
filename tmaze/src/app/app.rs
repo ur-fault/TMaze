@@ -354,9 +354,17 @@ pub fn init_theme_resolver() -> ThemeResolver {
 fn draw_small_screen_info(frame: &mut FrameBuffer, theme: &Theme) {
     let size = frame.size();
     frame.clear();
-    frame.view().draw_aligned(
-        renderer::drawable::Align::Center,
-        format!("Screen size is too small: {}x{}", size.0, size.1),
-        theme["text"],
-    );
+    let mut view = frame.view();
+    view.centered(Dims(size.0, 2), |f| {
+        f.draw_aligned(
+            renderer::drawable::Align::TopCenter,
+            "Screen is too small",
+            theme["text"],
+        );
+        f.draw_aligned(
+            renderer::drawable::Align::BottomCenter,
+            format!("actual size: {}x{}", size.0, size.1),
+            theme["text"],
+        );
+    });
 }

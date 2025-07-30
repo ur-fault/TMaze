@@ -270,11 +270,11 @@ pub trait Frame: IndexMut<Dims, Output = Cell> {
     }
 
     fn put_char(&mut self, pos @ Dims(x, y): Dims, character: char, style: Style) -> usize {
+        let width = character.width().unwrap_or(1) as i32;
         if x < 0 || self.size().0 <= x || y < 0 || self.size().1 <= y {
-            return 0;
+            return width as usize;
         }
 
-        let width = character.width().unwrap_or(1) as i32;
         if width == 0 {
             return 0;
         }
