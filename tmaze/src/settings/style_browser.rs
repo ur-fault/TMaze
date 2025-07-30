@@ -11,7 +11,7 @@ use crate::{
     helpers::not_release,
     renderer::{Cell, CellContent, Frame, FrameBuffer, Padding},
     settings::theme::Style,
-    ui::{CapsuleText, Screen},
+    ui::{CapsuleText, Screen, ScreenError},
 };
 
 use super::theme::{StyleNode, Theme, ThemeResolver};
@@ -440,7 +440,7 @@ impl ActivityHandler for StyleBrowser {
 }
 
 impl Screen for StyleBrowser {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> std::io::Result<()> {
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError> {
         let [border, text, search, background] =
             theme.extract(["sb.border", "sb.text", "sb.search", "sb.background"]);
 

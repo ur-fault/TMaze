@@ -27,7 +27,7 @@ use crate::{
         helpers::format_duration,
         multisize_duration_format, split_menu_actions,
         usecase::dpad::{DPad, DPadType},
-        Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, RedirectMenu, Screen,
+        Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, RedirectMenu, Screen, ScreenError,
     },
 };
 
@@ -810,7 +810,7 @@ impl ActivityHandler for GameActivity {
 }
 
 impl Screen for GameActivity {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> std::io::Result<()> {
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError> {
         let maze_frame = self.current_floor_frame();
         let game = &self.data.game;
 

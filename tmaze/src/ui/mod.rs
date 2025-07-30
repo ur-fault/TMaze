@@ -1,4 +1,3 @@
-use std::io;
 pub use std::time::Duration;
 
 use crate::{
@@ -28,8 +27,12 @@ pub use progressbar::*;
 pub use rect::*;
 pub use redirect_menu::*;
 
+pub enum ScreenError {
+    SmallScreen,
+}
+
 pub trait Screen {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> io::Result<()>;
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError>;
 }
 
 pub fn theme_resolver() -> ThemeResolver {
