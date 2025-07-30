@@ -264,12 +264,16 @@ impl App {
                 .frame()
                 .fill(Cell::styled(' ', self.data.theme.get("background")));
 
-            self.activities
+            match self
+                .activities
                 .active_mut()
                 .expect("No active active")
                 .screen()
                 .draw(self.renderer.frame(), &self.data.theme)
-                .unwrap();
+            {
+                Ok(_) => {}
+                Err(ui::ScreenError::SmallScreen) => todo!(),
+            }
 
             self.data
                 .logs

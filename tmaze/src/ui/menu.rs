@@ -5,12 +5,7 @@ use crossterm::event::{
 use pad::PadStr;
 use unicode_width::UnicodeWidthStr;
 
-use std::{
-    borrow::Cow,
-    fmt::{self},
-    io,
-    ops::RangeInclusive,
-};
+use std::{borrow::Cow, fmt, ops::RangeInclusive};
 
 use cmaze::dims::Dims;
 
@@ -25,7 +20,7 @@ use crate::{
     settings::theme::{Style, Theme, ThemeResolver},
 };
 
-use super::{center_box_in_screen, draw_box, Rect, Screen};
+use super::{center_box_in_screen, draw_box, Rect, Screen, ScreenError};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
@@ -519,9 +514,8 @@ impl ActivityHandler for Menu {
 }
 
 impl Screen for Menu {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), io::Error> {
+    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError> {
         let MenuConfig { title, counted, .. } = &self.config;
-
         let AppliedStyles {
             title: title_style,
             subtitle: subtitle_style,
