@@ -18,7 +18,7 @@ use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
-    renderer::{drawable::Drawable, Cell, Frame as _, Renderer},
+    renderer::{self, drawable::Drawable, Cell, Frame as _, FrameBuffer, Renderer},
     settings::{
         theme::{Theme, ThemeResolver},
         Settings,
@@ -272,7 +272,9 @@ impl App {
                 .draw(self.renderer.frame(), &self.data.theme)
             {
                 Ok(_) => {}
-                Err(ui::ScreenError::SmallScreen) => todo!(),
+                Err(ui::ScreenError::SmallScreen) => {
+                    draw_small_screen_info(self.renderer.frame(), &self.data.theme)
+                }
             }
 
             self.data
@@ -347,4 +349,14 @@ pub fn init_theme_resolver() -> ThemeResolver {
         .extend(logging::logging_theme_resolver());
 
     resolver
+}
+
+fn draw_small_screen_info(frame: &mut FrameBuffer, theme: &Theme) {
+    let size = frame.size();
+    frame.clear();
+    frame.view().draw_aligned(
+        renderer::drawable::Align::Center,
+        format!("Screen size is too small: {}x{}", size.0, size.1),
+        theme["text"],
+    );
 }
