@@ -304,7 +304,7 @@ struct AppliedStyles {
 
 pub struct Menu {
     config: MenuConfig,
-    selected: usize, // isize for more readable code
+    selected: usize,
     items_pos: Option<Rect>,
 }
 
@@ -550,6 +550,10 @@ impl Screen for Menu {
         let opt_count = options.len();
 
         let max_count = opt_count.to_string().len();
+
+        if frame.size().0 < size.0 || frame.size().1 < size.1 {
+            return Err(ScreenError::SmallScreen);
+        }
 
         draw_box(frame, pos, size, border_style);
 
