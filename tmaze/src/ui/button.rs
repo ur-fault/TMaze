@@ -3,7 +3,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     helpers::strings,
-    renderer::{Cell, Frame as _, FrameBuffer, FrameViewMut},
+    renderer::{Cell, Frame as _, FrameViewMut},
     settings::theme::{Style, Theme, ThemeResolver},
 };
 

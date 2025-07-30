@@ -15,11 +15,11 @@ use crate::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
     lerp, menu_actions,
-    renderer::{self, drawable::Align, Frame as _, FrameBuffer, FrameView, FrameViewMut, Padding},
+    renderer::{self, drawable::Align, Frame as _, FrameBuffer, FrameViewMut, Padding},
     settings::{
         self,
         style_browser::StyleBrowser,
-        theme::{Style, Theme, ThemeResolver},
+        theme::{Theme, ThemeResolver},
         CameraMode, MazePreset, Settings, SettingsActivity,
     },
     ui::{
@@ -598,7 +598,7 @@ impl GameActivity {
         let mut draw = |text: &str, align| frame.draw_aligned(align, text, style);
 
         draw(&pos_text, Align::TopLeft);
-        draw(&view_mode, Align::TopRight);
+        draw(view_mode, Align::TopRight);
         draw(&move_count, Align::BottomLeft);
         draw(&from_start, Align::BottomRight);
     }

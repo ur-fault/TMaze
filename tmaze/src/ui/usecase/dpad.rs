@@ -8,7 +8,7 @@ use crate::{
     app::app::AppData,
     helpers::line_center,
     make_even, make_odd,
-    renderer::{FrameBuffer, FrameViewMut},
+    renderer::FrameViewMut,
     settings::theme::{Theme, ThemeResolver},
     ui::{Button, ButtonStyles, Rect},
 };
