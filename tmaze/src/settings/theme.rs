@@ -138,13 +138,30 @@ pub enum StyleIdent {
     Ref(String),
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize)]
 #[cfg_attr(debug_assertions, serde(deny_unknown_fields))]
 pub struct Style {
     pub bg: Option<Color>,
     pub fg: Option<Color>,
     #[serde(deserialize_with = "deserialize_attributes", default)]
     pub attr: Attributes,
+    #[serde(default = "default_alpha")]
+    pub alpha: u8,
+}
+
+impl Default for Style {
+    fn default() -> Self {
+        Self {
+            bg: Default::default(),
+            fg: Default::default(),
+            attr: Default::default(),
+            alpha: 255,
+        }
+    }
+}
+
+fn default_alpha() -> u8 {
+    u8::MAX
 }
 
 impl Style {
@@ -194,17 +211,18 @@ impl From<Style> for ContentStyle {
     }
 }
 
-impl ops::BitOr for Style {
-    type Output = Self;
-
-    fn bitor(self, rhs: Self) -> Self {
-        Self {
-            bg: self.bg.or(rhs.bg),
-            fg: self.fg.or(rhs.fg),
-            attr: self.attr | rhs.attr,
-        }
-    }
-}
+// impl ops::BitOr for Style {
+//     type Output = Self;
+//
+//     fn bitor(self, rhs: Self) -> Self {
+//         Self {
+//             bg: self.bg.or(rhs.bg),
+//             fg: self.fg.or(rhs.fg),
+//             attr: self.attr | rhs.attr,
+//             alpha: self.alpha.max(rhs.alpha),
+//         }
+//     }
+// }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(untagged)]
@@ -507,12 +525,14 @@ mod tests {
             bg: None,
             fg: None,
             attr: Attributes::default(),
+            alpha: 0,
         };
         let default_style = Some(&default_style);
         let text_style = Style {
             bg: Some(Color::Named(NamedColor::Black)),
             fg: Some(Color::Named(NamedColor::White)),
             attr: Attributes::default(),
+            alpha: 0,
         };
 
         let definition = ThemeDefinition {
@@ -530,7 +550,8 @@ mod tests {
             Some(&Style {
                 bg: Some(Color::Named(NamedColor::Black)),
                 fg: Some(Color::Named(NamedColor::White)),
-                attr: Attributes::default()
+                attr: Attributes::default(),
+                alpha: 0,
             })
         );
 

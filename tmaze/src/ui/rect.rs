@@ -34,7 +34,7 @@ impl Rect {
     }
 
     pub fn contains(&self, pos: Dims) -> bool {
-        pos.0 >= self.start.0 && pos.0 <= self.end.0 && pos.1 >= self.start.1 && pos.1 <= self.end.1
+        (self.start.0..=self.end.0).contains(&pos.0) && (self.start.1..=self.end.1).contains(&pos.1)
     }
 
     // TODO: make it generic over `Borrow`

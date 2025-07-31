@@ -7,7 +7,7 @@ use std::{
     panic, thread,
 };
 
-use cmaze::dims::{Dims, Offset};
+use cmaze::dims::{Dims, Dims3D, Offset};
 use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
 use drawable::{Align, SizedDrawable};
 use unicode_width::UnicodeWidthChar;
@@ -253,20 +253,8 @@ impl Cell {
 pub trait Frame: IndexMut<Dims, Output = Cell> {
     fn size(&self) -> Dims;
 
-    // These 2 methods are used as a source of truth for the frame. Ideally, all other methods
-    // should use these methods to access the cells.
-
-    fn try_ref(&self, pos: Dims) -> Option<&Cell>;
-
-    fn try_ref_mut(&mut self, pos: Dims) -> Option<&mut Cell>;
-
-    fn try_set(&mut self, pos: Dims, to: Cell) -> bool {
-        match self.try_ref_mut(pos) {
-            Some(cell) => *cell = to,
-            None => return false,
-        }
-
-        true
+    fn contains(&self, pos: Dims) -> bool {
+        Rect::sized(self.size()).contains(pos)
     }
 
     fn put_char(&mut self, pos @ Dims(x, y): Dims, character: char, style: Style) -> usize {
@@ -322,11 +310,7 @@ pub trait Frame: IndexMut<Dims, Output = Cell> {
 
 impl Drawable for FrameViewMut<'_> {
     fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
-        for y in 0..self.size().1 {
-            for x in 0..self.size().0 {
-                frame.try_set(Dims(pos.0 + x, pos.1 + y), self[Dims(x, y)]);
-            }
-        }
+        self.imview().draw(pos, frame, ());
     }
 }
 
@@ -370,16 +354,6 @@ impl Frame for FrameBuffer {
         self.size
     }
 
-    fn try_ref(&self, pos: Dims) -> Option<&Cell> {
-        self.check_pos(pos)?;
-        Some(&self.buffer[pos.1 as usize][pos.0 as usize])
-    }
-
-    fn try_ref_mut(&mut self, pos: Dims) -> Option<&mut Cell> {
-        self.check_pos(pos)?;
-        Some(&mut self.buffer[pos.1 as usize][pos.0 as usize])
-    }
-
     fn imview<'a>(&'a self) -> FrameView<'a> {
         FrameView {
             bounds: Rect::sized_at(Dims(0, 0), self.size()),
@@ -390,6 +364,7 @@ impl Frame for FrameBuffer {
         FrameViewMut {
             bounds: Rect::sized_at(Dims(0, 0), self.size()),
             frame: self,
+            alpha: 255,
         }
     }
 }
@@ -398,13 +373,15 @@ impl std::ops::Index<Dims> for FrameBuffer {
     type Output = Cell;
 
     fn index(&self, pos: Dims) -> &Self::Output {
-        self.try_ref(pos).expect("Position out of bounds")
+        self.check_pos(pos).expect("Position out of bounds");
+        &self.buffer[pos.1 as usize][pos.0 as usize]
     }
 }
 
 impl std::ops::IndexMut<Dims> for FrameBuffer {
     fn index_mut(&mut self, pos: Dims) -> &mut Self::Output {
-        self.try_ref_mut(pos).expect("Position out of bounds")
+        self.check_pos(pos).expect("Position out of bounds");
+        &mut self.buffer[pos.1 as usize][pos.0 as usize]
     }
 }
 
@@ -426,21 +403,32 @@ impl FrameView<'_> {
     pub fn size(&self) -> Dims {
         self.bounds.size()
     }
+
+    fn contains(&self, pos: Dims) -> bool {
+        Rect::sized(self.size()).contains(pos)
+    }
 }
 
 impl std::ops::Index<Dims> for FrameView<'_> {
     type Output = Cell;
 
     fn index(&self, pos: Dims) -> &Self::Output {
-        self.frame.try_ref(pos + self.bounds.start).unwrap()
+        if Rect::sized(self.size()).contains(pos) {
+            &self.frame[pos + self.bounds.start]
+        } else {
+            panic!(
+                "Position out of bounds: {pos:?} in {:?}",
+                Rect::sized(self.size())
+            );
+        }
     }
 }
 
 impl Drawable for FrameView<'_> {
     fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
-        for y in 0..self.size().1 {
-            for x in 0..self.size().0 {
-                frame.try_set(Dims(pos.0 + x, pos.1 + y), self[Dims(x, y)]);
+        for ipos in Dims3D::iter_fill(Dims3D::ZERO, Dims3D(self.size().0, self.size().1, 1)) {
+            if self.contains(ipos.into()) {
+                frame[pos + ipos.into()] = self[ipos.into()];
             }
         }
     }
@@ -449,6 +437,7 @@ impl Drawable for FrameView<'_> {
 pub struct FrameViewMut<'a> {
     frame: &'a mut dyn Frame,
     bounds: Rect,
+    alpha: u8,
     // TODO: clip: bool,
 }
 
@@ -472,6 +461,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds,
+            alpha: 255,
         });
         self
     }
@@ -487,6 +477,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(start_x, start_y), size),
+            alpha: 255,
         });
         self
     }
@@ -497,6 +488,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(0, 0), size),
+            alpha: 255,
         });
         self
     }
@@ -508,6 +500,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(0, start_y), size),
+            alpha: 255,
         });
         self
     }
@@ -518,6 +511,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(0, 0), size),
+            alpha: 255,
         });
         self
     }
@@ -529,6 +523,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(start_x, 0), size),
+            alpha: 255,
         });
         self
     }
@@ -540,6 +535,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(0, start_y), size),
+            alpha: 255,
         });
         self
     }
@@ -551,6 +547,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(0, start_y), size),
+            alpha: 255,
         });
         self
     }
@@ -562,6 +559,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(start_x, 0), size),
+            alpha: 255,
         });
         self
     }
@@ -573,6 +571,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(start_x, 0), size),
+            alpha: 255,
         });
         self
     }
@@ -590,6 +589,7 @@ impl FrameViewMut<'_> {
         content(&mut FrameViewMut {
             frame: self,
             bounds: Rect::sized_at(Dims(start_x, start_y), inner_size),
+            alpha: 255,
         });
         self
     }
@@ -613,6 +613,7 @@ impl FrameViewMut<'_> {
             &mut FrameViewMut {
                 frame: self,
                 bounds: f,
+                alpha: 255,
             },
             payload,
         );
@@ -620,6 +621,7 @@ impl FrameViewMut<'_> {
             &mut FrameViewMut {
                 frame: self,
                 bounds: s,
+                alpha: 255,
             },
             payload,
         );
@@ -638,27 +640,21 @@ impl FrameViewMut<'_> {
         Rect::sized(self.size()).render(self, style);
         self
     }
+
+    pub fn alpha(&mut self, alpha: u8, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+        let size = self.size();
+        content(&mut FrameViewMut {
+            frame: self,
+            bounds: Rect::sized(size),
+            alpha,
+        });
+        self
+    }
 }
 
 impl Frame for FrameViewMut<'_> {
     fn size(&self) -> Dims {
         self.bounds.size()
-    }
-
-    fn try_ref(&self, pos: Dims) -> Option<&Cell> {
-        let pos = pos + self.bounds.start;
-        if !self.bounds.contains(pos) {
-            return None;
-        }
-        self.frame.try_ref(pos)
-    }
-
-    fn try_ref_mut(&mut self, pos: Dims) -> Option<&mut Cell> {
-        let pos = pos + self.bounds.start;
-        if !self.bounds.contains(pos) {
-            return None;
-        }
-        self.frame.try_ref_mut(pos)
     }
 
     fn imview(&self) -> FrameView<'_> {
@@ -672,6 +668,7 @@ impl Frame for FrameViewMut<'_> {
         FrameViewMut {
             bounds: self.bounds,
             frame: self.frame,
+            alpha: 255,
         }
     }
 }
@@ -680,13 +677,21 @@ impl std::ops::Index<Dims> for FrameViewMut<'_> {
     type Output = Cell;
 
     fn index(&self, pos: Dims) -> &Self::Output {
-        self.try_ref(pos).expect("Position out of bounds")
+        if self.contains(pos) {
+            &self.frame[pos + self.bounds.start]
+        } else {
+            panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
+        }
     }
 }
 
 impl std::ops::IndexMut<Dims> for FrameViewMut<'_> {
     fn index_mut(&mut self, pos: Dims) -> &mut Self::Output {
-        self.try_ref_mut(pos).expect("Position out of bounds")
+        if self.contains(pos) {
+            &mut self.frame[pos + self.bounds.start]
+        } else {
+            panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
+        }
     }
 }
 

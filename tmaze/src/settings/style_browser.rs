@@ -322,21 +322,23 @@ impl StyleBrowser {
 
                     if self.selected_index == node.item_index {
                         for x in 0..f.size().0 {
-                            if let Some(cell) = f.try_ref_mut(Dims(x, pos.1)) {
-                                match cell {
-                                    c @ Cell::Empty => {
-                                        *c = Cell::Content(CellContent {
-                                            character: ' ',
-                                            width: 1,
-                                            style: crossterm::style::ContentStyle {
-                                                attributes: Attributes::from(Attribute::Underlined),
-                                                ..crossterm::style::ContentStyle::default()
-                                            },
-                                        })
-                                    }
-                                    Cell::Content(c) => {
-                                        c.style.attributes.extend(Attribute::Underlined.into())
-                                    }
+                            let cell_pos = Dims(x, pos.1);
+                            if !f.contains(cell_pos) {
+                                continue;
+                            }
+                            match &mut f[cell_pos] {
+                                c @ Cell::Empty => {
+                                    *c = Cell::Content(CellContent {
+                                        character: ' ',
+                                        width: 1,
+                                        style: crossterm::style::ContentStyle {
+                                            attributes: Attributes::from(Attribute::Underlined),
+                                            ..crossterm::style::ContentStyle::default()
+                                        },
+                                    })
+                                }
+                                Cell::Content(c) => {
+                                    c.style.attributes.extend(Attribute::Underlined.into())
                                 }
                             }
                         }
@@ -370,21 +372,23 @@ impl StyleBrowser {
 
                     if self.selected_index == index {
                         for x in 0..f.size().0 {
-                            if let Some(cell) = f.try_ref_mut(Dims(x, current as i32)) {
-                                match cell {
-                                    c @ Cell::Empty => {
-                                        *c = Cell::Content(CellContent {
-                                            character: ' ',
-                                            width: 1,
-                                            style: crossterm::style::ContentStyle {
-                                                attributes: Attributes::from(Attribute::Underlined),
-                                                ..crossterm::style::ContentStyle::default()
-                                            },
-                                        })
-                                    }
-                                    Cell::Content(c) => {
-                                        c.style.attributes.extend(Attribute::Underlined.into())
-                                    }
+                            let cell_pos = Dims(x, current as i32);
+                            if !f.contains(cell_pos) {
+                                continue;
+                            }
+                            match &mut f[cell_pos] {
+                                c @ Cell::Empty => {
+                                    *c = Cell::Content(CellContent {
+                                        character: ' ',
+                                        width: 1,
+                                        style: crossterm::style::ContentStyle {
+                                            attributes: Attributes::from(Attribute::Underlined),
+                                            ..crossterm::style::ContentStyle::default()
+                                        },
+                                    })
+                                }
+                                Cell::Content(c) => {
+                                    c.style.attributes.extend(Attribute::Underlined.into())
                                 }
                             }
                         }
