@@ -3,7 +3,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     helpers::strings,
-    renderer::{Cell, Frame as _, FrameViewMut},
+    renderer::{CellContent, GMutView},
     settings::theme::{Style, Theme, ThemeResolver},
 };
 
@@ -120,19 +120,16 @@ impl Button {
 }
 
 impl Button {
-    pub fn draw_colored(&self, frame: &mut FrameViewMut, theme: &Theme) {
-        // let set = self.set && !self.disabled && !self.disable_highlight;
-
+    pub fn draw_colored(&self, frame: &mut GMutView, theme: &Theme) {
         let AppliedStyles { normal, content } = self.apply_styles(theme);
 
         // Box
-        frame.view().draw(self.pos, Rect::sized(self.size), normal);
+        frame.draw(self.pos, Rect::sized(self.size), normal);
 
         // Background
         frame.fill_rect(
-            self.pos + Dims(1, 1),
-            self.size - Dims(2, 2),
-            Cell::styled(' ', content),
+            Rect::sized_at(self.pos + Dims(1, 1), self.size - Dims(2, 2)),
+            CellContent::styled(' ', content),
         );
 
         // Text (content)
@@ -141,7 +138,7 @@ impl Button {
         let text = strings::trim_center(self.text.as_str(), text_rect.size().0 as usize);
         let style = content;
 
-        frame.view().draw(text_rect.start, text, style);
+        frame.draw(text_rect.start, text, style);
     }
 
     pub fn detect_over(&self, pos: Dims) -> bool {

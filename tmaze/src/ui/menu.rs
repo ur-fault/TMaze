@@ -14,10 +14,7 @@ use crate::{
         activity::{Activity, ActivityHandler, Change},
         app::AppData,
         event::Event,
-    },
-    helpers::{is_release, strings::MbyStaticStr, LineDir},
-    renderer::{Frame as _, FrameBuffer},
-    settings::theme::{Style, Theme, ThemeResolver},
+    }, helpers::{is_release, strings::MbyStaticStr, LineDir}, renderer::GMutView, settings::theme::{Style, Theme, ThemeResolver}
 };
 
 use super::{center_box_in_screen, draw_box, Rect, Screen, ScreenError};
@@ -514,7 +511,7 @@ impl ActivityHandler for Menu {
 }
 
 impl Screen for Menu {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError> {
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
         let MenuConfig { title, counted, .. } = &self.config;
         let AppliedStyles {
             title: title_style,
@@ -557,7 +554,6 @@ impl Screen for Menu {
 
         draw_box(frame, pos, size, border_style);
 
-        let mut frame = frame.view();
         frame.draw(title_pos, title.as_str(), title_style);
 
         for (i, subtitle) in self.config.subtitles.iter().enumerate() {

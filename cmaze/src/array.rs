@@ -168,19 +168,19 @@ impl<T: Clone> Array3D<T> {
     }
 }
 
-impl<T: Clone> ops::Index<Dims3D> for Array3D<T> {
+impl<I: Into<Dims3D>, T: Clone> ops::Index<I> for Array3D<T> {
     type Output = T;
 
-    fn index(&self, index: Dims3D) -> &Self::Output {
-        self.dim_to_idx(index)
+    fn index(&self, index: I) -> &Self::Output {
+        self.dim_to_idx(index.into())
             .and_then(|i| self.buf.get(i))
             .expect("Index out of bounds")
     }
 }
 
-impl<T: Clone> ops::IndexMut<Dims3D> for Array3D<T> {
-    fn index_mut(&mut self, index: Dims3D) -> &mut Self::Output {
-        self.dim_to_idx(index)
+impl<I: Into<Dims3D>, T: Clone> ops::IndexMut<I> for Array3D<T> {
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        self.dim_to_idx(index.into())
             .and_then(|i| self.buf.get_mut(i))
             .expect("Index out of bounds")
     }
@@ -241,6 +241,10 @@ impl<T> Array2DView<'_, T> {
         T: Clone,
     {
         Array3D::from_buf(self.buf.to_vec(), self.width, self.height, 1)
+    }
+
+    pub fn to_slice(&self) -> &[T] {
+        self.buf
     }
 }
 

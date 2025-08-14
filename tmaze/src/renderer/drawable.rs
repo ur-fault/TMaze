@@ -3,32 +3,32 @@ use unicode_width::{UnicodeWidthChar as _, UnicodeWidthStr as _};
 
 use crate::settings::theme::Style;
 
-use super::{Cell, Frame};
+use super::{Cell, GMutView};
 
 pub trait Drawable<S = ()> {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: S);
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: S);
 }
 
 impl<D: Drawable> Drawable for &D {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: ()) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: ()) {
         (**self).draw(pos, frame, styles);
     }
 }
 
 impl Drawable<Style> for char {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: Style) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         frame.put_char(pos, *self, styles);
     }
 }
 
 impl Drawable<Style> for String {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: Style) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         self.as_str().draw(pos, frame, styles);
     }
 }
 
 impl Drawable<Style> for &'_ str {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, styles: Style) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         let mut x = 0;
         for character in self.chars() {
             x += frame.put_char(Dims(pos.0 + x as i32, pos.1), character, styles);
@@ -37,7 +37,7 @@ impl Drawable<Style> for &'_ str {
 }
 
 impl Drawable for Cell {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _styles: ()) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, _styles: ()) {
         frame[pos] = *self;
     }
 }
@@ -75,7 +75,7 @@ pub trait SizedDrawable<S = ()>: Drawable<S> {
         }
     }
 
-    fn draw_aligned(&self, align: Align, frame: &mut dyn Frame, styles: S) {
+    fn draw_aligned(&self, align: Align, frame: &mut GMutView, styles: S) {
         let pos = self.align(align, frame.size());
         self.draw(pos, frame, styles);
     }
@@ -108,7 +108,7 @@ impl SizedDrawable for Cell {
 pub struct Styled<T, S>(pub T, pub S);
 
 impl<T: Drawable<S>, S: Clone> Drawable for Styled<T, S> {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
         self.0.draw(pos, frame, self.1.clone());
     }
 }

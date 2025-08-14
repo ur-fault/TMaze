@@ -1,7 +1,7 @@
 use cmaze::dims::{Dims, Offset};
 use crossterm::{
     event::{Event as TermEvent, KeyCode, KeyEvent},
-    style::{Attribute, Attributes},
+    style::Attribute,
 };
 use log::debug;
 use unicode_width::UnicodeWidthStr;
@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::not_release,
-    renderer::{Cell, CellContent, Frame, FrameBuffer, Padding},
+    renderer::{Cell, CellContent, GMutView, Padding},
     settings::theme::Style,
     ui::{CapsuleText, Screen, ScreenError},
 };
@@ -237,8 +237,8 @@ impl StyleBrowser {
         }
     }
 
-    fn search_bar(&mut self, border: Style, text: Style, search: Style, f: &mut impl Frame) {
-        f.view().pad(Padding::hor(1), |f| {
+    fn search_bar(&mut self, border: Style, text: Style, search: Style, f: &mut GMutView) {
+        f.pad(Padding::hor(1), |f| {
             if self.search.is_empty() {
                 f.draw(Dims::ZERO, "<Search>", search);
             } else {
@@ -274,12 +274,12 @@ impl StyleBrowser {
         });
 
         // separator line
-        f.view().bottom(1, |f| {
+        f.bottom(1, |f| {
             f.border(border);
         });
     }
 
-    fn items(&mut self, theme: &Theme, text: Style, f: &mut impl Frame) {
+    fn items(&mut self, theme: &Theme, text: Style, f: &mut GMutView) {
         const INDENT: i32 = 4;
 
         fn render_style(style: &str, theme: &Theme) -> (String, Style, i32) {
@@ -299,7 +299,7 @@ impl StyleBrowser {
             Mode::Logical(node) | Mode::Deps(node) => {
                 for (index, (node, depth)) in node.iter_visible().skip(self.scroll).enumerate() {
                     let pos = Dims(LEFT_MARGIN + depth as i32 * INDENT, index as i32);
-                    f.view().draw(
+                    f.draw(
                         pos,
                         node.item
                             .as_ref()
@@ -313,7 +313,7 @@ impl StyleBrowser {
                         let (style_text, node_style, width) = render_style(node_style, theme);
 
                         let size = f.size();
-                        f.view().draw(
+                        f.draw(
                             Dims(size.0 - width - RIGHT_MARGIN, pos.1),
                             style_text.as_str(),
                             node_style,
@@ -327,16 +327,7 @@ impl StyleBrowser {
                                 continue;
                             }
                             match &mut f[cell_pos] {
-                                c @ Cell::Empty => {
-                                    *c = Cell::Content(CellContent {
-                                        character: ' ',
-                                        width: 1,
-                                        style: crossterm::style::ContentStyle {
-                                            attributes: Attributes::from(Attribute::Underlined),
-                                            ..crossterm::style::ContentStyle::default()
-                                        },
-                                    })
-                                }
+                                Cell::Placeholder(_) => {}
                                 Cell::Content(c) => {
                                     c.style.attributes.extend(Attribute::Underlined.into())
                                 }
@@ -357,14 +348,14 @@ impl StyleBrowser {
                         let (style_text, node_style, width) = render_style(item_style, theme);
 
                         let size = f.size();
-                        f.view().draw(
+                        f.draw(
                             Dims(size.0 - width - RIGHT_MARGIN, current as i32),
                             style_text.as_str(),
                             node_style,
                         );
                     }
 
-                    f.view().draw(
+                    f.draw(
                         Dims(LEFT_MARGIN, current as i32),
                         item.payload.as_str(),
                         text,
@@ -377,16 +368,7 @@ impl StyleBrowser {
                                 continue;
                             }
                             match &mut f[cell_pos] {
-                                c @ Cell::Empty => {
-                                    *c = Cell::Content(CellContent {
-                                        character: ' ',
-                                        width: 1,
-                                        style: crossterm::style::ContentStyle {
-                                            attributes: Attributes::from(Attribute::Underlined),
-                                            ..crossterm::style::ContentStyle::default()
-                                        },
-                                    })
-                                }
+                                Cell::Placeholder(_) => {}
                                 Cell::Content(c) => {
                                     c.style.attributes.extend(Attribute::Underlined.into())
                                 }
@@ -444,17 +426,17 @@ impl ActivityHandler for StyleBrowser {
 }
 
 impl Screen for StyleBrowser {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError> {
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
         let [border, text, search, background] =
             theme.extract(["sb.border", "sb.text", "sb.search", "sb.background"]);
 
-        frame.view().pad(CONTENT_MARGIN.into(), |f| {
+        frame.pad(CONTENT_MARGIN.into(), |f| {
             f.border(border).inside(|f| {
-                f.fill(Cell::Content(CellContent {
+                f.fill(CellContent {
                     character: ' ',
                     width: 1,
                     style: background.into(),
-                }));
+                });
 
                 f.split(
                     Offset::Abs(2),
