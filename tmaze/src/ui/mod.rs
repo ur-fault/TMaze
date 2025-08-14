@@ -1,7 +1,7 @@
 pub use std::time::Duration;
 
 use crate::{
-    renderer::FrameBuffer,
+    renderer::GMutView,
     settings::{
         style_browser,
         theme::{Theme, ThemeResolver},
@@ -32,7 +32,7 @@ pub enum ScreenError {
 }
 
 pub trait Screen {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError>;
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError>;
 }
 
 pub fn theme_resolver() -> ThemeResolver {

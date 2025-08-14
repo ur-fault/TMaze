@@ -3,23 +3,26 @@ pub mod helpers;
 
 use std::{
     io::{self, stdout, Write},
-    ops::IndexMut,
+    ops::{Index, IndexMut},
     panic, thread,
 };
 
-use cmaze::dims::{Dims, Dims3D, Offset};
+use cmaze::{
+    array::Array3D,
+    dims::{Dims, Dims3D, Offset},
+};
 use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
-use drawable::{Align, SizedDrawable};
+use drawable::{Align, Drawable, SizedDrawable};
 use unicode_width::UnicodeWidthChar;
 
 use crate::{settings::theme::Style, ui::Rect};
 
-use self::{drawable::Drawable, helpers::term_size};
+use self::helpers::term_size;
 
 pub struct Renderer {
     size: Dims,
-    shown: FrameBuffer,
-    hidden: FrameBuffer,
+    shown: GBuffer,
+    hidden: GBuffer,
     full_redraw: bool,
 }
 
@@ -27,8 +30,8 @@ impl Renderer {
     pub fn new() -> io::Result<Self> {
         let (w, h) = term_size();
         let size = Dims(w as i32, h as i32);
-        let hidden = FrameBuffer::new(size);
-        let shown = FrameBuffer::new(size);
+        let hidden = GBuffer::new(size);
+        let shown = GBuffer::new(size);
 
         let mut ren = Renderer {
             size,
@@ -109,7 +112,7 @@ impl Renderer {
         }
     }
 
-    pub fn frame(&mut self) -> &mut FrameBuffer {
+    pub fn frame(&mut self) -> &mut GBuffer {
         &mut self.hidden
     }
 
@@ -124,14 +127,14 @@ impl Renderer {
         tty.queue(crossterm::style::ResetColor)?;
 
         for y in 0..self.size.1 {
-            if self.hidden[y] == self.shown[y] && !self.full_redraw {
+            if self.hidden.view()[y] == self.shown.view()[y] && !self.full_redraw {
                 continue;
             }
 
             tty.queue(crossterm::cursor::MoveTo(0, y as u16))?;
 
             for x in 0..self.size.0 {
-                if let Cell::Content(c) = &self.hidden[y][x as usize] {
+                if let Cell::Content(c) = &self.hidden.view()[Dims(x, y)] {
                     if style != c.style {
                         if style.background_color != c.style.background_color {
                             match c.style.background_color {
@@ -181,7 +184,7 @@ impl Renderer {
 
         std::mem::swap(&mut self.shown, &mut self.hidden);
 
-        self.hidden.clear();
+        self.hidden.mut_view().clear();
 
         Ok(())
     }
@@ -215,20 +218,37 @@ pub struct CellContent {
     pub style: ContentStyle,
 }
 
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+impl CellContent {
+    pub fn styled(c: char, s: Style) -> Self {
+        CellContent {
+            character: c,
+            width: c.width().unwrap_or(1) as u8,
+            style: s.into(),
+        }
+    }
+
+    pub fn empty() -> Self {
+        CellContent {
+            character: ' ',
+            width: 1,
+            style: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Cell {
-    #[default]
-    Empty,
+    Placeholder(u8),
     Content(CellContent),
 }
 
 impl Cell {
     pub fn styled(c: char, s: Style) -> Self {
-        Cell::Content(CellContent {
-            character: c,
-            width: c.width().unwrap_or(1) as u8,
-            style: s.into(),
-        })
+        Cell::Content(CellContent::styled(c, s))
+    }
+
+    pub fn empty() -> Self {
+        Cell::Content(CellContent::empty())
     }
 
     pub fn new(c: char) -> Self {
@@ -250,347 +270,348 @@ impl Cell {
     }
 }
 
-pub trait Frame: IndexMut<Dims, Output = Cell> {
-    fn size(&self) -> Dims;
+pub struct GBuffer(Array3D<Cell>);
 
-    fn contains(&self, pos: Dims) -> bool {
+impl GBuffer {
+    pub fn new(size: Dims) -> Self {
+        GBuffer(Array3D::new(
+            Cell::empty(),
+            size.0 as usize,
+            size.1 as usize,
+            1,
+        ))
+    }
+
+    pub fn size(&self) -> Dims {
+        self.0.size().into()
+    }
+
+    pub fn resize(&mut self, new_size: Dims) {
+        if self.size() != new_size {
+            self.0 = Array3D::new(Cell::empty(), new_size.0 as usize, new_size.1 as usize, 1);
+        }
+    }
+
+    pub fn contains(&self, pos: Dims) -> bool {
         Rect::sized(self.size()).contains(pos)
     }
 
-    fn put_char(&mut self, pos @ Dims(x, y): Dims, character: char, style: Style) -> usize {
-        let width = character.width().unwrap_or(1) as i32;
-        if x < 0 || self.size().0 <= x || y < 0 || self.size().1 <= y {
-            return width as usize;
+    pub fn mut_view(&mut self) -> GMutView<'_> {
+        GMutView {
+            bounds: Rect::sized_at(Dims::ZERO, self.size()),
+            buf: self,
+        }
+    }
+
+    pub fn view(&self) -> GView<'_> {
+        GView {
+            buf: self,
+            bounds: Rect::sized_at(Dims::ZERO, self.size()),
+        }
+    }
+}
+
+pub struct GView<'a> {
+    buf: &'a GBuffer,
+    bounds: Rect,
+}
+
+impl GView<'_> {
+    pub fn size(&self) -> Dims {
+        self.bounds.size()
+    }
+
+    pub fn contains(&self, cell_pos: Dims) -> bool {
+        Rect::sized(self.size()).contains(cell_pos)
+    }
+}
+
+impl Drawable for GView<'_> {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
+        for ipos in Dims::iter_fill(Dims::ZERO, self.size()) {
+            frame[pos + ipos] = self[ipos];
+        }
+    }
+}
+
+impl Index<Dims> for GView<'_> {
+    type Output = Cell;
+
+    fn index(&self, pos: Dims) -> &Self::Output {
+        #[cfg(debug_assertions)]
+        if !self.contains(pos) {
+            panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
         }
 
-        if width == 0 {
-            return 0;
+        self.buf.0.get(pos.into()).unwrap()
+    }
+}
+
+impl Index<i32> for GView<'_> {
+    type Output = [Cell];
+
+    fn index(&self, index: i32) -> &Self::Output {
+        if index < 0 || index >= self.size().1 {
+            panic!("Index out of bounds: {index}");
+        }
+        let line_index = self.buf.0.dim_to_idx(Dims3D(0, index, 0)).unwrap();
+        &self.buf.0.to_slice()[line_index..line_index + self.size().0 as usize]
+    }
+}
+
+pub struct GMutView<'a> {
+    buf: &'a mut GBuffer,
+    bounds: Rect,
+}
+
+impl GMutView<'_> {
+    pub fn size(&self) -> Dims {
+        self.bounds.size()
+    }
+
+    fn clear_space(&mut self, pos: Dims) {
+        #[cfg(debug_assertions)]
+        if !self.contains(pos) {
+            panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
         }
 
-        let cell = Cell::styled(character, style);
+        match self.buf.0.get_mut(pos.into()).unwrap() {
+            Cell::Content(c) => {
+                for x in pos.0..pos.0 + c.width as i32 {
+                    self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::empty();
+                }
+            }
+            Cell::Placeholder(w) => {
+                todo!()
+            }
+        }
+    }
 
-        self[pos] = cell;
+    fn put_char(&mut self, pos: Dims, chr: char, style: Style) -> usize {
+        let width = chr.width().unwrap_or(1) as i32;
+        for x in pos.0..pos.0 + width {
+            self.clear_space(Dims(x, pos.1));
+        }
 
-        for x in x + 1..x + width {
-            self[Dims(x, y)] = Cell::Empty;
+        self.buf.0[self.bounds.start + pos] = Cell::styled(chr, style);
+        for x in pos.0 + 1..pos.0 + width {
+            self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::Placeholder(width as u8);
         }
 
         width as usize
     }
 
-    fn fill(&mut self, cell: Cell) {
-        for y in 0..self.size().1 {
-            for x in 0..self.size().0 {
-                self[Dims(x, y)] = cell;
-            }
+    pub fn fill(&mut self, cell: CellContent) {
+        for pos in Dims::iter_fill(Dims::ZERO, self.size()) {
+            self.clear_space(self.bounds.start + pos);
+            self.buf.0[self.bounds.start + pos] = Cell::Content(cell);
         }
     }
 
-    fn fill_rect(&mut self, pos: Dims, size: Dims, cell: Cell) {
-        for y in pos.1..pos.1 + size.1 {
-            for x in pos.0..pos.0 + size.0 {
-                if x < 0 || x >= self.size().0 || y < 0 || y >= self.size().1 {
-                    continue;
-                }
-                self[Dims(x, y)] = cell;
-            }
-        }
+    pub fn fill_rect(&mut self, rect: Rect, content: CellContent) {
+        todo!()
     }
 
-    fn clear(&mut self) {
-        self.fill(Cell::new(' '));
+    pub fn clear(&mut self) {
+        self.fill(CellContent::empty());
     }
 
-    fn imview(&self) -> FrameView<'_>;
-
-    fn view(&mut self) -> FrameViewMut<'_>;
-}
-
-// These methods are used to create views of the frame, allowing for more complex layouts.
-
-impl Drawable for FrameViewMut<'_> {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
-        self.imview().draw(pos, frame, ());
+    pub fn contains(&self, cell_pos: Dims) -> bool {
+        Rect::sized(self.size()).contains(cell_pos)
     }
 }
 
-pub struct FrameBuffer {
-    buffer: Vec<Vec<Cell>>,
-    size: Dims,
-}
-
-impl FrameBuffer {
-    pub fn new(size: Dims) -> Self {
-        assert!(size.0 > 0 && size.1 > 0);
-        let mut buffer = Vec::with_capacity(size.1 as usize);
-        for _ in 0..size.1 {
-            buffer.push(vec![Cell::new(' '); size.0 as usize]);
-        }
-        FrameBuffer { buffer, size }
-    }
-
-    pub fn resize(&mut self, size: Dims) {
-        if self.size == size {
-            return;
-        }
-
-        self.size = size;
-        self.buffer.resize(size.1 as usize, Vec::new());
-        for row in self.buffer.iter_mut() {
-            row.resize(size.0 as usize, Cell::new(' '));
-        }
-    }
-
-    fn check_pos(&self, pos: Dims) -> Option<()> {
-        if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
-            return None;
-        }
-        Some(())
-    }
-}
-
-impl Frame for FrameBuffer {
-    fn size(&self) -> Dims {
-        self.size
-    }
-
-    fn imview<'a>(&'a self) -> FrameView<'a> {
-        FrameView {
-            bounds: Rect::sized_at(Dims(0, 0), self.size()),
-            frame: self,
-        }
-    }
-    fn view<'a>(&'a mut self) -> FrameViewMut<'a> {
-        FrameViewMut {
-            bounds: Rect::sized_at(Dims(0, 0), self.size()),
-            frame: self,
-            alpha: 255,
-        }
-    }
-}
-
-impl std::ops::Index<Dims> for FrameBuffer {
-    type Output = Cell;
-
-    fn index(&self, pos: Dims) -> &Self::Output {
-        self.check_pos(pos).expect("Position out of bounds");
-        &self.buffer[pos.1 as usize][pos.0 as usize]
-    }
-}
-
-impl std::ops::IndexMut<Dims> for FrameBuffer {
-    fn index_mut(&mut self, pos: Dims) -> &mut Self::Output {
-        self.check_pos(pos).expect("Position out of bounds");
-        &mut self.buffer[pos.1 as usize][pos.0 as usize]
-    }
-}
-
-impl std::ops::Index<i32> for FrameBuffer {
-    type Output = [Cell];
-
-    fn index(&self, index: i32) -> &Self::Output {
-        &self.buffer[index as usize]
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct FrameView<'a> {
-    frame: &'a dyn Frame,
-    bounds: Rect,
-}
-
-impl FrameView<'_> {
-    pub fn size(&self) -> Dims {
-        self.bounds.size()
-    }
-
-    fn contains(&self, pos: Dims) -> bool {
-        Rect::sized(self.size()).contains(pos)
-    }
-}
-
-impl std::ops::Index<Dims> for FrameView<'_> {
-    type Output = Cell;
-
-    fn index(&self, pos: Dims) -> &Self::Output {
-        if Rect::sized(self.size()).contains(pos) {
-            &self.frame[pos + self.bounds.start]
-        } else {
-            panic!(
-                "Position out of bounds: {pos:?} in {:?}",
-                Rect::sized(self.size())
-            );
-        }
-    }
-}
-
-impl Drawable for FrameView<'_> {
-    fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
-        for ipos in Dims3D::iter_fill(Dims3D::ZERO, Dims3D(self.size().0, self.size().1, 1)) {
-            if self.contains(ipos.into()) {
-                frame[pos + ipos.into()] = self[ipos.into()];
-            }
-        }
-    }
-}
-
-pub struct FrameViewMut<'a> {
-    frame: &'a mut dyn Frame,
-    bounds: Rect,
-    alpha: u8,
-    // TODO: clip: bool,
-}
-
-impl FrameViewMut<'_> {
+impl GMutView<'_> {
     pub fn draw<S>(&mut self, pos: Dims, content: impl Drawable<S>, styles: S) {
         content.draw(pos, self, styles);
     }
 
-    pub fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S)
-    where
-        Self: Sized,
-    {
+    pub fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S) {
         content.draw_aligned(align, self, styles);
     }
-    #[inline]
-    pub fn bounds(
-        &mut self,
-        bounds: Rect,
-        content: impl FnOnce(&mut FrameViewMut<'_>),
-    ) -> &mut Self {
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds,
-            alpha: 255,
-        });
-        self
-    }
+}
 
-    #[inline]
-    pub fn centered(
-        &mut self,
-        size: Dims,
-        content: impl FnOnce(&mut FrameViewMut<'_>),
-    ) -> &mut Self {
-        let start_x = (self.size().0 - size.0) / 2;
-        let start_y = (self.size().1 - size.1) / 2;
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, start_y), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn top(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let size = Dims(self.size().0, len);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, 0), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn bottom(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let start_y = self.size().1 - len;
-        let size = Dims(self.size().0, len);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, start_y), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn left(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let size = Dims(len, self.size().1);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, 0), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn right(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let start_x = self.size().0 - len;
-        let size = Dims(len, self.size().1);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, 0), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn off_top(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let start_y = by;
-        let size = Dims(self.size().0, self.size().1 - by);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, start_y), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn off_bottom(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let start_y = self.size().1 - by;
-        let size = Dims(self.size().0, self.size().1 - by);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(0, start_y), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn off_left(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let start_x = by;
-        let size = Dims(self.size().0 - by, self.size().1);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, 0), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn off_right(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let start_x = self.size().0 - by;
-        let size = Dims(self.size().0 - by, self.size().1);
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, 0), size),
-            alpha: 255,
-        });
-        self
-    }
-
-    #[inline]
-    pub fn pad(&mut self, padding: Padding, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let size = self.size();
-        let start_x = padding.left;
-        let start_y = padding.top;
-        let inner_size = Dims(
-            size.0 - padding.left - padding.right,
-            size.1 - padding.top - padding.bottom,
+impl GMutView<'_> {
+    fn check_bounds(&mut self, new: Rect) -> Rect {
+        assert!(
+            new.start.0 >= self.bounds.start.0 && new.start.1 >= self.bounds.start.1,
+            "new x: {}, y: {}, old x: {}, y: {}",
+            new.start.0,
+            new.start.1,
+            self.bounds.start.0,
+            self.bounds.start.1
         );
+        assert!(
+            new.end.0 <= self.bounds.end.0 && new.end.1 <= self.bounds.end.1,
+            "new x: {}, y: {}, old x: {}, y: {}",
+            new.end.0,
+            new.end.1,
+            self.bounds.end.0,
+            self.bounds.end.1
+        );
+        let old = self.bounds;
+        self.bounds = new;
+        old
+    }
 
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized_at(Dims(start_x, start_y), inner_size),
-            alpha: 255,
-        });
+    #[inline]
+    fn subview(&mut self, f: impl FnOnce(Rect) -> Rect, content: impl FnOnce(&mut GMutView)) {
+        let old = self.check_bounds(f(self.bounds));
+        content(self);
+        self.bounds = old;
+    }
+
+    #[inline]
+    pub fn bounds(&mut self, bounds: Rect, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let old_bounds = self.bounds;
+        // self.bounds = Rect::sized_at(bounds.start + old_bounds.start, bounds.size());
+        // self.check_bounds();
+        //
+        // content(self);
+        // self.bounds = old_bounds;
+        // self
+
+        self.subview(
+            |r| Rect::sized_at(bounds.start + r.start, bounds.size()),
+            content,
+        );
+        self
+
+        // let mut frame = Frame::MutView(self, bounds);
+        // content(&mut frame);
+        // self
+    }
+
+    #[inline]
+    pub fn centered(&mut self, size: Dims, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let start_x = (self.size().0 - size.0) / 2;
+        // let start_y = (self.size().1 - size.1) / 2;
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(start_x, start_y), size),
+        // ));
+        // let old_bounds = self.bounds;
+        // let start_x = (self.size().0 - size.0) / 2;
+        // let start_y = (self.size().1 - size.1) / 2;
+        // self.bounds = Rect::sized_at(old_bounds.start + Dims(start_x, start_y), size);
+        // self.check_bounds();
+        // content(self);
+        // self.bounds = old_bounds;
+        // self
+        self.subview(|r| r.centered(size), content);
+        self
+    }
+
+    #[inline]
+    pub fn top(&mut self, len: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let size = Dims(self.size().0, len);
+        // content(&mut Frame::MutView(self, Rect::sized_at(Dims(0, 0), size)));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn bottom(&mut self, len: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let start_y = self.size().1 - len;
+        // let size = Dims(self.size().0, len);
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(0, start_y), size),
+        // ));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn left(&mut self, len: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let size = Dims(len, self.size().1);
+        // content(&mut Frame::MutView(self, Rect::sized_at(Dims(0, 0), size)));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn right(&mut self, len: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let start_x = self.size().0 - len;
+        // let size = Dims(len, self.size().1);
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(start_x, 0), size),
+        // ));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn off_top(&mut self, by: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let start_y = by;
+        // let size = Dims(self.size().0, self.size().1 - by);
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(0, start_y), size),
+        // ));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn off_bottom(&mut self, by: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let start_y = self.size().1 - by;
+        // let size = Dims(self.size().0, self.size().1 - by);
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(0, start_y), size),
+        // ));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn off_left(&mut self, by: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let start_x = by;
+        // let size = Dims(self.size().0 - by, self.size().1);
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(start_x, 0), size),
+        // ));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn off_right(&mut self, by: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let start_x = self.size().0 - by;
+        // let size = Dims(self.size().0 - by, self.size().1);
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(start_x, 0), size),
+        // ));
+        // self
+        todo!()
+    }
+
+    #[inline]
+    pub fn pad(&mut self, padding: Padding, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        // let size = self.size();
+        // let start_x = padding.left;
+        // let start_y = padding.top;
+        // let inner_size = Dims(
+        //     size.0 - padding.left - padding.right,
+        //     size.1 - padding.top - padding.bottom,
+        // );
+        //
+        // content(&mut Frame::MutView(
+        //     self,
+        //     Rect::sized_at(Dims(start_x, start_y), inner_size),
+        // ));
+        // self
+        self.subview(
+            |r| Rect {
+                start: r.start + Dims(padding.left, padding.top),
+                end: r.end - Dims(padding.right, padding.bottom),
+            },
+            content,
+        );
         self
     }
 
@@ -600,37 +621,24 @@ impl FrameViewMut<'_> {
         ratio: Offset,
         vertical: bool,
         payload: &mut T, // to allow passing &mut T to the closures, e.g. &mut self
-        first: impl FnOnce(&mut FrameViewMut, &mut T),
-        second: impl FnOnce(&mut FrameViewMut, &mut T),
+        first: impl FnOnce(&mut GMutView, &mut T),
+        second: impl FnOnce(&mut GMutView, &mut T),
     ) -> &mut Self {
-        let (f, s) = if vertical {
-            Rect::sized(self.size()).split_y(ratio)
-        } else {
-            Rect::sized(self.size()).split_x(ratio)
-        };
-
-        first(
-            &mut FrameViewMut {
-                frame: self,
-                bounds: f,
-                alpha: 255,
-            },
-            payload,
-        );
-        second(
-            &mut FrameViewMut {
-                frame: self,
-                bounds: s,
-                alpha: 255,
-            },
-            payload,
-        );
-
-        self
+        // let (f, s) = if vertical {
+        //     Rect::sized(self.size()).split_y(ratio)
+        // } else {
+        //     Rect::sized(self.size()).split_x(ratio)
+        // };
+        //
+        // first(&mut Frame::MutView(self, f), payload);
+        // second(&mut Frame::MutView(self, s), payload);
+        //
+        // self
+        todo!()
     }
 
     #[inline]
-    pub fn inside(&mut self, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+    pub fn inside(&mut self, content: impl FnOnce(&mut GMutView)) -> &mut Self {
         self.pad(Padding::from(1), content);
         self
     }
@@ -640,60 +648,530 @@ impl FrameViewMut<'_> {
         Rect::sized(self.size()).render(self, style);
         self
     }
-
-    pub fn alpha(&mut self, alpha: u8, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
-        let size = self.size();
-        content(&mut FrameViewMut {
-            frame: self,
-            bounds: Rect::sized(size),
-            alpha,
-        });
-        self
-    }
 }
 
-impl Frame for FrameViewMut<'_> {
-    fn size(&self) -> Dims {
-        self.bounds.size()
-    }
-
-    fn imview(&self) -> FrameView<'_> {
-        FrameView {
-            bounds: self.bounds,
-            frame: self.frame,
-        }
-    }
-
-    fn view<'a>(&'a mut self) -> FrameViewMut<'a> {
-        FrameViewMut {
-            bounds: self.bounds,
-            frame: self.frame,
-            alpha: 255,
-        }
-    }
-}
-
-impl std::ops::Index<Dims> for FrameViewMut<'_> {
+impl Index<Dims> for GMutView<'_> {
     type Output = Cell;
 
     fn index(&self, pos: Dims) -> &Self::Output {
-        if self.contains(pos) {
-            &self.frame[pos + self.bounds.start]
-        } else {
-            panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
-        }
+        todo!()
     }
 }
 
-impl std::ops::IndexMut<Dims> for FrameViewMut<'_> {
+impl IndexMut<Dims> for GMutView<'_> {
     fn index_mut(&mut self, pos: Dims) -> &mut Self::Output {
-        if self.contains(pos) {
-            &mut self.frame[pos + self.bounds.start]
-        } else {
-            panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
-        }
+        todo!()
     }
 }
+
+// pub trait Frame: IndexMut<Dims, Output = Cell> {
+//     fn size(&self) -> Dims;
+//
+//     fn contains(&self, pos: Dims) -> bool {
+//         Rect::sized(self.size()).contains(pos)
+//     }
+//
+//     fn put_char(&mut self, pos @ Dims(x, y): Dims, character: char, style: Style) -> usize {
+//         let width = character.width().unwrap_or(1) as i32;
+//         if x < 0 || self.size().0 <= x || y < 0 || self.size().1 <= y {
+//             return width as usize;
+//         }
+//
+//         if width == 0 {
+//             return 0;
+//         }
+//
+//         let cell = Cell::styled(character, style);
+//
+//         self[pos] = cell;
+//
+//         for x in x + 1..x + width {
+//             self[Dims(x, y)] = Cell::Empty;
+//         }
+//
+//         width as usize
+//     }
+//
+//     fn fill(&mut self, cell: Cell) {
+//         for y in 0..self.size().1 {
+//             for x in 0..self.size().0 {
+//                 self[Dims(x, y)] = cell;
+//             }
+//         }
+//     }
+//
+//     fn fill_rect(&mut self, pos: Dims, size: Dims, cell: Cell) {
+//         for y in pos.1..pos.1 + size.1 {
+//             for x in pos.0..pos.0 + size.0 {
+//                 if x < 0 || x >= self.size().0 || y < 0 || y >= self.size().1 {
+//                     continue;
+//                 }
+//                 self[Dims(x, y)] = cell;
+//             }
+//         }
+//     }
+//
+//     fn clear(&mut self) {
+//         self.fill(Cell::new(' '));
+//     }
+//
+//     fn imview(&self) -> FrameView<'_>;
+//
+//     fn view(&mut self) -> FrameViewMut<'_>;
+// }
+//
+// // These methods are used to create views of the frame, allowing for more complex layouts.
+//
+// impl Drawable for FrameViewMut<'_> {
+//     fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
+//         self.imview().draw(pos, frame, ());
+//     }
+// }
+//
+// pub struct FrameBuffer {
+//     buffer: Vec<Vec<Cell>>,
+//     size: Dims,
+// }
+//
+// impl FrameBuffer {
+//     pub fn new(size: Dims) -> Self {
+//         assert!(size.0 > 0 && size.1 > 0);
+//         let mut buffer = Vec::with_capacity(size.1 as usize);
+//         for _ in 0..size.1 {
+//             buffer.push(vec![Cell::new(' '); size.0 as usize]);
+//         }
+//         FrameBuffer { buffer, size }
+//     }
+//
+//     pub fn resize(&mut self, size: Dims) {
+//         if self.size == size {
+//             return;
+//         }
+//
+//         self.size = size;
+//         self.buffer.resize(size.1 as usize, Vec::new());
+//         for row in self.buffer.iter_mut() {
+//             row.resize(size.0 as usize, Cell::new(' '));
+//         }
+//     }
+//
+//     fn check_pos(&self, pos: Dims) -> Option<()> {
+//         if (pos.0 < 0 || pos.0 >= self.size.0) || (pos.1 < 0 || pos.1 >= self.size.1) {
+//             return None;
+//         }
+//         Some(())
+//     }
+// }
+//
+// impl Frame for FrameBuffer {
+//     fn size(&self) -> Dims {
+//         self.size
+//     }
+//
+//     fn imview<'a>(&'a self) -> FrameView<'a> {
+//         FrameView {
+//             bounds: Rect::sized_at(Dims(0, 0), self.size()),
+//             frame: self,
+//         }
+//     }
+//     fn view<'a>(&'a mut self) -> FrameViewMut<'a> {
+//         FrameViewMut {
+//             bounds: Rect::sized_at(Dims(0, 0), self.size()),
+//             frame: self,
+//             backing: FrameViewBacking::Simple,
+//         }
+//     }
+// }
+//
+// impl std::ops::Index<Dims> for FrameBuffer {
+//     type Output = Cell;
+//
+//     fn index(&self, pos: Dims) -> &Self::Output {
+//         self.check_pos(pos).expect("Position out of bounds");
+//         &self.buffer[pos.1 as usize][pos.0 as usize]
+//     }
+// }
+//
+// impl std::ops::IndexMut<Dims> for FrameBuffer {
+//     fn index_mut(&mut self, pos: Dims) -> &mut Self::Output {
+//         self.check_pos(pos).expect("Position out of bounds");
+//         &mut self.buffer[pos.1 as usize][pos.0 as usize]
+//     }
+// }
+//
+// impl std::ops::Index<i32> for FrameBuffer {
+//     type Output = [Cell];
+//
+//     fn index(&self, index: i32) -> &Self::Output {
+//         &self.buffer[index as usize]
+//     }
+// }
+//
+// #[derive(Clone, Copy)]
+// pub struct FrameView<'a> {
+//     frame: &'a dyn Frame,
+//     bounds: Rect,
+// }
+//
+// impl FrameView<'_> {
+//     pub fn size(&self) -> Dims {
+//         self.bounds.size()
+//     }
+//
+//     fn contains(&self, pos: Dims) -> bool {
+//         Rect::sized(self.size()).contains(pos)
+//     }
+// }
+//
+// impl std::ops::Index<Dims> for FrameView<'_> {
+//     type Output = Cell;
+//
+//     fn index(&self, pos: Dims) -> &Self::Output {
+//         if Rect::sized(self.size()).contains(pos) {
+//             &self.frame[pos + self.bounds.start]
+//         } else {
+//             panic!(
+//                 "Position out of bounds: {pos:?} in {:?}",
+//                 Rect::sized(self.size())
+//             );
+//         }
+//     }
+// }
+//
+// impl Drawable for FrameView<'_> {
+//     fn draw(&self, pos: Dims, frame: &mut dyn Frame, _: ()) {
+//         for ipos in Dims::iter_fill(Dims::ZERO, self.size()) {
+//             if self.contains(ipos.into()) {
+//                 frame[pos + ipos.into()] = self[ipos.into()];
+//             }
+//         }
+//     }
+// }
+//
+// enum FrameViewBacking {
+//     Simple,
+//     Transparent { alpha: u8, buffer: FrameBuffer },
+// }
+//
+// pub struct FrameViewMut<'a> {
+//     frame: &'a mut dyn Frame,
+//     bounds: Rect,
+//     backing: FrameViewBacking,
+//     // TODO: clip: bool,
+// }
+//
+// impl FrameViewMut<'_> {
+//     pub fn draw<S>(&mut self, pos: Dims, content: impl Drawable<S>, styles: S) {
+//         content.draw(pos, self, styles);
+//     }
+//
+//     pub fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S)
+//     where
+//         Self: Sized,
+//     {
+//         content.draw_aligned(align, self, styles);
+//     }
+//     #[inline]
+//     pub fn bounds(
+//         &mut self,
+//         bounds: Rect,
+//         content: impl FnOnce(&mut FrameViewMut<'_>),
+//     ) -> &mut Self {
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds,
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn centered(
+//         &mut self,
+//         size: Dims,
+//         content: impl FnOnce(&mut FrameViewMut<'_>),
+//     ) -> &mut Self {
+//         let start_x = (self.size().0 - size.0) / 2;
+//         let start_y = (self.size().1 - size.1) / 2;
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(start_x, start_y), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn top(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let size = Dims(self.size().0, len);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(0, 0), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn bottom(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let start_y = self.size().1 - len;
+//         let size = Dims(self.size().0, len);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(0, start_y), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn left(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let size = Dims(len, self.size().1);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(0, 0), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn right(&mut self, len: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let start_x = self.size().0 - len;
+//         let size = Dims(len, self.size().1);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(start_x, 0), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn off_top(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let start_y = by;
+//         let size = Dims(self.size().0, self.size().1 - by);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(0, start_y), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn off_bottom(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let start_y = self.size().1 - by;
+//         let size = Dims(self.size().0, self.size().1 - by);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(0, start_y), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn off_left(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let start_x = by;
+//         let size = Dims(self.size().0 - by, self.size().1);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(start_x, 0), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn off_right(&mut self, by: i32, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let start_x = self.size().0 - by;
+//         let size = Dims(self.size().0 - by, self.size().1);
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(start_x, 0), size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn pad(&mut self, padding: Padding, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let size = self.size();
+//         let start_x = padding.left;
+//         let start_y = padding.top;
+//         let inner_size = Dims(
+//             size.0 - padding.left - padding.right,
+//             size.1 - padding.top - padding.bottom,
+//         );
+//
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized_at(Dims(start_x, start_y), inner_size),
+//             backing: FrameViewBacking::Simple,
+//         });
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn split<T>(
+//         &mut self,
+//         ratio: Offset,
+//         vertical: bool,
+//         payload: &mut T, // to allow passing &mut T to the closures, e.g. &mut self
+//         first: impl FnOnce(&mut FrameViewMut, &mut T),
+//         second: impl FnOnce(&mut FrameViewMut, &mut T),
+//     ) -> &mut Self {
+//         let (f, s) = if vertical {
+//             Rect::sized(self.size()).split_y(ratio)
+//         } else {
+//             Rect::sized(self.size()).split_x(ratio)
+//         };
+//
+//         first(
+//             &mut FrameViewMut {
+//                 frame: self,
+//                 bounds: f,
+//                 backing: FrameViewBacking::Simple,
+//             },
+//             payload,
+//         );
+//         second(
+//             &mut FrameViewMut {
+//                 frame: self,
+//                 bounds: s,
+//                 backing: FrameViewBacking::Simple,
+//             },
+//             payload,
+//         );
+//
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn inside(&mut self, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         self.pad(Padding::from(1), content);
+//         self
+//     }
+//
+//     #[inline]
+//     pub fn border(&mut self, style: Style) -> &mut Self {
+//         Rect::sized(self.size()).render(self, style);
+//         self
+//     }
+//
+//     pub fn alpha(&mut self, alpha: u8, content: impl FnOnce(&mut FrameViewMut)) -> &mut Self {
+//         let size = self.size();
+//         content(&mut FrameViewMut {
+//             frame: self,
+//             bounds: Rect::sized(size),
+//             backing: FrameViewBacking::Transparent {
+//                 alpha,
+//                 buffer: FrameBuffer::new(size),
+//             },
+//         });
+//         self
+//     }
+//
+//     fn clear_multicell_part(&mut self, pos: Dims) {
+//         let Cell::Empty(w) = self[pos] else {
+//             panic!("Expected `Cell::Empty` at position {pos:?}");
+//         };
+//
+//         if w == 0 {
+//             panic!("`Cell::Empty()` should not have `0` width");
+//         }
+//
+//         let char_start = pos.0 + self.bounds.start.0 - w as i32;
+//         let multicell = self.frame[Dims(char_start, pos.1 + self.bounds.start.1)]
+//             .content()
+//             .unwrap();
+//         let style = multicell.style;
+//         for x in char_start..char_start + multicell.width as i32 {
+//
+//         }
+//     }
+// }
+//
+// impl Frame for FrameViewMut<'_> {
+//     fn size(&self) -> Dims {
+//         self.bounds.size()
+//     }
+//
+//     fn imview(&self) -> FrameView<'_> {
+//         FrameView {
+//             bounds: self.bounds,
+//             frame: self.frame,
+//         }
+//     }
+//
+//     fn view<'a>(&'a mut self) -> FrameViewMut<'a> {
+//         FrameViewMut {
+//             bounds: self.bounds,
+//             frame: self.frame,
+//             backing: FrameViewBacking::Simple,
+//         }
+//     }
+// }
+//
+// impl std::ops::Index<Dims> for FrameViewMut<'_> {
+//     type Output = Cell;
+//
+//     fn index(&self, pos: Dims) -> &Self::Output {
+//         if !self.contains(pos) {
+//             panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
+//         }
+//
+//         match &self.backing {
+//             FrameViewBacking::Simple => &self.frame[pos + self.bounds.start],
+//             FrameViewBacking::Transparent { alpha: _, buffer } => &buffer[pos],
+//         }
+//     }
+// }
+//
+// impl std::ops::IndexMut<Dims> for FrameViewMut<'_> {
+//     fn index_mut(&mut self, pos: Dims) -> &mut Self::Output {
+//         if !self.contains(pos) {
+//             panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
+//         }
+//
+//         match &mut self.backing {
+//             FrameViewBacking::Simple => &mut self.frame[pos + self.bounds.start],
+//             FrameViewBacking::Transparent { alpha: _, buffer } => &mut buffer[pos],
+//         }
+//     }
+// }
+//
+// impl Drop for FrameViewMut<'_> {
+//     fn drop(&mut self) {
+//         if let FrameViewBacking::Transparent { alpha, buffer } = &mut self.backing {
+//             // Apply the alpha blending to the buffer
+//             for pos in Dims::iter_fill(Dims::ZERO, self.size()) {
+//                 match (&buffer[pos], &self.frame[pos + self.bounds.start]) {
+//                     (
+//                         Cell::Content(CellContent {
+//                             character,
+//                             width,
+//                             style,
+//                         }),
+//                         Cell::Empty(w),
+//                     ) => {
+//                         if *w == 0 {
+//                             panic!("`Cell::Empty()` should not have `0` width");
+//                         }
+//
+//                         let char_start = pos.0 + self.bounds.start.0 - *w as i32;
+//                         let problematic_cell = self.frame
+//                             [Dims(char_start, pos.1 + self.bounds.start.1)]
+//                         .content()
+//                         .unwrap();
+//                         for x in char_start..char_start + problematic_cell.width as i32 {}
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 pub struct Padding {
     pub top: i32,

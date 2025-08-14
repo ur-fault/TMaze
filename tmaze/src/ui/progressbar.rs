@@ -2,8 +2,6 @@ use unicode_width::UnicodeWidthStr;
 
 use cmaze::dims::Dims;
 
-use crate::renderer::Frame as _;
-
 use super::{draw_fn::*, *};
 
 pub struct ProgressBar {
@@ -29,7 +27,7 @@ impl ProgressBar {
 }
 
 impl Screen for ProgressBar {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError> {
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
         let progress_size = Dims(self.title.width() as i32 + 2 + 2, 4);
         let pos = center_box_in_screen(progress_size);
 
@@ -40,7 +38,6 @@ impl Screen for ProgressBar {
         let prg_style = theme["ui.progressbar.progress"];
 
         draw_box(frame, pos, progress_size, box_style);
-        let mut frame = frame.view();
         frame.draw(pos + Dims(2, 1), self.title.as_str(), text_style);
         frame.draw(pos + Dims(2, 2), prg, prg_style);
 

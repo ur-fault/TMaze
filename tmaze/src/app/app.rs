@@ -18,7 +18,7 @@ use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
-    renderer::{self, drawable::Drawable, Cell, Frame as _, FrameBuffer, Renderer},
+    renderer::{self, drawable::Drawable, CellContent, GMutView, Renderer},
     settings::{
         theme::{Theme, ThemeResolver},
         Settings,
@@ -262,24 +262,27 @@ impl App {
 
             self.renderer
                 .frame()
-                .fill(Cell::styled(' ', self.data.theme.get("background")));
+                .mut_view()
+                .fill(CellContent::styled(' ', self.data.theme.get("background")));
 
             match self
                 .activities
                 .active_mut()
                 .expect("No active active")
                 .screen()
-                .draw(self.renderer.frame(), &self.data.theme)
+                .draw(&mut self.renderer.frame().mut_view(), &self.data.theme)
             {
                 Ok(_) => {}
                 Err(ui::ScreenError::SmallScreen) => {
-                    draw_small_screen_info(self.renderer.frame(), &self.data.theme)
+                    draw_small_screen_info(&mut self.renderer.frame().mut_view(), &self.data.theme)
                 }
             }
 
-            self.data
-                .logs
-                .draw(Dims(0, 0), self.renderer.frame(), &self.data.theme);
+            self.data.logs.draw(
+                Dims(0, 0),
+                &mut self.renderer.frame().mut_view(),
+                &self.data.theme,
+            );
 
             // TODO: let activities show debug info and about the app itself
             // then we can draw it here
@@ -351,11 +354,10 @@ pub fn init_theme_resolver() -> ThemeResolver {
     resolver
 }
 
-fn draw_small_screen_info(frame: &mut FrameBuffer, theme: &Theme) {
+fn draw_small_screen_info(frame: &mut GMutView, theme: &Theme) {
     let size = frame.size();
     frame.clear();
-    let mut view = frame.view();
-    view.centered(Dims(size.0, 2), |f| {
+    frame.centered(Dims(size.0, 2), |f| {
         f.draw_aligned(
             renderer::drawable::Align::TopCenter,
             "Screen is too small",

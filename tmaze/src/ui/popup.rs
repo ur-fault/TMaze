@@ -7,7 +7,6 @@ use super::{draw_fn::*, *};
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::is_release,
-    renderer::Frame as _,
 };
 
 pub struct Popup {
@@ -56,7 +55,7 @@ impl ActivityHandler for Popup {
 }
 
 impl Screen for Popup {
-    fn draw(&mut self, frame: &mut FrameBuffer, theme: &Theme) -> Result<(), ScreenError> {
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
         let box_size = popup_size(&self.title, &self.texts);
         let title_pos = center_box_in_screen(Dims(self.title.width() as i32, 1)).0;
         let pos = center_box_in_screen(box_size);
@@ -66,7 +65,6 @@ impl Screen for Popup {
         let title_style = theme["ui.popup.title"];
 
         draw_box(frame, pos, box_size, box_style);
-        let mut frame = frame.view();
         frame.draw(Dims(title_pos, pos.1 + 1), self.title.as_str(), title_style);
 
         if !self.texts.is_empty() {
