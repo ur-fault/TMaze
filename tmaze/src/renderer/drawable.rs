@@ -17,7 +17,7 @@ impl<D: Drawable> Drawable for &D {
 
 impl Drawable<Style> for char {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
-        frame.put_char(pos, *self, styles);
+        frame.set_content_of(pos, *self, styles);
     }
 }
 
@@ -27,18 +27,18 @@ impl Drawable<Style> for String {
     }
 }
 
-impl Drawable<Style> for &'_ str {
+impl Drawable<Style> for &str {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         let mut x = 0;
         for character in self.chars() {
-            x += frame.put_char(Dims(pos.0 + x as i32, pos.1), character, styles);
+            x += frame.set_content_of(Dims(pos.0 + x as i32, pos.1), character, styles);
         }
     }
 }
 
 impl Drawable for Cell {
     fn draw(&self, pos: Dims, frame: &mut GMutView, _styles: ()) {
-        frame[pos] = *self;
+        todo!()
     }
 }
 
