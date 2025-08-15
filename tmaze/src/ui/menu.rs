@@ -84,7 +84,7 @@ impl MenuItem {
 
     // TODO: same as Display, make it get a buffer and write to it,
     // so we don't allocate a new string every time
-    fn render(&self, width: usize) -> Cow<str> {
+    fn render(&self, width: usize) -> Cow<'_, str> {
         match self {
             MenuItem::Text(text) => text.as_ref_cow(),
             MenuItem::Option(OptionDef { text, val, .. }) => {

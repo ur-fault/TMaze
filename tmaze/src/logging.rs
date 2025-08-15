@@ -119,7 +119,7 @@ impl UiLogs {
         }
     }
 
-    fn borrow_mut_logs(&self) -> MutexGuard<Logs> {
+    fn borrow_mut_logs(&self) -> MutexGuard<'_, Logs> {
         self.logs.lock().expect("a thread holding log panicked")
     }
 }
@@ -265,7 +265,7 @@ impl AppLogger {
         }));
     }
 
-    fn borrow_mut_logs(&self) -> MutexGuard<Logs> {
+    fn borrow_mut_logs(&self) -> MutexGuard<'_, Logs> {
         self.logs.lock().expect("a thread holding log panicked")
     }
 }

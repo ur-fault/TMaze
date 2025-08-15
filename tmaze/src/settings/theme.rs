@@ -145,6 +145,8 @@ pub struct Style {
     pub fg: Option<Color>,
     #[serde(deserialize_with = "deserialize_attributes", default)]
     pub attr: Attributes,
+    #[serde(default = "default_alpha")]
+    pub alpha: u8,
 }
 
 impl Default for Style {
@@ -153,6 +155,7 @@ impl Default for Style {
             bg: Default::default(),
             fg: Default::default(),
             attr: Default::default(),
+            alpha: u8::MAX,
         }
     }
 }

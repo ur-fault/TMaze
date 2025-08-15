@@ -47,7 +47,7 @@ impl ProgressHandle {
         child
     }
 
-    pub fn lock(&self) -> MutexGuard<Progress> {
+    pub fn lock(&self) -> MutexGuard<'_, Progress> {
         self.progress.lock().unwrap()
     }
 

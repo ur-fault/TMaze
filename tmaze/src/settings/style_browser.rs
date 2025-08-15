@@ -561,7 +561,7 @@ impl NodeItem {
         self.children.is_empty() && self.item.is_none()
     }
 
-    fn iter(&self) -> NodeItemIter {
+    fn iter(&self) -> NodeItemIter<'_> {
         NodeItemIter {
             node: self,
             index: 0,
@@ -571,7 +571,7 @@ impl NodeItem {
         }
     }
 
-    fn iter_visible(&self) -> NodeItemIter {
+    fn iter_visible(&self) -> NodeItemIter<'_> {
         NodeItemIter {
             node: self,
             index: 0,
