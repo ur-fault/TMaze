@@ -631,11 +631,7 @@ impl GameActivity {
             .get_cell(self.data.game.get_player_pos())
             .unwrap();
         if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
-            viewport[player_draw_pos]
-                .content_mut()
-                .unwrap()
-                .style
-                .foreground_color = theme["game.player"].to_cross().foreground_color;
+            viewport.style_of(player_draw_pos).fg = theme["game.player"].fg;
         } else {
             viewport.draw(player_draw_pos, self.data.player_char, theme["game.player"]);
         }
@@ -947,7 +943,12 @@ impl MazeBoard {
         }
 
         let layer = board.get_cells().layer(floor as usize).unwrap();
-        Self::render_stairs(&mut frame.mut_view(), layer, game.get_maze().is_tower(), theme);
+        Self::render_stairs(
+            &mut frame.mut_view(),
+            layer,
+            game.get_maze().is_tower(),
+            theme,
+        );
 
         frame
     }

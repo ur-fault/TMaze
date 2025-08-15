@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::not_release,
-    renderer::{Cell, CellContent, GMutView, Padding},
+    renderer::{CellContent, GMutView, Padding},
     settings::theme::Style,
     ui::{CapsuleText, Screen, ScreenError},
 };
@@ -326,12 +326,9 @@ impl StyleBrowser {
                             if !f.contains(cell_pos) {
                                 continue;
                             }
-                            match &mut f[cell_pos] {
-                                Cell::Placeholder(_) => {}
-                                Cell::Content(c) => {
-                                    c.style.attributes.extend(Attribute::Underlined.into())
-                                }
-                            }
+                            f.style_of(cell_pos)
+                                .attr
+                                .extend(Attribute::Underlined.into());
                         }
                     }
                 }
@@ -367,12 +364,9 @@ impl StyleBrowser {
                             if !f.contains(cell_pos) {
                                 continue;
                             }
-                            match &mut f[cell_pos] {
-                                Cell::Placeholder(_) => {}
-                                Cell::Content(c) => {
-                                    c.style.attributes.extend(Attribute::Underlined.into())
-                                }
-                            }
+                            f.style_of(cell_pos)
+                                .attr
+                                .extend(Attribute::Underlined.into());
                         }
                     }
                 }
