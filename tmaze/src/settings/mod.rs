@@ -196,11 +196,11 @@ impl Settings {
         self.read_only
     }
 
-    pub fn read(&self) -> std::sync::RwLockReadGuard<SettingsInner> {
+    pub fn read(&self) -> std::sync::RwLockReadGuard<'_, SettingsInner> {
         self.shared.read().unwrap()
     }
 
-    pub fn write(&mut self) -> std::sync::RwLockWriteGuard<SettingsInner> {
+    pub fn write(&mut self) -> std::sync::RwLockWriteGuard<'_, SettingsInner> {
         self.shared.write().unwrap()
     }
 }

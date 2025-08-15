@@ -3,7 +3,7 @@ use unicode_width::{UnicodeWidthChar as _, UnicodeWidthStr as _};
 
 use crate::settings::theme::Style;
 
-use super::{Cell, GMutView};
+use super::GMutView;
 
 pub trait Drawable<S = ()> {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: S);
@@ -33,12 +33,6 @@ impl Drawable<Style> for &str {
         for character in self.chars() {
             x += frame.set_content_of(Dims(pos.0 + x as i32, pos.1), character, styles);
         }
-    }
-}
-
-impl Drawable for Cell {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, _styles: ()) {
-        todo!()
     }
 }
 
@@ -96,12 +90,6 @@ impl SizedDrawable<Style> for String {
 impl SizedDrawable<Style> for &'_ str {
     fn size(&self) -> Dims {
         Dims(self.width() as i32, 1)
-    }
-}
-
-impl SizedDrawable for Cell {
-    fn size(&self) -> Dims {
-        Dims::ONE
     }
 }
 

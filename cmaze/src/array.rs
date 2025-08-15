@@ -77,7 +77,7 @@ impl<T: Clone> Array3D<T> {
         }
     }
 
-    pub fn layer(&self, z: usize) -> Option<Array2DView<T>> {
+    pub fn layer(&self, z: usize) -> Option<Array2DView<'_, T>> {
         if z >= self.depth {
             return None;
         }
@@ -93,7 +93,7 @@ impl<T: Clone> Array3D<T> {
         })
     }
 
-    pub fn layers(&self) -> impl Iterator<Item = Array2DView<T>> + '_ {
+    pub fn layers(&self) -> impl Iterator<Item = Array2DView<'_, T>> {
         (0..self.depth).map(move |z| self.layer(z).unwrap())
     }
 

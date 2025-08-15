@@ -431,7 +431,7 @@ impl GMutView<'_> {
                     self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::empty();
                 }
             }
-            Cell::Placeholder(w) => {
+            Cell::Placeholder(_) => {
                 todo!()
             }
         }

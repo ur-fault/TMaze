@@ -51,7 +51,7 @@ pub enum MbyStaticStr {
 }
 
 impl MbyStaticStr {
-    pub fn as_ref_cow(&self) -> Cow<str> {
+    pub fn as_ref_cow(&self) -> Cow<'_, str> {
         match self {
             Self::Static(s) => Cow::Borrowed(s),
             Self::Owned(s) => Cow::Borrowed(s.as_str()),
