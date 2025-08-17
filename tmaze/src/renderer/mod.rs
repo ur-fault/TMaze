@@ -548,6 +548,7 @@ impl GMutView<'_> {
         self.fill(CellContent::empty());
     }
 
+    #[inline]
     pub fn contains(&self, cell_pos: Dims) -> bool {
         Rect::sized(self.size()).contains(cell_pos)
     }
