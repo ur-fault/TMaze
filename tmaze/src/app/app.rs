@@ -18,7 +18,7 @@ use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
-    renderer::{self, drawable::Drawable, CellContent, GMutView, Renderer},
+    renderer::{self, draw::Draw, CellContent, GMutView, Renderer},
     settings::{
         theme::{Theme, ThemeResolver},
         Settings,
@@ -359,12 +359,12 @@ fn draw_small_screen_info(frame: &mut GMutView, theme: &Theme) {
     frame.clear();
     frame.centered(Dims(size.0, 2), |f| {
         f.draw_aligned(
-            renderer::drawable::Align::TopCenter,
+            renderer::draw::Align::TopCenter,
             "Screen is too small",
             theme["text"],
         );
         f.draw_aligned(
-            renderer::drawable::Align::BottomCenter,
+            renderer::draw::Align::BottomCenter,
             format!("actual size: {}x{}", size.0, size.1),
             theme["text"],
         );

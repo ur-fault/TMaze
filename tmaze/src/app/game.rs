@@ -15,7 +15,7 @@ use crate::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
     lerp, menu_actions,
-    renderer::{drawable::Align, CellContent, GBuffer, GMutView, Padding},
+    renderer::{draw::Align, CellContent, GBuffer, GMutView, Padding},
     settings::{
         self,
         style_browser::StyleBrowser,

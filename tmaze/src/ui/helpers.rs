@@ -6,7 +6,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     helpers::{self, strings::multisize_string},
-    renderer::{drawable::Drawable, helpers::term_size, GMutView},
+    renderer::{draw::Draw, helpers::term_size, GMutView},
     settings::theme::Style,
 };
 
@@ -81,7 +81,7 @@ pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyl
 
 pub struct CapsuleText(pub String);
 
-impl Drawable<Style> for CapsuleText {
+impl Draw<Style> for CapsuleText {
     fn draw(&self, pos: Dims, frame: &mut GMutView, style: Style) {
         frame.draw(pos + Dims(0, 0), '', style.invert());
         frame.draw(pos + Dims(1, 0), self.0.as_str(), style);

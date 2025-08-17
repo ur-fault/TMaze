@@ -5,29 +5,29 @@ use crate::settings::theme::Style;
 
 use super::GMutView;
 
-pub trait Drawable<S = ()> {
+pub trait Draw<S = ()> {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: S);
 }
 
-impl<D: Drawable> Drawable for &D {
+impl<D: Draw> Draw for &D {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: ()) {
         (**self).draw(pos, frame, styles);
     }
 }
 
-impl Drawable<Style> for char {
+impl Draw<Style> for char {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         frame.set_content_of(pos, *self, styles);
     }
 }
 
-impl Drawable<Style> for String {
+impl Draw<Style> for String {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         self.as_str().draw(pos, frame, styles);
     }
 }
 
-impl Drawable<Style> for &str {
+impl Draw<Style> for &str {
     fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         let mut x = 0;
         for character in self.chars() {
@@ -48,7 +48,7 @@ pub enum Align {
     BottomRight,
 }
 
-pub trait SizedDrawable<S = ()>: Drawable<S> {
+pub trait SizedDrawable<S = ()>: Draw<S> {
     fn size(&self) -> Dims;
 
     fn align(&self, align: Align, frame_size: Dims) -> Dims {
@@ -95,7 +95,7 @@ impl SizedDrawable<Style> for &'_ str {
 
 pub struct Styled<T, S>(pub T, pub S);
 
-impl<T: Drawable<S>, S: Clone> Drawable for Styled<T, S> {
+impl<T: Draw<S>, S: Clone> Draw for Styled<T, S> {
     fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
         self.0.draw(pos, frame, self.1.clone());
     }
