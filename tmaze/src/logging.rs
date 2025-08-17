@@ -13,7 +13,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     helpers::constants::paths,
-    renderer::{drawable::Drawable, GMutView},
+    renderer::{draw::Draw, GMutView},
     settings::{
         theme::{Color, NamedColor, Style, Theme},
         Settings,
@@ -124,7 +124,7 @@ impl UiLogs {
     }
 }
 
-impl Drawable<&Theme> for UiLogs {
+impl Draw<&Theme> for UiLogs {
     fn draw(&self, pos: Dims, frame: &mut GMutView, theme: &Theme) {
         let [msg_style, source_style, extra] =
             theme.extract(["log.message", "log.source", "log.extra"]);

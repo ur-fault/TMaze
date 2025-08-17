@@ -1,4 +1,4 @@
-pub mod drawable;
+pub mod draw;
 pub mod helpers;
 
 use std::{
@@ -12,7 +12,7 @@ use cmaze::{
     dims::{Dims, Dims3D, Offset},
 };
 use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
-use drawable::{Align, Drawable, SizedDrawable};
+use draw::{Align, Draw, SizedDrawable};
 use unicode_width::UnicodeWidthChar;
 
 use crate::{settings::theme::Style, ui::Rect};
@@ -366,7 +366,7 @@ impl GView<'_> {
     }
 }
 
-impl Drawable for GView<'_> {
+impl Draw for GView<'_> {
     fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
         for rel_line in 0..self.size().1 {
             let local_line = rel_line + self.bounds.start.1;
@@ -561,7 +561,7 @@ impl GMutView<'_> {
 }
 
 impl GMutView<'_> {
-    pub fn draw<S>(&mut self, pos: Dims, content: impl Drawable<S>, styles: S) {
+    pub fn draw<S>(&mut self, pos: Dims, content: impl Draw<S>, styles: S) {
         content.draw(pos, self, styles);
     }
 

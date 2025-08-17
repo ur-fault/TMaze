@@ -4,7 +4,7 @@ use substring::Substring as _;
 
 use crate::{
     helpers::box_center,
-    renderer::{drawable::Drawable, GMutView},
+    renderer::{draw::Draw, GMutView},
     settings::theme::{Style, ThemeResolver},
 };
 
@@ -152,7 +152,7 @@ impl Rect {
     }
 }
 
-impl Drawable<Style> for Rect {
+impl Draw<Style> for Rect {
     fn draw(&self, pos: Dims, frame: &mut GMutView, style: Style) {
         draw_box(frame, pos + self.start, self.size(), style);
     }
