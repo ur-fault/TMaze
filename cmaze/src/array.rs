@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::dims::{Dims, Dims3D};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "Array3DSerde<T>", into = "Array3DSerde<T>")]
 pub struct Array3D<T: Clone> {
     buf: Vec<T>,
@@ -46,12 +46,12 @@ impl<T: Clone> Array3D<T> {
         Some(Dims3D(x as i32, y as i32, z as i32))
     }
 
-    pub fn get(&self, pos: Dims3D) -> Option<&T> {
-        self.dim_to_idx(pos).and_then(|i| self.buf.get(i))
+    pub fn get(&self, pos: impl Into<Dims3D>) -> Option<&T> {
+        self.dim_to_idx(pos.into()).and_then(|i| self.buf.get(i))
     }
 
-    pub fn get_mut(&mut self, pos: Dims3D) -> Option<&mut T> {
-        self.dim_to_idx(pos).and_then(move |i| self.buf.get_mut(i))
+    pub fn get_mut(&mut self, pos: impl Into<Dims3D>) -> Option<&mut T> {
+        self.dim_to_idx(pos.into()).and_then(move |i| self.buf.get_mut(i))
     }
 }
 

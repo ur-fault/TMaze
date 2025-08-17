@@ -287,6 +287,7 @@ impl Cell {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GBuffer(Array3D<Cell>);
 
 impl GBuffer {
@@ -325,6 +326,28 @@ impl GBuffer {
             buf: self,
             bounds: Rect::sized_at(Dims::ZERO, self.size()),
         }
+    }
+
+    pub fn write(&self, to: &mut impl Write) -> io::Result<()> {
+        for y in 0..self.size().1 {
+            let mut x = 0;
+            while x < self.size().0 {
+                let Cell::Content(CellContent {
+                    character,
+                    width,
+                    style,
+                }) = &self.0[Dims(x, y)]
+                else {
+                    panic!("Shouldn't encounter a placeholder cell");
+                };
+
+                let styled = style.to_cross().apply(*character);
+                write!(to, "{styled}")?;
+                x += *width as i32;
+            }
+            writeln!(to)?;
+        }
+        Ok(())
     }
 }
 
@@ -393,7 +416,7 @@ impl Index<Dims> for GView<'_> {
             panic!("Position out of bounds: {pos:?} in {:?}", self.bounds);
         }
 
-        self.buf.0.get(pos.into()).unwrap()
+        self.buf.0.get(pos).unwrap()
     }
 }
 
@@ -425,14 +448,18 @@ impl GMutView<'_> {
             return;
         }
 
-        match self.buf.0.get_mut(pos.into()).unwrap() {
+        match self.buf.0.get_mut(self.bounds.start + pos).unwrap() {
             Cell::Content(c) => {
                 for x in pos.0..pos.0 + c.width as i32 {
                     self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::empty();
                 }
             }
-            Cell::Placeholder(_) => {
-                todo!()
+            Cell::Placeholder(w) => {
+                let start = self.bounds.start + pos - Dims(*w as i32, 0);
+                let width = self.buf.0[start].content().unwrap().width as i32;
+                for x in start.0..start.0 + width {
+                    self.buf.0[Dims(x, start.1)] = Cell::empty();
+                }
             }
         }
     }
@@ -490,16 +517,28 @@ impl GMutView<'_> {
         &mut self.buf.0[start].content_mut().unwrap().style
     }
 
-    pub fn fill(&mut self, cell: CellContent) {
-        // TODO: doesn't handle multi-cell content properly
-        for pos in Dims::iter_fill(Dims::ZERO, self.size()) {
-            self.clear_space(self.bounds.start + pos);
-            self.buf.0[self.bounds.start + pos] = Cell::Content(cell);
+    pub fn fill(
+        &mut self,
+        CellContent {
+            character,
+            style,
+            width: _,
+        }: CellContent,
+    ) -> &mut Self {
+        for y in 0..self.size().1 {
+            let mut x = 0;
+            while x < self.size().0 {
+                x += self.set_content_of(Dims(x, y), character, style) as i32;
+            }
         }
+        self
     }
 
-    pub fn fill_rect(&mut self, rect: Rect, content: CellContent) {
-        self.bounds(rect, |f| f.fill(content));
+    pub fn fill_rect(&mut self, rect: Rect, content: CellContent) -> &mut Self {
+        self.bounds(rect, |f| {
+            f.fill(content);
+        });
+        self
     }
 
     pub fn clear(&mut self) {
