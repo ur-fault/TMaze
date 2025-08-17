@@ -232,6 +232,12 @@ impl From<Dims> for Dims3D {
     }
 }
 
+impl From<(i32, i32)> for Dims3D {
+    fn from(tuple: (i32, i32)) -> Self {
+        Dims3D(tuple.0, tuple.1, 0)
+    }
+}
+
 impl Add for DimsU {
     type Output = DimsU;
 

@@ -336,7 +336,7 @@ impl GBuffer {
                     character,
                     width,
                     style,
-                }) = &self.0[Dims(x, y)]
+                }) = &self.0[(x, y)]
                 else {
                     panic!("Shouldn't encounter a placeholder cell");
                 };
@@ -372,7 +372,7 @@ impl Drawable for GView<'_> {
             let local_line = rel_line + self.bounds.start.1;
             let mut rel_x = 0;
 
-            while self.buf.0[Dims(rel_x + self.bounds.start.0, local_line)].is_placeholder() {
+            while self.buf.0[(rel_x + self.bounds.start.0, local_line)].is_placeholder() {
                 if !self.contains(Dims(rel_x + self.bounds.start.0, local_line)) {
                     panic!(
                         "Position out of bounds: ({}, {local_line}) in {:?}",
@@ -386,7 +386,7 @@ impl Drawable for GView<'_> {
 
             while rel_x
                 + self.bounds.start.0
-                + self.buf.0[Dims(rel_x + self.bounds.start.0, local_line)]
+                + self.buf.0[(rel_x + self.bounds.start.0, local_line)]
                     .content()
                     .unwrap()
                     .width as i32
@@ -396,7 +396,7 @@ impl Drawable for GView<'_> {
                     character,
                     width,
                     style,
-                } = *self.buf.0[Dims(rel_x + self.bounds.start.0, local_line)]
+                } = *self.buf.0[(rel_x + self.bounds.start.0, local_line)]
                     .content()
                     .unwrap();
 
@@ -461,7 +461,7 @@ impl GMutView<'_> {
                 let width = cell_content.width as i32;
                 let cell = Cell::styled(' ', cell_content.style);
                 for x in start.0..start.0 + width {
-                    self.buf.0[Dims(x, start.1)] = cell;
+                    self.buf.0[(x, start.1)] = cell;
                 }
             }
         }
