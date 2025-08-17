@@ -23,7 +23,7 @@ fn main() {
         .centered(Dims(6, 2), |f| {
             f.fill(CellContent::styled(
                 '$',
-                Style::bg(Color::Named(NamedColor::DarkYellow)),
+                Style::bg(Color::Named(NamedColor::Blue)),
             ));
         });
     });

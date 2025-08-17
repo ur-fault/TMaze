@@ -450,15 +450,18 @@ impl GMutView<'_> {
 
         match self.buf.0.get_mut(self.bounds.start + pos).unwrap() {
             Cell::Content(c) => {
+                let cell = Cell::styled(' ', c.style);
                 for x in pos.0..pos.0 + c.width as i32 {
-                    self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::empty();
+                    self.buf.0[self.bounds.start + Dims(x, pos.1)] = cell;
                 }
             }
             Cell::Placeholder(w) => {
                 let start = self.bounds.start + pos - Dims(*w as i32, 0);
-                let width = self.buf.0[start].content().unwrap().width as i32;
+                let cell_content = self.buf.0[start].content().unwrap();
+                let width = cell_content.width as i32;
+                let cell = Cell::styled(' ', cell_content.style);
                 for x in start.0..start.0 + width {
-                    self.buf.0[Dims(x, start.1)] = Cell::empty();
+                    self.buf.0[Dims(x, start.1)] = cell;
                 }
             }
         }
