@@ -55,7 +55,12 @@ impl ActivityHandler for Popup {
 }
 
 impl Screen for Popup {
-    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
+    fn draw(
+        &mut self,
+        frame: &mut GMutView,
+        theme: &Theme,
+        scheme: &TerminalColorScheme,
+    ) -> Result<(), ScreenError> {
         let box_size = popup_size(&self.title, &self.texts);
         let title_pos = center_box_in_screen(Dims(self.title.width() as i32, 1)).0;
         let pos = center_box_in_screen(box_size);
@@ -64,18 +69,29 @@ impl Screen for Popup {
         let text_style = theme["ui.popup.text"];
         let title_style = theme["ui.popup.title"];
 
-        draw_box(frame, pos, box_size, box_style);
-        frame.draw(Dims(title_pos, pos.1 + 1), self.title.as_str(), title_style);
+        draw_box(frame, pos, box_size, box_style, scheme);
+        frame.draw(
+            Dims(title_pos, pos.1 + 1),
+            self.title.as_str(),
+            title_style,
+            scheme,
+        );
 
         if !self.texts.is_empty() {
             frame.draw(
                 pos + Dims(1, 2),
                 "─".repeat(box_size.0 as usize - 2),
                 box_style,
+                scheme,
             );
 
             for (i, text) in self.texts.iter().enumerate() {
-                frame.draw(pos + Dims(2, i as i32 + 3), text.as_str(), text_style);
+                frame.draw(
+                    pos + Dims(2, i as i32 + 3),
+                    text.as_str(),
+                    text_style,
+                    scheme,
+                );
             }
         }
 

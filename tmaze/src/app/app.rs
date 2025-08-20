@@ -20,7 +20,7 @@ use crate::{
     logging::{self, AppLogger, LoggerOptions, UiLogs},
     renderer::{self, draw::Draw, CellContent, GMutView, Renderer},
     settings::{
-        theme::{Theme, ThemeResolver},
+        theme::{TerminalColorScheme, Theme, ThemeResolver},
         Settings,
     },
     ui,
@@ -260,28 +260,35 @@ impl App {
                 }
             }
 
-            self.renderer
-                .frame()
-                .mut_view()
-                .fill(CellContent::styled(' ', self.data.theme.get("background")));
+            let scheme = &self.data().settings.get_terminal_scheme();
+            self.renderer.frame().mut_view().fill(
+                CellContent::styled(' ', self.data.theme.get("background")),
+                scheme,
+            );
 
             match self
                 .activities
                 .active_mut()
                 .expect("No active active")
                 .screen()
-                .draw(&mut self.renderer.frame().mut_view(), &self.data.theme)
-            {
+                .draw(
+                    &mut self.renderer.frame().mut_view(),
+                    &self.data.theme,
+                    scheme,
+                ) {
                 Ok(_) => {}
-                Err(ui::ScreenError::SmallScreen) => {
-                    draw_small_screen_info(&mut self.renderer.frame().mut_view(), &self.data.theme)
-                }
+                Err(ui::ScreenError::SmallScreen) => draw_small_screen_info(
+                    &mut self.renderer.frame().mut_view(),
+                    &self.data.theme,
+                    scheme,
+                ),
             }
 
             self.data.logs.draw(
                 Dims(0, 0),
                 &mut self.renderer.frame().mut_view(),
                 &self.data.theme,
+                scheme,
             );
 
             // TODO: let activities show debug info and about the app itself
@@ -354,7 +361,7 @@ pub fn init_theme_resolver() -> ThemeResolver {
     resolver
 }
 
-fn draw_small_screen_info(frame: &mut GMutView, theme: &Theme) {
+fn draw_small_screen_info(frame: &mut GMutView, theme: &Theme, scheme: &TerminalColorScheme) {
     let size = frame.size();
     frame.clear();
     frame.centered(Dims(size.0, 2), |f| {
@@ -362,11 +369,13 @@ fn draw_small_screen_info(frame: &mut GMutView, theme: &Theme) {
             renderer::draw::Align::TopCenter,
             "Screen is too small",
             theme["text"],
+            scheme,
         );
         f.draw_aligned(
             renderer::draw::Align::BottomCenter,
             format!("actual size: {}x{}", size.0, size.1),
             theme["text"],
+            scheme,
         );
     });
 }

@@ -155,7 +155,7 @@ impl Default for Style {
             bg: Default::default(),
             fg: Default::default(),
             attr: Default::default(),
-            alpha: u8::MAX,
+            alpha: default_alpha(),
         }
     }
 }
@@ -198,6 +198,18 @@ impl Style {
     pub fn to_cross(self) -> ContentStyle {
         self.into()
     }
+
+    pub fn mix(self, other: Self, scheme: &TerminalColorScheme) -> Self {
+        // println!("{self:?} on {other:?}");
+        let mixed = Style {
+            bg: Color::mix(self.bg, other.bg, self.alpha, MixMode::BgOnBg, scheme),
+            fg: Color::mix(self.fg, other.bg, self.alpha, MixMode::FgOnBg, scheme),
+            attr: self.attr,
+            alpha: 255,
+        };
+        // println!("mixed: {mixed:?}");
+        mixed
+    }
 }
 
 impl From<Style> for ContentStyle {
@@ -210,19 +222,6 @@ impl From<Style> for ContentStyle {
         }
     }
 }
-
-// impl ops::BitOr for Style {
-//     type Output = Self;
-//
-//     fn bitor(self, rhs: Self) -> Self {
-//         Self {
-//             bg: self.bg.or(rhs.bg),
-//             fg: self.fg.or(rhs.fg),
-//             attr: self.attr | rhs.attr,
-//             alpha: self.alpha.max(rhs.alpha),
-//         }
-//     }
-// }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(untagged)]
@@ -240,6 +239,52 @@ impl Color {
             Color::Named(named) => format!("{named:?}"),
             Color::RGB(r, g, b) | Color::Hex(r, g, b) => format!("#{:02X}{:02X}{:02X}", r, g, b),
         }
+    }
+
+    pub fn mix(
+        color: Option<Self>,
+        on: Option<Self>,
+        alpha: u8,
+        mode: MixMode,
+        scheme: &TerminalColorScheme,
+    ) -> Option<Self> {
+        use MixMode::*;
+
+        if alpha == 0 {
+            return match on {
+                None => {
+                    let (r, g, b) = scheme.primary_bg;
+                    Some(RGB(r, g, b))
+                }
+                Some(color) => Some(color),
+            };
+        }
+
+        if alpha == 255 {
+            return color;
+        }
+
+        let alpha = alpha as u16;
+        use Color::*;
+        let (r1, g1, b1) = match color {
+            None => match mode {
+                BgOnBg => scheme.primary_bg,
+                FgOnBg => scheme.primary_fg,
+            },
+            Some(Named(name)) => name.to_rgb(&scheme),
+            Some(RGB(r, g, b) | Hex(r, g, b)) => (r, g, b),
+        };
+
+        let (r2, g2, b2) = match on {
+            None => scheme.primary_bg,
+            Some(Named(name)) => name.to_rgb(&scheme),
+            Some(RGB(r, g, b) | Hex(r, g, b)) => (r, g, b),
+        };
+
+        let r = (r1 as u16 * alpha + r2 as u16 * (255 - alpha)) / 255;
+        let g = (g1 as u16 * alpha + g2 as u16 * (255 - alpha)) / 255;
+        let b = (b1 as u16 * alpha + b2 as u16 * (255 - alpha)) / 255;
+        Some(RGB(r as u8, g as u8, b as u8))
     }
 }
 
@@ -309,6 +354,11 @@ where
     Ok((r, g, b))
 }
 
+pub enum MixMode {
+    BgOnBg,
+    FgOnBg,
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NamedColor {
@@ -328,6 +378,127 @@ pub enum NamedColor {
     DarkCyan,
     White,
     Grey,
+}
+
+impl NamedColor {
+    pub fn to_rgb(&self, mapping: &TerminalColorScheme) -> (u8, u8, u8) {
+        use NamedColor::*;
+        match self {
+            Black => mapping.black,
+            DarkGrey => mapping.dark_grey,
+            Red => mapping.red,
+            DarkRed => mapping.dark_red,
+            Green => mapping.green,
+            DarkGreen => mapping.dark_green,
+            Yellow => mapping.yellow,
+            DarkYellow => mapping.dark_yellow,
+            Blue => mapping.blue,
+            DarkBlue => mapping.dark_blue,
+            Magenta => mapping.magenta,
+            DarkMagenta => mapping.dark_magenta,
+            Cyan => mapping.cyan,
+            DarkCyan => mapping.dark_cyan,
+            White => mapping.white,
+            Grey => mapping.grey,
+        }
+    }
+}
+
+pub type Rgb = (u8, u8, u8);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TerminalColorScheme {
+    primary_fg: Rgb,
+    primary_bg: Rgb,
+    black: Rgb,     // grey
+    dark_grey: Rgb, // dark grey
+    red: Rgb,
+    dark_red: Rgb,
+    green: Rgb,
+    dark_green: Rgb,
+    yellow: Rgb,
+    dark_yellow: Rgb,
+    blue: Rgb,
+    dark_blue: Rgb,
+    magenta: Rgb,
+    dark_magenta: Rgb,
+    cyan: Rgb,
+    dark_cyan: Rgb,
+    white: Rgb,
+    grey: Rgb,
+}
+
+impl TerminalColorScheme {
+    fn hex(s: &str) -> Rgb {
+        if s.len() == 6 {
+            (
+                u8::from_str_radix(&s[0..2], 16).unwrap(),
+                u8::from_str_radix(&s[2..4], 16).unwrap(),
+                u8::from_str_radix(&s[4..6], 16).unwrap(),
+            )
+        } else if s.len() == 3 {
+            (
+                u8::from_str_radix(&s[0..1], 16).unwrap() * 17,
+                u8::from_str_radix(&s[1..2], 16).unwrap() * 17,
+                u8::from_str_radix(&s[2..3], 16).unwrap() * 17,
+            )
+        } else {
+            panic!("Invalid hex color: {}", s);
+        }
+    }
+
+    pub fn named(name: &str) -> Self {
+        let h = TerminalColorScheme::hex;
+
+        match name {
+            "catppuccin_mocha" => TerminalColorScheme {
+                primary_fg: h("cdd6f4"),
+                primary_bg: h("1e1e2e"),
+                black: h("45475a"),
+                dark_grey: h("585b70"),
+                red: h("f38ba8"),
+                dark_red: h("f38ba8"),
+                green: h("a6e3a1"),
+                dark_green: h("a6e3a1"),
+                yellow: h("f9e2af"),
+                dark_yellow: h("f9e2af"),
+                blue: h("89b4fa"),
+                dark_blue: h("89b4fa"),
+                magenta: h("f5c2e7"),
+                dark_magenta: h("f5c2e7"),
+                cyan: h("94e2d5"),
+                dark_cyan: h("94e2d5"),
+                white: h("bac2de"),
+                grey: h("a6adc8"),
+            },
+            _ => panic!("Unknown terminal color scheme: {}", name),
+        }
+    }
+}
+
+impl Default for TerminalColorScheme {
+    fn default() -> Self {
+        TerminalColorScheme {
+            primary_fg: (255, 255, 255),
+            primary_bg: (0, 0, 0),
+            black: (0, 0, 0),
+            dark_grey: (64, 64, 64),
+            red: (255, 0, 0),
+            dark_red: (128, 0, 0),
+            green: (0, 255, 0),
+            dark_green: (0, 128, 0),
+            yellow: (255, 255, 0),
+            dark_yellow: (128, 128, 0),
+            blue: (0, 0, 255),
+            dark_blue: (0, 0, 128),
+            magenta: (255, 0, 255),
+            dark_magenta: (128, 0, 128),
+            cyan: (0, 255, 255),
+            dark_cyan: (0, 128, 128),
+            white: (255, 255, 255),
+            grey: (192, 192, 192),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]

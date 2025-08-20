@@ -14,7 +14,10 @@ use crate::{
         activity::{Activity, ActivityHandler, Change},
         app::AppData,
         event::Event,
-    }, helpers::{is_release, strings::MbyStaticStr, LineDir}, renderer::GMutView, settings::theme::{Style, Theme, ThemeResolver}
+    },
+    helpers::{is_release, strings::MbyStaticStr, LineDir},
+    renderer::GMutView,
+    settings::theme::{Style, TerminalColorScheme, Theme, ThemeResolver},
 };
 
 use super::{center_box_in_screen, draw_box, Rect, Screen, ScreenError};
@@ -511,7 +514,12 @@ impl ActivityHandler for Menu {
 }
 
 impl Screen for Menu {
-    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
+    fn draw(
+        &mut self,
+        frame: &mut GMutView,
+        theme: &Theme,
+        scheme: &TerminalColorScheme,
+    ) -> Result<(), ScreenError> {
         let MenuConfig { title, counted, .. } = &self.config;
         let AppliedStyles {
             title: title_style,
@@ -552,15 +560,16 @@ impl Screen for Menu {
             return Err(ScreenError::SmallScreen);
         }
 
-        draw_box(frame, pos, size, border_style);
+        draw_box(frame, pos, size, border_style, scheme);
 
-        frame.draw(title_pos, title.as_str(), title_style);
+        frame.draw(title_pos, title.as_str(), title_style, scheme);
 
         for (i, subtitle) in self.config.subtitles.iter().enumerate() {
             frame.draw(
                 subtitles_pos + Dims(0, i as i32),
                 subtitle.as_str(),
                 subtitle_style,
+                scheme,
             );
         }
 
@@ -568,6 +577,7 @@ impl Screen for Menu {
             items_pos - Dims(0, 1),
             Rect::sized(Dims(size.0 - 2, 1)),
             separator_style,
+            scheme,
         );
 
         for (i, option) in options.iter().enumerate() {
@@ -585,12 +595,14 @@ impl Screen for Menu {
                     items_pos + Dims(0, i as i32),
                     "> ",
                     prep_style(selector_style),
+                    scheme,
                 );
             } else {
                 frame.draw(
                     items_pos + Dims(0, i as i32),
                     "  ",
                     prep_style(selector_style),
+                    scheme,
                 );
             }
 
@@ -599,6 +611,7 @@ impl Screen for Menu {
                     count_pos.unwrap() + Dims(0, i as i32),
                     format!("{:width$}. ", i + 1, width = max_count),
                     prep_style(number_style),
+                    scheme,
                 );
             }
 
@@ -606,6 +619,7 @@ impl Screen for Menu {
                 item_text_pos + Dims(0, i as i32),
                 option.as_ref().pad_to_width(item_text_len),
                 prep_style(text_style),
+                scheme,
             );
         }
 

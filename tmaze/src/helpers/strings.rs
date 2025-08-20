@@ -9,7 +9,11 @@ use cmaze::dims::Dims;
 use substring::Substring;
 use unicode_width::UnicodeWidthStr as _;
 
-use crate::{renderer::{draw::Draw, GMutView}, settings::theme::Style, ui::draw_str};
+use crate::{
+    renderer::{draw::Draw, GMutView},
+    settings::theme::{Style, TerminalColorScheme},
+    ui::draw_str,
+};
 
 pub fn trim_center(text: &str, width: usize) -> &str {
     let str_width = text.width();
@@ -78,8 +82,14 @@ impl fmt::Debug for MbyStaticStr {
 }
 
 impl Draw<Style> for MbyStaticStr {
-    fn draw(&self, Dims(x, y): Dims, frame: &mut GMutView, styles: Style) {
-        draw_str(frame, x, y, self, styles);
+    fn draw(
+        &self,
+        Dims(x, y): Dims,
+        frame: &mut GMutView,
+        styles: Style,
+        scheme: &TerminalColorScheme,
+    ) {
+        draw_str(frame, x, y, self, styles, scheme);
     }
 }
 
