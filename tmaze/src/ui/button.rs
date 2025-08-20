@@ -4,7 +4,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::{
     helpers::strings,
     renderer::{CellContent, GMutView},
-    settings::theme::{Style, Theme, ThemeResolver},
+    settings::theme::{Style, TerminalColorScheme, Theme, ThemeResolver},
 };
 
 use super::Rect;
@@ -120,16 +120,17 @@ impl Button {
 }
 
 impl Button {
-    pub fn draw_colored(&self, frame: &mut GMutView, theme: &Theme) {
+    pub fn draw_colored(&self, frame: &mut GMutView, theme: &Theme, scheme: &TerminalColorScheme) {
         let AppliedStyles { normal, content } = self.apply_styles(theme);
 
         // Box
-        frame.draw(self.pos, Rect::sized(self.size), normal);
+        frame.draw(self.pos, Rect::sized(self.size), normal, scheme);
 
         // Background
         frame.fill_rect(
             Rect::sized_at(self.pos + Dims(1, 1), self.size - Dims(2, 2)),
             CellContent::styled(' ', content),
+            scheme,
         );
 
         // Text (content)
@@ -138,7 +139,7 @@ impl Button {
         let text = strings::trim_center(self.text.as_str(), text_rect.size().0 as usize);
         let style = content;
 
-        frame.draw(text_rect.start, text, style);
+        frame.draw(text_rect.start, text, style, scheme);
     }
 
     pub fn detect_over(&self, pos: Dims) -> bool {

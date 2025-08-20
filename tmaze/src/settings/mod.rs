@@ -20,6 +20,7 @@ use crate::{
     helpers::constants::paths::settings_path,
     menu_actions,
     renderer::MouseGuard,
+    settings::theme::TerminalColorScheme,
     ui::{split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem, OptionDef, Popup, Screen},
 };
 
@@ -95,6 +96,12 @@ pub enum UpdateCheckInterval {
     Always,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TerminalSchemeDef {
+    Named(String),
+    Custom(TerminalColorScheme),
+}
+
 #[derive(Debug, Derivative, Serialize, Deserialize)]
 #[derivative(Default)]
 #[serde(rename = "Settings")]
@@ -109,6 +116,8 @@ pub struct SettingsInner {
     pub debug_logging_level: Option<String>,
     #[serde(default)]
     pub file_logging_level: Option<String>,
+    #[serde(default)]
+    pub terminal_scheme: Option<TerminalSchemeDef>,
 
     // viewport
     #[serde(default)]
@@ -249,6 +258,14 @@ impl Settings {
             .clone()
             .and_then(|level| level.parse().ok())
             .unwrap_or(log::Level::Info)
+    }
+
+    pub fn get_terminal_scheme(&self) -> TerminalColorScheme {
+        match &self.read().terminal_scheme {
+            Some(TerminalSchemeDef::Named(name)) => TerminalColorScheme::named(name),
+            Some(TerminalSchemeDef::Custom(scheme)) => scheme.clone(),
+            None => TerminalColorScheme::default(),
+        }
     }
 
     pub fn get_slow(&self) -> bool {

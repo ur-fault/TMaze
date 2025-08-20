@@ -1,37 +1,37 @@
 use cmaze::dims::Dims;
 use unicode_width::{UnicodeWidthChar as _, UnicodeWidthStr as _};
 
-use crate::settings::theme::Style;
+use crate::settings::theme::{Style, TerminalColorScheme};
 
 use super::GMutView;
 
 pub trait Draw<S = ()> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: S);
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: S, scheme: &TerminalColorScheme);
 }
 
 impl<D: Draw> Draw for &D {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: ()) {
-        (**self).draw(pos, frame, styles);
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: (), scheme: &TerminalColorScheme) {
+        (**self).draw(pos, frame, styles, scheme);
     }
 }
 
 impl Draw<Style> for char {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
-        frame.set_content_of(pos, *self, styles);
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style, scheme: &TerminalColorScheme) {
+        frame.set_content_of(pos, *self, styles, scheme);
     }
 }
 
 impl Draw<Style> for String {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
-        self.as_str().draw(pos, frame, styles);
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style, scheme: &TerminalColorScheme) {
+        self.as_str().draw(pos, frame, styles, scheme);
     }
 }
 
 impl Draw<Style> for &str {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style, scheme: &TerminalColorScheme) {
         let mut x = 0;
         for character in self.chars() {
-            x += frame.set_content_of(Dims(pos.0 + x as i32, pos.1), character, styles);
+            x += frame.set_content_of(Dims(pos.0 + x as i32, pos.1), character, styles, scheme);
         }
     }
 }
@@ -69,9 +69,9 @@ pub trait SizedDrawable<S = ()>: Draw<S> {
         }
     }
 
-    fn draw_aligned(&self, align: Align, frame: &mut GMutView, styles: S) {
+    fn draw_aligned(&self, align: Align, frame: &mut GMutView, styles: S, scheme: &TerminalColorScheme) {
         let pos = self.align(align, frame.size());
-        self.draw(pos, frame, styles);
+        self.draw(pos, frame, styles, scheme);
     }
 }
 
@@ -96,8 +96,8 @@ impl SizedDrawable<Style> for &'_ str {
 pub struct Styled<T, S>(pub T, pub S);
 
 impl<T: Draw<S>, S: Clone> Draw for Styled<T, S> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
-        self.0.draw(pos, frame, self.1.clone());
+    fn draw(&self, pos: Dims, frame: &mut GMutView, _: (), scheme: &TerminalColorScheme) {
+        self.0.draw(pos, frame, self.1.clone(), scheme);
     }
 }
 

@@ -9,7 +9,7 @@ use crate::{
     helpers::line_center,
     make_even, make_odd,
     renderer::GMutView,
-    settings::theme::{Theme, ThemeResolver},
+    settings::theme::{TerminalColorScheme, Theme, ThemeResolver},
     ui::{Button, ButtonStyles, Rect},
 };
 
@@ -95,8 +95,8 @@ impl DPad {
         self.for_mut_buttons(|button| button.disable_highlight = disable_highlight);
     }
 
-    pub fn render(&self, frame: &mut GMutView, theme: &Theme) {
-        self.for_buttons(|button| button.draw_colored(frame, theme));
+    pub fn render(&self, frame: &mut GMutView, theme: &Theme, scheme: &TerminalColorScheme) {
+        self.for_buttons(|button| button.draw_colored(frame, theme, scheme));
     }
 
     /// Splits the screen into space for the viewport and the dpad.

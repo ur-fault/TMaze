@@ -7,7 +7,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::{
     helpers::{self, strings::multisize_string},
     renderer::{draw::Draw, helpers::term_size, GMutView},
-    settings::theme::Style,
+    settings::theme::{Style, TerminalColorScheme},
 };
 
 pub fn center_box_in_screen(box_dims: Dims) -> Dims {
@@ -82,13 +82,14 @@ pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyl
 pub struct CapsuleText(pub String);
 
 impl Draw<Style> for CapsuleText {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, style: Style) {
-        frame.draw(pos + Dims(0, 0), '', style.invert());
-        frame.draw(pos + Dims(1, 0), self.0.as_str(), style);
+    fn draw(&self, pos: Dims, frame: &mut GMutView, style: Style, scheme: &TerminalColorScheme) {
+        frame.draw(pos + Dims(0, 0), '', style.invert(), scheme);
+        frame.draw(pos + Dims(1, 0), self.0.as_str(), style, scheme);
         frame.draw(
             pos + Dims(self.0.width() as i32 + 1, 0),
             '',
             style.invert(),
+            scheme,
         );
     }
 }

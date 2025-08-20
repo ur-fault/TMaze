@@ -15,7 +15,10 @@ use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableC
 use draw::{Align, Draw, SizedDrawable};
 use unicode_width::UnicodeWidthChar;
 
-use crate::{settings::theme::Style, ui::Rect};
+use crate::{
+    settings::theme::{Style, TerminalColorScheme},
+    ui::Rect,
+};
 
 use self::helpers::term_size;
 
@@ -367,7 +370,7 @@ impl GView<'_> {
 }
 
 impl Draw for GView<'_> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, _: (), scheme: &TerminalColorScheme) {
         for rel_line in 0..self.size().1 {
             let local_line = rel_line + self.bounds.start.1;
             let mut rel_x = 0;
@@ -400,7 +403,7 @@ impl Draw for GView<'_> {
                     .content()
                     .unwrap();
 
-                frame.set_content_of(pos + Dims(rel_x, rel_line), character, style);
+                frame.set_content_of(pos + Dims(rel_x, rel_line), character, style, scheme);
                 rel_x += width as i32;
             }
         }
@@ -467,18 +470,28 @@ impl GMutView<'_> {
         }
     }
 
-    fn set_content_of(&mut self, pos: Dims, chr: char, style: Style) -> usize {
+    fn set_content_of(
+        &mut self,
+        pos: Dims,
+        chr: char,
+        style: Style,
+        scheme: &TerminalColorScheme,
+    ) -> usize {
         let width = chr.width().unwrap_or(1) as i32;
 
         if !self.contains(pos) || !self.contains(Dims(pos.0 + width - 1, pos.1)) {
             return width as usize;
         }
 
+        let prev_style = *self.style_of(pos);
+
         for x in pos.0..pos.0 + width {
             self.clear_space(Dims(x, pos.1));
         }
 
-        self.buf.0[self.bounds.start + pos] = Cell::styled(chr, style);
+        let new_style = style.mix(prev_style, scheme);
+        // panic!("{prev_style:?} + {style:?} = {new_style:?}");
+        self.buf.0[self.bounds.start + pos] = Cell::styled(chr, new_style);
         for x in pos.0 + 1..pos.0 + width {
             self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::Placeholder((x - pos.0) as u8);
         }
@@ -527,25 +540,31 @@ impl GMutView<'_> {
             style,
             width: _,
         }: CellContent,
+        scheme: &TerminalColorScheme,
     ) -> &mut Self {
         for y in 0..self.size().1 {
             let mut x = 0;
             while x < self.size().0 {
-                x += self.set_content_of(Dims(x, y), character, style) as i32;
+                x += self.set_content_of(Dims(x, y), character, style, scheme) as i32;
             }
         }
         self
     }
 
-    pub fn fill_rect(&mut self, rect: Rect, content: CellContent) -> &mut Self {
+    pub fn fill_rect(
+        &mut self,
+        rect: Rect,
+        content: CellContent,
+        scheme: &TerminalColorScheme,
+    ) -> &mut Self {
         self.bounds(rect, |f| {
-            f.fill(content);
+            f.fill(content, scheme);
         });
         self
     }
 
     pub fn clear(&mut self) {
-        self.fill(CellContent::empty());
+        self.fill(CellContent::empty(), &TerminalColorScheme::default());
     }
 
     #[inline]
@@ -562,12 +581,24 @@ impl GMutView<'_> {
 }
 
 impl GMutView<'_> {
-    pub fn draw<S>(&mut self, pos: Dims, content: impl Draw<S>, styles: S) {
-        content.draw(pos, self, styles);
+    pub fn draw<S>(
+        &mut self,
+        pos: Dims,
+        content: impl Draw<S>,
+        styles: S,
+        scheme: &TerminalColorScheme,
+    ) {
+        content.draw(pos, self, styles, scheme);
     }
 
-    pub fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S) {
-        content.draw_aligned(align, self, styles);
+    pub fn draw_aligned<S>(
+        &mut self,
+        align: Align,
+        content: impl SizedDrawable<S>,
+        styles: S,
+        scheme: &TerminalColorScheme,
+    ) {
+        content.draw_aligned(align, self, styles, scheme);
     }
 }
 
@@ -718,8 +749,8 @@ impl GMutView<'_> {
     }
 
     #[inline]
-    pub fn border(&mut self, style: Style) -> &mut Self {
-        Rect::sized(self.size()).render(self, style);
+    pub fn border(&mut self, style: Style, scheme: &TerminalColorScheme) -> &mut Self {
+        Rect::sized(self.size()).render(self, style, scheme);
         self
     }
 }
