@@ -500,7 +500,6 @@ impl GMutView<'_> {
         }
 
         let new_style = style.mix(prev_style, scheme);
-        // panic!("{prev_style:?} + {style:?} = {new_style:?}");
         self.buf.0[self.bounds.start + pos] = Cell::styled(chr, new_style);
         for x in pos.0 + 1..pos.0 + width {
             self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::Placeholder((x - pos.0) as u8);
