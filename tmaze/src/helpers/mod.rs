@@ -2,6 +2,7 @@ pub mod constants;
 pub mod strings;
 
 use core::fmt;
+use std::ops::Range;
 
 use crossterm::event::KeyEventKind;
 
@@ -176,6 +177,13 @@ pub const fn on_off(val: bool, capitalized: bool) -> &'static str {
         (false, true) => "Off",
         (false, false) => "off",
     }
+}
+
+#[inline]
+pub fn range_intersection<T: PartialOrd>(a: Range<T>, b: Range<T>) -> Range<T> {
+    let start = if a.start > b.start { a.start } else { b.start };
+    let end = if a.end < b.end { a.end } else { b.end };
+    start..end
 }
 
 /// Returns the value if it is odd, otherwise returns the value decremented by 1.

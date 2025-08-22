@@ -16,6 +16,7 @@ use draw::{Align, Draw, SizedDrawable};
 use unicode_width::UnicodeWidthChar;
 
 use crate::{
+    helpers::range_intersection,
     settings::theme::{Style, TerminalColorScheme},
     ui::Rect,
 };
@@ -445,7 +446,7 @@ impl GMutView<'_> {
         self.bounds.size()
     }
 
-    fn clear_space(&mut self, pos: Dims) {
+    fn clear_space(&mut self, pos: Dims, style: Option<Style>) {
         #[cfg(debug_assertions)]
         if !self.contains(pos) {
             return;
@@ -453,7 +454,8 @@ impl GMutView<'_> {
 
         match self.buf.0.get_mut(self.bounds.start + pos).unwrap() {
             Cell::Content(c) => {
-                let cell = Cell::styled(' ', c.style);
+                let style = style.unwrap_or(c.style);
+                let cell = Cell::styled(' ', style);
                 for x in pos.0..pos.0 + c.width as i32 {
                     self.buf.0[self.bounds.start + Dims(x, pos.1)] = cell;
                 }
@@ -462,7 +464,8 @@ impl GMutView<'_> {
                 let start = self.bounds.start + pos - Dims(*w as i32, 0);
                 let cell_content = self.buf.0[start].content().unwrap();
                 let width = cell_content.width as i32;
-                let cell = Cell::styled(' ', cell_content.style);
+                let style = style.unwrap_or(cell_content.style);
+                let cell = Cell::styled(' ', style);
                 for x in start.0..start.0 + width {
                     self.buf.0[(x, start.1)] = cell;
                 }
@@ -480,13 +483,20 @@ impl GMutView<'_> {
         let width = chr.width().unwrap_or(1) as i32;
 
         if !self.contains(pos) || !self.contains(Dims(pos.0 + width - 1, pos.1)) {
+            for x in range_intersection(
+                pos.0..pos.0 + width,
+                self.bounds.start.0..self.bounds.end.0 + 1,
+            ) {
+                self.clear_space(Dims(x, pos.1), Some(style));
+            }
+
             return width as usize;
         }
 
         let prev_style = *self.style_of(pos);
 
         for x in pos.0..pos.0 + width {
-            self.clear_space(Dims(x, pos.1));
+            self.clear_space(Dims(x, pos.1), None);
         }
 
         let new_style = style.mix(prev_style, scheme);
