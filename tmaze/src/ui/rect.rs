@@ -22,7 +22,7 @@ impl Rect {
     }
 
     pub fn sized_at(start: Dims, size: Dims) -> Self {
-        Self::new(start, Dims(start.0 + size.0, start.1 + size.1) - Dims(1, 1))
+        Self::new(start, Dims(start.0 + size.0, start.1 + size.1) - Dims::ONE)
     }
 
     pub fn sized(size: Dims) -> Self {
@@ -30,7 +30,7 @@ impl Rect {
     }
 
     pub fn size(&self) -> Dims {
-        Dims(self.end.0 - self.start.0, self.end.1 - self.start.1) + Dims(1, 1)
+        Dims(self.end.0 - self.start.0, self.end.1 - self.start.1) + Dims::ONE
     }
 
     pub fn contains(&self, pos: Dims) -> bool {
