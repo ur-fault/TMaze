@@ -386,13 +386,15 @@ impl Draw for GView<'_> {
                 rel_x += 1;
             }
 
-            while rel_x
-                + self.bounds.start.0
-                + self.buf.0[(rel_x + self.bounds.start.0, local_line)]
-                    .content()
-                    .unwrap()
-                    .width as i32
-                <= self.bounds.end.0
+            while rel_x + self.bounds.start.0 <= self.bounds.end.0
+                && rel_x
+                    + self.bounds.start.0
+                    + self.buf.0[(rel_x + self.bounds.start.0, local_line)]
+                        .content()
+                        .unwrap()
+                        .width as i32
+                    - 1
+                    <= self.bounds.end.0
             {
                 let CellContent {
                     character,
