@@ -10,7 +10,7 @@ use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::not_release,
     renderer::{CellContent, GMutView, Padding},
-    settings::theme::{Style, TerminalColorScheme},
+    settings::theme::Style,
     ui::{CapsuleText, Screen, ScreenError},
 };
 
@@ -237,19 +237,12 @@ impl StyleBrowser {
         }
     }
 
-    fn search_bar(
-        &mut self,
-        border: Style,
-        text: Style,
-        search: Style,
-        scheme: &TerminalColorScheme,
-        f: &mut GMutView,
-    ) {
+    fn search_bar(&mut self, border: Style, text: Style, search: Style, f: &mut GMutView) {
         f.pad(Padding::hor(1), |f| {
             if self.search.is_empty() {
-                f.draw(Dims::ZERO, "<Search>", search, scheme);
+                f.draw(Dims::ZERO, "<Search>", search);
             } else {
-                f.draw(Dims::ZERO, self.search.as_str(), text, scheme);
+                f.draw(Dims::ZERO, self.search.as_str(), text);
             }
 
             type Tab = (&'static str, fn(&Mode) -> bool);
@@ -272,10 +265,9 @@ impl StyleBrowser {
                         Dims(xoff, 0),
                         CapsuleText(format!(" {name} ")),
                         text.invert(),
-                        scheme,
                     );
                 } else {
-                    f.draw(Dims(xoff, 0), format!("  {name}  "), text, scheme);
+                    f.draw(Dims(xoff, 0), format!("  {name}  "), text);
                 };
                 xoff += name.width() as i32 + 5;
             }
@@ -283,17 +275,11 @@ impl StyleBrowser {
 
         // separator line
         f.bottom(1, |f| {
-            f.border(border, scheme);
+            f.border(border);
         });
     }
 
-    fn items(
-        &mut self,
-        theme: &Theme,
-        text: Style,
-        scheme: &TerminalColorScheme,
-        f: &mut GMutView,
-    ) {
+    fn items(&mut self, theme: &Theme, text: Style, f: &mut GMutView) {
         const INDENT: i32 = 4;
 
         fn render_style(style: &str, theme: &Theme) -> (String, Style, i32) {
@@ -321,7 +307,6 @@ impl StyleBrowser {
                             .payload
                             .as_str(),
                         text,
-                        scheme,
                     );
 
                     if let Some(node_style) = node.item.as_ref().and_then(|i| i.style.as_ref()) {
@@ -332,7 +317,6 @@ impl StyleBrowser {
                             Dims(size.0 - width - RIGHT_MARGIN, pos.1),
                             style_text.as_str(),
                             node_style,
-                            scheme,
                         );
                     }
 
@@ -365,7 +349,6 @@ impl StyleBrowser {
                             Dims(size.0 - width - RIGHT_MARGIN, current as i32),
                             style_text.as_str(),
                             node_style,
-                            scheme,
                         );
                     }
 
@@ -373,7 +356,6 @@ impl StyleBrowser {
                         Dims(LEFT_MARGIN, current as i32),
                         item.payload.as_str(),
                         text,
-                        scheme,
                     );
 
                     if self.selected_index == index {
@@ -438,18 +420,13 @@ impl ActivityHandler for StyleBrowser {
 }
 
 impl Screen for StyleBrowser {
-    fn draw(
-        &mut self,
-        frame: &mut GMutView,
-        theme: &Theme,
-        scheme: &TerminalColorScheme,
-    ) -> Result<(), ScreenError> {
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
         let [border, text, search, background] =
             theme.extract(["sb.border", "sb.text", "sb.search", "sb.background"]);
 
         frame.pad(CONTENT_MARGIN.into(), |f| {
-            f.border(border, scheme).inside(|f| {
-                f.fill(CellContent::styled(' ', background), scheme);
+            f.border(border).inside(|f| {
+                f.fill(CellContent::styled(' ', background));
 
                 f.split(
                     Offset::Abs(2),
@@ -457,10 +434,10 @@ impl Screen for StyleBrowser {
                     self,
                     |f, this| {
                         // search and tabs
-                        this.search_bar(border, text, search, scheme, f);
+                        this.search_bar(border, text, search, f);
                     },
                     |f, this| {
-                        this.items(theme, text, scheme, f);
+                        this.items(theme, text, f);
                     },
                 );
             });

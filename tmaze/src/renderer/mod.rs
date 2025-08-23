@@ -31,11 +31,11 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new() -> io::Result<Self> {
+    pub fn new(scheme: &TerminalColorScheme) -> io::Result<Self> {
         let (w, h) = term_size();
         let size = Dims(w as i32, h as i32);
-        let hidden = GBuffer::new(size);
-        let shown = GBuffer::new(size);
+        let hidden = GBuffer::new(size, scheme);
+        let shown = GBuffer::new(size, scheme);
 
         let mut ren = Renderer {
             size,
@@ -177,7 +177,7 @@ impl Renderer {
                             }
                             tty.queue(crossterm::style::SetAttributes(c_style.attributes))?;
                         }
-                        style = c_style.into();
+                        style = c_style;
                     }
                     tty.queue(crossterm::style::Print(c.character))?;
                 }
@@ -224,11 +224,11 @@ pub struct CellContent {
 }
 
 impl CellContent {
-    pub fn styled(c: char, s: Style) -> Self {
+    pub fn styled(c: char, style: Style) -> Self {
         CellContent {
             character: c,
             width: c.width().unwrap_or(1) as u8,
-            style: s.into(),
+            style,
         }
     }
 
@@ -292,16 +292,14 @@ impl Cell {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GBuffer(Array3D<Cell>);
+pub struct GBuffer(Array3D<Cell>, Box<TerminalColorScheme>);
 
 impl GBuffer {
-    pub fn new(size: Dims) -> Self {
-        GBuffer(Array3D::new(
-            Cell::empty(),
-            size.0 as usize,
-            size.1 as usize,
-            1,
-        ))
+    pub fn new(size: Dims, scheme: &TerminalColorScheme) -> Self {
+        GBuffer(
+            Array3D::new(Cell::empty(), size.0 as usize, size.1 as usize, 1),
+            Box::new(scheme.clone()),
+        )
     }
 
     pub fn size(&self) -> Dims {
@@ -371,7 +369,7 @@ impl GView<'_> {
 }
 
 impl Draw for GView<'_> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, _: (), scheme: &TerminalColorScheme) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
         for rel_line in 0..self.size().1 {
             let local_line = rel_line + self.bounds.start.1;
             let mut rel_x = 0;
@@ -404,7 +402,7 @@ impl Draw for GView<'_> {
                     .content()
                     .unwrap();
 
-                frame.set_content_of(pos + Dims(rel_x, rel_line), character, style, scheme);
+                frame.set_content_of(pos + Dims(rel_x, rel_line), character, style);
                 rel_x += width as i32;
             }
         }
@@ -473,13 +471,7 @@ impl GMutView<'_> {
         }
     }
 
-    fn set_content_of(
-        &mut self,
-        pos: Dims,
-        chr: char,
-        style: Style,
-        scheme: &TerminalColorScheme,
-    ) -> usize {
+    fn set_content_of(&mut self, pos: Dims, chr: char, style: Style) -> usize {
         let width = chr.width().unwrap_or(1) as i32;
 
         if !self.contains(pos) || !self.contains(Dims(pos.0 + width - 1, pos.1)) {
@@ -499,7 +491,7 @@ impl GMutView<'_> {
             self.clear_space(Dims(x, pos.1), None);
         }
 
-        let new_style = style.mix(prev_style, scheme);
+        let new_style = style.mix(prev_style, &self.buf.1);
         self.buf.0[self.bounds.start + pos] = Cell::styled(chr, new_style);
         for x in pos.0 + 1..pos.0 + width {
             self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::Placeholder((x - pos.0) as u8);
@@ -549,31 +541,25 @@ impl GMutView<'_> {
             style,
             width: _,
         }: CellContent,
-        scheme: &TerminalColorScheme,
     ) -> &mut Self {
         for y in 0..self.size().1 {
             let mut x = 0;
             while x < self.size().0 {
-                x += self.set_content_of(Dims(x, y), character, style, scheme) as i32;
+                x += self.set_content_of(Dims(x, y), character, style) as i32;
             }
         }
         self
     }
 
-    pub fn fill_rect(
-        &mut self,
-        rect: Rect,
-        content: CellContent,
-        scheme: &TerminalColorScheme,
-    ) -> &mut Self {
+    pub fn fill_rect(&mut self, rect: Rect, content: CellContent) -> &mut Self {
         self.bounds(rect, |f| {
-            f.fill(content, scheme);
+            f.fill(content);
         });
         self
     }
 
     pub fn clear(&mut self) {
-        self.fill(CellContent::empty(), &TerminalColorScheme::default());
+        self.fill(CellContent::empty());
     }
 
     #[inline]
@@ -590,24 +576,12 @@ impl GMutView<'_> {
 }
 
 impl GMutView<'_> {
-    pub fn draw<S>(
-        &mut self,
-        pos: Dims,
-        content: impl Draw<S>,
-        styles: S,
-        scheme: &TerminalColorScheme,
-    ) {
-        content.draw(pos, self, styles, scheme);
+    pub fn draw<S>(&mut self, pos: Dims, content: impl Draw<S>, styles: S) {
+        content.draw(pos, self, styles);
     }
 
-    pub fn draw_aligned<S>(
-        &mut self,
-        align: Align,
-        content: impl SizedDrawable<S>,
-        styles: S,
-        scheme: &TerminalColorScheme,
-    ) {
-        content.draw_aligned(align, self, styles, scheme);
+    pub fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S) {
+        content.draw_aligned(align, self, styles);
     }
 }
 
@@ -758,8 +732,8 @@ impl GMutView<'_> {
     }
 
     #[inline]
-    pub fn border(&mut self, style: Style, scheme: &TerminalColorScheme) -> &mut Self {
-        Rect::sized(self.size()).render(self, style, scheme);
+    pub fn border(&mut self, style: Style) -> &mut Self {
+        Rect::sized(self.size()).render(self, style);
         self
     }
 }

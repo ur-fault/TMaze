@@ -1,11 +1,9 @@
-use std::io;
-
 use tmaze::{
     app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
-    renderer::FrameBuffer,
+    renderer::GMutView,
     settings::theme::Theme,
-    ui::Screen,
+    ui::{Screen, ScreenError},
 };
 
 use crossterm::event::{Event as TermEvent, KeyEvent};
@@ -52,7 +50,7 @@ impl ActivityHandler for MyActivity {
 }
 
 impl Screen for MyActivity {
-    fn draw(&mut self, _: &mut FrameBuffer, _: &Theme) -> io::Result<()> {
+    fn draw(&mut self, _: &mut GMutView, _: &Theme) -> Result<(), ScreenError> {
         Ok(())
     }
 }

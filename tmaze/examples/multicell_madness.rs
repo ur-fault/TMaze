@@ -14,21 +14,22 @@ fn main() {
         ..Default::default()
     };
 
-    let mut buf = GBuffer::new(Dims(19, 8));
     let scheme = TerminalColorScheme::named("catppuccin_mocha");
+    let mut buf = GBuffer::new(Dims(19, 8), &scheme);
 
-    buf.mut_view().border(style, &scheme).inside(|f| {
-        f.fill(
-            CellContent::styled(' ', Style::bg(Color::Named(NamedColor::DarkYellow))),
-            &scheme,
-        )
-        .fill(CellContent::styled('あ', red), &scheme)
+    buf.mut_view().border(style).inside(|f| {
+        f.fill(CellContent::styled(
+            ' ',
+            Style::bg(Color::Named(NamedColor::DarkYellow)),
+        ))
+        .fill(CellContent::styled('あ', red))
         .centered(Dims(6, 2), |f| {
-            f.fill(
-                CellContent::styled('$', Style::bg(Color::Named(NamedColor::Blue))),
-                &scheme,
-            );
+            f.fill(CellContent::styled(
+                '$',
+                Style::bg(Color::Named(NamedColor::Blue)),
+            ));
         });
     });
+
     buf.write(&mut stdout()).unwrap();
 }
