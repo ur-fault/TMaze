@@ -131,8 +131,7 @@ pub fn maze2screen_3d(pos_on_maze: impl Into<Dims3D>) -> Dims3D {
 }
 
 pub fn maze2screen(pos_on_maze: impl Into<Dims3D>) -> Dims {
-    let pos_on_maze = pos_on_maze.into();
-    Dims(pos_on_maze.0 * 2 + 1, pos_on_maze.1 * 2 + 1)
+    Dims::from(pos_on_maze.into()) * 2 + Dims::ONE
 }
 
 pub fn is_release(k: KeyEventKind) -> bool {
