@@ -4,7 +4,7 @@ use crate::{
     renderer::GMutView,
     settings::{
         style_browser,
-        theme::{TerminalColorScheme, Theme, ThemeResolver},
+        theme::{Theme, ThemeResolver},
     },
 };
 
@@ -32,12 +32,7 @@ pub enum ScreenError {
 }
 
 pub trait Screen {
-    fn draw(
-        &mut self,
-        frame: &mut GMutView,
-        theme: &Theme,
-        scheme: &TerminalColorScheme,
-    ) -> Result<(), ScreenError>;
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError>;
 }
 
 pub fn theme_resolver() -> ThemeResolver {

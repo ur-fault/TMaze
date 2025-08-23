@@ -200,15 +200,12 @@ impl Style {
     }
 
     pub fn mix(self, other: Self, scheme: &TerminalColorScheme) -> Self {
-        // println!("{self:?} on {other:?}");
-        let mixed = Style {
+        Style {
             bg: Color::mix(self.bg, other.bg, self.alpha, MixMode::BgOnBg, scheme),
             fg: Color::mix(self.fg, other.bg, self.alpha, MixMode::FgOnBg, scheme),
             attr: self.attr,
             alpha: 255,
-        };
-        // println!("mixed: {mixed:?}");
-        mixed
+        }
     }
 }
 
@@ -271,13 +268,13 @@ impl Color {
                 BgOnBg => scheme.primary_bg,
                 FgOnBg => scheme.primary_fg,
             },
-            Some(Named(name)) => name.to_rgb(&scheme),
+            Some(Named(name)) => name.to_rgb(scheme),
             Some(RGB(r, g, b) | Hex(r, g, b)) => (r, g, b),
         };
 
         let (r2, g2, b2) = match on {
             None => scheme.primary_bg,
-            Some(Named(name)) => name.to_rgb(&scheme),
+            Some(Named(name)) => name.to_rgb(scheme),
             Some(RGB(r, g, b) | Hex(r, g, b)) => (r, g, b),
         };
 
@@ -692,16 +689,12 @@ mod tests {
         // resolver.link("loop A", "loop B");
         // resolver.link("loop B", "loop A");
 
-        let default_style = Style {
-            bg: None,
-            fg: None,
-            attr: Attributes::default(),
-        };
+        let default_style = Style::default();
         let default_style = Some(&default_style);
         let text_style = Style {
             bg: Some(Color::Named(NamedColor::Black)),
             fg: Some(Color::Named(NamedColor::White)),
-            attr: Attributes::default(),
+            ..Default::default()
         };
 
         let definition = ThemeDefinition {
@@ -719,7 +712,7 @@ mod tests {
             Some(&Style {
                 bg: Some(Color::Named(NamedColor::Black)),
                 fg: Some(Color::Named(NamedColor::White)),
-                attr: Attributes::default(),
+                ..Default::default()
             })
         );
 

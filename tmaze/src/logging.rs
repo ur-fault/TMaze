@@ -15,7 +15,7 @@ use crate::{
     helpers::constants::paths,
     renderer::{draw::Draw, GMutView},
     settings::{
-        theme::{Color, NamedColor, Style, TerminalColorScheme, Theme},
+        theme::{Color, NamedColor, Style, Theme},
         Settings,
     },
 };
@@ -125,7 +125,7 @@ impl UiLogs {
 }
 
 impl Draw<&Theme> for UiLogs {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, theme: &Theme, scheme: &TerminalColorScheme) {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, theme: &Theme) {
         let [msg_style, source_style, extra] =
             theme.extract(["log.message", "log.source", "log.extra"]);
 
@@ -151,10 +151,10 @@ impl Draw<&Theme> for UiLogs {
 
             const INDICATOR_CHAR: char = '|';
 
-            log.source.draw(src_pos, frame, source_style, scheme);
-            "->".draw(Dims(msg_x - 3, y), frame, extra, scheme);
-            log.message.draw(msg_pos, frame, msg_style, scheme);
-            INDICATOR_CHAR.draw(Dims(frame.size().0 - 1, y), frame, indicator_style, scheme);
+            log.source.draw(src_pos, frame, source_style);
+            "->".draw(Dims(msg_x - 3, y), frame, extra);
+            log.message.draw(msg_pos, frame, msg_style);
+            INDICATOR_CHAR.draw(Dims(frame.size().0 - 1, y), frame, indicator_style);
         }
     }
 }

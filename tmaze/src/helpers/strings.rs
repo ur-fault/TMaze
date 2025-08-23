@@ -11,7 +11,7 @@ use unicode_width::UnicodeWidthStr as _;
 
 use crate::{
     renderer::{draw::Draw, GMutView},
-    settings::theme::{Style, TerminalColorScheme},
+    settings::theme::Style,
     ui::draw_str,
 };
 
@@ -82,14 +82,8 @@ impl fmt::Debug for MbyStaticStr {
 }
 
 impl Draw<Style> for MbyStaticStr {
-    fn draw(
-        &self,
-        Dims(x, y): Dims,
-        frame: &mut GMutView,
-        styles: Style,
-        scheme: &TerminalColorScheme,
-    ) {
-        draw_str(frame, x, y, self, styles, scheme);
+    fn draw(&self, Dims(x, y): Dims, frame: &mut GMutView, styles: Style) {
+        draw_str(frame, x, y, self, styles);
     }
 }
 

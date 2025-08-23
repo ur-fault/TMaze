@@ -1,12 +1,10 @@
-use std::io;
-
 use cmaze::dims::Dims;
 use tmaze::{
     app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
     helpers::is_release,
-    renderer::{Cell, FrameBuffer},
+    renderer::{CellContent, GMutView},
     settings::theme::Theme,
-    ui::Screen,
+    ui::{Rect, Screen, ScreenError},
 };
 
 use crossterm::event::{Event as TermEvent, KeyEvent};
@@ -41,12 +39,11 @@ impl ActivityHandler for MyActivity {
 }
 
 impl Screen for MyActivity {
-    fn draw(&mut self, frame: &mut FrameBuffer, _: &Theme) -> io::Result<()> {
-        for y in 0..5 {
-            for x in 0..5 {
-                frame[Dims(x, y)] = Cell::new('█');
-            }
-        }
+    fn draw(&mut self, frame: &mut GMutView, _: &Theme) -> Result<(), ScreenError> {
+        frame.fill_rect(
+            Rect::new(Dims::ZERO, Dims(5, 5)),
+            CellContent::styled('█', Default::default()),
+        );
 
         Ok(())
     }

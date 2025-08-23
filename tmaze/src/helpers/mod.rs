@@ -23,8 +23,7 @@ pub const fn box_center(container_start: Dims, container_end: Dims, box_dims: Di
 
 #[inline]
 pub fn maze_render_size(maze: &MazeBoard) -> Dims {
-    let msize = maze.size();
-    Dims(msize.0, msize.1) * 2 + Dims(1, 1)
+    Dims::from(maze.size()) * 2 + Dims(1, 1)
 }
 
 #[inline]

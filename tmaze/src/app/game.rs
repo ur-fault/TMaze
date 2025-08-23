@@ -556,7 +556,7 @@ impl GameActivity {
         &self.maze_board.frames[self.data.camera_pos.2 as usize]
     }
 
-    fn render_meta_texts(&self, frame: &mut GMutView, theme: &Theme, scheme: &TerminalColorScheme) {
+    fn render_meta_texts(&self, frame: &mut GMutView, theme: &Theme) {
         let max_width = (frame.size().0 / 2 + 1) as usize;
 
         let pl_pos = self.data.game.get_player_pos() + Dims3D(1, 1, 1);
@@ -596,7 +596,7 @@ impl GameActivity {
         let view_mode = strings::multisize_string(view_mode.to_multisize_strings(), max_width);
 
         let style = theme["text"];
-        let mut draw = |text: &str, align| frame.draw_aligned(align, text, style, scheme);
+        let mut draw = |text: &str, align| frame.draw_aligned(align, text, style);
 
         draw(&pos_text, Align::TopLeft);
         draw(view_mode, Align::TopRight);
@@ -604,13 +604,7 @@ impl GameActivity {
         draw(&from_start, Align::BottomRight);
     }
 
-    pub fn render_visited_places(
-        &self,
-        frame: &mut GMutView,
-        maze_pos: Dims,
-        theme: &Theme,
-        scheme: &TerminalColorScheme,
-    ) {
+    pub fn render_visited_places(&self, frame: &mut GMutView, maze_pos: Dims, theme: &Theme) {
         use CellWall::{Down, Up};
 
         let game = &self.data.game;
@@ -618,7 +612,7 @@ impl GameActivity {
             let cell = game.get_maze().board.get_cell(*move_pos).unwrap();
             if move_pos.2 == game.get_player_pos().2 && cell.get_wall(Up) && cell.get_wall(Down) {
                 let real_pos = maze2screen(*move_pos) + maze_pos;
-                frame.draw(real_pos, '.', theme["game.visited"], scheme); // FIXME: move out of the loop
+                frame.draw(real_pos, '.', theme["game.visited"]); // FIXME: move out of the loop
             }
         }
     }
@@ -629,7 +623,6 @@ impl GameActivity {
         game: &RunningGame,
         viewport: &mut GMutView,
         theme: &Theme,
-        scheme: &TerminalColorScheme,
     ) {
         let player = self.sm_player_pos;
         let player_draw_pos = maze_pos + player.into();
@@ -641,12 +634,7 @@ impl GameActivity {
         if !cell.get_wall(CellWall::Up) || !cell.get_wall(CellWall::Down) {
             viewport.style_of(player_draw_pos).fg = theme["game.player"].fg;
         } else {
-            viewport.draw(
-                player_draw_pos,
-                self.data.player_char,
-                theme["game.player"],
-                scheme,
-            );
+            viewport.draw(player_draw_pos, self.data.player_char, theme["game.player"]);
         }
     }
 
@@ -817,12 +805,7 @@ impl ActivityHandler for GameActivity {
 }
 
 impl Screen for GameActivity {
-    fn draw(
-        &mut self,
-        frame: &mut GMutView,
-        theme: &Theme,
-        scheme: &TerminalColorScheme,
-    ) -> Result<(), ScreenError> {
+    fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
         let maze_frame = self.current_floor_frame();
         let game = &self.data.game;
 
@@ -840,20 +823,20 @@ impl Screen for GameActivity {
 
         frame.bounds(self.viewport_rect, |f| {
             f.centered(vp_size + Dims(2, 4), |f| {
-                self.render_meta_texts(f, theme, scheme);
+                self.render_meta_texts(f, theme);
                 f.pad(Padding::ver(1), |f| {
-                    f.border(theme["game.viewport.border"], scheme)
+                    f.border(theme["game.viewport.border"])
                         .pad(Padding::all(1), |f| {
-                            f.draw(maze_pos, &maze_frame.view(), (), scheme);
-                            self.render_visited_places(f, maze_pos, theme, scheme);
+                            f.draw(maze_pos, maze_frame.view(), ());
+                            self.render_visited_places(f, maze_pos, theme);
 
                             if (self.data.game.get_player_pos().2) == self.sm_camera_pos.2 {
-                                self.render_player(maze_pos, game, f, theme, scheme);
+                                self.render_player(maze_pos, game, f, theme);
                             }
                         });
                     if let CameraMode::EdgeFollow { x: xoff, y: yoff } = self.camera_mode {
                         if !does_fit && self.show_debug {
-                            render_edge_follow_rulers((xoff, yoff), f, theme, scheme);
+                            render_edge_follow_rulers((xoff, yoff), f, theme);
                         }
                     }
                 });
@@ -862,12 +845,9 @@ impl Screen for GameActivity {
 
         if let Some(dpad_rect) = self.dpad_rect {
             frame.bounds(dpad_rect, |f| {
-                self.touch_controls
-                    .as_ref()
-                    .unwrap()
-                    .render(f, theme, scheme);
+                self.touch_controls.as_ref().unwrap().render(f, theme);
                 if self.show_debug {
-                    f.border(theme["debug.border"], scheme);
+                    f.border(theme["debug.border"]);
                 }
             });
         }
@@ -877,12 +857,7 @@ impl Screen for GameActivity {
 }
 
 #[inline]
-fn render_edge_follow_rulers(
-    rulers: (Offset, Offset),
-    frame: &mut GMutView,
-    theme: &Theme,
-    scheme: &TerminalColorScheme,
-) {
+fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut GMutView, theme: &Theme) {
     let [s_start, s_end] = theme.extract(["debug.rulers.start", "debug.rulers.end"]);
 
     let vps = frame.size();
@@ -894,7 +869,7 @@ fn render_edge_follow_rulers(
     const V: char = Vertical.round();
     const H: char = Horizontal.round();
 
-    let mut draw = |pos, dir, end| frame.draw(pos, dir, if end { s_end } else { s_start }, scheme);
+    let mut draw = |pos, dir, end| frame.draw(pos, dir, if end { s_end } else { s_start });
 
     #[rustfmt::skip]
     {
@@ -922,7 +897,7 @@ impl MazeBoard {
             .map(|floor| Self::render_floor(game, floor, theme, scheme))
             .collect();
 
-        Self::render_special(&mut frames, game, theme, scheme);
+        Self::render_special(&mut frames, game, theme);
 
         Self { frames }
     }
@@ -938,16 +913,13 @@ impl MazeBoard {
 
         let size = maze_render_size(board);
 
-        let mut frame = GBuffer::new(size);
+        let mut frame = GBuffer::new(size, scheme);
         frame
             .mut_view()
-            .fill(CellContent::styled(' ', theme["game.background"]), scheme);
+            .fill(CellContent::styled(' ', theme["game.background"]));
 
-        let mut draw = |pos, l: LineDir| {
-            frame
-                .mut_view()
-                .draw(Dims::from(pos), l.double(), normals, scheme)
-        };
+        let mut draw =
+            |pos, l: LineDir| frame.mut_view().draw(Dims::from(pos), l.double(), normals);
 
         for y in -1..board.size().1 {
             for x in -1..board.size().0 {
@@ -982,19 +954,12 @@ impl MazeBoard {
             layer,
             game.get_maze().is_tower(),
             theme,
-            scheme,
         );
 
         frame
     }
 
-    fn render_stairs(
-        frame: &mut GMutView,
-        floors: Array2DView<Cell>,
-        tower: bool,
-        theme: &Theme,
-        scheme: &TerminalColorScheme,
-    ) {
+    fn render_stairs(frame: &mut GMutView, floors: Array2DView<Cell>, tower: bool, theme: &Theme) {
         let s_stairs_up = theme["game.stairs.up"];
         let s_stairs_down = theme["game.stairs.down"];
         let s_stairs_both = theme["game.stairs.both"];
@@ -1012,23 +977,18 @@ impl MazeBoard {
 
             let style = if tower && up { s_stairs_up_tower } else { st };
             let pos = maze2screen(pos);
-            frame.draw(pos, ch, style, scheme);
+            frame.draw(pos, ch, style);
         }
     }
 
-    fn render_special(
-        frames: &mut [GBuffer],
-        game: &RunningGame,
-        theme: &Theme,
-        scheme: &TerminalColorScheme,
-    ) {
+    fn render_special(frames: &mut [GBuffer], game: &RunningGame, theme: &Theme) {
         let goal_style = theme["game.goal"];
         let goal_pos = game.get_goal_pos();
 
         let frame = &mut frames[goal_pos.2 as usize];
         frame
             .mut_view()
-            .draw(maze2screen(goal_pos), '$', goal_style, scheme);
+            .draw(maze2screen(goal_pos), '$', goal_style);
     }
 }
 

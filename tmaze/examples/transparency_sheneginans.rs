@@ -10,7 +10,7 @@ use tmaze::{
 fn main() {
     let scheme = TerminalColorScheme::named("catppuccin_mocha");
 
-    let mut buf = GBuffer::new(Dims(64, 32));
+    let mut buf = GBuffer::new(Dims(64, 32), &scheme);
 
     for i in 0..64 {
         buf.mut_view().fill_rect(
@@ -23,7 +23,6 @@ fn main() {
                     ..Default::default()
                 },
             ),
-            &scheme,
         );
     }
 
@@ -39,7 +38,6 @@ fn main() {
                     ..Default::default()
                 },
             ),
-            &scheme,
         );
     }
 
@@ -113,4 +111,3 @@ fn main() {
     // buf.mut_view().clear();
     // f(&mut buf, 0);
 }
-
