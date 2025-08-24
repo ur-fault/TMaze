@@ -489,14 +489,25 @@ impl GMutView<'_> {
 
         let prev_style = *self.style_of(pos);
 
-        for x in pos.0..pos.0 + width {
-            self.clear_space(Dims(x, pos.1), None);
-        }
+        if chr == ' ' && self.content_of(pos).is_some_and(|c| c.width == 1) {
+            if style.alpha == 255 {
+                self.buf.0[self.bounds.start + pos] = Cell::styled(' ', style);
+            } else {
+                let chr = self.content_of(pos).unwrap().character;
+                let new_style = style.mix(prev_style, &self.buf.1, true);
+                self.buf.0[self.bounds.start + pos] = Cell::styled(chr, new_style);
+            }
+        } else {
+            for x in pos.0..pos.0 + width {
+                self.clear_space(Dims(x, pos.1), None);
+            }
 
-        let new_style = style.mix(prev_style, &self.buf.1);
-        self.buf.0[self.bounds.start + pos] = Cell::styled(chr, new_style);
-        for x in pos.0 + 1..pos.0 + width {
-            self.buf.0[self.bounds.start + Dims(x, pos.1)] = Cell::Placeholder((x - pos.0) as u8);
+            let new_style = style.mix(prev_style, &self.buf.1, false);
+            self.buf.0[self.bounds.start + pos] = Cell::styled(chr, new_style);
+            for x in pos.0 + 1..pos.0 + width {
+                self.buf.0[self.bounds.start + Dims(x, pos.1)] =
+                    Cell::Placeholder((x - pos.0) as u8);
+            }
         }
 
         width as usize
