@@ -97,6 +97,7 @@ pub enum UpdateCheckInterval {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum TerminalSchemeDef {
     Named(String),
     Custom(TerminalColorScheme),
