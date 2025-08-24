@@ -11,7 +11,7 @@ use cmaze::{
 use tmaze::{
     app::{app::init_theme_resolver, game::MazeBoard},
     renderer::{draw::Align, AlphaView, GBuffer},
-    settings::theme::{Color, NamedColor, Style, TerminalColorScheme, ThemeDefinition},
+    settings::theme::{Color, Style, TerminalColorScheme, ThemeDefinition},
 };
 
 fn fade(t: f32) -> f32 {
@@ -70,10 +70,10 @@ pub fn perlin(x: f32, y: f32) -> f32 {
     let u = fade(xf);
     let v = fade(yf);
 
-    let aa = P[(P[xi as usize] + yi) as usize] as i32;
-    let ab = P[(P[xi as usize] + yi + 1) as usize] as i32;
-    let ba = P[(P[xi as usize + 1] + yi) as usize] as i32;
-    let bb = P[(P[xi as usize + 1] + yi + 1) as usize] as i32;
+    let aa = P[(P[xi as usize] + yi) as usize];
+    let ab = P[(P[xi as usize] + yi + 1) as usize];
+    let ba = P[(P[xi as usize + 1] + yi) as usize];
+    let bb = P[(P[xi as usize + 1] + yi + 1) as usize];
 
     let x1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1.0, yf), u);
     let x2 = lerp(grad(ab, xf, yf - 1.0), grad(bb, xf - 1.0, yf - 1.0), u);
