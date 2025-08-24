@@ -6,7 +6,8 @@ use serde::{de::Error, Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    helpers::constants::paths::theme_file_path, settings::attribute::deserialize_attributes,
+    helpers::{constants::paths::theme_file_path, ToDebug},
+    settings::attribute::deserialize_attributes,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -199,10 +200,32 @@ impl Style {
         self.into()
     }
 
-    pub fn mix(self, other: Self, scheme: &TerminalColorScheme) -> Self {
+    pub fn mix(self, on: Self, scheme: &TerminalColorScheme, ignore_fg: bool) -> Self {
+        use MixMode::*;
+
         Style {
-            bg: Color::mix(self.bg, other.bg, self.alpha, MixMode::BgOnBg, scheme),
-            fg: Color::mix(self.fg, other.bg, self.alpha, MixMode::FgOnBg, scheme),
+            bg: Color::mix(
+                Bg {
+                    top: self.bg,
+                    on: on.bg,
+                },
+                self.alpha,
+                scheme,
+            ),
+            fg: Color::mix(
+                match ignore_fg {
+                    true => TransparentFg {
+                        top_bg: self.bg,
+                        on_fg: on.fg,
+                    },
+                    false => Fg {
+                        fg: self.fg,
+                        on: on.bg,
+                    },
+                },
+                self.alpha,
+                scheme,
+            ),
             attr: self.attr,
             alpha: 255,
         }
@@ -230,52 +253,78 @@ pub enum Color {
     Hex(u8, u8, u8),
 }
 
+pub enum MixMode {
+    Bg {
+        top: Option<Color>,
+        on: Option<Color>,
+    },
+    Fg {
+        fg: Option<Color>,
+        on: Option<Color>,
+    },
+    TransparentFg {
+        top_bg: Option<Color>,
+        on_fg: Option<Color>,
+    },
+}
+
 impl Color {
     pub fn as_text(&self) -> String {
         match self {
-            Color::Named(named) => format!("{named:?}"),
+            Color::Named(named) => named.to_debug(),
             Color::RGB(r, g, b) | Color::Hex(r, g, b) => format!("#{:02X}{:02X}{:02X}", r, g, b),
         }
     }
 
-    pub fn mix(
-        color: Option<Self>,
-        on: Option<Self>,
-        alpha: u8,
-        mode: MixMode,
-        scheme: &TerminalColorScheme,
-    ) -> Option<Self> {
+    pub fn mix(mode: MixMode, alpha: u8, scheme: &TerminalColorScheme) -> Option<Self> {
+        use Color::*;
         use MixMode::*;
 
+        let alpha = alpha as u16;
+
         if alpha == 0 {
-            return match on {
-                None => {
-                    let (r, g, b) = scheme.primary_bg;
-                    Some(RGB(r, g, b))
-                }
-                Some(color) => Some(color),
+            return match mode {
+                Bg { on, .. } => on,
+                Fg { on, .. } => Some(on.unwrap_or(RGB(
+                    scheme.primary_bg.0,
+                    scheme.primary_bg.1,
+                    scheme.primary_bg.2,
+                ))),
+                TransparentFg { on_fg: on, .. } => on,
             };
         }
 
         if alpha == 255 {
-            return color;
+            return match mode {
+                Bg { top, .. } => top,
+                Fg { fg, .. } => fg,
+                TransparentFg { top_bg, .. } => Some(top_bg.unwrap_or(RGB(
+                    scheme.primary_bg.0,
+                    scheme.primary_bg.1,
+                    scheme.primary_bg.2,
+                ))),
+            };
         }
 
-        let alpha = alpha as u16;
-        use Color::*;
-        let (r1, g1, b1) = match color {
-            None => match mode {
-                BgOnBg => scheme.primary_bg,
-                FgOnBg => scheme.primary_fg,
-            },
+        let classify = |color, default| match color {
+            None => default,
             Some(Named(name)) => name.to_rgb(scheme),
             Some(RGB(r, g, b) | Hex(r, g, b)) => (r, g, b),
         };
 
-        let (r2, g2, b2) = match on {
-            None => scheme.primary_bg,
-            Some(Named(name)) => name.to_rgb(scheme),
-            Some(RGB(r, g, b) | Hex(r, g, b)) => (r, g, b),
+        let [(r1, g1, b1), (r2, g2, b2)] = match mode {
+            Bg { top, on } => [
+                classify(top, scheme.primary_bg),
+                classify(on, scheme.primary_bg),
+            ],
+            Fg { fg, on } => [
+                classify(fg, scheme.primary_fg),
+                classify(on, scheme.primary_bg),
+            ],
+            TransparentFg { top_bg, on_fg } => [
+                classify(top_bg, scheme.primary_bg),
+                classify(on_fg, scheme.primary_fg),
+            ],
         };
 
         let r = (r1 as u16 * alpha + r2 as u16 * (255 - alpha)) / 255;
@@ -351,10 +400,10 @@ where
     Ok((r, g, b))
 }
 
-pub enum MixMode {
-    BgOnBg,
-    FgOnBg,
-}
+// pub enum MixMode {
+//     BgOnBg,
+//     FgOnBg,
+// }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
