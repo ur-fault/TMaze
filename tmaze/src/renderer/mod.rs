@@ -11,7 +11,9 @@ use cmaze::{
     array::Array3D,
     dims::{Dims, Dims3D, Offset},
 };
-use crossterm::{event::Event, execute, style::ContentStyle, terminal, QueueableCommand};
+use crossterm::{
+    event::Event, execute, style::ContentStyle, terminal, QueueableCommand, SynchronizedUpdate,
+};
 use draw::{Align, Draw, SizedDrawable};
 use unicode_width::UnicodeWidthChar;
 
@@ -127,65 +129,69 @@ impl Renderer {
     pub fn show(&mut self) -> io::Result<()> {
         let mut tty = stdout();
 
-        let mut style = ContentStyle::default();
-        tty.queue(crossterm::style::ResetColor)?;
+        tty.sync_update(|tty| {
+            let mut style = ContentStyle::default();
+            tty.queue(crossterm::style::ResetColor)?;
 
-        for y in 0..self.size.1 {
-            if self.hidden.view()[y] == self.shown.view()[y] && !self.full_redraw {
-                continue;
-            }
+            for y in 0..self.size.1 {
+                if self.hidden.view()[y] == self.shown.view()[y] && !self.full_redraw {
+                    continue;
+                }
 
-            tty.queue(crossterm::cursor::MoveTo(0, y as u16))?;
+                tty.queue(crossterm::cursor::MoveTo(0, y as u16))?;
 
-            for x in 0..self.size.0 {
-                if let Cell::Content(c) = &self.hidden.view()[Dims(x, y)] {
-                    if style != c.style.into() {
-                        let c_style: ContentStyle = c.style.into();
-                        if style.background_color != c_style.background_color {
-                            match c_style.background_color {
-                                Some(x) => {
-                                    tty.queue(crossterm::style::SetBackgroundColor(x))?;
-                                }
-                                None => {
-                                    tty.queue(crossterm::style::SetBackgroundColor(
-                                        crossterm::style::Color::Reset,
-                                    ))?;
+                for x in 0..self.size.0 {
+                    if let Cell::Content(c) = &self.hidden.view()[Dims(x, y)] {
+                        if style != c.style.into() {
+                            let c_style: ContentStyle = c.style.into();
+                            if style.background_color != c_style.background_color {
+                                match c_style.background_color {
+                                    Some(x) => {
+                                        tty.queue(crossterm::style::SetBackgroundColor(x))?;
+                                    }
+                                    None => {
+                                        tty.queue(crossterm::style::SetBackgroundColor(
+                                            crossterm::style::Color::Reset,
+                                        ))?;
+                                    }
                                 }
                             }
-                        }
-                        if style.foreground_color != c_style.foreground_color {
-                            match c_style.foreground_color {
-                                Some(x) => {
+                            if style.foreground_color != c_style.foreground_color {
+                                match c_style.foreground_color {
+                                    Some(x) => {
+                                        tty.queue(crossterm::style::SetForegroundColor(x))?;
+                                    }
+                                    None => {
+                                        tty.queue(crossterm::style::SetForegroundColor(
+                                            crossterm::style::Color::Reset,
+                                        ))?;
+                                    }
+                                }
+                            }
+                            if style.attributes != c_style.attributes {
+                                tty.queue(crossterm::style::SetAttribute(
+                                    crossterm::style::Attribute::Reset,
+                                ))?;
+                                if let Some(x) = c_style.foreground_color {
                                     tty.queue(crossterm::style::SetForegroundColor(x))?;
                                 }
-                                None => {
-                                    tty.queue(crossterm::style::SetForegroundColor(
-                                        crossterm::style::Color::Reset,
-                                    ))?;
+                                if let Some(x) = c_style.background_color {
+                                    tty.queue(crossterm::style::SetBackgroundColor(x))?;
                                 }
+                                tty.queue(crossterm::style::SetAttributes(c_style.attributes))?;
                             }
+                            style = c_style;
                         }
-                        if style.attributes != c_style.attributes {
-                            tty.queue(crossterm::style::SetAttribute(
-                                crossterm::style::Attribute::Reset,
-                            ))?;
-                            if let Some(x) = c_style.foreground_color {
-                                tty.queue(crossterm::style::SetForegroundColor(x))?;
-                            }
-                            if let Some(x) = c_style.background_color {
-                                tty.queue(crossterm::style::SetBackgroundColor(x))?;
-                            }
-                            tty.queue(crossterm::style::SetAttributes(c_style.attributes))?;
-                        }
-                        style = c_style;
+                        tty.queue(crossterm::style::Print(c.character))?;
                     }
-                    tty.queue(crossterm::style::Print(c.character))?;
                 }
             }
-        }
 
-        tty.flush()?;
-        self.full_redraw = false;
+            tty.flush()?;
+            self.full_redraw = false;
+
+            std::io::Result::Ok(())
+        })??;
 
         std::mem::swap(&mut self.shown, &mut self.hidden);
 
