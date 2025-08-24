@@ -2,7 +2,7 @@ use std::io::stdout;
 
 use cmaze::dims::Dims;
 use tmaze::{
-    renderer::{CellContent, GBuffer},
+    renderer::{CellContent, GBuffer, RenderMode},
     settings::theme::{Color, NamedColor, Style, TerminalColorScheme},
     ui::Rect,
 };
@@ -35,7 +35,7 @@ fn main() {
             }
         }
 
-        buf.write(&mut stdout()).unwrap();
+        buf.write(&mut stdout(), RenderMode::RGB).unwrap();
     }
 
     {
@@ -70,7 +70,7 @@ fn main() {
             );
         }
 
-        buf.write(&mut stdout()).unwrap();
+        buf.write(&mut stdout(), RenderMode::RGB).unwrap();
     }
 
     {
@@ -94,7 +94,7 @@ fn main() {
                         ));
                     });
             });
-            buf.write(&mut stdout()).unwrap();
+            buf.write(&mut stdout(), RenderMode::RGB).unwrap();
         };
 
         let mut buf = GBuffer::new(Dims(14, 6), &scheme);

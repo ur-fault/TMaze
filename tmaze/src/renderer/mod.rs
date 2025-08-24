@@ -30,6 +30,7 @@ pub struct Renderer {
     shown: GBuffer,
     hidden: GBuffer,
     full_redraw: bool,
+    pub mode: RenderMode,
 }
 
 impl Renderer {
@@ -44,6 +45,7 @@ impl Renderer {
             shown,
             hidden,
             full_redraw: true,
+            mode: RenderMode::default(),
         };
 
         ren.turn_on()?;
@@ -145,7 +147,14 @@ impl Renderer {
                 for x in 0..self.size.0 {
                     if let Cell::Content(c) = &self.hidden.view()[Dims(x, y)] {
                         if style != c.style.into() {
-                            let c_style: ContentStyle = c.style.into();
+                            let mut c_style = c.style;
+
+                            if self.mode == RenderMode::Named {
+                                c_style = c_style.to_named(&self.hidden.1);
+                            }
+
+                            let c_style: ContentStyle = c_style.into();
+
                             if style.background_color != c_style.background_color {
                                 tty.queue(style::SetBackgroundColor(
                                     c_style.background_color.unwrap_or(style::Color::Reset),
@@ -185,6 +194,13 @@ impl Renderer {
 
         Ok(())
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+pub enum RenderMode {
+    #[default]
+    RGB,
+    Named,
 }
 
 impl Drop for Renderer {
@@ -322,18 +338,22 @@ impl GBuffer {
         }
     }
 
-    pub fn write(&self, to: &mut impl Write) -> io::Result<()> {
+    pub fn write(&self, to: &mut impl Write, mode: RenderMode) -> io::Result<()> {
         for y in 0..self.size().1 {
             let mut x = 0;
             while x < self.size().0 {
                 let Cell::Content(CellContent {
                     character,
                     width,
-                    style,
+                    mut style,
                 }) = &self.0[(x, y)]
                 else {
                     panic!("Shouldn't encounter a placeholder cell");
                 };
+
+                if mode == RenderMode::Named {
+                    style = style.to_named(&self.1);
+                }
 
                 let styled = style.to_cross().apply(*character);
                 write!(to, "{styled}")?;

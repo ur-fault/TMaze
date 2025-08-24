@@ -2,7 +2,7 @@ use std::io::stdout;
 
 use cmaze::dims::Dims;
 use tmaze::{
-    renderer::{CellContent, GBuffer},
+    renderer::{CellContent, GBuffer, RenderMode},
     settings::theme::{Color, NamedColor, Style, TerminalColorScheme},
 };
 
@@ -31,5 +31,5 @@ fn main() {
         });
     });
 
-    buf.write(&mut stdout()).unwrap();
+    buf.write(&mut stdout(), RenderMode::RGB).unwrap();
 }
