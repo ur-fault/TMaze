@@ -477,11 +477,13 @@ impl GMutView<'_> {
         let width = chr.width().unwrap_or(1) as i32;
 
         if !self.contains(pos) || !self.contains(Dims(pos.0 + width - 1, pos.1)) {
-            for x in range_intersection(
-                pos.0..pos.0 + width,
-                self.bounds.start.0..self.bounds.end.0 + 1,
-            ) {
-                self.clear_space(Dims(x, pos.1), Some(style));
+            if (0..self.size().1).contains(&pos.1) {
+                for x in range_intersection(
+                    self.bounds.start.0 + pos.0..self.bounds.start.0 + pos.0 + width,
+                    self.bounds.start.0..self.bounds.end.0,
+                ) {
+                    self.clear_space(Dims(x, pos.1), Some(style));
+                }
             }
 
             return width as usize;
