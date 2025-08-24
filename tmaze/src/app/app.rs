@@ -13,14 +13,19 @@ use cmaze::{
 };
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
+use unicode_width::UnicodeWidthStr;
 
 use crate::{
     data::SaveData,
     helpers::{constants::paths::settings_path, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
-    renderer::{self, draw::Draw, CellContent, GMutView, Renderer},
+    renderer::{
+        self,
+        draw::{Align, Draw},
+        AlphaView, CellContent, GBuffer, GMutView, Renderer,
+    },
     settings::{
-        theme::{Theme, ThemeResolver},
+        theme::{Style, TerminalColorScheme, Theme, ThemeResolver},
         Settings,
     },
     ui,
@@ -193,6 +198,40 @@ impl App {
     pub fn run(&mut self) -> Option<ActivityResult> {
         log::trace!("Starting main loop");
 
+        let yotsuba = string_to_gbuf(
+            "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⣀⣀⣀⣀⣀⣀⣼⣄⡀⠘⢋⠀⠀⠀⠀⠀⢀⣀⣤⣴⣦⣾⠿⣻⠟⡿⢻⠟⡿⣷⣶⣾⣶⣦⣤⣄⣀⣀⠀⠀⠀⠀⠀⢠⠟⠋⠀⣀⣤⣶⣷⣤⣤⣶⡄⠀⠀⠀
+⠀⠀⠈⣿⣿⣿⢻⠿⠿⠿⡿⣿⣶⣤⣿⣦⣤⣴⣾⠿⠿⠛⢉⠐⡀⠣⠀⠌⠠⠅⢊⠐⡠⠐⢂⠢⠙⡉⠻⠟⠿⣿⣶⣴⣄⣠⣿⣤⣴⣾⣿⡿⠟⡛⢛⣿⡿⠃⠀⠀⠀
+⠀⠀⣀⣈⣻⣿⡇⠠⠐⡠⠐⣠⣿⣿⣿⡿⠛⠡⠂⠌⠠⠍⢡⢈⡄⡑⠊⠌⠡⠨⢀⠩⠔⡈⢂⠄⠡⠒⠡⢉⠰⠀⠜⠛⠿⣿⣿⣿⣿⣏⠴⠨⠑⡊⡉⢿⣷⡶⣶⣶⣤
+⢰⣿⣿⠿⠟⢫⣅⢉⡐⢉⣴⣿⣿⡿⠃⠈⠡⢈⠡⠈⠁⠌⡐⢆⠤⣉⠑⢌⠓⣁⠊⡔⢢⠔⡡⢈⠄⠃⡔⢂⠦⢁⠂⠌⡐⢠⠙⠿⣿⣿⣷⣤⢉⠡⡐⡃⠤⢡⣿⣿⡟
+⠘⠛⣿⣿⣴⡀⠘⠦⢖⣼⣿⡿⢋⣔⠂⡁⠂⣤⣒⡂⢁⠂⣴⣾⣾⢠⠑⡨⣼⣷⣷⣜⡤⠃⠔⠡⢂⣴⣈⡐⠂⢌⠡⢊⠔⡂⢉⡐⢈⠻⣿⣿⣧⡐⡠⢑⢢⣿⣿⣏⠀
+⠀⣠⣶⣿⣟⠉⠰⢒⣿⣿⡟⣵⣿⣦⠐⣠⣿⣿⡟⢀⢂⣼⣿⣿⡏⠡⣐⣴⣿⡟⠛⣿⣷⣍⡄⠃⡜⣿⣿⣧⣍⠠⠌⣞⣶⡥⢂⡐⡀⢂⠉⣿⣿⣿⣦⣁⣺⣽⣿⣿⡿
+⠈⠿⠿⠿⠾⢿⣷⣿⣿⣟⣾⣿⣿⠭⡸⣶⣿⡿⢃⢌⣾⣿⣿⣿⡃⢟⣾⣿⡟⠁⠀⠈⣿⣿⣤⠃⣼⣿⣿⣿⣿⣥⠸⣘⣿⣿⡦⡔⡈⢷⣿⣦⢛⣿⣿⠟⠋⠉⠉⠀⠀
+⠀⠀⠀⠀⠀⠀⠉⣻⣿⢡⣿⣿⠟⣀⣳⣿⣿⡇⣟⣾⣿⠇⣿⣷⢃⣿⣿⡟⠀⠀⠀⠀⠈⣿⣿⣧⣷⣿⣿⣀⣻⣿⣧⡙⣿⣿⣷⡹⡐⢊⣿⣿⡌⢿⣯⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢰⣿⣇⣺⣿⣿⣇⣼⣿⣿⣿⣿⣿⣿⡿⠿⣿⣿⣿⣿⠟⠀⠀⠀⠀⠀⠀⠘⣿⣿⡿⣿⣿⠟⠛⢿⣿⣿⣿⣿⣿⣷⡡⠆⣿⣿⡇⢛⣿⡆⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⣼⣿⢹⣿⣿⠿⣿⣿⡿⠋⣿⣳⣿⠋⠀⠀⣿⣿⣿⠟⠀⠀⠀⠀⠀⠀⠀⠀⠈⣿⣷⣿⡿⠆⠀⠘⢿⣧⣽⣿⣿⣿⣿⡄⣿⣿⡿⣹⣿⡇⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢸⣿⡟⣾⣿⣿⣆⣿⣿⠃⠀⣿⣿⣿⣶⣴⣴⣿⣿⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣿⣿⣷⣶⣶⣶⣴⣿⣿⣿⡇⠹⣿⣧⢿⣿⣷⠫⣿⡇⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣾⣿⠏⠀⣴⣿⠟⢛⠛⠿⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⢹⣿⠿⠿⣷⣿⣟⡛⢿⣿⡇⠀⢹⣿⣼⣿⣧⣖⣿⡇⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢸⣿⣿⡟⣿⣿⣿⡏⢀⣾⣿⠃⣴⣿⣤⣴⣾⣿⣿⣿⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⠱⣿⣏⣠⣴⣿⣿⣿⣷⡌⠻⣿⣄⠈⣿⣿⣿⠟⣿⣿⡇⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢰⣿⡟⠀⣿⣿⠟⠀⢠⣿⡇⢸⣿⣿⣿⣿⣿⣿⣿⣿⣷⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⣿⣿⠀⠈⢿⣿⡆⠈⢻⡇⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢈⣿⡇⠀⣿⣿⠀⠀⢨⣿⡇⠈⣿⣿⣿⣿⣿⣿⣿⣿⣟⠀⠀⠀⠀⠀⠀⠀⠀⠀⢹⣿⣿⣿⣿⣿⣿⣿⣿⡟⠀⣿⣯⠀⠀⢸⣿⠃⠀⢸⡇⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠘⣿⣧⠀⠻⣿⠂⠀⠈⢿⠃⠀⠘⢿⣿⣿⣿⣿⡿⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⢿⣿⣿⣿⣿⡿⠃⠀⠀⣿⡿⠀⠀⣾⣿⠃⢠⣾⡇⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠘⣿⣦⠘⣿⣶⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⢴⣿⡃⣠⣾⡿⠁⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠈⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⣶⣿⣏⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢀⣼⣿⡟⠹⣿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣸⣿⣿⠟⣩⠹⣿⣷⣄⡀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢠⣾⡿⠇⢀⠐⡈⠿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣶⣿⠟⠡⢂⠤⢁⢈⣻⣿⣷⡆⠀⠀⠀
+⠀⠀⠀⠀⢠⣿⣛⣄⣦⠐⢂⡁⢂⠩⠿⣿⣿⣦⣀⠀⠀⠀⠀⠀⠀⠀⠿⠿⠛⠛⠛⠛⠛⠿⠟⠛⠀⠀⠀⠀⠀⠀⣀⣤⣾⣿⡿⠋⡈⢁⠂⠆⣼⣿⣿⣿⣿⡇⠀⠀⠀
+⠀⠀⠀⠐⢿⠿⠿⢿⣿⣷⢀⠄⠂⢀⠂⠄⣙⣿⣿⣷⣦⣄⣀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣤⣶⣿⣿⣿⣻⠾⠁⡔⢤⣨⣂⡐⣿⣿⠁⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⢸⣿⣧⣾⣾⣿⠦⠜⣼⣿⠟⠀⠀⠉⠛⠛⢿⣿⣿⣶⡷⣴⣦⣴⣶⣶⣶⣿⣿⣿⣿⠟⠋⠀⠀⠀⠻⣿⣿⣷⣤⣿⣿⠿⠿⢿⠿⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠘⠛⠋⠉⠉⣿⣿⣿⡿⠋⠁⠀⠀⢀⣴⣶⣿⣿⡁⠀⠀⠉⠉⠉⠉⠉⠉⠁⣀⣸⣿⣷⣶⣦⠀⠀⠀⠈⠹⢿⣾⣿⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠿⠋⠀⠀⠀⠀⢀⣿⡟⣯⣛⠿⣿⣿⣷⣶⣶⣶⣶⣶⣿⣿⡿⣟⠻⣏⢿⣻⣤⠠⠀⠀⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⢠⣿⡿⢯⡱⢎⣳⢥⣯⡭⣭⡙⡭⢭⢭⣙⣳⣼⣎⣷⣋⡿⣜⣿⣶⠀⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣨⣿⡿⣙⢧⣽⡟⡏⠛⠛⠳⠑⠏⠸⠙⠚⠫⠛⠛⠉⢿⣯⡗⣮⢞⡿⣷⡀⠀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣿⣯⠳⣍⣾⡿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢿⣿⣴⢫⡜⢿⣿⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣿⡟⢦⡛⣼⠿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⢯⣓⢎⡧⣻⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀",
+            &self.data.settings.get_terminal_scheme(),
+        );
+
         let rem_events = 'mainloop: loop {
             while let Some(job) = self.data.jobs.pop() {
                 log::trace!("Running job: {:?}", job.name().unwrap_or("<unnamed>"));
@@ -266,18 +305,33 @@ impl App {
                 .mut_view()
                 .fill(CellContent::styled(' ', self.data.theme.get("background")));
 
+            self.renderer
+                .frame()
+                .mut_view()
+                .draw_aligned(Align::Center, yotsuba.view(), ());
+
+            let mut screen = GBuffer::new(
+                self.data.screen_size,
+                &self.data.settings.get_terminal_scheme(),
+            );
+
             match self
                 .activities
                 .active_mut()
                 .expect("No active active")
                 .screen()
-                .draw(&mut self.renderer.frame().mut_view(), &self.data.theme)
+                .draw(&mut screen.mut_view(), &self.data.theme)
             {
                 Ok(_) => {}
                 Err(ui::ScreenError::SmallScreen) => {
                     draw_small_screen_info(&mut self.renderer.frame().mut_view(), &self.data.theme)
                 }
             }
+
+            self.renderer
+                .frame()
+                .mut_view()
+                .draw(Dims(0, 0), AlphaView(screen.view(), 200), ());
 
             self.data.logs.draw(
                 Dims(0, 0),
@@ -370,4 +424,22 @@ fn draw_small_screen_info(frame: &mut GMutView, theme: &Theme) {
             theme["text"],
         );
     });
+}
+
+fn string_to_gbuf(s: &str, scheme: &TerminalColorScheme) -> GBuffer {
+    let width = s
+        .lines()
+        .map(|l| l.width())
+        .max()
+        .expect("non-empty string") as i32;
+    let height = s.lines().count() as i32;
+
+    let mut buf = GBuffer::new(Dims(width, height), &scheme);
+
+    for (y, line) in s.lines().enumerate() {
+        buf.mut_view()
+            .draw(Dims(0, y as i32), line, Style::default());
+    }
+
+    buf
 }
