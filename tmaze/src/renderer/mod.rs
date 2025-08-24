@@ -345,6 +345,7 @@ impl GBuffer {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct GView<'a> {
     buf: &'a GBuffer,
     bounds: Rect,
@@ -400,6 +401,12 @@ impl Draw for GView<'_> {
                 rel_x += width as i32;
             }
         }
+    }
+}
+
+impl SizedDrawable for GView<'_> {
+    fn size(&self) -> Dims {
+        self.size()
     }
 }
 
@@ -742,6 +749,64 @@ impl GMutView<'_> {
     pub fn border(&mut self, style: Style) -> &mut Self {
         Rect::sized(self.size()).render(self, style);
         self
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AlphaView<'a>(pub GView<'a>, pub u8);
+
+impl Draw for AlphaView<'_> {
+    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
+        let alpha = self.1;
+        for rel_line in 0..self.0.size().1 {
+            let local_line = rel_line + self.0.bounds.start.1;
+            let mut rel_x = 0;
+
+            while self.0.buf.0[(rel_x + self.0.bounds.start.0, local_line)].is_placeholder() {
+                if !self
+                    .0
+                    .contains(Dims(rel_x + self.0.bounds.start.0, local_line))
+                {
+                    panic!(
+                        "Position out of 0.bounds: ({}, {local_line}) in {:?}",
+                        rel_x + self.0.bounds.start.0,
+                        self.0.bounds
+                    );
+                }
+
+                rel_x += 1;
+            }
+
+            while rel_x + self.0.bounds.start.0 <= self.0.bounds.end.0
+                && rel_x
+                    + self.0.bounds.start.0
+                    + self.0.buf.0[(rel_x + self.0.bounds.start.0, local_line)]
+                        .content()
+                        .unwrap()
+                        .width as i32
+                    - 1
+                    <= self.0.bounds.end.0
+            {
+                let CellContent {
+                    character,
+                    width,
+                    mut style,
+                } = *self.0.buf.0[(rel_x + self.0.bounds.start.0, local_line)]
+                    .content()
+                    .unwrap();
+
+                style.alpha = alpha;
+
+                frame.set_content_of(pos + Dims(rel_x, rel_line), character, style);
+                rel_x += width as i32;
+            }
+        }
+    }
+}
+
+impl SizedDrawable for AlphaView<'_> {
+    fn size(&self) -> Dims {
+        self.0.size()
     }
 }
 
