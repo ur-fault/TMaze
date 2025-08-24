@@ -1,17 +1,7 @@
-use std::{mem, sync::Arc};
-
-use cmaze::{
-    algorithms::{
-        region_generator::RndKruskals, region_splitter::DefaultRegionSplitter, GeneratorRegistry,
-        MazeSpec, MazeSpecType, SplitterRegistry,
-    },
-    dims::{Dims, Dims3D},
-    game::{GameProperities, RunningGame},
-};
+use cmaze::dims::Dims;
 use tmaze::{
-    app::{app::init_theme_resolver, game::MazeBoard},
-    renderer::{draw::Align, AlphaView, GBuffer, RenderMode},
-    settings::theme::{Color, Style, TerminalColorScheme, ThemeDefinition},
+    renderer::{GBuffer, RenderMode},
+    settings::theme::{Color, Style, TerminalColorScheme},
 };
 
 fn fade(t: f32) -> f32 {
@@ -87,50 +77,25 @@ fn main() {
 
     for y in 0..32 {
         for x in 0..64 {
-            let n = perlin(x as f32 / 8.0, y as f32 * 2.0 / 8.0);
-            let alpha = (((n + 1.0) / 2.0) * 255.0) as u8;
+            let r = (perlin(x as f32 / 8., y as f32 * 2. / 8.) + 1.) / 2.;
+            let g = (perlin(x as f32 / 8.0 + 64., y as f32 * 2. / 8. + 32.) + 1.) / 2.;
+            let b = (perlin(x as f32 / 8.0 + 32., y as f32 * 2. / 8. + 64.) + 1.) / 2.;
             buf.mut_view().draw(
                 Dims(x, y),
                 ' ',
                 Style {
-                    bg: Some(Color::RGB(0, 255, 0)),
-                    alpha,
+                    bg: Some(Color::RGB(
+                        (r * 255.) as u8,
+                        (g * 255.) as u8,
+                        (b * 255.) as u8,
+                    )),
                     ..Default::default()
                 },
             );
         }
     }
 
-    let game = RunningGame::prepare(
-        GameProperities {
-            maze_spec: MazeSpec {
-                inner_spec: MazeSpecType::Simple {
-                    size: Some(Dims3D(10, 5, 1)),
-                    start: None,
-                    end: None,
-                    mask: None,
-                    splitter: None,
-                    generator: None,
-                },
-                seed: None,
-                maze_type: None,
-            },
-        },
-        &GeneratorRegistry::with_default(Arc::new(RndKruskals), "rnd_kruskals"),
-        &SplitterRegistry::with_default(Arc::new(DefaultRegionSplitter), "dfs"),
-    )
-    .unwrap()
-    .handle
-    .join()
-    .unwrap()
-    .unwrap();
-
-    let theme = init_theme_resolver().resolve(&ThemeDefinition::parse_default());
-    let board = MazeBoard::new(&game, &theme, &scheme);
-    let board_buf: Vec<GBuffer> = unsafe { mem::transmute(board) };
-
-    buf.mut_view()
-        .draw_aligned(Align::Center, AlphaView(board_buf[0].view(), 200), ());
-
-    buf.write(&mut std::io::stdout(), RenderMode::Named).unwrap();
+    buf.write(&mut std::io::stdout(), RenderMode::RGB).unwrap();
+    buf.write(&mut std::io::stdout(), RenderMode::Named)
+        .unwrap();
 }

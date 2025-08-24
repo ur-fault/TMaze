@@ -230,6 +230,18 @@ impl Style {
             alpha: 255,
         }
     }
+
+    pub fn to_named(mut self, scheme: &TerminalColorScheme) -> Self {
+        if let Some(Color::RGB(r, g, b) | Color::Hex(r, g, b)) = self.fg {
+            self.fg = scheme.closest_color((r, g, b), true).map(Color::Named);
+        }
+
+        if let Some(Color::RGB(r, g, b) | Color::Hex(r, g, b)) = self.bg {
+            self.bg = scheme.closest_color((r, g, b), false).map(Color::Named);
+        }
+
+        self
+    }
 }
 
 impl From<Style> for ContentStyle {
@@ -400,11 +412,6 @@ where
     Ok((r, g, b))
 }
 
-// pub enum MixMode {
-//     BgOnBg,
-//     FgOnBg,
-// }
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NamedColor {
@@ -519,6 +526,44 @@ impl TerminalColorScheme {
             },
             _ => panic!("Unknown terminal color scheme: {}", name),
         }
+    }
+
+    pub fn closest_color(&self, color: (u8, u8, u8), fg: bool) -> Option<NamedColor> {
+        let mut closest = None;
+        let mut closest_dist = u32::MAX;
+
+        let colors = [
+            (Some(NamedColor::Black), self.black),
+            (Some(NamedColor::DarkGrey), self.dark_grey),
+            (Some(NamedColor::Red), self.red),
+            (Some(NamedColor::DarkRed), self.dark_red),
+            (Some(NamedColor::Green), self.green),
+            (Some(NamedColor::DarkGreen), self.dark_green),
+            (Some(NamedColor::Yellow), self.yellow),
+            (Some(NamedColor::DarkYellow), self.dark_yellow),
+            (Some(NamedColor::Blue), self.blue),
+            (Some(NamedColor::DarkBlue), self.dark_blue),
+            (Some(NamedColor::Magenta), self.magenta),
+            (Some(NamedColor::DarkMagenta), self.dark_magenta),
+            (Some(NamedColor::Cyan), self.cyan),
+            (Some(NamedColor::DarkCyan), self.dark_cyan),
+            (Some(NamedColor::White), self.white),
+            (Some(NamedColor::Grey), self.grey),
+            (None, if fg { self.primary_fg } else { self.primary_bg }),
+        ];
+
+        for (named, rgb) in colors.iter() {
+            let dr = rgb.0 as i32 - color.0 as i32;
+            let dg = rgb.1 as i32 - color.1 as i32;
+            let db = rgb.2 as i32 - color.2 as i32;
+            let dist = (dr * dr + dg * dg + db * db) as u32;
+            if dist < closest_dist {
+                closest_dist = dist;
+                closest = *named;
+            }
+        }
+
+        closest
     }
 }
 
