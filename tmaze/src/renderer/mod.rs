@@ -130,6 +130,8 @@ impl Renderer {
         let mut tty = stdout();
 
         tty.sync_update(|tty| {
+            use crossterm::style;
+
             let mut style = ContentStyle::default();
             tty.queue(crossterm::style::ResetColor)?;
 
@@ -145,44 +147,28 @@ impl Renderer {
                         if style != c.style.into() {
                             let c_style: ContentStyle = c.style.into();
                             if style.background_color != c_style.background_color {
-                                match c_style.background_color {
-                                    Some(x) => {
-                                        tty.queue(crossterm::style::SetBackgroundColor(x))?;
-                                    }
-                                    None => {
-                                        tty.queue(crossterm::style::SetBackgroundColor(
-                                            crossterm::style::Color::Reset,
-                                        ))?;
-                                    }
-                                }
+                                tty.queue(style::SetBackgroundColor(
+                                    c_style.background_color.unwrap_or(style::Color::Reset),
+                                ))?;
                             }
                             if style.foreground_color != c_style.foreground_color {
-                                match c_style.foreground_color {
-                                    Some(x) => {
-                                        tty.queue(crossterm::style::SetForegroundColor(x))?;
-                                    }
-                                    None => {
-                                        tty.queue(crossterm::style::SetForegroundColor(
-                                            crossterm::style::Color::Reset,
-                                        ))?;
-                                    }
-                                }
+                                tty.queue(style::SetForegroundColor(
+                                    c_style.foreground_color.unwrap_or(style::Color::Reset),
+                                ))?;
                             }
                             if style.attributes != c_style.attributes {
-                                tty.queue(crossterm::style::SetAttribute(
-                                    crossterm::style::Attribute::Reset,
-                                ))?;
+                                tty.queue(style::SetAttribute(style::Attribute::Reset))?;
                                 if let Some(x) = c_style.foreground_color {
-                                    tty.queue(crossterm::style::SetForegroundColor(x))?;
+                                    tty.queue(style::SetForegroundColor(x))?;
                                 }
                                 if let Some(x) = c_style.background_color {
-                                    tty.queue(crossterm::style::SetBackgroundColor(x))?;
+                                    tty.queue(style::SetBackgroundColor(x))?;
                                 }
-                                tty.queue(crossterm::style::SetAttributes(c_style.attributes))?;
+                                tty.queue(style::SetAttributes(c_style.attributes))?;
                             }
                             style = c_style;
                         }
-                        tty.queue(crossterm::style::Print(c.character))?;
+                        tty.queue(style::Print(c.character))?;
                     }
                 }
             }
