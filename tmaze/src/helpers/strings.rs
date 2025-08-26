@@ -82,7 +82,7 @@ impl fmt::Debug for MbyStaticStr {
 }
 
 impl Draw<Style> for MbyStaticStr {
-    fn draw(&self, Dims(x, y): Dims, frame: &mut GMutView, styles: Style) {
+    fn draw_on(&self, Dims(x, y): Dims, frame: &mut GMutView, styles: Style) {
         draw_str(frame, x, y, self, styles);
     }
 }

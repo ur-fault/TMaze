@@ -3,7 +3,7 @@ pub mod helpers;
 
 use std::{
     io::{self, stdout, Write},
-    ops::Index,
+    ops::{self, Index},
     panic, thread,
 };
 
@@ -382,7 +382,7 @@ impl GView<'_> {
 }
 
 impl Draw for GView<'_> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, _: ()) {
         for rel_line in 0..self.size().1 {
             let local_line = rel_line + self.bounds.start.1;
             let mut rel_x = 0;
@@ -611,7 +611,7 @@ impl GMutView<'_> {
 
 impl GMutView<'_> {
     pub fn draw<S>(&mut self, pos: Dims, content: impl Draw<S>, styles: S) {
-        content.draw(pos, self, styles);
+        content.draw_on(pos, self, styles);
     }
 
     pub fn draw_aligned<S>(&mut self, align: Align, content: impl SizedDrawable<S>, styles: S) {
@@ -776,7 +776,7 @@ impl GMutView<'_> {
 pub struct AlphaView<'a>(pub GView<'a>, pub u8);
 
 impl Draw for AlphaView<'_> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, _: ()) {
         let alpha = self.1;
         for rel_line in 0..self.0.size().1 {
             let local_line = rel_line + self.0.bounds.start.1;
@@ -830,6 +830,63 @@ impl SizedDrawable for AlphaView<'_> {
     }
 }
 
+pub enum MutViewHandle<'a> {
+    Owned(GMutView<'a>),
+    Borrowed(&'a mut GMutView<'a>),
+}
+
+impl<'a> ops::Deref for MutViewHandle<'a> {
+    type Target = GMutView<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            MutViewHandle::Owned(v) => v,
+            MutViewHandle::Borrowed(v) => v,
+        }
+    }
+}
+
+impl ops::DerefMut for MutViewHandle<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            MutViewHandle::Owned(v) => v,
+            MutViewHandle::Borrowed(v) => v,
+        }
+    }
+}
+
+pub enum AlphaMutView<'a> {
+    Opague(GMutView<'a>),
+    Alpha(GMutView<'a>, GBuffer, u8),
+}
+
+impl<'a> AlphaMutView<'a> {
+    pub fn new(view: GMutView<'a>, alpha: u8) -> AlphaMutView<'a> {
+        if alpha == 255 {
+            AlphaMutView::Opague(view)
+        } else {
+            let buf = GBuffer::new(view.size(), &view.buf.1);
+            AlphaMutView::Alpha(view, buf, alpha)
+        }
+    }
+
+    pub fn mut_view(&'a mut self) -> MutViewHandle<'a> {
+        match self {
+            AlphaMutView::Opague(v) => MutViewHandle::Borrowed(v),
+            AlphaMutView::Alpha(_, b, _) => MutViewHandle::Owned(b.mut_view()),
+        }
+    }
+}
+
+impl Drop for AlphaMutView<'_> {
+    fn drop(&mut self) {
+        if let AlphaMutView::Alpha(view, buf, alpha) = self {
+            view.draw(Dims::ZERO, AlphaView(buf.view(), *alpha), ());
+        }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct Padding {
     pub top: i32,
     pub right: i32,

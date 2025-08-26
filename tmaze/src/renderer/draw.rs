@@ -6,29 +6,29 @@ use crate::settings::theme::Style;
 use super::GMutView;
 
 pub trait Draw<S = ()> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: S);
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: S);
 }
 
 impl<D: Draw> Draw for &D {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: ()) {
-        (**self).draw(pos, frame, styles);
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: ()) {
+        (**self).draw_on(pos, frame, styles);
     }
 }
 
 impl Draw<Style> for char {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         frame.set_content_of(pos, *self, styles);
     }
 }
 
 impl Draw<Style> for String {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
-        self.as_str().draw(pos, frame, styles);
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
+        self.as_str().draw_on(pos, frame, styles);
     }
 }
 
 impl Draw<Style> for &str {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: Style) {
         let mut x = 0;
         for character in self.chars() {
             x += frame.set_content_of(Dims(pos.0 + x as i32, pos.1), character, styles);
@@ -71,7 +71,7 @@ pub trait SizedDrawable<S = ()>: Draw<S> {
 
     fn draw_aligned(&self, align: Align, frame: &mut GMutView, styles: S) {
         let pos = self.align(align, frame.size());
-        self.draw(pos, frame, styles);
+        self.draw_on(pos, frame, styles);
     }
 }
 
@@ -96,8 +96,8 @@ impl SizedDrawable<Style> for &'_ str {
 pub struct Styled<T, S>(pub T, pub S);
 
 impl<T: Draw<S>, S: Clone> Draw for Styled<T, S> {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, _: ()) {
-        self.0.draw(pos, frame, self.1.clone());
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, _: ()) {
+        self.0.draw_on(pos, frame, self.1.clone());
     }
 }
 
