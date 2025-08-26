@@ -279,7 +279,7 @@ impl App {
                 }
             }
 
-            self.data.logs.draw(
+            self.data.logs.draw_on(
                 Dims(0, 0),
                 &mut self.renderer.frame().mut_view(),
                 &self.data.theme,

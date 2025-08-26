@@ -82,7 +82,7 @@ pub fn style_with_attribute(style: ContentStyle, attr: Attribute) -> ContentStyl
 pub struct CapsuleText(pub String);
 
 impl Draw<Style> for CapsuleText {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, style: Style) {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, style: Style) {
         frame.draw(pos + Dims(0, 0), '', style.invert());
         frame.draw(pos + Dims(1, 0), self.0.as_str(), style);
         frame.draw(

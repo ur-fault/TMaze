@@ -153,7 +153,7 @@ impl Rect {
 }
 
 impl Draw<Style> for Rect {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, style: Style) {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, style: Style) {
         draw_box(frame, pos + self.start, self.size(), style);
     }
 }

@@ -125,7 +125,7 @@ impl UiLogs {
 }
 
 impl Draw<&Theme> for UiLogs {
-    fn draw(&self, pos: Dims, frame: &mut GMutView, theme: &Theme) {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, theme: &Theme) {
         let [msg_style, source_style, extra] =
             theme.extract(["log.message", "log.source", "log.extra"]);
 
@@ -151,10 +151,10 @@ impl Draw<&Theme> for UiLogs {
 
             const INDICATOR_CHAR: char = '|';
 
-            log.source.draw(src_pos, frame, source_style);
-            "->".draw(Dims(msg_x - 3, y), frame, extra);
-            log.message.draw(msg_pos, frame, msg_style);
-            INDICATOR_CHAR.draw(Dims(frame.size().0 - 1, y), frame, indicator_style);
+            log.source.draw_on(src_pos, frame, source_style);
+            "->".draw_on(Dims(msg_x - 3, y), frame, extra);
+            log.message.draw_on(msg_pos, frame, msg_style);
+            INDICATOR_CHAR.draw_on(Dims(frame.size().0 - 1, y), frame, indicator_style);
         }
     }
 }
