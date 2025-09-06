@@ -1,4 +1,4 @@
-use std::io::stdout;
+use std::{io::stdout, rc::Rc};
 
 use cmaze::dims::Dims;
 use tmaze::{
@@ -8,7 +8,7 @@ use tmaze::{
 };
 
 fn main() {
-    let scheme = TerminalColorScheme::named("catppuccin_mocha");
+    let scheme = Rc::new(TerminalColorScheme::named("catppuccin_mocha"));
 
     {
         let mut buf = GBuffer::new(Dims(12, 3), &scheme);

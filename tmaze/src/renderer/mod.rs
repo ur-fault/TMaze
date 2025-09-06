@@ -19,7 +19,7 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::{
     helpers::range_intersection,
-    settings::theme::{Style, TerminalColorScheme},
+    settings::theme::{SharedScheme, Style},
     ui::Rect,
 };
 
@@ -34,7 +34,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(scheme: &TerminalColorScheme) -> io::Result<Self> {
+    pub fn new(scheme: &SharedScheme) -> io::Result<Self> {
         let (w, h) = term_size();
         let size = Dims(w as i32, h as i32);
         let hidden = GBuffer::new(size, scheme);
@@ -300,13 +300,13 @@ impl Cell {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GBuffer(Array3D<Cell>, Box<TerminalColorScheme>);
+pub struct GBuffer(Array3D<Cell>, SharedScheme);
 
 impl GBuffer {
-    pub fn new(size: Dims, scheme: &TerminalColorScheme) -> Self {
+    pub fn new(size: Dims, scheme: &SharedScheme) -> Self {
         GBuffer(
             Array3D::new(Cell::empty(), size.0 as usize, size.1 as usize, 1),
-            Box::new(scheme.clone()),
+            scheme.clone(),
         )
     }
 

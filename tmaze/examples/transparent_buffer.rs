@@ -1,4 +1,4 @@
-use std::{mem, sync::Arc};
+use std::{mem, rc::Rc, sync::Arc};
 
 use cmaze::{
     algorithms::{
@@ -82,7 +82,7 @@ pub fn perlin(x: f32, y: f32) -> f32 {
 }
 
 fn main() {
-    let scheme = TerminalColorScheme::named("catppuccin_mocha");
+    let scheme = Rc::new(TerminalColorScheme::named("catppuccin_mocha"));
     let mut buf = GBuffer::new(Dims(64, 32), &scheme);
 
     for y in 0..32 {
@@ -129,7 +129,7 @@ fn main() {
         mem::transmute(MazeBoard::new(
             &game,
             &init_theme_resolver().resolve(&ThemeDefinition::parse_default()),
-            &scheme,
+            scheme.clone(),
         ))
     };
 
