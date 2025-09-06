@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap, fmt::Display, ops, path::PathBuf};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Display, ops, path::PathBuf, rc::Rc};
 
 use crossterm::style::{Attributes, ContentStyle};
 use hashbrown::HashMap;
@@ -458,6 +458,8 @@ impl NamedColor {
 }
 
 pub type Rgb = (u8, u8, u8);
+
+pub type SharedScheme = Rc<TerminalColorScheme>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TerminalColorScheme {

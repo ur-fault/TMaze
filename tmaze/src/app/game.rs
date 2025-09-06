@@ -19,7 +19,7 @@ use crate::{
     settings::{
         self,
         style_browser::StyleBrowser,
-        theme::{TerminalColorScheme, Theme, ThemeResolver},
+        theme::{SharedScheme, Theme, ThemeResolver},
         CameraMode, MazePreset, Settings, SettingsActivity,
     },
     ui::{
@@ -514,7 +514,7 @@ impl GameActivity {
 
         let camera_mode = settings.get_camera_mode();
         let maze_board =
-            MazeBoard::new(&game.game, &app_data.theme, &settings.get_terminal_scheme());
+            MazeBoard::new(&game.game, &app_data.theme, settings.get_terminal_scheme());
         let margins = settings.get_viewport_margin();
 
         #[cfg(feature = "sound")]
@@ -890,11 +890,11 @@ pub struct MazeBoard {
 }
 
 impl MazeBoard {
-    pub fn new(game: &RunningGame, theme: &Theme, scheme: &TerminalColorScheme) -> Self {
+    pub fn new(game: &RunningGame, theme: &Theme, scheme: SharedScheme) -> Self {
         let maze = game.get_maze();
 
         let mut frames: Vec<_> = (0..maze.size().2)
-            .map(|floor| Self::render_floor(game, floor, theme, scheme))
+            .map(|floor| Self::render_floor(game, floor, theme, &scheme))
             .collect();
 
         Self::render_special(&mut frames, game, theme);
@@ -906,7 +906,7 @@ impl MazeBoard {
         game: &RunningGame,
         floor: i32,
         theme: &Theme,
-        scheme: &TerminalColorScheme,
+        scheme: &SharedScheme,
     ) -> GBuffer {
         let board = &game.get_maze().board;
         let normals = theme["game.walls"];

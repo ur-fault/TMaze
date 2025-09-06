@@ -20,7 +20,7 @@ use crate::{
     helpers::constants::paths::settings_path,
     menu_actions,
     renderer::MouseGuard,
-    settings::theme::TerminalColorScheme,
+    settings::theme::{SharedScheme, TerminalColorScheme},
     ui::{split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem, OptionDef, Popup, Screen},
 };
 
@@ -261,11 +261,13 @@ impl Settings {
             .unwrap_or(log::Level::Info)
     }
 
-    pub fn get_terminal_scheme(&self) -> TerminalColorScheme {
+    pub fn get_terminal_scheme(&self) -> SharedScheme {
         match &self.read().terminal_scheme {
-            Some(TerminalSchemeDef::Named(name)) => TerminalColorScheme::named(name),
-            Some(TerminalSchemeDef::Custom(scheme)) => scheme.clone(),
-            None => TerminalColorScheme::default(),
+            Some(TerminalSchemeDef::Named(name)) => {
+                SharedScheme::new(TerminalColorScheme::named(name))
+            }
+            Some(TerminalSchemeDef::Custom(scheme)) => SharedScheme::new(scheme.clone()),
+            None => SharedScheme::new(TerminalColorScheme::default()),
         }
     }
 
