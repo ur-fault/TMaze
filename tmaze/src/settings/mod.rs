@@ -60,15 +60,12 @@ impl MazePreset {
                 self.maze_spec.size()?,
                 regions.iter().map(|r| r.mask.enabled_count()).sum(),
             ),
-            MazeSpecType::Simple { mask, .. } => {
-                let size = self.maze_spec.size()?;
-                (
-                    size,
-                    mask.as_ref()
-                        .map(|m| m.enabled_count())
-                        .unwrap_or(size.product() as usize),
-                )
-            }
+            MazeSpecType::Simple { mask, .. } => (
+                self.maze_spec.size()?,
+                mask.as_ref()
+                    .map(|m| m.enabled_count())
+                    .unwrap_or(self.maze_spec.size()?.product() as usize),
+            ),
         };
 
         if size.2 == 1 {
