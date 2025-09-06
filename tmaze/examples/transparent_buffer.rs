@@ -10,8 +10,8 @@ use cmaze::{
 };
 use tmaze::{
     app::{app::init_theme_resolver, game::MazeBoard},
-    renderer::{draw::Align, AlphaView, GBuffer, RenderMode},
-    settings::theme::{Color, Style, TerminalColorScheme, ThemeDefinition},
+    renderer::{draw::Align, GBuffer, RenderMode},
+    settings::theme::{Color, NamedColor, Style, TerminalColorScheme, ThemeDefinition},
 };
 
 fn fade(t: f32) -> f32 {
@@ -93,7 +93,7 @@ fn main() {
                 Dims(x, y),
                 ' ',
                 Style {
-                    bg: Some(Color::RGB(0, 255, 0)),
+                    bg: Some(Color::Named(NamedColor::Red)),
                     alpha,
                     ..Default::default()
                 },
@@ -117,7 +117,7 @@ fn main() {
             },
         },
         &GeneratorRegistry::with_default(Arc::new(RndKruskals), "rnd_kruskals"),
-        &SplitterRegistry::with_default(Arc::new(DefaultRegionSplitter), "dfs"),
+        &SplitterRegistry::with_default(Arc::new(DefaultRegionSplitter), "default"),
     )
     .unwrap()
     .handle
@@ -125,12 +125,19 @@ fn main() {
     .unwrap()
     .unwrap();
 
-    let theme = init_theme_resolver().resolve(&ThemeDefinition::parse_default());
-    let board = MazeBoard::new(&game, &theme, &scheme);
-    let board_buf: Vec<GBuffer> = unsafe { mem::transmute(board) };
+    let board: Vec<GBuffer> = unsafe {
+        mem::transmute(MazeBoard::new(
+            &game,
+            &init_theme_resolver().resolve(&ThemeDefinition::parse_default()),
+            &scheme,
+        ))
+    };
 
-    buf.mut_view()
-        .draw_aligned(Align::Center, AlphaView(board_buf[0].view(), 200), ());
+    let board_view = board[0].view();
 
-    buf.write(&mut std::io::stdout(), RenderMode::Named).unwrap();
+    buf.mut_view().centered(board_view.size(), |f| {
+        f.alpha(200, |v| v.draw_aligned(Align::Center, board_view, ()));
+    });
+
+    buf.write(&mut std::io::stdout(), RenderMode::RGB).unwrap();
 }
