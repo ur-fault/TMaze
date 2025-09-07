@@ -555,14 +555,14 @@ impl TerminalColorScheme {
             (None, if fg { self.primary_fg } else { self.primary_bg }),
         ];
 
-        for (named, rgb) in colors.iter() {
+        for (named, rgb) in colors {
             let dr = rgb.0 as i32 - color.0 as i32;
             let dg = rgb.1 as i32 - color.1 as i32;
             let db = rgb.2 as i32 - color.2 as i32;
             let dist = (dr * dr + dg * dg + db * db) as u32;
             if dist < closest_dist {
                 closest_dist = dist;
-                closest = *named;
+                closest = named;
             }
         }
 
