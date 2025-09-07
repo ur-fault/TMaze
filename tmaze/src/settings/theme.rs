@@ -503,28 +503,29 @@ impl TerminalColorScheme {
     }
 
     pub fn named(name: &str) -> Self {
-        let h = TerminalColorScheme::hex;
+        // TODO: generate from existing terminal schemes, Alacritty mby?
+        const H: fn(&str) -> Rgb = TerminalColorScheme::hex;
 
         match name {
             "catppuccin_mocha" => TerminalColorScheme {
-                primary_fg: h("cdd6f4"),
-                primary_bg: h("1e1e2e"),
-                black: h("45475a"),
-                dark_grey: h("585b70"),
-                red: h("f38ba8"),
-                dark_red: h("f38ba8"),
-                green: h("a6e3a1"),
-                dark_green: h("a6e3a1"),
-                yellow: h("f9e2af"),
-                dark_yellow: h("f9e2af"),
-                blue: h("89b4fa"),
-                dark_blue: h("89b4fa"),
-                magenta: h("f5c2e7"),
-                dark_magenta: h("f5c2e7"),
-                cyan: h("94e2d5"),
-                dark_cyan: h("94e2d5"),
-                white: h("bac2de"),
-                grey: h("a6adc8"),
+                primary_fg: H("cdd6f4"),
+                primary_bg: H("1e1e2e"),
+                black: H("45475a"),
+                dark_grey: H("585b70"),
+                red: H("f38ba8"),
+                dark_red: H("f38ba8"),
+                green: H("a6e3a1"),
+                dark_green: H("a6e3a1"),
+                yellow: H("f9e2af"),
+                dark_yellow: H("f9e2af"),
+                blue: H("89b4fa"),
+                dark_blue: H("89b4fa"),
+                magenta: H("f5c2e7"),
+                dark_magenta: H("f5c2e7"),
+                cyan: H("94e2d5"),
+                dark_cyan: H("94e2d5"),
+                white: H("bac2de"),
+                grey: H("a6adc8"),
             },
             _ => panic!("Unknown terminal color scheme: {}", name),
         }
