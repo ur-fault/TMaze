@@ -497,6 +497,9 @@ impl GMutView<'_> {
     }
 
     fn set_content_of(&mut self, pos: Dims, chr: char, style: Style) -> usize {
+        // TODO: make GBuffer have a complex flag, whether it contains multicell characters,
+        // allowing us to skip ton of code and optimize
+
         let width = chr.width().unwrap_or(1) as i32;
 
         if !self.contains(pos) || !self.contains(Dims(pos.0 + width - 1, pos.1)) {
