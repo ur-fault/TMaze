@@ -188,13 +188,13 @@ fn extract_scheme(filename: &OsStr, toml: &TomlTable) -> Result<Scheme, MyError>
 }
 
 fn write_scheme_case(buf: &mut String, scheme: &mut Scheme) -> Result<(), MyError> {
-    buf.push_str("    \"");
-    buf.push_str(&scheme.name);
-    buf.push_str("\" => Self {\n");
+    writeln!(buf, "    \"{}\" => Self {{", scheme.name)?;
     for (field_name, _, color) in scheme.iter_fields() {
-        buf.push_str("        ");
-        buf.push_str(field_name);
-        write!(buf, ": ({}, {}, {}),\n", color[0], color[1], color[2])?;
+        writeln!(
+            buf,
+            "        {field_name}: ({}, {}, {}),",
+            color[0], color[1], color[2]
+        )?;
     }
     buf.push_str("    },\n");
 
@@ -205,9 +205,7 @@ fn write_scheme_name(scheme_name_array: &mut String, scheme: &Scheme) {
     if !scheme_name_array.ends_with('[') {
         scheme_name_array.push_str(", ");
     }
-    scheme_name_array.push('"');
-    scheme_name_array.push_str(&scheme.name);
-    scheme_name_array.push('"');
+    write!(scheme_name_array, "\"{}\"", scheme.name).unwrap();
 }
 
 fn process_schemes(out_dir: &Path) -> Result<(), MyError> {
@@ -240,8 +238,7 @@ match scheme_name {
         write_scheme_name(&mut scheme_name_array, &scheme);
     }
 
-    match_code
-        .push_str(r#"    _ => panic!("Unknown terminal color scheme: {}", scheme_name),"#);
+    match_code.push_str(r#"    _ => panic!("Unknown terminal color scheme: {}", scheme_name),"#);
     match_code.push_str("\n}\n");
     scheme_name_array.push(']');
 
