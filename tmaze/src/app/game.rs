@@ -513,8 +513,13 @@ impl GameActivity {
         let settings = &app_data.settings;
 
         let camera_mode = settings.get_camera_mode();
-        let maze_board =
-            MazeBoard::new(&game.game, &app_data.theme, settings.get_terminal_scheme());
+        let maze_board = MazeBoard::new(
+            &game.game,
+            &app_data.theme,
+            settings
+                .get_terminal_scheme()
+                .expect("invalid built-in terminal color scheme"),
+        );
         let margins = settings.get_viewport_margin();
 
         #[cfg(feature = "sound")]
