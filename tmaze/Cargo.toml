@@ -45,3 +45,7 @@ updates = ["dep:crates_io_api", "dep:semver", "dep:tokio"]
 sound = ["dep:rodio"]
 local_paths = []
 
+
+[build-dependencies]
+boml = "1"
+thiserror = "2"

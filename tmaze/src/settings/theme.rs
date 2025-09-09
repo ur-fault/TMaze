@@ -484,51 +484,8 @@ pub struct TerminalColorScheme {
 }
 
 impl TerminalColorScheme {
-    fn hex(s: &str) -> Rgb {
-        if s.len() == 6 {
-            (
-                u8::from_str_radix(&s[0..2], 16).unwrap(),
-                u8::from_str_radix(&s[2..4], 16).unwrap(),
-                u8::from_str_radix(&s[4..6], 16).unwrap(),
-            )
-        } else if s.len() == 3 {
-            (
-                u8::from_str_radix(&s[0..1], 16).unwrap() * 17,
-                u8::from_str_radix(&s[1..2], 16).unwrap() * 17,
-                u8::from_str_radix(&s[2..3], 16).unwrap() * 17,
-            )
-        } else {
-            panic!("Invalid hex color: {}", s);
-        }
-    }
-
-    pub fn named(name: &str) -> Self {
-        // TODO: generate from existing terminal schemes, Alacritty mby?
-        const H: fn(&str) -> Rgb = TerminalColorScheme::hex;
-
-        match name {
-            "catppuccin_mocha" => TerminalColorScheme {
-                primary_fg: H("cdd6f4"),
-                primary_bg: H("1e1e2e"),
-                black: H("45475a"),
-                dark_grey: H("585b70"),
-                red: H("f38ba8"),
-                dark_red: H("f38ba8"),
-                green: H("a6e3a1"),
-                dark_green: H("a6e3a1"),
-                yellow: H("f9e2af"),
-                dark_yellow: H("f9e2af"),
-                blue: H("89b4fa"),
-                dark_blue: H("89b4fa"),
-                magenta: H("f5c2e7"),
-                dark_magenta: H("f5c2e7"),
-                cyan: H("94e2d5"),
-                dark_cyan: H("94e2d5"),
-                white: H("bac2de"),
-                grey: H("a6adc8"),
-            },
-            _ => panic!("Unknown terminal color scheme: {}", name),
-        }
+    pub fn named(scheme_name: &str) -> Self {
+        include!(concat!(env!("OUT_DIR"), "/schemes_match.rs"))
     }
 
     pub fn closest_color(&self, color: (u8, u8, u8), fg: bool) -> Option<NamedColor> {
