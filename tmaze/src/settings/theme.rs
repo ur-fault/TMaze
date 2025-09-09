@@ -485,7 +485,11 @@ pub struct TerminalColorScheme {
 
 impl TerminalColorScheme {
     pub fn named(scheme_name: &str) -> Self {
-        include!(concat!(env!("OUT_DIR"), "/schemes_match.rs"))
+        include!(concat!(env!("OUT_DIR"), "/schemes_match.in"))
+    }
+
+    pub fn all_schemes() -> &'static [&'static str] {
+        &include!(concat!(env!("OUT_DIR"), "/schemes_names.in"))
     }
 
     pub fn closest_color(&self, color: (u8, u8, u8), fg: bool) -> Option<NamedColor> {
