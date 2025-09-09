@@ -14,7 +14,7 @@ fn main() {
         ..Default::default()
     };
 
-    let scheme = Rc::new(TerminalColorScheme::named("catppuccin_mocha"));
+    let scheme = Rc::new(TerminalColorScheme::named("catppuccin_mocha").unwrap());
     let mut buf = GBuffer::new(Dims(19, 8), &scheme);
 
     buf.mut_view().border(style).inside(|f| {

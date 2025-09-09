@@ -38,6 +38,11 @@ struct Args {
         help = "When printing styles, prefix with their sequence number"
     )]
     counted_styles: bool,
+    #[clap(
+        long = "print-terminal-schemes",
+        help = "Print built-in terminal color schemes and quit"
+    )]
+    print_terminal_schemes: bool,
     // TODO: styles don't have descriptions yet
     // #[clap(long = "style-desc", help = "When printing styles, show descriptions")]
     // style_desc: bool,
@@ -81,6 +86,11 @@ fn main() -> Result<(), GameError> {
 
     if let Some(mode) = _args.print_theme_options {
         print_style_options(mode.unwrap_or_default(), _args.counted_styles);
+        return Ok(());
+    }
+
+    if _args.print_terminal_schemes {
+        print_builtin_terminal_schemes();
         return Ok(());
     }
 
@@ -132,4 +142,12 @@ fn print_style_options(mode: StylesPrintMode, counted: bool) {
             }
         }
     }
+}
+
+fn print_builtin_terminal_schemes() {
+    println!("Built-in terminal color schemes:");
+    for name in tmaze::settings::theme::TerminalColorScheme::all_schemes() {
+        println!("- {}", name);
+    }
+    println!("Credit to https://github.com/alacritty/alacritty-theme");
 }

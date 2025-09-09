@@ -221,8 +221,10 @@ match scheme_name {
 "
     .into();
 
-    for scheme_entry in schemes {
-        let scheme_entry = scheme_entry?;
+    let mut schemes = schemes.into_iter().collect::<Result<Vec<_>, _>>()?;
+    schemes.sort_by_key(|e| e.file_name());
+
+    for scheme_entry in schemes.into_iter() {
         eprintln!("Processing scheme: {:?}", scheme_entry);
         let content = fs::read_to_string(scheme_entry.path())?;
         let toml = boml::parse(&content).map_err(BomlParseError::from)?;
@@ -238,7 +240,7 @@ match scheme_name {
         write_scheme_name(&mut scheme_name_array, &scheme);
     }
 
-    match_code.push_str(r#"    _ => panic!("Unknown terminal color scheme: {}", scheme_name),"#);
+    match_code.push_str(r#"    _ => return None,"#);
     match_code.push_str("\n}\n");
     scheme_name_array.push(']');
 

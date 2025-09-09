@@ -82,7 +82,7 @@ pub fn perlin(x: f32, y: f32) -> f32 {
 }
 
 fn main() {
-    let scheme = Rc::new(TerminalColorScheme::named("catppuccin_mocha"));
+    let scheme = Rc::new(TerminalColorScheme::named("catppuccin_mocha").unwrap());
     let mut buf = GBuffer::new(Dims(64, 32), &scheme);
 
     for y in 0..32 {

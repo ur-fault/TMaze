@@ -129,8 +129,12 @@ impl App {
         let settings =
             Settings::load_json(settings_path(), read_only).expect("failed to load settings");
 
-        let renderer =
-            Renderer::new(&settings.get_terminal_scheme()).expect("failed to create renderer");
+        let renderer = Renderer::new(
+            &settings
+                .get_terminal_scheme()
+                .expect("unknown built-in terminal color scheme, use '--print-terminal-schemes' to see options"),
+        )
+        .expect("failed to create renderer");
         let activities = Activities::empty();
 
         let (logger, logs) = AppLogger::new_with_options(

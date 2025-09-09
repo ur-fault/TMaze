@@ -258,13 +258,13 @@ impl Settings {
             .unwrap_or(log::Level::Info)
     }
 
-    pub fn get_terminal_scheme(&self) -> SharedScheme {
+    pub fn get_terminal_scheme(&self) -> Option<SharedScheme> {
         match &self.read().terminal_scheme {
             Some(TerminalSchemeDef::Named(name)) => {
-                SharedScheme::new(TerminalColorScheme::named(name))
+                Some(SharedScheme::new(TerminalColorScheme::named(name)?))
             }
-            Some(TerminalSchemeDef::Custom(scheme)) => SharedScheme::new(scheme.clone()),
-            None => SharedScheme::new(TerminalColorScheme::default()),
+            Some(TerminalSchemeDef::Custom(scheme)) => Some(SharedScheme::new(scheme.clone())),
+            None => Some(SharedScheme::new(TerminalColorScheme::default())),
         }
     }
 
