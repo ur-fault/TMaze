@@ -232,6 +232,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "boml"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a96d68a303a5dd009292d8fea60bf27916d734d6841b53a53c685ad80182526d"
+
+[[package]]
 name = "bumpalo"
 version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2366,6 +2372,7 @@ name = "tmaze"
 version = "1.17.1"
 dependencies = [
  "better-panic",
+ "boml",
  "chrono",
  "clap",
  "cmaze",
