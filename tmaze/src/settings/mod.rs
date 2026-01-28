@@ -2,6 +2,8 @@ mod attribute;
 pub mod style_browser;
 pub mod theme;
 
+mod new_settings;
+
 use cmaze::{
     algorithms::{MazeSpec, MazeSpecType},
     dims::{Dims, Offset},
