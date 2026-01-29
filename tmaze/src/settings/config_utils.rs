@@ -85,6 +85,30 @@ macro_rules! config {
                     )*
                 }
             }
+
+            impl From<&[<Partial $name>]> for $name {
+                fn from(partial: &[<Partial $name>]) -> Self {
+                    let mut config = Self::default();
+                    config.merge(partial);
+                    config
+                }
+            }
+
+            impl TryFrom<Value> for [<Partial $name>] {
+                type Error = (String, Self);
+
+                fn try_from(value: Value) -> Result<Self, Self::Error> {
+                    match value {
+                        Value::Object(map) => {
+                            let json_value = serde_json::to_value(map)
+                                .expect("Failed to convert map to JSON value"); // should not happen
+                            serde_json::from_value(json_value)
+                                .map_err(|e| (e.to_string(), Self::default()))
+                        }
+                        _ => Err(("Expected an object for partial config".to_string(), Self::default())),
+                    }
+                }
+            }
         }
     };
 

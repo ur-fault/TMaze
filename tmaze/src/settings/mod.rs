@@ -4,6 +4,7 @@ pub mod theme;
 
 pub mod new_settings;
 pub mod config_utils;
+pub mod model;
 
 use cmaze::{
     algorithms::{MazeSpec, MazeSpecType},

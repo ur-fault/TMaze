@@ -1,24 +1,24 @@
-use cmaze::{
-    algorithms::MazeSpec,
-    dims::{Dims, Dims3D, Offset},
-};
-
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
 
-use crate::{config, impl_merge_prims, settings::config_utils::Mergeable};
+use crate::{helpers::TupleMap, settings::model::{Config, PartialConfig, Value}};
 
 struct Settings {
     inner: Arc<SettingsInner>,
 }
 
 impl Settings {
-    fn new() -> Self {
-        Settings {
-            inner: Arc::new(SettingsInner::new()),
-        }
+    /// Loads settings from configuration files.
+    ///
+    /// Returns the loaded settings and a boolean indicating whether any errors/warnings occurred
+    /// during loading.
+    ///
+    /// TODO: Report the actual errors/warnings to the user.
+    fn load() -> (Self, bool) {
+        SettingsInner::load().map_first(|inner| Self {
+            inner: Arc::new(inner),
+        })
     }
 }
 
@@ -29,171 +29,127 @@ struct SettingsInner {
 }
 
 impl SettingsInner {
-    fn new() -> Self {
-        Self {
-            config_layer: PartialConfig::default(),
-            base: Config::default(),
+    fn load() -> (Self, bool) {
+        let mut errored = false;
+
+        let base_config = Config::default();
+        let config_layer = match load_config_from_file("config.json5") {
+            Ok(config) => config,
+            Err(_err) => {
+                errored = true;
+                PartialConfig::default()
+            }
+        };
+
+        let config = Self {
+            config_layer,
+            base: base_config,
+        };
+
+        (config, errored)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+enum ConfigLoadError {
+    IoError(#[from] std::io::Error),
+    JsonError(#[from] json5::Error),
+    SettingsFormatError(String),
+}
+
+impl Display for ConfigLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigLoadError::IoError(e) => write!(f, "I/O error: {}", e),
+            ConfigLoadError::JsonError(e) => write!(f, "Parse error: {}", e),
+            ConfigLoadError::SettingsFormatError(e) => write!(f, "Settings format error: {}", e),
         }
     }
 }
 
-enum ConfigLoadError {
-    IoError(std::io::Error),
-    ParseError(String),
-}
-
-fn load_config_from_file(path: &str) -> Result<PartialConfig, ConfigLoadError> {
-    todo!()
-
-}
-
-type Rgb = (u8, u8, u8);
-
-impl_merge_prims! {
-    String
-    f64
-    i64
-    bool
-
-    Rgb
-    Dims
-    Dims3D
-
-    log::Level
-    CameraMode
-    UpdateCheckInterval
-}
-
-config! {
-    pub struct Config {
-        #[nest] general: General,
-        #[nest] viewport: Viewport,
-        #[nest] nagivation: Navigation,
-        #[nest] updates: Updates,
-        #[nest] audio: Audio,
-    }
-
-    pub struct General {
-        theme: String,
-        logging_level: log::Level = log::Level::Info,
-        debug_logging_level: log::Level = log::Level::Info,
-        file_logging_level: log::Level = log::Level::Info,
-        #[nest] terminal_scheme: TerminalColorScheme,
-    }
-
-    pub struct Viewport {
-        slow: bool,
-        disable_tower_auto_up: bool,
-        camera_mode: CameraMode,
-        camera_smoothing: f64 = 0.5,
-        player_smoothing: f64 = 0.5,
-        viewport_margin: Dims = Dims(4, 3),
-    }
-
-    pub struct Navigation {
-        enable_mouse: bool = true,
-        enable_dpad: bool,
-        landscape_dpad_on_left: bool,
-        dpad_swap_up_down: bool,
-        enable_margin_around_dpad: bool,
-        enable_dpad_highlight: bool = true,
-    }
-
-    pub struct Updates {
-        check_interval: UpdateCheckInterval,
-        display_update_check_errors: bool,
-    }
-
-    pub struct Audio {
-        enable_audio: bool,
-        audio_volume: f64,
-        enable_music: bool,
-        music_volume: f64,
+fn load_config_from_file(path: &str) -> Result<PartialConfig, (ConfigLoadError, PartialConfig)> {
+    match load_values_from_file(path) {
+        Ok(value) => PartialConfig::try_from(value)
+            .map_err(|(e, val)| (ConfigLoadError::SettingsFormatError(e), val)),
+        Err((e, val)) => Err((e, PartialConfig::try_from(val).unwrap_or_default())),
     }
 }
 
-config! {
-    pub struct Presets {
-        presets: PresetList,
+fn load_values_from_file(path: &str) -> Result<Value, (ConfigLoadError, Value)> {
+    macro_rules! pack_error {
+        ($err:expr) => {
+            match $err {
+                Ok(val) => Ok(val),
+                Err(e) => Err((e.into(), Value::Object(HashMap::new()))),
+            }
+        };
     }
+
+    // json5 doesn't support reading from reader
+    let content = pack_error!(std::fs::read_to_string(path))?;
+    let config_value = pack_error!(json5::from_str::<Value>(&content))?;
+    let values_with_extensions = load_extension_blocks(config_value)?;
+    Ok(values_with_extensions)
 }
 
-config! {
-    pub struct TerminalColorScheme {
-        primary_fg: Rgb,
-        primary_bg: Rgb,
-        black: Rgb,     // grey
-        dark_grey: Rgb, // dark grey
-        red: Rgb,
-        dark_red: Rgb,
-        green: Rgb,
-        dark_green: Rgb,
-        yellow: Rgb,
-        dark_yellow: Rgb,
-        blue: Rgb,
-        dark_blue: Rgb,
-        magenta: Rgb,
-        dark_magenta: Rgb,
-        cyan: Rgb,
-        dark_cyan: Rgb,
-        white: Rgb,
-        grey: Rgb,
+mod config_file_constants {
+    pub const IMPORT_KEY: &str = "#from";
+}
+
+fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value)> {
+    use config_file_constants::IMPORT_KEY;
+
+    /// Merges `ext` into `base`. In case of conflict, `ext` takes precedence.
+    /// Note that in this case, `base` is file behing `#from`, and `ext` is the current file.
+    ///
+    /// For objects, merging is done recursively.
+    ///
+    /// TODO: Allow rules customization in the future, for example to support list contatenation.
+    fn merge(base: &mut Value, ext: Value) {
+        match (base, ext) {
+            (Value::Object(base_map), Value::Object(ext_map)) => {
+                for (key, ext_value) in ext_map {
+                    if key == IMPORT_KEY {
+                        continue; // skip #from key during merge
+                    }
+
+                    if let Some(base_value) = base_map.get_mut(&key) {
+                        merge(base_value, ext_value);
+                    } else {
+                        base_map.insert(key, ext_value);
+                    }
+                }
+            }
+            (base_val, ext) => {
+                *base_val = ext;
+            }
+        }
     }
-}
 
-#[derive(Default, Clone, Copy, Debug, Serialize, Deserialize)]
-#[serde(tag = "mode")]
-pub enum CameraMode {
-    #[default]
-    CloseFollow,
-    EdgeFollow {
-        x: Offset,
-        y: Offset,
-    },
-}
+    let value = match config {
+        Value::Object(map) => {
+            if map.contains_key(IMPORT_KEY) {
+                if let Value::String(file_path) = &map[IMPORT_KEY] {
+                    let mut base_config = load_values_from_file(file_path)?;
+                    merge(&mut base_config, Value::Object(map));
+                    base_config
+                } else {
+                    return Err((
+                        ConfigLoadError::SettingsFormatError(format!(
+                            "{IMPORT_KEY} value must be a string",
+                        )),
+                        Value::Object(map),
+                    ));
+                }
+            } else {
+                Value::Object(map)
+            }
+        }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub enum UpdateCheckInterval {
-    Never,
-    #[default]
-    Daily,
-    Weekly,
-    Monthly,
-    Yearly,
-    Always,
-}
+        val => val,
+    };
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PresetList {
-    presets: Vec<MazePreset>,
-}
-
-impl Mergeable<Self> for PresetList {
-    fn merge(&mut self, other: &Self) {
-        self.presets.extend_from_slice(&other.presets);
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MazePreset {
-    pub title: String,
-    pub description: Option<String>,
-
-    pub default: bool,
-
-    pub maze_spec: MazeSpec,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-// Note: order of variants matters for correct deserialization
-enum Value {
-    Object(HashMap<String, Value>),
-    List(Vec<Value>),
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    String(String),
+    Ok(value)
 }
 
 #[cfg(test)]
@@ -234,7 +190,10 @@ mod tests {
             }
 
             if let Some(Value::Object(settings)) = map.get("settings") {
-                assert_eq!(settings.get("option1"), Some(&Value::String("value1".to_string())));
+                assert_eq!(
+                    settings.get("option1"),
+                    Some(&Value::String("value1".to_string()))
+                );
                 assert_eq!(settings.get("option2"), Some(&Value::Bool(false)));
             } else {
                 panic!("Expected 'settings' to be an object");
