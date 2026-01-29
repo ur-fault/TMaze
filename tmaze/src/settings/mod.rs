@@ -1,5 +1,4 @@
 mod attribute;
-pub mod style_browser;
 pub mod theme;
 
 pub mod new_settings;

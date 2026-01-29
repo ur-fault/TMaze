@@ -2,10 +2,7 @@ pub use std::time::Duration;
 
 use crate::{
     renderer::GMutView,
-    settings::{
-        style_browser,
-        theme::{Theme, ThemeResolver},
-    },
+    settings::theme::{Theme, ThemeResolver},
 };
 
 pub mod button;
@@ -49,8 +46,7 @@ pub fn theme_resolver() -> ThemeResolver {
         .extend(popup::popup_theme_resolver())
         .extend(progressbar::progressbar_theme_resolver())
         .extend(rect::rect_theme_resolver())
-        .extend(usecase::usedcase_ui_theme_resolver())
-        .extend(style_browser::style_browser_theme_resolver());
+        .extend(usecase::usecase_ui_theme_resolver());
 
     resolver
 }

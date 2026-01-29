@@ -18,7 +18,6 @@ use crate::{
     renderer::{draw::Align, CellContent, GBuffer, GMutView, Padding},
     settings::{
         self,
-        style_browser::StyleBrowser,
         theme::{SharedScheme, Theme, ThemeResolver},
         CameraMode, MazePreset, Settings, SettingsActivity,
     },
@@ -26,7 +25,7 @@ use crate::{
         self,
         helpers::format_duration,
         multisize_duration_format, split_menu_actions,
-        usecase::dpad::{DPad, DPadType},
+        usecase::{dpad::{DPad, DPadType}, style_browser::StyleBrowser},
         Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, RedirectMenu, Screen, ScreenError,
     },
 };

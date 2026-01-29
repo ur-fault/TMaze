@@ -10,11 +10,9 @@ use crate::{
     app::{app::AppData, ActivityHandler, Change, Event},
     helpers::not_release,
     renderer::{CellContent, GMutView, Padding},
-    settings::theme::Style,
+    settings::theme::{Style, StyleNode, Theme, ThemeResolver},
     ui::{CapsuleText, Screen, ScreenError},
 };
-
-use super::theme::{StyleNode, Theme, ThemeResolver};
 
 const CONTENT_MARGIN: Dims = Dims(4, 1);
 const LEFT_MARGIN: i32 = 1;
