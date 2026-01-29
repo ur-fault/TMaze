@@ -54,7 +54,7 @@ macro_rules! default_theme_name {
     };
 }
 const DEFAULT_THEME_NAME: &str = default_theme_name!();
-const DEFAULT_THEME: &str = include_str!(concat!("./", default_theme_name!()));
+const DEFAULT_THEME: &str = include_str!(concat!("./files/", default_theme_name!()));
 
 impl ThemeDefinition {
     pub fn parse_default() -> Self {

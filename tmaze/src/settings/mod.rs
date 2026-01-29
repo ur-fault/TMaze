@@ -31,7 +31,7 @@ use crate::{
 #[cfg(feature = "sound")]
 use crate::sound::create_audio_settings;
 
-const DEFAULT_SETTINGS_JSON: &str = include_str!("./default_settings.json5");
+const DEFAULT_SETTINGS_JSON: &str = include_str!("./files/default_settings.json5");
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 #[serde(tag = "mode")]

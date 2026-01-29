@@ -1,8 +1,11 @@
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, path::Path, sync::Arc};
 
 use hashbrown::HashMap;
 
-use crate::{helpers::TupleMap, settings::model::{Config, PartialConfig, Value}};
+use crate::{
+    helpers::{constants::paths, TupleMap},
+    settings::model::{Config, PartialConfig, Value},
+};
 
 struct Settings {
     inner: Arc<SettingsInner>,
@@ -33,7 +36,7 @@ impl SettingsInner {
         let mut errored = false;
 
         let base_config = Config::default();
-        let config_layer = match load_config_from_file("config.json5") {
+        let config_layer = match load_config_from_file(&paths::settings_path()) {
             Ok(config) => config,
             Err(_err) => {
                 errored = true;
@@ -67,7 +70,7 @@ impl Display for ConfigLoadError {
     }
 }
 
-fn load_config_from_file(path: &str) -> Result<PartialConfig, (ConfigLoadError, PartialConfig)> {
+fn load_config_from_file(path: &Path) -> Result<PartialConfig, (ConfigLoadError, PartialConfig)> {
     match load_values_from_file(path) {
         Ok(value) => PartialConfig::try_from(value)
             .map_err(|(e, val)| (ConfigLoadError::SettingsFormatError(e), val)),
@@ -75,7 +78,7 @@ fn load_config_from_file(path: &str) -> Result<PartialConfig, (ConfigLoadError, 
     }
 }
 
-fn load_values_from_file(path: &str) -> Result<Value, (ConfigLoadError, Value)> {
+fn load_values_from_file(path: &Path) -> Result<Value, (ConfigLoadError, Value)> {
     macro_rules! pack_error {
         ($err:expr) => {
             match $err {
@@ -130,7 +133,7 @@ fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value
         Value::Object(map) => {
             if map.contains_key(IMPORT_KEY) {
                 if let Value::String(file_path) = &map[IMPORT_KEY] {
-                    let mut base_config = load_values_from_file(file_path)?;
+                    let mut base_config = load_values_from_file(Path::new(file_path))?;
                     merge(&mut base_config, Value::Object(map));
                     base_config
                 } else {
