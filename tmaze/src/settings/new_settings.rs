@@ -2,10 +2,13 @@ use cmaze::{
     algorithms::MazeSpec,
     dims::{Dims, Dims3D, Offset},
 };
-use paste::paste;
+
 use std::sync::Arc;
 
 use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
+
+use crate::{config, impl_merge_prims, settings::config_utils::Mergeable};
 
 struct Settings {
     inner: Arc<SettingsInner>,
@@ -28,126 +31,20 @@ struct SettingsInner {
 impl SettingsInner {
     fn new() -> Self {
         Self {
-            config_layer: PartialConfig {
-                general: todo!(),
-                viewport: todo!(),
-                nagivation: todo!(),
-                updates: todo!(),
-                audio: todo!(),
-            },
-            base: Config {
-                general: todo!(),
-                viewport: todo!(),
-                nagivation: todo!(),
-                updates: todo!(),
-                audio: todo!(),
-            },
+            config_layer: PartialConfig::default(),
+            base: Config::default(),
         }
     }
 }
 
-trait Mergeable<O> {
-    fn merge(&mut self, other: &O);
+enum ConfigLoadError {
+    IoError(std::io::Error),
+    ParseError(String),
 }
 
-// trace_macros!(true);
+fn load_config_from_file(path: &str) -> Result<PartialConfig, ConfigLoadError> {
+    todo!()
 
-macro_rules! config {
-    (@step $name:ident
-         [$($fields:tt)*]
-         [$($rfields:tt)*]
-         [$($pfields:tt)*]
-         { $field:ident : $type:ty, $($rest:tt)* }
-    ) => {
-        config!{ @step
-            $name
-            [ $($fields)* $field Default::default() ]
-            [ $($rfields)* pub $field : $type, ]
-            [ $($pfields)* pub $field : Option<$type>, ]
-            { $($rest)* }
-        }
-    };
-
-    (@step $name:ident
-         [$($fields:tt)*]
-         [$($rfields:tt)*]
-         [$($pfields:tt)*]
-         { #[nest] $field:ident : $type:ty, $($rest:tt)* }
-    ) => {
-        config!{ @step
-            $name
-            [ $($fields)* $field Default::default() ]
-            [ $($rfields)* pub $field : $type, ]
-            [ $($pfields)* pub $field : Option<[<Partial $type>]>, ]
-            { $($rest)* }
-        }
-    };
-
-    (@step $name:ident
-         [$($fields:tt)*]
-         [$($rfields:tt)*]
-         [$($pfields:tt)*]
-         { $field:ident : $type:ty = $def:expr, $($rest:tt)* }
-    ) => {
-        config!{ @step
-            $name
-            [ $($fields)* $field ($def) ]
-            [ $($rfields)* pub $field : $type, ]
-            [ $($pfields)* pub $field : Option<$type>, ]
-            { $($rest)* }
-        }
-    };
-
-    (@step $name:ident
-         [$($fields:ident $def_vals:expr)*]
-         [$($rfields:tt)*]
-         [$($pfields:tt)*]
-         { }
-    ) => {
-        pub struct $name {
-            $($rfields)*
-        }
-
-        impl ::std::default::Default for $name {
-            fn default() -> Self {
-                Self {
-                    $(
-                        $fields : $def_vals,
-                    )*
-                }
-            }
-        }
-
-        paste! {
-            pub struct [<Partial $name>] {
-                $($pfields)*
-            }
-
-            impl Mergeable<[<Partial $name>]> for $name {
-                fn merge(&mut self, other: &[<Partial $name>]) {
-                    $(
-                        if let Some(value) = &other.$fields {
-                            self.$fields.merge(value);
-                        }
-                    )*
-                }
-            }
-        }
-    };
-
-    ($(pub struct $name:ident { $($body:tt)* })*) => {
-        $(config!{ @step $name [] [] [] { $($body)* } })*
-    };
-}
-
-macro_rules! impl_merge_prims {
-    ($($t:ty)*) => {
-        $(impl Mergeable<$t> for $t where $t: Clone {
-            fn merge(&mut self, other: &$t) {
-                *self = other.clone();
-            }
-        })*
-    };
 }
 
 type Rgb = (u8, u8, u8);
@@ -157,11 +54,14 @@ impl_merge_prims! {
     f64
     i64
     bool
-    log::Level
+
     Rgb
     Dims
     Dims3D
+
+    log::Level
     CameraMode
+    UpdateCheckInterval
 }
 
 config! {
@@ -200,8 +100,8 @@ config! {
     }
 
     pub struct Updates {
-        check_interval: bool,
-        include_prereleases: bool,
+        check_interval: UpdateCheckInterval,
+        display_update_check_errors: bool,
     }
 
     pub struct Audio {
@@ -210,7 +110,9 @@ config! {
         enable_music: bool,
         music_volume: f64,
     }
+}
 
+config! {
     pub struct Presets {
         presets: PresetList,
     }
@@ -239,7 +141,8 @@ config! {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(tag = "mode")]
 pub enum CameraMode {
     #[default]
     CloseFollow,
@@ -249,7 +152,7 @@ pub enum CameraMode {
     },
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum UpdateCheckInterval {
     Never,
     #[default]
@@ -260,7 +163,7 @@ pub enum UpdateCheckInterval {
     Always,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PresetList {
     presets: Vec<MazePreset>,
 }
@@ -271,7 +174,7 @@ impl Mergeable<Self> for PresetList {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazePreset {
     pub title: String,
     pub description: Option<String>,
@@ -281,11 +184,63 @@ pub struct MazePreset {
     pub maze_spec: MazeSpec,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+// Note: order of variants matters for correct deserialization
 enum Value {
     Object(HashMap<String, Value>),
     List(Vec<Value>),
-    String(String),
-    Number(f64),
     Int(i64),
+    Float(f64),
     Bool(bool),
+    String(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_value_deserialize() {
+        let json_data = r#"
+        {
+            "name": "Example",
+            "enabled": true,
+            "threshold": 10.5,
+            "count": 42,
+            "items": [1, 2, 3],
+            "settings": {
+                "option1": "value1",
+                "option2": false
+            }
+        }
+        "#;
+
+        let parsed: Value = serde_json::from_str(json_data).unwrap();
+
+        if let Value::Object(map) = parsed {
+            assert_eq!(map.get("name"), Some(&Value::String("Example".to_string())));
+            assert_eq!(map.get("enabled"), Some(&Value::Bool(true)));
+            assert_eq!(map.get("threshold"), Some(&Value::Float(10.5)));
+            assert_eq!(map.get("count"), Some(&Value::Int(42)));
+
+            if let Some(Value::List(items)) = map.get("items") {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Value::Int(1));
+                assert_eq!(items[1], Value::Int(2));
+                assert_eq!(items[2], Value::Int(3));
+            } else {
+                panic!("Expected 'items' to be a list");
+            }
+
+            if let Some(Value::Object(settings)) = map.get("settings") {
+                assert_eq!(settings.get("option1"), Some(&Value::String("value1".to_string())));
+                assert_eq!(settings.get("option2"), Some(&Value::Bool(false)));
+            } else {
+                panic!("Expected 'settings' to be an object");
+            }
+        } else {
+            panic!("Expected top-level value to be an object");
+        }
+    }
 }

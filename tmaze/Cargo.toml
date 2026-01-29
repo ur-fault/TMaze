@@ -26,7 +26,7 @@ derivative = "2.2.0"
 unicode-width = "0.1.14"
 thiserror = "2"
 chrono = { version = "0.4.38", features = ["serde"] }
-log = "0.4"
+log = { version =  "0.4", features = ["serde"] }
 smallvec = { version = "1.13.2", features = ["const_generics"] }
 hashbrown = { version = "0.14", features = ["serde"] }
 toml = "0.8"
