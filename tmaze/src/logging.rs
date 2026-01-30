@@ -17,7 +17,6 @@ use crate::{
     settings::{
         model::Config,
         theme::{Color, NamedColor, Style, Theme},
-        Settings,
     },
 };
 
@@ -189,7 +188,7 @@ impl Default for LoggerOptions {
         Self {
             decay: DEFAULT_DECAY,
             max_visible: DEFAULT_MAX_VISIBLE,
-            path: Some(paths::log_file_path()),
+            path: Some(paths::managed::log_file()),
             file_level: log::Level::Debug,
         }
     }

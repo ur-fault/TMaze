@@ -1,6 +1,8 @@
+use std::{io::Write, os::unix::ffi::OsStrExt};
+
 use tmaze::{
     app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
-    helpers::constants::paths::{save_data_path, settings_path},
+    helpers::constants::paths,
     settings::{theme::TerminalColorScheme, Settings},
 };
 
@@ -66,12 +68,9 @@ fn main() -> Result<(), GameError> {
     // }
 
     if _args.show_config_path {
-        let settings_path = settings_path();
-        if let Some(s) = settings_path.to_str() {
-            println!("{}", s);
-        } else {
-            println!("{:?}", settings_path);
-        }
+        let settings_path = paths::config();
+        std::io::stdout().write_all(settings_path.as_os_str().as_bytes())?;
+        std::io::stdout().flush()?;
         return Ok(());
     }
 
@@ -87,7 +86,7 @@ fn main() -> Result<(), GameError> {
     }
 
     if _args.delete_data {
-        let _ = std::fs::remove_file(save_data_path());
+        let _ = std::fs::remove_file(paths::managed::save_data());
         return Ok(());
     }
 

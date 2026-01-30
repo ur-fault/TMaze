@@ -150,6 +150,10 @@ impl App {
         );
         logger.init();
 
+        if settings_error {
+            log::error!("Errors were encountered while loading the config.");
+        }
+
         let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
         let jobs = Jobs::new();

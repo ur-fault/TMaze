@@ -8,7 +8,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{helpers::constants::paths::save_data_path, settings::model::{Config, UpdateCheckInterval}};
+use crate::{
+    helpers::constants::paths::managed::save_data,
+    settings::model::{Config, UpdateCheckInterval},
+};
 
 pub mod model {
     use cmaze::{algorithms::MazeType, dims::Dims3D};
@@ -59,12 +62,12 @@ pub enum SaveDataError {
 
 impl SaveData {
     pub fn load() -> Result<Self, SaveDataError> {
-        match Self::load_from(&save_data_path()) {
+        match Self::load_from(&save_data()) {
             Ok(data) => Ok(data),
             Err(SaveDataError::Io(_)) => Ok(SaveData {
                 last_update_check: None,
                 best_results: HashMap::new(),
-                path: save_data_path(),
+                path: save_data(),
             }),
             Err(err) => Err(err),
         }
@@ -74,7 +77,7 @@ impl SaveData {
         Self::load().unwrap_or_else(|_| Self {
             last_update_check: None,
             best_results: HashMap::new(),
-            path: save_data_path(),
+            path: save_data(),
         })
     }
 

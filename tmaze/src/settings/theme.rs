@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::{
     config,
-    helpers::{constants::paths::theme_file_path, ToDebug},
+    helpers::{constants::paths::theme_file, ToDebug},
 };
 
 use super::config_utils::Mergeable;
@@ -81,7 +81,7 @@ impl ThemeDefinition {
     }
 
     fn prepare_default_theme() -> Result<Self, LoadError> {
-        let path = theme_file_path(DEFAULT_THEME_NAME);
+        let path = theme_file(DEFAULT_THEME_NAME);
 
         std::fs::create_dir_all(path.parent().unwrap())?;
         if !path.exists() {
@@ -92,7 +92,7 @@ impl ThemeDefinition {
     }
 
     pub fn load_by_name(name: &str) -> Result<Self, LoadError> {
-        Self::load_by_path(theme_file_path(name))
+        Self::load_by_path(theme_file(name))
     }
 
     pub fn load_by_path(path: PathBuf) -> Result<Self, LoadError> {

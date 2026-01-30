@@ -10,7 +10,7 @@ use cmaze::{
 };
 
 use crate::{
-    app::{self, game_state::GameData, GameViewMode},
+    app::{game_state::GameData, GameViewMode},
     helpers::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },

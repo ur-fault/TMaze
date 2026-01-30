@@ -26,7 +26,7 @@ pub mod paths {
     use std::path::PathBuf;
 
     #[cfg(not(feature = "local_paths"))]
-    pub fn base_path() -> PathBuf {
+    pub fn base() -> PathBuf {
         use dirs::preference_dir;
 
         preference_dir().unwrap().join("tmaze")
@@ -37,23 +37,36 @@ pub mod paths {
         PathBuf::from("./")
     }
 
-    pub fn theme_path() -> PathBuf {
-        base_path().join("themes/")
+    pub fn theme() -> PathBuf {
+        base().join("themes/")
     }
 
-    pub fn theme_file_path(theme: &str) -> PathBuf {
-        theme_path().join(theme)
+    pub fn theme_file(theme_name: &str) -> PathBuf {
+        theme().join(theme_name)
     }
 
-    pub fn settings_path() -> PathBuf {
-        base_path().join("settings.json5")
+    pub fn config() -> PathBuf {
+        base().join("settings.json5")
     }
 
-    pub fn save_data_path() -> PathBuf {
-        base_path().join("data.json")
-    }
+    pub mod managed {
+        use super::base;
+        use std::path::PathBuf;
 
-    pub fn log_file_path() -> PathBuf {
-        base_path().join("log.txt")
+        pub fn path() -> PathBuf {
+            base().join(".managed/")
+        }
+
+        pub fn ui_settings() -> PathBuf {
+            path().join("ui_settings.json")
+        }
+
+        pub fn save_data() -> PathBuf {
+            path().join("data.json")
+        }
+
+        pub fn log_file() -> PathBuf {
+            path().join("log.txt")
+        }
     }
 }

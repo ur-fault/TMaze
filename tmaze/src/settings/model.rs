@@ -4,7 +4,6 @@ use cmaze::{
     algorithms::{MazeSpec, MazeSpecType},
     dims::{Dims, Offset},
 };
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{

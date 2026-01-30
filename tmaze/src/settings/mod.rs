@@ -12,7 +12,7 @@ use hashbrown::HashMap;
 
 use crate::{
     helpers::{constants::paths, TupleMap},
-    settings::config_utils::Value,
+    settings::config_utils::{Mergeable, Value},
 };
 
 use model::{Config, PartialConfig};
@@ -36,22 +36,21 @@ impl Settings {
     }
 
     pub fn read(&self) -> &Config {
-        &self.inner.base
+        &self.inner.config
     }
 }
 
 struct SettingsInner {
-    // ui_layer: PartialConfig,
     config_layer: PartialConfig,
-    base: Config,
+    ui_layer: PartialConfig,
+    config: Config,
 }
 
 impl SettingsInner {
     fn load() -> (Self, bool) {
         let mut errored = false;
 
-        let base_config = Config::default();
-        let config_layer = match load_config_from_file(&paths::settings_path()) {
+        let config_layer = match load_config_from_file(&paths::config()) {
             Ok(config) => config,
             Err(_err) => {
                 errored = true;
@@ -59,12 +58,25 @@ impl SettingsInner {
             }
         };
 
-        let config = Self {
-            config_layer,
-            base: base_config,
+        let ui_layer = match load_config_from_file(&paths::managed::ui_settings()) {
+            Ok(config) => config,
+            Err(_err) => {
+                errored = true;
+                PartialConfig::default()
+            }
         };
 
-        (config, errored)
+        let mut config = Config::default();
+        config.merge(&config_layer);
+        config.merge(&ui_layer);
+
+        let settings = Self {
+            config_layer,
+            ui_layer,
+            config,
+        };
+
+        (settings, errored)
     }
 }
 
@@ -83,6 +95,14 @@ impl Display for ConfigLoadError {
             ConfigLoadError::SettingsFormatError(e) => write!(f, "Settings format error: {}", e),
         }
     }
+}
+
+fn load_ui_config_from_file(path: &Path) -> PartialConfig {
+    PartialConfig::try_from(
+        json5::from_str(&std::fs::read_to_string(path).unwrap_or_default())
+            .unwrap_or(Value::Object(HashMap::new())),
+    )
+    .unwrap_or_default()
 }
 
 fn load_config_from_file(path: &Path) -> Result<PartialConfig, (ConfigLoadError, PartialConfig)> {
