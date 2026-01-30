@@ -1,3 +1,6 @@
+use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
+
 pub trait Mergeable<O> {
     fn merge(&mut self, other: &O);
 }
@@ -56,6 +59,7 @@ macro_rules! config {
          [$($pfields:tt)*]
          { }
     ) => {
+        #[derive(Clone, Debug)]
         pub struct $name {
             $($rfields)*
         }
@@ -76,7 +80,7 @@ macro_rules! config {
                 $($pfields)*
             }
 
-            impl Mergeable<[<Partial $name>]> for $name {
+            impl $crate::settings::config_utils::Mergeable<[<Partial $name>]> for $name {
                 fn merge(&mut self, other: &[<Partial $name>]) {
                     $(
                         if let Some(value) = &other.$fields {
@@ -94,15 +98,15 @@ macro_rules! config {
                 }
             }
 
-            impl TryFrom<Value> for [<Partial $name>] {
+            impl TryFrom<$crate::settings::config_utils::Value> for [<Partial $name>] {
                 type Error = (String, Self);
 
-                fn try_from(value: Value) -> Result<Self, Self::Error> {
+                fn try_from(value: $crate::settings::config_utils::Value) -> Result<Self, Self::Error> {
                     match value {
-                        Value::Object(map) => {
-                            let json_value = serde_json::to_value(map)
+                        $crate::settings::config_utils::Value::Object(map) => {
+                            let json_value = ::serde_json::to_value(map)
                                 .expect("Failed to convert map to JSON value"); // should not happen
-                            serde_json::from_value(json_value)
+                            ::serde_json::from_value(json_value)
                                 .map_err(|e| (e.to_string(), Self::default()))
                         }
                         _ => Err(("Expected an object for partial config".to_string(), Self::default())),
@@ -126,4 +130,16 @@ macro_rules! impl_merge_prims {
             }
         })*
     };
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+// Note: order of variants matters for correct deserialization
+pub enum Value {
+    Object(HashMap<String, Value>),
+    List(Vec<Value>),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    String(String),
 }

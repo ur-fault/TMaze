@@ -6,9 +6,13 @@ use serde::{de::Error, Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
+    config,
     helpers::{constants::paths::theme_file_path, ToDebug},
-    settings::attribute::deserialize_attributes,
 };
+
+use super::config_utils::Mergeable;
+
+use super::attribute::deserialize_attributes;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
@@ -87,8 +91,8 @@ impl ThemeDefinition {
         Self::load_by_path(path)
     }
 
-    pub fn load_by_name(path: &str) -> Result<Self, LoadError> {
-        Self::load_by_path(theme_file_path(path))
+    pub fn load_by_name(name: &str) -> Result<Self, LoadError> {
+        Self::load_by_path(theme_file_path(name))
     }
 
     pub fn load_by_path(path: PathBuf) -> Result<Self, LoadError> {
@@ -98,6 +102,8 @@ impl ThemeDefinition {
             .extension()
             .and_then(|s| s.to_str())
             .expect("No extension");
+
+        // TODO: names without extension
 
         match ext {
             "toml" => Self::load_toml(path),
@@ -461,26 +467,27 @@ pub type Rgb = (u8, u8, u8);
 
 pub type SharedScheme = Rc<TerminalColorScheme>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TerminalColorScheme {
-    primary_fg: Rgb,
-    primary_bg: Rgb,
-    black: Rgb,     // grey
-    dark_grey: Rgb, // dark grey
-    red: Rgb,
-    dark_red: Rgb,
-    green: Rgb,
-    dark_green: Rgb,
-    yellow: Rgb,
-    dark_yellow: Rgb,
-    blue: Rgb,
-    dark_blue: Rgb,
-    magenta: Rgb,
-    dark_magenta: Rgb,
-    cyan: Rgb,
-    dark_cyan: Rgb,
-    white: Rgb,
-    grey: Rgb,
+config! {
+    pub struct TerminalColorScheme {
+        primary_fg: Rgb = (255, 255, 255),
+        primary_bg: Rgb = (0, 0, 0),
+        black: Rgb = (0, 0, 0),
+        dark_grey: Rgb = (64, 64, 64),
+        red: Rgb = (255, 0, 0),
+        dark_red: Rgb = (128, 0, 0),
+        green: Rgb = (0, 255, 0),
+        dark_green: Rgb = (0, 128, 0),
+        yellow: Rgb = (255, 255, 0),
+        dark_yellow: Rgb = (128, 128, 0),
+        blue: Rgb = (0, 0, 255),
+        dark_blue: Rgb = (0, 0, 128),
+        magenta: Rgb = (255, 0, 255),
+        dark_magenta: Rgb = (128, 0, 128),
+        cyan: Rgb = (0, 255, 255),
+        dark_cyan: Rgb = (0, 128, 128),
+        white: Rgb = (255, 255, 255),
+        grey: Rgb = (192, 192, 192),
+    }
 }
 
 impl TerminalColorScheme {
@@ -528,31 +535,6 @@ impl TerminalColorScheme {
         }
 
         closest
-    }
-}
-
-impl Default for TerminalColorScheme {
-    fn default() -> Self {
-        TerminalColorScheme {
-            primary_fg: (255, 255, 255),
-            primary_bg: (0, 0, 0),
-            black: (0, 0, 0),
-            dark_grey: (64, 64, 64),
-            red: (255, 0, 0),
-            dark_red: (128, 0, 0),
-            green: (0, 255, 0),
-            dark_green: (0, 128, 0),
-            yellow: (255, 255, 0),
-            dark_yellow: (128, 128, 0),
-            blue: (0, 0, 255),
-            dark_blue: (0, 0, 128),
-            magenta: (255, 0, 255),
-            dark_magenta: (128, 0, 128),
-            cyan: (0, 255, 255),
-            dark_cyan: (0, 128, 128),
-            white: (255, 255, 255),
-            grey: (192, 192, 192),
-        }
     }
 }
 

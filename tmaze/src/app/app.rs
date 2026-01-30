@@ -1,4 +1,5 @@
 use std::{
+    rc::Rc,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -16,11 +17,12 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
     data::SaveData,
-    helpers::{constants::paths::settings_path, on_off},
+    helpers::on_off,
     logging::{self, AppLogger, LoggerOptions, UiLogs},
     renderer::{self, draw::Draw, CellContent, GMutView, Renderer},
     settings::{
-        theme::{Theme, ThemeResolver},
+        model::Config,
+        theme::{SharedScheme, TerminalColorScheme, Theme, ThemeDefinition, ThemeResolver},
         Settings,
     },
     ui,
@@ -50,13 +52,14 @@ pub struct AppData {
     pub settings: Settings,
     pub save: SaveData,
     pub use_data: AppStateData,
+    pub appearance: Appearance,
     pub screen_size: Dims,
-    pub theme: Theme,
-    pub theme_resolver: ThemeResolver,
     pub logs: UiLogs,
     pub registries: Registries,
     jobs: Jobs,
+
     app_start: Instant,
+    read_only: bool,
 
     #[cfg(feature = "sound")]
     pub sound_player: SoundPlayer,
@@ -77,11 +80,13 @@ impl AppData {
             }
         }
 
-        let volume = if self.settings.get_enable_audio() && self.settings.get_enable_music() {
-            self.settings.get_audio_volume() * self.settings.get_music_volume()
+        let cfg = &self.settings.read().audio;
+        let volume = if cfg.enable_audio && cfg.enable_music {
+            cfg.audio_volume * cfg.music_volume
         } else {
             0.0
-        };
+        } as f32;
+
         self.sound_player.set_volume(volume);
 
         self.bgm_track = Some(track);
@@ -91,6 +96,10 @@ impl AppData {
 
     pub fn queuer(&self) -> Qer {
         self.jobs.queuer()
+    }
+
+    pub fn is_ro(&self) -> bool {
+        self.read_only
     }
 }
 
@@ -126,22 +135,18 @@ impl App {
     /// - initializes the job queue,
     /// - initializes the registries,
     pub fn empty(read_only: bool) -> Self {
-        let settings =
-            Settings::load_json(settings_path(), read_only).expect("failed to load settings");
+        let (settings, settings_error) = Settings::load();
+        let config = settings.read();
 
-        let renderer = Renderer::new(
-            &settings
-                .get_terminal_scheme()
-                .expect("unknown built-in terminal color scheme, use '--print-terminal-schemes' to see options"),
-        )
-        .expect("failed to create renderer");
+        let renderer = Renderer::new(&Rc::new(config.general.terminal_scheme.clone()))
+            .expect("failed to create renderer");
         let activities = Activities::empty();
 
         let (logger, logs) = AppLogger::new_with_options(
-            settings.get_logging_level(),
+            config.general.logging_level,
             LoggerOptions::default()
                 .read_only(read_only)
-                .file_level(settings.get_file_logging_level()),
+                .file_level(config.general.file_logging_level),
         );
         logger.init();
 
@@ -164,12 +169,11 @@ impl App {
         };
 
         log::info!("Loading theme");
-        let resolver = init_theme_resolver();
-        let theme_def = settings.get_theme();
-        let theme = resolver.resolve(&theme_def);
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
+
+        let appereance = Appearance::new(&config);
 
         Self {
             renderer,
@@ -179,12 +183,12 @@ impl App {
                 settings,
                 save,
                 use_data,
+                appearance: appereance,
                 screen_size: frame_size,
                 jobs,
-                theme,
-                theme_resolver: resolver,
                 logs,
                 registries,
+                read_only,
 
                 #[cfg(feature = "sound")]
                 sound_player,
@@ -219,7 +223,7 @@ impl App {
                         ..
                     }) => self.switch_debug(),
                     event @ crossterm::event::Event::Mouse(_) => {
-                        if self.data.settings.get_enable_mouse() {
+                        if self.data.settings.read().nagivation.enable_mouse {
                             events.push(Event::Term(event));
                         }
                     }
@@ -265,29 +269,28 @@ impl App {
                 }
             }
 
+            let theme = &self.data.appearance.theme;
             self.renderer
                 .frame()
                 .mut_view()
-                .fill(CellContent::styled(' ', self.data.theme.get("background")));
+                .fill(CellContent::styled(' ', theme.get("background")));
 
             match self
                 .activities
                 .active_mut()
                 .expect("No active active")
                 .screen()
-                .draw(&mut self.renderer.frame().mut_view(), &self.data.theme)
+                .draw(&mut self.renderer.frame().mut_view(), &theme)
             {
                 Ok(_) => {}
                 Err(ui::ScreenError::SmallScreen) => {
-                    draw_small_screen_info(&mut self.renderer.frame().mut_view(), &self.data.theme)
+                    draw_small_screen_info(&mut self.renderer.frame().mut_view(), &theme)
                 }
             }
 
-            self.data.logs.draw_on(
-                Dims(0, 0),
-                &mut self.renderer.frame().mut_view(),
-                &self.data.theme,
-            );
+            self.data
+                .logs
+                .draw_on(Dims(0, 0), &mut self.renderer.frame().mut_view(), &theme);
 
             // TODO: let activities show debug info and about the app itself
             // then we can draw it here
@@ -305,7 +308,7 @@ impl App {
 
     fn switch_debug(&mut self) {
         self.data.use_data.show_debug = !self.data.use_data.show_debug;
-        self.data.logs.switch_debug(&self.data.settings);
+        self.data.logs.switch_debug(self.data.settings.read());
         log::warn!(
             "Debug mode: {}",
             on_off(self.data.use_data.show_debug, false)
@@ -341,6 +344,55 @@ impl App {
 pub struct AppStateData {
     pub last_selected_preset: Option<usize>,
     pub show_debug: bool,
+}
+
+pub struct Appearance {
+    theme: Theme,
+    scheme: SharedScheme,
+    resolver: ThemeResolver,
+}
+
+impl Appearance {
+    pub fn new(config: &Config) -> Self {
+        let resolver = init_theme_resolver();
+
+        Self {
+            theme: Self::load_theme(config, &resolver),
+            scheme: Self::load_scheme(config),
+            resolver,
+        }
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    pub fn scheme(&self) -> &Rc<TerminalColorScheme> {
+        &self.scheme
+    }
+
+    pub fn resolver(&self) -> &ThemeResolver {
+        &self.resolver
+    }
+}
+
+impl Appearance {
+    fn load_theme(config: &Config, resolver: &ThemeResolver) -> Theme {
+        match config.general.theme.as_str() {
+            "" => resolver.resolve(&ThemeDefinition::parse_default()),
+            name => match ThemeDefinition::load_by_name(name) {
+                Ok(def) => resolver.resolve(&def),
+                Err(err) => {
+                    log::error!("Failed to load theme '{}': {}", name, err);
+                    resolver.resolve(&ThemeDefinition::parse_default())
+                }
+            },
+        }
+    }
+
+    fn load_scheme(config: &Config) -> SharedScheme {
+        Rc::new(config.general.terminal_scheme.clone())
+    }
 }
 
 pub fn init_theme_resolver() -> ThemeResolver {

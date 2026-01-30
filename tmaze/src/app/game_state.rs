@@ -9,7 +9,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::{
     helpers::{is_release, maze2screen_3d},
-    settings::{MazePreset, Settings},
+    settings::model::{Config, MazePreset},
 };
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -45,7 +45,7 @@ pub struct GameData {
 }
 
 impl GameData {
-    pub fn handle_event(&mut self, settings: &Settings, event: KeyEvent) -> Result<(), bool> {
+    pub fn handle_event(&mut self, settings: &Config, event: KeyEvent) -> Result<(), bool> {
         let KeyEvent {
             code,
             modifiers,
@@ -103,7 +103,7 @@ impl GameData {
         Ok(())
     }
 
-    pub fn apply_move(&mut self, settings: &Settings, wall: CellWall, fast: bool) {
+    pub fn apply_move(&mut self, settings: &Config, wall: CellWall, fast: bool) {
         match self.view_mode {
             GameViewMode::Spectator => {
                 let mut off = wall.reverse_wall().to_coord();
@@ -122,14 +122,14 @@ impl GameData {
                 self.game
                     .move_player(
                         wall,
-                        if settings.get_slow() {
+                        if settings.viewport.slow {
                             MoveMode::Slow
                         } else if fast {
                             MoveMode::Fast
                         } else {
                             MoveMode::Normal
                         },
-                        !settings.get_disable_tower_auto_up(),
+                        !settings.viewport.disable_tower_auto_up,
                     )
                     .unwrap();
             }

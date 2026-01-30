@@ -15,6 +15,7 @@ use crate::{
     helpers::constants::paths,
     renderer::{draw::Draw, GMutView},
     settings::{
+        model::Config,
         theme::{Color, NamedColor, Style, Theme},
         Settings,
     },
@@ -108,14 +109,16 @@ impl UiLogs {
         }
     }
 
-    pub fn switch_debug(&self, settings: &Settings) {
+    pub fn switch_debug(&self, settings: &Config) {
         let mut debug = self.debug.write().unwrap();
         *debug = !*debug;
 
+        let config = &settings.general;
+
         if *debug {
-            *self.min_level.write().unwrap() = settings.get_debug_logging_level();
+            *self.min_level.write().unwrap() = config.debug_logging_level;
         } else {
-            *self.min_level.write().unwrap() = settings.get_logging_level();
+            *self.min_level.write().unwrap() = config.logging_level;
         }
     }
 

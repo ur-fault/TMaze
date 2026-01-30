@@ -3,7 +3,9 @@ use dpad::dpad_theme_resolver;
 use crate::settings::theme::ThemeResolver;
 
 pub mod dpad;
-pub mod style_browser;
+mod screens;
+
+pub use screens::*;
 
 pub fn usecase_ui_theme_resolver() -> ThemeResolver {
     let mut resolver = ThemeResolver::new();

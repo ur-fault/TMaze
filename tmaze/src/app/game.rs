@@ -10,22 +10,25 @@ use cmaze::{
 };
 
 use crate::{
-    app::{game_state::GameData, GameViewMode},
+    app::{self, game_state::GameData, GameViewMode},
     helpers::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
     lerp, menu_actions,
     renderer::{draw::Align, CellContent, GBuffer, GMutView, Padding},
     settings::{
-        self,
+        model::{CameraMode, Config, MazePreset, Viewport},
         theme::{SharedScheme, Theme, ThemeResolver},
-        CameraMode, MazePreset, Settings, SettingsActivity,
     },
     ui::{
         self,
         helpers::format_duration,
         multisize_duration_format, split_menu_actions,
-        usecase::{dpad::{DPad, DPadType}, style_browser::StyleBrowser},
+        usecase::{
+            dpad::{DPad, DPadType},
+            settings::SettingsActivity,
+            style_browser::StyleBrowser,
+        },
         Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, RedirectMenu, Screen, ScreenError,
     },
 };
@@ -79,7 +82,7 @@ pub struct MainMenu {
 impl MainMenu {
     pub fn new() -> Self {
         let options = menu_actions!(
-            "New Game" -> data => Self::start_new_game(&data.settings, &data.use_data),
+            "New Game" -> data => Self::start_new_game(data.settings.read(), &data.use_data),
             "Settings" -> _ => Self::show_settings_screen(),
             "Controls" -> _ => Self::show_controls_popup(),
             "Info" -> _ => Self::show_info_menu(),
@@ -98,7 +101,7 @@ impl MainMenu {
     fn show_settings_screen() -> Change {
         Change::push(Activity::new_base_boxed(
             "settings".to_string(),
-            settings::SettingsActivity::new(),
+            SettingsActivity::new(),
         ))
     }
 
@@ -164,7 +167,7 @@ impl MainMenu {
             "Style options browser" -> data => Change::Push(
                 Activity::new_base_boxed(
                     "style options browser".to_string(),
-                    StyleBrowser::new(data.theme_resolver.clone())
+                    StyleBrowser::new(data.appearance.resolver().clone())
                 )
             ),
             "Back" -> _ => Change::pop_top(),
@@ -181,11 +184,20 @@ impl MainMenu {
         )
     }
 
-    fn start_new_game(settings: &Settings, use_data: &AppStateData) -> Change {
-        Change::push(Activity::new_base_boxed(
-            "maze size",
-            MazePresetMenu::new(settings, use_data),
-        ))
+    fn start_new_game(settings: &Config, use_data: &AppStateData) -> Change {
+        match MazePresetMenu::new(settings, use_data) {
+            Some(preset_menu) => Change::push(Activity::new_base_boxed("maze preset", preset_menu)),
+            None => {
+                // TODO: reference settings once ready
+                const MSG: &str = "No maze presets available, please add some in config";
+                log::warn!("{}", MSG);
+
+                Change::push(Activity::new_base_boxed(
+                    "no presets",
+                    Popup::new("No presets".to_string(), vec![MSG.to_string()]),
+                ))
+            }
+        }
     }
 
     #[cfg(feature = "sound")]
@@ -224,11 +236,15 @@ pub struct MazePresetMenu {
 }
 
 impl MazePresetMenu {
-    pub fn new(settings: &Settings, app_state_data: &AppStateData) -> Self {
+    pub fn new(config: &Config, app_state_data: &AppStateData) -> Option<Self> {
+        if config.presets.is_empty() {
+            return None;
+        }
+
         let mut menu_config = MenuConfig::new_from_strings(
-            "Maze size".to_string(),
-            settings
-                .get_presets()
+            "Maze preset".to_string(),
+            config
+                .presets
                 .iter()
                 .map(|maze| maze.title.clone())
                 .collect::<Vec<_>>(),
@@ -236,7 +252,7 @@ impl MazePresetMenu {
 
         let default = app_state_data
             .last_selected_preset
-            .or_else(|| settings.get_presets().iter().position(|maze| maze.default));
+            .or_else(|| config.presets.iter().position(|maze| maze.default));
 
         if let Some(i) = default {
             menu_config = menu_config.default(i);
@@ -244,9 +260,9 @@ impl MazePresetMenu {
 
         let menu = Menu::new(menu_config);
 
-        let presets = settings.get_presets().to_vec();
+        let presets = config.presets.to_vec();
 
-        Self { menu, presets }
+        Some(Self { menu, presets })
     }
 }
 
@@ -509,17 +525,12 @@ pub struct GameActivity {
 
 impl GameActivity {
     pub fn new(game: GameData, app_data: &mut AppData) -> Self {
-        let settings = &app_data.settings;
+        let config = app_data.settings.read();
+        let appear = &app_data.appearance;
 
-        let camera_mode = settings.get_camera_mode();
-        let maze_board = MazeBoard::new(
-            &game.game,
-            &app_data.theme,
-            settings
-                .get_terminal_scheme()
-                .expect("invalid built-in terminal color scheme"),
-        );
-        let margins = settings.get_viewport_margin();
+        let camera_mode = config.viewport.camera_mode;
+        let maze_board = MazeBoard::new(&game.game, appear.theme(), appear.scheme().clone());
+        let margins = config.viewport.viewport_margin;
 
         #[cfg(feature = "sound")]
         app_data.play_bgm(MusicTrack::choose_for_maze(game.game.get_maze()));
@@ -643,10 +654,11 @@ impl GameActivity {
     }
 
     fn update_viewport(&mut self, data: &AppData) {
+        let cfg = data.settings.read();
         if self.is_dpad_enabled() {
             let (viewport_rect, dpad_rect) = DPad::split_screen(data);
             let mut dpad_rect = dpad_rect;
-            if data.settings.get_enable_margin_around_dpad() {
+            if cfg.nagivation.enable_margin_around_dpad {
                 dpad_rect = dpad_rect.margin(self.margins);
             }
 
@@ -664,17 +676,16 @@ impl GameActivity {
 
     fn init_dpad(&mut self, data: &AppData) {
         let dpad_type = DPadType::from_maze(self.data.game.get_maze());
-        let swap_up_down = data.settings.get_dpad_swap_up_down();
+        let swap_up_down = data.settings.read().nagivation.dpad_swap_up_down;
 
         let touch_controls = DPad::new(None, swap_up_down, dpad_type);
         self.touch_controls = Some(Box::new(touch_controls));
     }
 
     fn update_dpad(&mut self, data: &AppData) {
-        if (data.settings.get_enable_dpad() && data.settings.get_enable_mouse())
-            != self.is_dpad_enabled()
-        {
-            if data.settings.get_enable_dpad() {
+        let config = &data.settings.read().nagivation;
+        if (config.enable_dpad && config.enable_mouse) != self.is_dpad_enabled() {
+            if config.enable_dpad {
                 log::info!("Enabling dpad");
                 self.init_dpad(data);
             } else {
@@ -686,8 +697,8 @@ impl GameActivity {
         if self.is_dpad_enabled() {
             let dpad = self.touch_controls.as_mut().unwrap();
 
-            dpad.swap_up_down = data.settings.get_dpad_swap_up_down();
-            dpad.disable_highlight(!data.settings.get_enable_dpad_highlight());
+            dpad.swap_up_down = config.dpad_swap_up_down;
+            dpad.disable_highlight(!config.enable_dpad_highlight);
         }
     }
 
@@ -719,7 +730,7 @@ impl ActivityHandler for GameActivity {
             match event {
                 Event::Term(event) => match event {
                     TermEvent::Key(key_event) => {
-                        match self.data.handle_event(&data.settings, key_event) {
+                        match self.data.handle_event(data.settings.read(), key_event) {
                             Err(false) => {
                                 self.data.game.pause().unwrap();
 
@@ -735,7 +746,7 @@ impl ActivityHandler for GameActivity {
                     TermEvent::Mouse(event) => {
                         if let Some(ref mut touch_controls) = self.touch_controls {
                             if let Some(dir) = touch_controls.apply_mouse_event(event) {
-                                self.data.apply_move(&data.settings, dir, false);
+                                self.data.apply_move(data.settings.read(), dir, false);
                             }
                         }
                     }
@@ -785,8 +796,15 @@ impl ActivityHandler for GameActivity {
             }
         }
 
-        self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.data.game.get_player_pos())) at data.settings.get_player_smoothing());
-        self.sm_camera_pos = lerp!((self.sm_camera_pos) -> (self.data.camera_pos) at data.settings.get_camera_smoothing());
+        let Viewport {
+            camera_smoothing,
+            player_smoothing,
+            ..
+        } = data.settings.read().viewport;
+
+        self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.data.game.get_player_pos())) at player_smoothing);
+        self.sm_camera_pos =
+            lerp!((self.sm_camera_pos) -> (self.data.camera_pos) at camera_smoothing);
 
         self.show_debug = data.use_data.show_debug;
 

@@ -1,629 +1,223 @@
-mod attribute;
+pub mod attribute;
+pub mod model;
 pub mod theme;
 
-pub mod new_settings;
-pub mod config_utils;
-pub mod model;
+// mod old_settings;
 
-use cmaze::{
-    algorithms::{MazeSpec, MazeSpecType},
-    dims::{Dims, Offset},
-};
-use derivative::Derivative;
-use serde::{Deserialize, Serialize};
-use std::{
-    fs, io,
-    path::PathBuf,
-    sync::{Arc, RwLock},
-};
-use theme::ThemeDefinition;
+mod config_utils;
+
+use std::{fmt::Display, path::Path, sync::Arc};
+
+use hashbrown::HashMap;
 
 use crate::{
-    app::{self, app::AppData, Activity, ActivityHandler, Change},
-    helpers::constants::paths::settings_path,
-    menu_actions,
-    renderer::MouseGuard,
-    settings::theme::{SharedScheme, TerminalColorScheme},
-    ui::{split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem, OptionDef, Popup, Screen},
+    helpers::{constants::paths, TupleMap},
+    settings::config_utils::Value,
 };
 
-#[cfg(feature = "sound")]
-use crate::sound::create_audio_settings;
+use model::{Config, PartialConfig};
 
-const DEFAULT_SETTINGS_JSON: &str = include_str!("./files/default_settings.json5");
-
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[serde(tag = "mode")]
-pub enum CameraMode {
-    #[default]
-    CloseFollow,
-    EdgeFollow {
-        x: Offset,
-        y: Offset,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MazePreset {
-    pub title: String,
-    pub description: Option<String>,
-
-    #[serde(default)]
-    pub default: bool,
-
-    // TODO: make `serde(flatten)` once switched to TOML/JSON
-    #[serde(flatten)]
-    pub maze_spec: MazeSpec,
-}
-
-impl MazePreset {
-    pub fn short_desc(&self) -> Option<String> {
-        let (size, cells): (_, usize) = match &self.maze_spec.inner_spec {
-            MazeSpecType::Regions { regions, .. } => (
-                self.maze_spec.size()?,
-                regions.iter().map(|r| r.mask.enabled_count()).sum(),
-            ),
-            MazeSpecType::Simple { mask, .. } => (
-                self.maze_spec.size()?,
-                mask.as_ref()
-                    .map(|m| m.enabled_count())
-                    .unwrap_or(self.maze_spec.size()?.product() as usize),
-            ),
-        };
-
-        if size.2 == 1 {
-            Some(format!(
-                "{}: {}x{} ({} cells)",
-                self.title, size.0, size.1, cells
-            ))
-        } else {
-            Some(format!(
-                "{}: {}x{}x{} ({} cells)",
-                self.title, size.0, size.1, size.2, cells
-            ))
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
-pub enum UpdateCheckInterval {
-    Never,
-    #[default]
-    Daily,
-    Weekly,
-    Monthly,
-    Yearly,
-    Always,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum TerminalSchemeDef {
-    Named(String),
-    Custom(TerminalColorScheme),
-}
-
-#[derive(Debug, Derivative, Serialize, Deserialize)]
-#[derivative(Default)]
-#[serde(rename = "Settings")]
-// FIXME: separate sections into their own struct
-pub struct SettingsInner {
-    // general
-    #[serde(default)]
-    pub theme: Option<String>,
-    #[serde(default)]
-    pub logging_level: Option<String>,
-    #[serde(default)]
-    pub debug_logging_level: Option<String>,
-    #[serde(default)]
-    pub file_logging_level: Option<String>,
-    #[serde(default)]
-    pub terminal_scheme: Option<TerminalSchemeDef>,
-
-    // viewport
-    #[serde(default)]
-    pub slow: Option<bool>,
-    #[serde(default)]
-    pub disable_tower_auto_up: Option<bool>,
-    #[serde(default)]
-    pub camera_mode: Option<CameraMode>,
-    #[serde(default)]
-    pub camera_smoothing: Option<f32>,
-    #[serde[default]]
-    pub player_smoothing: Option<f32>,
-    #[serde(default)]
-    pub viewport_margin: Option<(i32, i32)>,
-
-    // navigation
-    #[serde(default)]
-    pub enable_mouse: Option<bool>,
-    #[serde(default)]
-    pub enable_dpad: Option<bool>,
-    #[serde(default)]
-    pub landscape_dpad_on_left: Option<bool>,
-    #[serde(default)]
-    pub dpad_swap_up_down: Option<bool>,
-    #[serde(default)]
-    pub enable_margin_around_dpad: Option<bool>,
-    #[serde(default)]
-    pub enable_dpad_highlight: Option<bool>,
-
-    // update check
-    #[serde(default)]
-    pub update_check_interval: Option<UpdateCheckInterval>,
-    #[serde(default)]
-    pub display_update_check_errors: Option<bool>,
-
-    // audio
-    #[serde(default)]
-    pub enable_audio: Option<bool>,
-    #[serde(default)]
-    pub audio_volume: Option<f32>,
-    #[serde(default)]
-    pub enable_music: Option<bool>,
-    #[serde(default)]
-    pub music_volume: Option<f32>,
-
-    // presets
-    #[serde(default)]
-    pub presets: Option<Vec<MazePreset>>,
-    // TODO: it's not possible in RON to have a HashMap with flattened keys,
-    // so we will support it in different way formats
-    // once we support them - this would mean dropping RON support
-    // https://github.com/ron-rs/ron/issues/115
-    // pub unknown_fields: HashMap<String, Value>,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Settings {
-    shared: Arc<RwLock<SettingsInner>>,
-    path: PathBuf,
-    read_only: bool,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        let settings = SettingsInner::default();
-        Self {
-            shared: Arc::new(RwLock::new(settings)),
-            path: settings_path(),
-            read_only: false,
-        }
-    }
-}
-
-#[allow(dead_code)]
-impl Settings {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn path(&self) -> PathBuf {
-        self.path.clone()
-    }
-
-    pub fn is_ro(&self) -> bool {
-        self.read_only
-    }
-
-    pub fn read(&self) -> std::sync::RwLockReadGuard<'_, SettingsInner> {
-        self.shared.read().unwrap()
-    }
-
-    pub fn write(&mut self) -> std::sync::RwLockWriteGuard<'_, SettingsInner> {
-        self.shared.write().unwrap()
-    }
+    inner: Arc<SettingsInner>,
 }
 
 impl Settings {
-    pub fn get_theme(&self) -> ThemeDefinition {
-        let name = self.read().theme.clone();
-        let maybe_theme = match &name {
-            Some(theme_name) => ThemeDefinition::load_by_name(theme_name),
-            None => ThemeDefinition::load_default(self.read_only),
-        };
-
-        match maybe_theme {
-            Ok(theme) => theme,
-            Err(err) if name.is_some() => {
-                log::error!("Could not load the theme: {}", err);
-                ThemeDefinition::parse_default()
-            }
-            Err(err) if name.is_none() => {
-                log::error!("Could not load the default theme: {}", err);
-                ThemeDefinition::parse_default()
-            }
-            _ => unreachable!("`is_none` and `is_some` handle all cases"),
-        }
-    }
-
-    pub fn get_logging_level(&self) -> log::Level {
-        self.read()
-            .logging_level
-            .clone()
-            .and_then(|level| level.parse().ok())
-            .unwrap_or(log::Level::Info)
-    }
-
-    pub fn get_debug_logging_level(&self) -> log::Level {
-        self.read()
-            .debug_logging_level
-            .clone()
-            .and_then(|level| level.parse().ok())
-            .unwrap_or(log::Level::Info)
-    }
-
-    pub fn get_file_logging_level(&self) -> log::Level {
-        self.read()
-            .file_logging_level
-            .clone()
-            .and_then(|level| level.parse().ok())
-            .unwrap_or(log::Level::Info)
-    }
-
-    pub fn get_terminal_scheme(&self) -> Option<SharedScheme> {
-        match &self.read().terminal_scheme {
-            Some(TerminalSchemeDef::Named(name)) => {
-                Some(SharedScheme::new(TerminalColorScheme::named(name)?))
-            }
-            Some(TerminalSchemeDef::Custom(scheme)) => Some(SharedScheme::new(scheme.clone())),
-            None => Some(SharedScheme::new(TerminalColorScheme::default())),
-        }
-    }
-
-    pub fn get_slow(&self) -> bool {
-        self.read().slow.unwrap_or_default()
-    }
-
-    pub fn set_slow(&mut self, value: bool) -> &mut Self {
-        self.write().slow = Some(value);
-        self
-    }
-
-    pub fn get_disable_tower_auto_up(&self) -> bool {
-        self.read().disable_tower_auto_up.unwrap_or_default()
-    }
-
-    pub fn set_disable_tower_auto_up(&mut self, value: bool) -> &mut Self {
-        self.write().disable_tower_auto_up = Some(value);
-        self
-    }
-
-    pub fn get_camera_mode(&self) -> CameraMode {
-        self.read().camera_mode.unwrap_or_default()
-    }
-
-    pub fn set_camera_mode(&mut self, value: CameraMode) -> &mut Self {
-        self.write().camera_mode = Some(value);
-        self
-    }
-
-    pub fn get_camera_smoothing(&self) -> f32 {
-        self.read().camera_smoothing.unwrap_or(0.5).clamp(0.5, 1.0)
-    }
-
-    pub fn set_camera_smoothing(&mut self, value: f32) -> &mut Self {
-        self.write().camera_smoothing = Some(value.clamp(0.5, 1.0));
-        self
-    }
-
-    pub fn get_player_smoothing(&self) -> f32 {
-        self.read().player_smoothing.unwrap_or(0.8).clamp(0.5, 1.0)
-    }
-
-    pub fn set_player_smoothing(&mut self, value: f32) -> &mut Self {
-        self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
-        self
-    }
-
-    pub fn get_viewport_margin(&self) -> Dims {
-        self.read()
-            .viewport_margin
-            .map(Dims::from)
-            .unwrap_or(Dims(4, 3))
-    }
-
-    pub fn set_viewport_margin(&mut self, value: Dims) -> &mut Self {
-        self.write().viewport_margin = Some(value.into());
-        self
-    }
-
-    pub fn get_enable_mouse(&self) -> bool {
-        self.read().enable_mouse.unwrap_or(true)
-    }
-
-    pub fn set_enable_mouse(&mut self, value: bool) -> &mut Self {
-        self.write().enable_mouse = Some(value);
-        self
-    }
-
-    pub fn get_enable_dpad(&self) -> bool {
-        self.read().enable_dpad.unwrap_or(false)
-    }
-
-    pub fn set_enable_dpad(&mut self, value: bool) -> &mut Self {
-        self.write().enable_dpad = Some(value);
-        self
-    }
-
-    pub fn get_landscape_dpad_on_left(&self) -> bool {
-        self.read().landscape_dpad_on_left.unwrap_or(false)
-    }
-
-    pub fn set_landscape_dpad_on_left(&mut self, value: bool) -> &mut Self {
-        self.write().landscape_dpad_on_left = Some(value);
-        self
-    }
-
-    pub fn get_dpad_swap_up_down(&self) -> bool {
-        self.read().dpad_swap_up_down.unwrap_or(false)
-    }
-
-    pub fn set_dpad_swap_up_down(&mut self, value: bool) -> &mut Self {
-        self.write().dpad_swap_up_down = Some(value);
-        self
-    }
-
-    pub fn get_enable_margin_around_dpad(&self) -> bool {
-        self.read().enable_margin_around_dpad.unwrap_or(false)
-    }
-
-    pub fn set_enable_margin_around_dpad(&mut self, value: bool) -> &mut Self {
-        self.write().enable_margin_around_dpad = Some(value);
-        self
-    }
-
-    pub fn get_enable_dpad_highlight(&self) -> bool {
-        self.read().enable_dpad_highlight.unwrap_or(true)
-    }
-
-    pub fn set_enable_dpad_highlight(&mut self, value: bool) -> &mut Self {
-        self.write().enable_dpad_highlight = Some(value);
-        self
-    }
-
-    pub fn set_check_interval(&mut self, value: UpdateCheckInterval) -> &mut Self {
-        self.write().update_check_interval = Some(value);
-        self
-    }
-
-    pub fn get_check_interval(&self) -> UpdateCheckInterval {
-        self.read().update_check_interval.unwrap_or_default()
-    }
-
-    pub fn get_display_update_check_errors(&self) -> bool {
-        self.read().display_update_check_errors.unwrap_or(true)
-    }
-
-    pub fn set_display_update_check_errors(&mut self, value: bool) -> &mut Self {
-        self.write().display_update_check_errors = Some(value);
-        self
-    }
-
-    pub fn get_enable_audio(&self) -> bool {
-        self.read().enable_audio.unwrap_or_default()
-    }
-
-    pub fn set_enable_audio(&mut self, value: bool) -> &mut Self {
-        self.write().enable_audio = Some(value);
-        self
-    }
-
-    pub fn get_audio_volume(&self) -> f32 {
-        self.read().audio_volume.unwrap_or_default().clamp(0., 1.)
-    }
-
-    pub fn set_audio_volume(&mut self, value: f32) -> &mut Self {
-        self.write().audio_volume = Some(value.clamp(0., 1.));
-        self
-    }
-
-    pub fn get_enable_music(&self) -> bool {
-        self.read().enable_music.unwrap_or_default()
-    }
-
-    pub fn set_enable_music(&mut self, value: bool) -> &mut Self {
-        self.write().enable_music = Some(value);
-        self
-    }
-
-    pub fn get_music_volume(&self) -> f32 {
-        self.read().music_volume.unwrap_or_default().clamp(0., 1.)
-    }
-
-    pub fn set_music_volume(&mut self, value: f32) -> &mut Self {
-        self.write().music_volume = Some(value.clamp(0., 1.));
-        self
-    }
-
-    pub fn set_presets(&mut self, value: Vec<MazePreset>) -> &mut Self {
-        self.write().presets = Some(value);
-        self
-    }
-
-    pub fn get_presets(&self) -> Vec<MazePreset> {
-        self.read().presets.clone().unwrap_or_default()
-    }
-}
-
-// JSON
-impl Settings {
-    pub fn load_json(path: PathBuf, read_only: bool) -> io::Result<Self> {
-        let settings_string = fs::read_to_string(&path);
-        let settings: SettingsInner = if let Ok(settings_string) = settings_string {
-            json5::from_str(&settings_string)
-                .expect("Could not parse settings file: check the syntax")
-        } else {
-            if !read_only {
-                fs::create_dir_all(path.parent().unwrap())?;
-                fs::write(&path, DEFAULT_SETTINGS_JSON)?;
-            }
-            json5::from_str(DEFAULT_SETTINGS_JSON).unwrap()
-        };
-
-        Ok(Self {
-            shared: Arc::new(RwLock::new(settings)),
-            path,
-            read_only,
+    /// Loads settings from configuration files.
+    ///
+    /// Returns the loaded settings and a boolean indicating whether any warnings occurred during
+    /// loading.
+    ///
+    /// TODO: Report the actual errors/warnings to the user.
+    pub fn load() -> (Self, bool) {
+        SettingsInner::load().map_first(|inner| Self {
+            inner: Arc::new(inner),
         })
     }
 
-    pub fn reset_json(&mut self) {
-        *self.write() = json5::from_str(DEFAULT_SETTINGS_JSON).unwrap();
-
-        let path = settings_path();
-        fs::write(&path, DEFAULT_SETTINGS_JSON).unwrap();
-
-        self.path = path;
-    }
-
-    pub fn reset_json_config(path: PathBuf) {
-        fs::write(path, DEFAULT_SETTINGS_JSON).unwrap();
+    pub fn read(&self) -> &Config {
+        &self.inner.base
     }
 }
 
-struct OtherSettingsPopup(Popup, MouseGuard);
-
-impl OtherSettingsPopup {
-    fn new(settings: &Settings) -> Self {
-        let popup = Popup::new(
-            "Other settings".to_string(),
-            vec![
-                "Path to the current settings:".to_string(),
-                format!(" {}", settings.path().to_string_lossy().to_string()),
-                "".to_string(),
-                "Other settings are not implemented in UI yet.".to_string(),
-                "Please edit the settings file directly.".to_string(),
-            ],
-        );
-
-        Self(popup, MouseGuard::new().unwrap())
-    }
+struct SettingsInner {
+    // ui_layer: PartialConfig,
+    config_layer: PartialConfig,
+    base: Config,
 }
 
-impl ActivityHandler for OtherSettingsPopup {
-    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
-        self.0.update(events, data)
-    }
+impl SettingsInner {
+    fn load() -> (Self, bool) {
+        let mut errored = false;
 
-    fn screen(&mut self) -> &mut dyn Screen {
-        &mut self.0
-    }
-}
-
-pub struct SettingsActivity {
-    actions: Vec<MenuAction<Change>>,
-    menu: Menu,
-}
-
-impl SettingsActivity {
-    fn other_settings_popup(settings: &Settings) -> Activity {
-        Activity::new_base_boxed("settings".to_string(), OtherSettingsPopup::new(settings))
-    }
-}
-
-#[allow(clippy::new_without_default)]
-impl SettingsActivity {
-    pub fn new() -> Self {
-        let options = menu_actions!(
-            "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
-            "Controls" -> data => Change::push(create_controls_settings(data)),
-            "Other settings" -> data => Change::push(SettingsActivity::other_settings_popup(&data.settings)),
-            "Back" -> _ => Change::pop_top(),
-        );
-
-        let (options, actions) = split_menu_actions(options);
-
-        let menu_config = MenuConfig::new("Settings", options).subtitle("Changes are not saved");
-
-        Self {
-            actions,
-            menu: Menu::new(menu_config),
-        }
-    }
-
-    pub fn new_activity() -> Activity {
-        Activity::new_base_boxed("settings".to_string(), Self::new())
-    }
-}
-
-impl ActivityHandler for SettingsActivity {
-    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
-        match self.menu.update(events, data)? {
-            Change::Pop {
-                res: Some(sub_activity),
-                ..
-            } => {
-                let index = *sub_activity
-                    .downcast::<usize>()
-                    .expect("menu should return index");
-                Some((self.actions[index])(data))
+        let base_config = Config::default();
+        let config_layer = match load_config_from_file(&paths::settings_path()) {
+            Ok(config) => config,
+            Err(_err) => {
+                errored = true;
+                PartialConfig::default()
             }
-            res => Some(res),
-        }
-    }
+        };
 
-    fn screen(&mut self) -> &mut dyn Screen {
-        &mut self.menu
+        let config = Self {
+            config_layer,
+            base: base_config,
+        };
+
+        (config, errored)
     }
 }
 
-pub fn create_controls_settings(data: &mut AppData) -> Activity {
-    let menu_config = MenuConfig::new(
-        "Controls settings",
-        [
-            MenuItem::Option(OptionDef {
-                text: "Enable mouse input".into(),
-                val: data.settings.get_enable_mouse(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_mouse(*enabled);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Enable dpad".into(),
-                val: data.settings.get_enable_dpad(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_dpad(*enabled);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Left-handed dpad".into(),
-                val: data.settings.get_landscape_dpad_on_left(),
-                fun: Box::new(|is_on_left, data| {
-                    *is_on_left = !*is_on_left;
-                    data.settings.set_landscape_dpad_on_left(*is_on_left);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Swap Up and Down buttons".into(),
-                val: data.settings.get_dpad_swap_up_down(),
-                fun: Box::new(|do_swap, data| {
-                    *do_swap = !*do_swap;
-                    data.settings.set_dpad_swap_up_down(*do_swap);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Enable margin around dpad".into(),
-                val: data.settings.get_enable_margin_around_dpad(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_margin_around_dpad(*enabled);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Enable dpad highlight".into(),
-                val: data.settings.get_enable_dpad_highlight(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_dpad_highlight(*enabled);
-                }),
-            }),
-            MenuItem::Separator,
-            MenuItem::Text("Exit".into()),
-        ],
-    );
+#[derive(Debug, thiserror::Error)]
+enum ConfigLoadError {
+    IoError(#[from] std::io::Error),
+    JsonError(#[from] json5::Error),
+    SettingsFormatError(String),
+}
 
-    Activity::new_base_boxed("controls settings", Menu::new(menu_config))
+impl Display for ConfigLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigLoadError::IoError(e) => write!(f, "I/O error: {}", e),
+            ConfigLoadError::JsonError(e) => write!(f, "Parse error: {}", e),
+            ConfigLoadError::SettingsFormatError(e) => write!(f, "Settings format error: {}", e),
+        }
+    }
+}
+
+fn load_config_from_file(path: &Path) -> Result<PartialConfig, (ConfigLoadError, PartialConfig)> {
+    match load_values_from_file(path) {
+        Ok(value) => PartialConfig::try_from(value)
+            .map_err(|(e, val)| (ConfigLoadError::SettingsFormatError(e), val)),
+        Err((e, val)) => Err((e, PartialConfig::try_from(val).unwrap_or_default())),
+    }
+}
+
+fn load_values_from_file(path: &Path) -> Result<Value, (ConfigLoadError, Value)> {
+    macro_rules! pack_error {
+        ($err:expr) => {
+            match $err {
+                Ok(val) => Ok(val),
+                Err(e) => Err((e.into(), Value::Object(HashMap::new()))),
+            }
+        };
+    }
+
+    // json5 doesn't support reading from reader
+    let content = pack_error!(std::fs::read_to_string(path))?;
+    let config_value = pack_error!(json5::from_str::<Value>(&content))?;
+    let values_with_extensions = load_extension_blocks(config_value)?;
+    Ok(values_with_extensions)
+}
+
+mod config_file_constants {
+    pub const IMPORT_KEY: &str = "#from";
+}
+
+fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value)> {
+    use config_file_constants::IMPORT_KEY;
+
+    /// Merges `ext` into `base`. In case of conflict, `ext` takes precedence.
+    /// Note that in this case, `base` is file behing `#from`, and `ext` is the current file.
+    ///
+    /// For objects, merging is done recursively.
+    ///
+    /// TODO: Allow rules customization in the future, for example to support list contatenation.
+    fn merge(base: &mut Value, ext: Value) {
+        match (base, ext) {
+            (Value::Object(base_map), Value::Object(ext_map)) => {
+                for (key, ext_value) in ext_map {
+                    if key == IMPORT_KEY {
+                        continue; // skip #from key during merge
+                    }
+
+                    if let Some(base_value) = base_map.get_mut(&key) {
+                        merge(base_value, ext_value);
+                    } else {
+                        base_map.insert(key, ext_value);
+                    }
+                }
+            }
+            (base_val, ext) => {
+                *base_val = ext;
+            }
+        }
+    }
+
+    let value = match config {
+        Value::Object(map) => {
+            if map.contains_key(IMPORT_KEY) {
+                if let Value::String(file_path) = &map[IMPORT_KEY] {
+                    let mut base_config = load_values_from_file(Path::new(file_path))?;
+                    merge(&mut base_config, Value::Object(map));
+                    base_config
+                } else {
+                    return Err((
+                        ConfigLoadError::SettingsFormatError(format!(
+                            "{IMPORT_KEY} value must be a string",
+                        )),
+                        Value::Object(map),
+                    ));
+                }
+            } else {
+                Value::Object(map)
+            }
+        }
+
+        val => val,
+    };
+
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_value_deserialize() {
+        let json_data = r#"
+        {
+            "name": "Example",
+            "enabled": true,
+            "threshold": 10.5,
+            "count": 42,
+            "items": [1, 2, 3],
+            "settings": {
+                "option1": "value1",
+                "option2": false
+            }
+        }
+        "#;
+
+        let parsed: Value = serde_json::from_str(json_data).unwrap();
+
+        if let Value::Object(map) = parsed {
+            assert_eq!(map.get("name"), Some(&Value::String("Example".to_string())));
+            assert_eq!(map.get("enabled"), Some(&Value::Bool(true)));
+            assert_eq!(map.get("threshold"), Some(&Value::Float(10.5)));
+            assert_eq!(map.get("count"), Some(&Value::Int(42)));
+
+            if let Some(Value::List(items)) = map.get("items") {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Value::Int(1));
+                assert_eq!(items[1], Value::Int(2));
+                assert_eq!(items[2], Value::Int(3));
+            } else {
+                panic!("Expected 'items' to be a list");
+            }
+
+            if let Some(Value::Object(settings)) = map.get("settings") {
+                assert_eq!(
+                    settings.get("option1"),
+                    Some(&Value::String("value1".to_string()))
+                );
+                assert_eq!(settings.get("option2"), Some(&Value::Bool(false)));
+            } else {
+                panic!("Expected 'settings' to be an object");
+            }
+        } else {
+            panic!("Expected top-level value to be an object");
+        }
+    }
 }

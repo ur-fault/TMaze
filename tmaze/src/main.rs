@@ -1,7 +1,7 @@
 use tmaze::{
     app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
     helpers::constants::paths::{save_data_path, settings_path},
-    settings::Settings,
+    settings::{theme::TerminalColorScheme, Settings},
 };
 
 #[cfg(feature = "updates")]
@@ -12,8 +12,9 @@ use clap::{Parser, ValueEnum};
 #[derive(Parser, Debug)]
 #[clap(version, author, about, name = "tmaze")]
 struct Args {
-    #[clap(long, action, help = "Reset config to default and quit")]
-    reset_config: bool,
+    // FIXME: This should reset UI config, not the user config
+    // #[clap(long, action, help = "Reset config to default and quit")]
+    // reset_config: bool,
     #[clap(short, long, action, help = "Show config path and quit")]
     show_config_path: bool,
     #[clap(long, help = "Show config in debug format and quit")]
@@ -59,10 +60,10 @@ enum StylesPrintMode {
 fn main() -> Result<(), GameError> {
     let _args = Args::parse();
 
-    if _args.reset_config {
-        Settings::reset_json_config(settings_path());
-        return Ok(());
-    }
+    // if _args.reset_config {
+    //     Settings::reset_json_config(settings_path());
+    //     return Ok(());
+    // }
 
     if _args.show_config_path {
         let settings_path = settings_path();
@@ -75,7 +76,13 @@ fn main() -> Result<(), GameError> {
     }
 
     if _args.debug_config {
-        println!("{:#?}", Settings::load_json(settings_path(), true)?.read());
+        let (config, errd) = Settings::load();
+        if errd {
+            eprintln!("Warning: Errors were encountered while loading the config.");
+        }
+
+        println!("{:#?}", config.read());
+
         return Ok(());
     }
 
@@ -146,7 +153,7 @@ fn print_style_options(mode: StylesPrintMode, counted: bool) {
 
 fn print_builtin_terminal_schemes() {
     println!("Built-in terminal color schemes:");
-    for name in tmaze::settings::theme::TerminalColorScheme::all_schemes() {
+    for name in TerminalColorScheme::all_schemes() {
         println!("- {}", name);
     }
     println!("Credit to https://github.com/alacritty/alacritty-theme");

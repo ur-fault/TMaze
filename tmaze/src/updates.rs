@@ -34,11 +34,12 @@ pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
 }
 
 pub fn check(app_data: &mut AppData) {
-    if app_data.save.is_update_checked(&app_data.settings) {
+    let cfg = app_data.settings.read();
+    if app_data.save.is_update_checked(cfg) {
         return;
     }
 
-    let display_update_errors = app_data.settings.get_display_update_check_errors();
+    let display_update_errors = cfg.updates.display_update_check_errors;
 
     let qer = app_data.queuer();
 
@@ -54,7 +55,7 @@ pub fn check(app_data: &mut AppData) {
             Ok(Some(version)) => {
                 log::warn!("Newer version found: {}", version);
                 qer.queue(Job::new(|data| {
-                    if !data.settings.is_ro() {
+                    if !data.is_ro() {
                         data.save
                             .update_last_check()
                             .expect("Failed to save the save data");
@@ -64,7 +65,7 @@ pub fn check(app_data: &mut AppData) {
             Ok(None) => {
                 log::info!("No newer version found");
                 qer.queue(Job::new(|data| {
-                    if !data.settings.is_ro() {
+                    if !data.is_ro() {
                         data.save
                             .update_last_check()
                             .expect("Failed to save the save data");

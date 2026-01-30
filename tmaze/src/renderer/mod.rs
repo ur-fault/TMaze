@@ -299,7 +299,7 @@ impl Cell {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct GBuffer(Array3D<Cell>, SharedScheme);
 
 impl GBuffer {
@@ -366,6 +366,13 @@ impl GBuffer {
             writeln!(to)?;
         }
         Ok(())
+    }
+}
+
+impl PartialEq for GBuffer {
+    fn eq(&self, other: &Self) -> bool {
+        // Note: we purposely ignore the scheme
+        self.0 == other.0
     }
 }
 

@@ -73,7 +73,7 @@ impl SoundPlayer {
             return;
         };
         let sink = Sink::try_new(handle).expect("Failed to create sink");
-        sink.set_volume(self.settings.get_audio_volume());
+        sink.set_volume(self.settings.read().audio.audio_volume as f32);
         sink.append(track);
         sink.play();
         sink.detach();
@@ -91,54 +91,60 @@ impl SoundPlayer {
 
 pub fn create_audio_settings(data: &mut AppData) -> Activity {
     fn update_vol(data: &mut AppData) {
-        if data.settings.get_enable_audio() && data.settings.get_enable_music() {
+        let cfg = &data.settings.read().audio;
+
+        if cfg.enable_audio && cfg.enable_music {
             data.sound_player
-                .set_volume(data.settings.get_audio_volume() * data.settings.get_music_volume());
+                .set_volume((cfg.audio_volume * cfg.music_volume) as f32);
         } else {
             data.sound_player.set_volume(0.0);
         }
     }
+
+    // FIXME: re-add settings updating once supported
+
+    let config = &data.settings.read().audio;
 
     let menu_config = menu::MenuConfig::new(
         "Audio settings",
         [
             MenuItem::Option(OptionDef {
                 text: "Global mute".into(),
-                val: !data.settings.get_enable_audio(),
+                val: !config.enable_audio,
                 fun: Box::new(|mute, data| {
                     *mute = !*mute;
-                    data.settings.set_enable_audio(!*mute);
+                    // data.settings.set_enable_audio(!*mute);
                     update_vol(data);
                 }),
             }),
             MenuItem::Slider(SliderDef {
                 text: "Global volume".into(),
-                val: (data.settings.get_audio_volume() * 5.0) as i32,
+                val: (config.audio_volume * 5.0) as i32,
                 range: 0..=5,
                 as_num: false,
                 fun: Box::new(|up, vol, data| {
                     *vol += if up { 1 } else { -1 };
-                    data.settings.set_audio_volume(*vol as f32 / 5.0);
+                    // data.settings.set_audio_volume(*vol as f32 / 5.0);
                     update_vol(data);
                 }),
             }),
             MenuItem::Option(OptionDef {
                 text: "Music mute".into(),
-                val: !data.settings.get_enable_music(),
+                val: !config.enable_music,
                 fun: Box::new(|mute, data| {
                     *mute = !*mute;
-                    data.settings.set_enable_music(!*mute);
+                    // data.settings.set_enable_music(!*mute);
                     update_vol(data);
                 }),
             }),
             MenuItem::Slider(SliderDef {
                 text: "Music volume".into(),
-                val: (data.settings.get_music_volume() * 5.0) as i32,
+                val: (config.music_volume * 5.0) as i32,
                 range: 0..=5,
                 as_num: false,
                 fun: Box::new(|up, vol, data| {
                     *vol += if up { 1 } else { -1 };
-                    data.settings.set_music_volume(*vol as f32 / 5.0);
+                    // data.settings.set_music_volume(*vol as f32 / 5.0);
                     update_vol(data);
                 }),
             }),

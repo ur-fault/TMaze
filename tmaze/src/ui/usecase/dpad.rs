@@ -101,11 +101,7 @@ impl DPad {
 
     /// Splits the screen into space for the viewport and the dpad.
     ///
-    /// Returns a tuple containing:
-    /// - Whether the dpad is vertical
-    /// - Whether the dpad is on the left side
-    /// - The split offset
-    // pub fn split_screen(screen_size: Dims, on_left: bool) -> (bool, bool, Offset) {
+    /// Returns (viewport_rect, dpad_rect)
     pub fn split_screen(data: &AppData) -> (Rect, Rect) {
         let screen_size = data.screen_size;
         let screen_ratio = (screen_size.0 as f32 / 2.0) / screen_size.1 as f32;
@@ -123,10 +119,10 @@ impl DPad {
         if is_vertical {
             screen_rect.split_y_end(Offset::Abs(dpad_size))
         } else {
-            let on_right = !data.settings.get_landscape_dpad_on_left();
+            let on_left = data.settings.read().nagivation.landscape_dpad_on_left;
             let offset = Offset::Abs(dpad_size);
 
-            if !on_right {
+            if on_left {
                 let (dpad, vp) = screen_rect.split_x(offset);
                 (vp, dpad)
             } else {

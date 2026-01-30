@@ -311,6 +311,7 @@ pub struct Menu {
 impl Menu {
     pub fn new(config: MenuConfig) -> Self {
         let MenuConfig { options, .. } = &config;
+        debug_assert!(!options.is_empty(), "Menu must have at least one option");
 
         let default = config.default.unwrap_or(0).clamp(0, options.len() - 1);
 

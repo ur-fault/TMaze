@@ -1,8 +1,19 @@
-use cmaze::{algorithms::MazeSpec, dims::{Dims, Offset}};
+use std::ops::Deref;
+
+use cmaze::{
+    algorithms::{MazeSpec, MazeSpecType},
+    dims::{Dims, Offset},
+};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::{config, impl_merge_prims, settings::config_utils::Mergeable};
+use crate::{
+    config, impl_merge_prims,
+    settings::{
+        config_utils::Mergeable,
+        theme::{PartialTerminalColorScheme, TerminalColorScheme},
+    },
+};
 
 config! {
     pub struct Config {
@@ -11,6 +22,7 @@ config! {
         #[nest] nagivation: Navigation,
         #[nest] updates: Updates,
         #[nest] audio: Audio,
+        presets: PresetList,
     }
 
     pub struct General {
@@ -52,37 +64,11 @@ config! {
     }
 }
 
-config! {
-    pub struct Presets {
-        presets: PresetList,
-    }
-
-    pub struct TerminalColorScheme {
-        primary_fg: Rgb,
-        primary_bg: Rgb,
-        black: Rgb,     // grey
-        dark_grey: Rgb, // dark grey
-        red: Rgb,
-        dark_red: Rgb,
-        green: Rgb,
-        dark_green: Rgb,
-        yellow: Rgb,
-        dark_yellow: Rgb,
-        blue: Rgb,
-        dark_blue: Rgb,
-        magenta: Rgb,
-        dark_magenta: Rgb,
-        cyan: Rgb,
-        dark_cyan: Rgb,
-        white: Rgb,
-        grey: Rgb,
-    }
-}
 impl_merge_prims! {
-    String
-    f64
     i64
     bool
+    f64
+    String
 
     Rgb
     Dims
@@ -94,7 +80,7 @@ impl_merge_prims! {
 
 type Rgb = (u8, u8, u8);
 
-#[derive(Default, Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "mode")]
 pub enum CameraMode {
     #[default]
@@ -105,7 +91,7 @@ pub enum CameraMode {
     },
 }
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub enum UpdateCheckInterval {
     Never,
     #[default]
@@ -118,7 +104,16 @@ pub enum UpdateCheckInterval {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PresetList {
+    #[serde(flatten)]
     presets: Vec<MazePreset>,
+}
+
+impl Deref for PresetList {
+    type Target = [MazePreset];
+
+    fn deref(&self) -> &Self::Target {
+        &self.presets
+    }
 }
 
 impl Mergeable<Self> for PresetList {
@@ -137,14 +132,31 @@ pub struct MazePreset {
     pub maze_spec: MazeSpec,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-// Note: order of variants matters for correct deserialization
-pub enum Value {
-    Object(HashMap<String, Value>),
-    List(Vec<Value>),
-    Int(i64),
-    Float(f64),
-    Bool(bool),
-    String(String),
+impl MazePreset {
+    pub fn short_desc(&self) -> Option<String> {
+        let (size, cells): (_, usize) = match &self.maze_spec.inner_spec {
+            MazeSpecType::Regions { regions, .. } => (
+                self.maze_spec.size()?,
+                regions.iter().map(|r| r.mask.enabled_count()).sum(),
+            ),
+            MazeSpecType::Simple { mask, .. } => (
+                self.maze_spec.size()?,
+                mask.as_ref()
+                    .map(|m| m.enabled_count())
+                    .unwrap_or(self.maze_spec.size()?.product() as usize),
+            ),
+        };
+
+        if size.2 == 1 {
+            Some(format!(
+                "{}: {}x{} ({} cells)",
+                self.title, size.0, size.1, cells
+            ))
+        } else {
+            Some(format!(
+                "{}: {}x{}x{} ({} cells)",
+                self.title, size.0, size.1, size.2, cells
+            ))
+        }
+    }
 }

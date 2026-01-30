@@ -8,10 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    helpers::constants::paths::save_data_path,
-    settings::{Settings, UpdateCheckInterval},
-};
+use crate::{helpers::constants::paths::save_data_path, settings::model::{Config, UpdateCheckInterval}};
 
 pub mod model {
     use cmaze::{algorithms::MazeType, dims::Dims3D};
@@ -105,10 +102,10 @@ impl SaveData {
 }
 
 impl SaveData {
-    pub fn is_update_checked(&self, settings: &Settings) -> bool {
+    pub fn is_update_checked(&self, settings: &Config) -> bool {
         use UpdateCheckInterval::*;
 
-        match settings.get_check_interval() {
+        match settings.updates.check_interval {
             Never => true,
             Daily => self.check_date(|d| d),
             Weekly => self.check_date(|d| d.iso_week()),
