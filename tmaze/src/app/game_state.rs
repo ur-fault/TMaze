@@ -45,7 +45,7 @@ pub struct GameData {
 }
 
 impl GameData {
-    pub fn handle_event(&mut self, settings: &Config, event: KeyEvent) -> Result<(), bool> {
+    pub fn handle_event(&mut self, config: &Config, event: KeyEvent) -> Result<(), bool> {
         let KeyEvent {
             code,
             modifiers,
@@ -60,23 +60,23 @@ impl GameData {
 
         match code {
             KeyCode::Up | KeyCode::Char('w' | 'W') => {
-                self.apply_move(settings, CellWall::Top, is_fast);
+                self.apply_move(config, CellWall::Top, is_fast);
             }
             KeyCode::Down | KeyCode::Char('s' | 'S') => {
-                self.apply_move(settings, CellWall::Bottom, is_fast);
+                self.apply_move(config, CellWall::Bottom, is_fast);
             }
             KeyCode::Left | KeyCode::Char('a' | 'A') => {
-                self.apply_move(settings, CellWall::Left, is_fast);
+                self.apply_move(config, CellWall::Left, is_fast);
             }
             KeyCode::Right | KeyCode::Char('d' | 'D') => {
-                self.apply_move(settings, CellWall::Right, is_fast);
+                self.apply_move(config, CellWall::Right, is_fast);
             }
             KeyCode::Char('Q') => return Err(true),
             KeyCode::Char('f' | 'q' | 'l') => {
-                self.apply_move(settings, CellWall::Down, is_fast);
+                self.apply_move(config, CellWall::Down, is_fast);
             }
             KeyCode::Char('r' | 'e' | 'p') => {
-                self.apply_move(settings, CellWall::Up, is_fast);
+                self.apply_move(config, CellWall::Up, is_fast);
             }
             KeyCode::Char(' ') => {
                 match self.view_mode {

@@ -6,7 +6,7 @@ pub mod theme;
 
 mod config_utils;
 
-use std::{fmt::Display, path::Path, sync::Arc};
+use std::{fmt::Display, ops::Deref, path::Path, sync::Arc};
 
 use hashbrown::HashMap;
 
@@ -36,6 +36,14 @@ impl Settings {
     }
 
     pub fn read(&self) -> &Config {
+        &self.inner.config
+    }
+}
+
+impl Deref for Settings {
+    type Target = Config;
+
+    fn deref(&self) -> &Self::Target {
         &self.inner.config
     }
 }

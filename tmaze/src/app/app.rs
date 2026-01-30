@@ -80,7 +80,7 @@ impl AppData {
             }
         }
 
-        let cfg = &self.settings.read().audio;
+        let cfg = &self.settings.audio;
         let volume = if cfg.enable_audio && cfg.enable_music {
             cfg.audio_volume * cfg.music_volume
         } else {
@@ -136,17 +136,16 @@ impl App {
     /// - initializes the registries,
     pub fn empty(read_only: bool) -> Self {
         let (settings, settings_error) = Settings::load();
-        let config = settings.read();
 
-        let renderer = Renderer::new(&Rc::new(config.general.terminal_scheme.clone()))
+        let renderer = Renderer::new(&Rc::new(settings.general.terminal_scheme.clone()))
             .expect("failed to create renderer");
         let activities = Activities::empty();
 
         let (logger, logs) = AppLogger::new_with_options(
-            config.general.logging_level,
+            settings.general.logging_level,
             LoggerOptions::default()
                 .read_only(read_only)
-                .file_level(config.general.file_logging_level),
+                .file_level(settings.general.file_logging_level),
         );
         logger.init();
 
@@ -177,7 +176,7 @@ impl App {
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
 
-        let appereance = Appearance::new(&config);
+        let appereance = Appearance::new(&settings);
 
         Self {
             renderer,
@@ -227,7 +226,7 @@ impl App {
                         ..
                     }) => self.switch_debug(),
                     event @ crossterm::event::Event::Mouse(_) => {
-                        if self.data.settings.read().nagivation.enable_mouse {
+                        if self.data.settings.nagivation.enable_mouse {
                             events.push(Event::Term(event));
                         }
                     }
@@ -312,7 +311,7 @@ impl App {
 
     fn switch_debug(&mut self) {
         self.data.use_data.show_debug = !self.data.use_data.show_debug;
-        self.data.logs.switch_debug(self.data.settings.read());
+        self.data.logs.switch_debug(&self.data.settings);
         log::warn!(
             "Debug mode: {}",
             on_off(self.data.use_data.show_debug, false)

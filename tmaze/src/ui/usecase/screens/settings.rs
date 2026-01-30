@@ -94,7 +94,7 @@ impl ActivityHandler for SettingsActivity {
 }
 
 pub fn create_controls_settings(data: &mut AppData) -> Activity {
-    let cfg = &data.settings.read().nagivation;
+    let cfg = &data.settings.nagivation;
 
     let menu_config = MenuConfig::new(
         "Controls settings",

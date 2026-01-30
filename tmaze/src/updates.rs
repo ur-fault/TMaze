@@ -34,7 +34,8 @@ pub async fn get_newer_async() -> Result<Option<Version>, CratesError> {
 }
 
 pub fn check(app_data: &mut AppData) {
-    let cfg = app_data.settings.read();
+    let cfg = &app_data.settings;
+
     if app_data.save.is_update_checked(cfg) {
         return;
     }
