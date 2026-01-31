@@ -6,7 +6,12 @@ pub mod theme;
 
 mod config_utils;
 
-use std::{fmt::Display, ops::Deref, path::Path, sync::Arc};
+use std::{
+    fmt::Display,
+    ops::Deref,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use hashbrown::HashMap;
 
@@ -29,62 +34,76 @@ impl Settings {
     /// loading.
     ///
     /// TODO: Report the actual errors/warnings to the user.
-    pub fn load() -> (Self, bool) {
+    pub fn load() -> (Self, Option<Vec<String>>) {
         SettingsInner::load().map_first(|inner| Self {
             inner: Arc::new(inner),
         })
     }
 
-    pub fn read(&self) -> &Config {
-        &self.inner.config
+    pub fn read(&self) -> impl Deref<Target = Config> + use<'_> {
+        self.inner.config.lock().unwrap()
     }
-}
 
-impl Deref for Settings {
-    type Target = Config;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner.config
+    pub fn update_ui(&self, with: impl FnOnce(&mut PartialConfig)) {
+        let mut ui_layer = self.inner.ui_layer.lock().unwrap();
+        with(&mut ui_layer);
+        self.inner.rebuild();
     }
 }
 
 struct SettingsInner {
     config_layer: PartialConfig,
-    ui_layer: PartialConfig,
-    config: Config,
+    ui_layer: Mutex<PartialConfig>,
+    config: Mutex<Config>,
 }
 
 impl SettingsInner {
-    fn load() -> (Self, bool) {
-        let mut errored = false;
+    fn load() -> (Self, Option<Vec<String>>) {
+        let mut errors = vec![];
 
         let config_layer = match load_config_from_file(&paths::config()) {
             Ok(config) => config,
-            Err(_err) => {
-                errored = true;
-                PartialConfig::default()
+            Err((err, config)) => {
+                errors.push(format!(
+                    "Failed to load user config, please check for syntax or invalid options. {err}"
+                ));
+                config
             }
         };
 
         let ui_layer = match load_config_from_file(&paths::managed::ui_settings()) {
             Ok(config) => config,
-            Err(_err) => {
-                errored = true;
-                PartialConfig::default()
+            Err((err, config)) => {
+                errors.push(format!(
+                    "Failed to load UI settings, possible corruption. {err}"
+                ));
+                config
             }
         };
 
-        let mut config = Config::default();
-        config.merge(&config_layer);
-        config.merge(&ui_layer);
-
         let settings = Self {
             config_layer,
-            ui_layer,
-            config,
+            ui_layer: Mutex::new(ui_layer),
+            config: Mutex::new(Config::default()),
         };
 
-        (settings, errored)
+        settings.rebuild();
+
+        let errors = if errors.is_empty() {
+            None
+        } else {
+            Some(errors)
+        };
+
+        (settings, errors)
+    }
+
+    fn rebuild(&self) {
+        let mut config = Config::default();
+        config.merge(&self.config_layer);
+        config.merge(&self.ui_layer.lock().unwrap());
+
+        *self.config.lock().unwrap() = config;
     }
 }
 

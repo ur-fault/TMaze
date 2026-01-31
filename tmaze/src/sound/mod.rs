@@ -73,7 +73,7 @@ impl SoundPlayer {
             return;
         };
         let sink = Sink::try_new(handle).expect("Failed to create sink");
-        sink.set_volume(self.settings.audio.audio_volume as f32);
+        sink.set_volume(self.settings.read().audio.audio_volume as f32);
         sink.append(track);
         sink.play();
         sink.detach();
@@ -91,7 +91,7 @@ impl SoundPlayer {
 
 pub fn create_audio_settings(data: &mut AppData) -> Activity {
     fn update_vol(data: &mut AppData) {
-        let cfg = &data.settings.audio;
+        let cfg = &data.settings.read().audio;
 
         if cfg.enable_audio && cfg.enable_music {
             data.sound_player
@@ -103,7 +103,7 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
 
     // FIXME: re-add settings updating once supported
 
-    let config = &data.settings.audio;
+    let config = &data.settings.read().audio;
 
     let menu_config = menu::MenuConfig::new(
         "Audio settings",

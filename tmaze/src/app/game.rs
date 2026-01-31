@@ -82,7 +82,7 @@ pub struct MainMenu {
 impl MainMenu {
     pub fn new() -> Self {
         let options = menu_actions!(
-            "New Game" -> data => Self::start_new_game(&data.settings, &data.use_data),
+            "New Game" -> data => Self::start_new_game(&data.settings.read(), &data.use_data),
             "Settings" -> _ => Self::show_settings_screen(),
             "Controls" -> _ => Self::show_controls_popup(),
             "Info" -> _ => Self::show_info_menu(),
@@ -525,12 +525,14 @@ pub struct GameActivity {
 
 impl GameActivity {
     pub fn new(game: GameData, app_data: &mut AppData) -> Self {
-        let config = &app_data.settings.viewport;
+        let config = app_data.settings.read();
+        let viewport_cfg = &config.viewport;
         let appear = &app_data.appearance;
 
-        let camera_mode = config.camera_mode;
+        let camera_mode = viewport_cfg.camera_mode;
         let maze_board = MazeBoard::new(&game.game, appear.theme(), appear.scheme().clone());
-        let margins = config.viewport_margin;
+        let margins = viewport_cfg.viewport_margin;
+        drop(config);
 
         #[cfg(feature = "sound")]
         app_data.play_bgm(MusicTrack::choose_for_maze(game.game.get_maze()));
@@ -654,7 +656,7 @@ impl GameActivity {
     }
 
     fn update_viewport(&mut self, data: &AppData) {
-        let cfg = &data.settings.nagivation;
+        let cfg = &data.settings.read().nagivation;
 
         if self.is_dpad_enabled() {
             let (viewport_rect, dpad_rect) = DPad::split_screen(data);
@@ -677,14 +679,14 @@ impl GameActivity {
 
     fn init_dpad(&mut self, data: &AppData) {
         let dpad_type = DPadType::from_maze(self.data.game.get_maze());
-        let swap_up_down = data.settings.nagivation.dpad_swap_up_down;
+        let swap_up_down = data.settings.read().nagivation.dpad_swap_up_down;
 
         let touch_controls = DPad::new(None, swap_up_down, dpad_type);
         self.touch_controls = Some(Box::new(touch_controls));
     }
 
     fn update_dpad(&mut self, data: &AppData) {
-        let config = &data.settings.nagivation;
+        let config = &data.settings.read().nagivation;
         if (config.enable_dpad && config.enable_mouse) != self.is_dpad_enabled() {
             if config.enable_dpad {
                 log::info!("Enabling dpad");
@@ -719,6 +721,8 @@ impl ActivityHandler for GameActivity {
             _ => {}
         }
 
+        let config = data.settings.read();
+
         self.update_dpad(data);
         self.update_viewport(data);
 
@@ -730,24 +734,22 @@ impl ActivityHandler for GameActivity {
             #[allow(clippy::single_match)]
             match event {
                 Event::Term(event) => match event {
-                    TermEvent::Key(key_event) => {
-                        match self.data.handle_event(&data.settings, key_event) {
-                            Err(false) => {
-                                self.data.game.pause().unwrap();
+                    TermEvent::Key(key_event) => match self.data.handle_event(&config, key_event) {
+                        Err(false) => {
+                            self.data.game.pause().unwrap();
 
-                                return Some(Change::push(Activity::new_base_boxed(
-                                    "pause".to_string(),
-                                    PauseMenu::new(),
-                                )));
-                            }
-                            Err(true) => return Some(Change::pop_until("main menu")),
-                            Ok(_) => {}
+                            return Some(Change::push(Activity::new_base_boxed(
+                                "pause".to_string(),
+                                PauseMenu::new(),
+                            )));
                         }
-                    }
+                        Err(true) => return Some(Change::pop_until("main menu")),
+                        Ok(_) => {}
+                    },
                     TermEvent::Mouse(event) => {
                         if let Some(ref mut touch_controls) = self.touch_controls {
                             if let Some(dir) = touch_controls.apply_mouse_event(event) {
-                                self.data.apply_move(&data.settings, dir, false);
+                                self.data.apply_move(&config, dir, false);
                             }
                         }
                     }
@@ -801,7 +803,7 @@ impl ActivityHandler for GameActivity {
             camera_smoothing,
             player_smoothing,
             ..
-        } = data.settings.viewport;
+        } = data.settings.read().viewport;
 
         self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.data.game.get_player_pos())) at player_smoothing);
         self.sm_camera_pos =

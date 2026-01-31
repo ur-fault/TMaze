@@ -17,7 +17,7 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
     data::SaveData,
-    helpers::on_off,
+    helpers::{constants::paths, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
     renderer::{self, draw::Draw, CellContent, GMutView, Renderer},
     settings::{
@@ -80,7 +80,7 @@ impl AppData {
             }
         }
 
-        let cfg = &self.settings.audio;
+        let cfg = &self.settings.read().audio;
         let volume = if cfg.enable_audio && cfg.enable_music {
             cfg.audio_volume * cfg.music_volume
         } else {
@@ -135,22 +135,31 @@ impl App {
     /// - initializes the job queue,
     /// - initializes the registries,
     pub fn empty(read_only: bool) -> Self {
-        let (settings, settings_error) = Settings::load();
+        if !read_only {
+            Self::prepare_dirs()
+                .expect("Failed to prepare application directories. Please check permissions.");
+        }
 
-        let renderer = Renderer::new(&Rc::new(settings.general.terminal_scheme.clone()))
+        let (settings, settings_errors) = Settings::load();
+        let config = settings.read();
+
+        let renderer = Renderer::new(&Rc::new(config.general.terminal_scheme.clone()))
             .expect("failed to create renderer");
         let activities = Activities::empty();
 
         let (logger, logs) = AppLogger::new_with_options(
-            settings.general.logging_level,
+            config.general.logging_level,
             LoggerOptions::default()
                 .read_only(read_only)
-                .file_level(settings.general.file_logging_level),
+                .file_level(config.general.file_logging_level),
         );
         logger.init();
 
-        if settings_error {
+        if let Some(errors) = settings_errors {
             log::error!("Errors were encountered while loading the config.");
+            for err in errors {
+                log::error!(" - {}", err);
+            }
         }
 
         let save = SaveData::load().expect("failed to load save data");
@@ -176,7 +185,9 @@ impl App {
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
 
-        let appereance = Appearance::new(&settings);
+        let appereance = Appearance::new(&config);
+
+        drop(config);
 
         Self {
             renderer,
@@ -212,6 +223,7 @@ impl App {
 
             let mut events = vec![];
 
+            // FIXME: better polling strategy, IO will need faster response times
             let mut delay = Duration::from_millis(45);
             while let Ok(true) = crossterm::event::poll(delay) {
                 let event = read().unwrap();
@@ -226,7 +238,7 @@ impl App {
                         ..
                     }) => self.switch_debug(),
                     event @ crossterm::event::Event::Mouse(_) => {
-                        if self.data.settings.nagivation.enable_mouse {
+                        if self.data.settings.read().nagivation.enable_mouse {
                             events.push(Event::Term(event));
                         }
                     }
@@ -311,11 +323,19 @@ impl App {
 
     fn switch_debug(&mut self) {
         self.data.use_data.show_debug = !self.data.use_data.show_debug;
-        self.data.logs.switch_debug(&self.data.settings);
+        self.data.logs.switch_debug(&self.data.settings.read());
         log::warn!(
             "Debug mode: {}",
             on_off(self.data.use_data.show_debug, false)
         );
+    }
+
+    fn prepare_dirs() -> std::io::Result<()> {
+        for dir in paths::all_dirs() {
+            std::fs::create_dir_all(&dir)?;
+        }
+
+        Ok(())
     }
 
     pub fn activity_count(&self) -> usize {

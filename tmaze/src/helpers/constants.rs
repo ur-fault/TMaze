@@ -49,6 +49,10 @@ pub mod paths {
         base().join("settings.json5")
     }
 
+    pub fn all_dirs() -> impl Iterator<Item = PathBuf> {
+        vec![theme(), managed::path()].into_iter()
+    }
+
     pub mod managed {
         use super::base;
         use std::path::PathBuf;

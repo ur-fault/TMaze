@@ -60,49 +60,52 @@ enum StylesPrintMode {
 }
 
 fn main() -> Result<(), GameError> {
-    let _args = Args::parse();
+    let args = Args::parse();
 
     // if _args.reset_config {
     //     Settings::reset_json_config(settings_path());
     //     return Ok(());
     // }
 
-    if _args.show_config_path {
+    if args.show_config_path {
         let settings_path = paths::config();
         std::io::stdout().write_all(settings_path.as_os_str().as_bytes())?;
         std::io::stdout().flush()?;
         return Ok(());
     }
 
-    if _args.debug_config {
-        let (config, errd) = Settings::load();
-        if errd {
+    if args.debug_config {
+        let (config, errors) = Settings::load();
+        if let Some(errors) = errors {
             eprintln!("Warning: Errors were encountered while loading the config.");
+            for error in errors {
+                eprintln!("- {}", error);
+            }
         }
 
-        println!("{:#?}", config.read());
+        println!("{:#?}", *config.read());
 
         return Ok(());
     }
 
-    if _args.delete_data {
+    if args.delete_data {
         let _ = std::fs::remove_file(paths::managed::save_data());
         return Ok(());
     }
 
-    if let Some(mode) = _args.print_theme_options {
-        print_style_options(mode.unwrap_or_default(), _args.counted_styles);
+    if let Some(mode) = args.print_theme_options {
+        print_style_options(mode.unwrap_or_default(), args.counted_styles);
         return Ok(());
     }
 
-    if _args.print_terminal_schemes {
+    if args.print_terminal_schemes {
         print_builtin_terminal_schemes();
         return Ok(());
     }
 
     better_panic::install();
 
-    let mut app = App::empty(_args.read_only);
+    let mut app = App::empty(args.read_only);
     let menu = MainMenu::new();
     app.activities_mut()
         .push(Activity::new_base_boxed("main menu", menu));
