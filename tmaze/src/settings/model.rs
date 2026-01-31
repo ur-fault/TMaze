@@ -102,22 +102,20 @@ pub enum UpdateCheckInterval {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PresetList {
-    #[serde(flatten)]
-    presets: Vec<MazePreset>,
-}
+#[serde(transparent)]
+pub struct PresetList(Vec<MazePreset>);
 
 impl Deref for PresetList {
     type Target = [MazePreset];
 
     fn deref(&self) -> &Self::Target {
-        &self.presets
+        &self.0
     }
 }
 
 impl Mergeable<Self> for PresetList {
     fn merge(&mut self, other: &Self) {
-        self.presets.extend_from_slice(&other.presets);
+        self.0.extend_from_slice(&other.0);
     }
 }
 
