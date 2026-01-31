@@ -63,6 +63,7 @@ impl ConvertContext {
         self.path.push(segment);
     }
 
+    #[allow(dead_code)]
     pub fn push_key(&mut self, key: &str) {
         self.path.push(Segment::Key(key.to_string()));
     }
@@ -90,9 +91,6 @@ impl ConvertContext {
 pub trait LenientConvert: Sized {
     fn convert(value: Value, context: &mut ConvertContext) -> Option<Self>;
 }
-
-pub trait ConfigValue<O>: Mergeable<O> + LenientConvert + Default {}
-impl<T, O> ConfigValue<O> for T where T: Mergeable<O> + LenientConvert + Default {}
 
 #[macro_export]
 macro_rules! config {

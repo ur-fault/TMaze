@@ -10,8 +10,6 @@ use crate::{
     helpers::{constants::paths::theme_file, ToDebug},
 };
 
-use super::config_utils::Mergeable;
-
 use super::attribute::deserialize_attributes;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

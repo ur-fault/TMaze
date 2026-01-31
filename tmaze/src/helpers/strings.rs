@@ -10,7 +10,9 @@ use substring::Substring;
 use unicode_width::UnicodeWidthStr as _;
 
 use crate::{
-    renderer::{draw::Draw, GMutView}, settings::theme::Style, ui::draw_str
+    renderer::{draw::Draw, GMutView},
+    settings::theme::Style,
+    ui::draw_str,
 };
 
 pub fn trim_center(text: &str, width: usize) -> &str {

@@ -8,7 +8,6 @@ mod config_utils;
 
 use std::{
     fmt::Display,
-    io,
     ops::Deref,
     path::Path,
     sync::{Arc, Mutex},
