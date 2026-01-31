@@ -7,9 +7,9 @@ use cmaze::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    config, impl_merge_prims,
+    config, impl_lenient_deserialize, impl_lenient_prims, impl_merge_prims,
     settings::{
-        config_utils::Mergeable,
+        config_utils::{ConvertContext, LenientConvert, Mergeable, Value},
         theme::{PartialTerminalColorScheme, TerminalColorScheme},
     },
 };
@@ -77,6 +77,22 @@ impl_merge_prims! {
     UpdateCheckInterval
 }
 
+impl_lenient_prims! {
+    i64 => Int,
+    bool => Bool,
+    f64 => Float Int,
+    String => String,
+}
+
+impl_lenient_deserialize! {
+    log::Level
+    CameraMode
+    UpdateCheckInterval
+    MazePreset
+    Dims
+    Rgb
+}
+
 type Rgb = (u8, u8, u8);
 
 #[derive(Default, Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
@@ -119,13 +135,36 @@ impl Mergeable<Self> for PresetList {
     }
 }
 
+impl LenientConvert for PresetList {
+    fn convert(value: Value, context: &mut ConvertContext) -> Option<Self> {
+        let Value::List(list) = value else {
+            context.err("expected a list of maze presets".to_string());
+            return None;
+        };
+
+        let mut presets = vec![];
+        for (i, item) in list.into_iter().enumerate() {
+            context.push_index(i);
+            match MazePreset::convert(item, context) {
+                Some(preset) => presets.push(preset),
+                None => { /* error already recorded */ }
+            }
+            context.pop();
+        }
+
+        Some(PresetList(presets))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazePreset {
     pub title: String,
     pub description: Option<String>,
 
+    #[serde(default)]
     pub default: bool,
 
+    #[serde(flatten)]
     pub maze_spec: MazeSpec,
 }
 

@@ -78,8 +78,6 @@ pub type Algorithm = (String, Params);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazeSpec {
-    // /// Size of the maze.
-    // pub size: Dims3D,
     /// Specification of the maze.
     #[serde(default, flatten)]
     pub inner_spec: MazeSpecType,

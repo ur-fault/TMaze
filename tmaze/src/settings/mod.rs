@@ -18,7 +18,7 @@ use hashbrown::HashMap;
 
 use crate::{
     helpers::{constants::paths, TupleMap},
-    settings::config_utils::{Mergeable, Value},
+    settings::config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value},
 };
 
 use model::{Config, PartialConfig};
@@ -62,28 +62,10 @@ impl SettingsInner {
     fn load() -> (Self, Option<Vec<String>>) {
         let mut errors = vec![];
 
-        let config_layer = match load_config_from_file(&paths::config()) {
-            Ok(config) => config,
-            Err((err, config)) => {
-                errors.push(format!(
-                    "Failed to load user config, please check for syntax or invalid options. {err}"
-                ));
-                config
-            }
-        };
+        let (config_layer, load_errors) = load_config_from_file(&paths::config());
+        errors.extend(load_errors.iter().map(ConvertError::to_string));
 
-        let ui_layer = match load_config_from_file(&paths::managed::ui_settings()) {
-            Ok(config) => config,
-            Err((ConfigLoadError::IoError(err), _)) if err.kind() == io::ErrorKind::NotFound => {
-                PartialConfig::default()
-            }
-            Err((err, config)) => {
-                errors.push(format!(
-                    "Failed to load UI settings, possible corruption. {err}"
-                ));
-                config
-            }
-        };
+        let ui_layer = load_ui_config_from_file(&paths::managed::ui_settings());
 
         let settings = Self {
             config_layer,
@@ -129,19 +111,23 @@ impl Display for ConfigLoadError {
 }
 
 fn load_ui_config_from_file(path: &Path) -> PartialConfig {
-    PartialConfig::try_from(
-        json5::from_str(&std::fs::read_to_string(path).unwrap_or_default())
-            .unwrap_or(Value::Object(HashMap::new())),
-    )
-    .unwrap_or_default()
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
 }
 
-fn load_config_from_file(path: &Path) -> Result<PartialConfig, (ConfigLoadError, PartialConfig)> {
-    match load_values_from_file(path) {
-        Ok(value) => PartialConfig::try_from(value)
-            .map_err(|(e, val)| (ConfigLoadError::SettingsFormatError(e), val)),
-        Err((e, val)) => Err((e, PartialConfig::try_from(val).unwrap_or_default())),
-    }
+fn load_config_from_file(path: &Path) -> (PartialConfig, Vec<ConvertError>) {
+    let mut context = ConvertContext::new();
+    let config = match load_values_from_file(path) {
+        Ok(value) => PartialConfig::convert(value, &mut context),
+        Err((e, val)) => {
+            context.err(format!("Failed to load config: {}", e));
+            PartialConfig::convert(val, &mut context)
+        }
+    };
+
+    (config.unwrap_or_default(), context.errors())
 }
 
 fn load_values_from_file(path: &Path) -> Result<Value, (ConfigLoadError, Value)> {

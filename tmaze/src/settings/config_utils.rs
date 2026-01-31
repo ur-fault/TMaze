@@ -1,9 +1,98 @@
+use std::fmt::Display;
+
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 pub trait Mergeable<O> {
     fn merge(&mut self, other: &O);
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Segment {
+    Key(String),
+    Index(usize),
+}
+
+impl Display for Segment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Segment::Key(key) => write!(f, "{}", key),
+            Segment::Index(index) => write!(f, "[{}]", index),
+        }
+    }
+}
+
+pub type Path = Vec<Segment>;
+
+#[derive(Clone, Debug)]
+pub struct ConvertError {
+    // TODO: Add source file/line info
+    pub path: Path,
+    pub detail: String,
+}
+
+impl std::fmt::Display for ConvertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let path_str = self.path.iter().map(Segment::to_string).collect::<Vec<_>>();
+        let path_str = path_str.join(".");
+        write!(f, "'{}': {}", path_str, self.detail)
+    }
+}
+
+pub struct ConvertContext {
+    pub path: Path,
+    pub errors: Vec<ConvertError>,
+}
+
+impl ConvertContext {
+    pub fn new() -> Self {
+        Self {
+            path: vec![],
+            errors: vec![],
+        }
+    }
+
+    pub fn at<T>(&mut self, segment: Segment, inside: impl FnOnce(&mut Self) -> T) -> T {
+        self.push(segment);
+        let t = inside(self);
+        self.pop();
+        t
+    }
+
+    pub fn push(&mut self, segment: Segment) {
+        self.path.push(segment);
+    }
+
+    pub fn push_key(&mut self, key: &str) {
+        self.path.push(Segment::Key(key.to_string()));
+    }
+
+    pub fn push_index(&mut self, index: usize) {
+        self.path.push(Segment::Index(index));
+    }
+
+    pub fn pop(&mut self) {
+        self.path.pop();
+    }
+
+    pub fn err(&mut self, detail: String) {
+        self.errors.push(ConvertError {
+            path: self.path.clone(),
+            detail,
+        });
+    }
+
+    pub fn errors(self) -> Vec<ConvertError> {
+        self.errors
+    }
+}
+
+pub trait LenientConvert: Sized {
+    fn convert(value: Value, context: &mut ConvertContext) -> Option<Self>;
+}
+
+pub trait ConfigValue<O>: Mergeable<O> + LenientConvert + Default {}
+impl<T, O> ConfigValue<O> for T where T: Mergeable<O> + LenientConvert + Default {}
 
 #[macro_export]
 macro_rules! config {
@@ -14,12 +103,14 @@ macro_rules! config {
          // this branch must be 1st so that #[nest] is parsed as special attribute
          { #[nest] $(#[$attr:meta])* $field:ident : $type:ty, $($rest:tt)* }
     ) => {
-        config!{ @step
-            $name
-            [ $($fields)* $field = ::std::default::Default::default(), ]
-            [ $($rfields)* pub $field : $type, ]
-            [ $($pfields)* $(#[$attr])* pub $field : Option<[<Partial $type>]>, ]
-            { $($rest)* }
+        ::paste::paste! {
+            config!{ @step
+                $name
+                [ $($fields)* $field : [<Partial $type>] = ::std::default::Default::default(), ]
+                [ $($rfields)* pub $field : $type, ]
+                [ $($pfields)* $(#[$attr])* pub $field : Option<[<Partial $type>]>, ]
+                { $($rest)* }
+            }
         }
     };
 
@@ -31,7 +122,7 @@ macro_rules! config {
     ) => {
         config!{ @step
             $name
-            [ $($fields)* $field = ::std::default::Default::default(), ]
+            [ $($fields)* $field : $type = ::std::default::Default::default(), ]
             [ $($rfields)* pub $field : $type, ]
             [ $($pfields)* $(#[$attr])* pub $field : Option<$type>, ]
             { $($rest)* }
@@ -46,7 +137,7 @@ macro_rules! config {
     ) => {
         config!{ @step
             $name
-            [ $($fields)* $field = ($def), ]
+            [ $($fields)* $field : $type = ($def), ]
             [ $($rfields)* pub $field : $type, ]
             [ $($pfields)* $(#[$attr])* pub $field : Option<$type>, ]
             { $($rest)* }
@@ -54,7 +145,7 @@ macro_rules! config {
     };
 
     (@step $name:ident
-         [$($fields:ident = $def_vals:expr),* ,]
+         [$($fields:ident : $type:ty = $def_vals:expr),* ,]
          [$($rfields:tt)*]
          [$($pfields:tt)*]
          { }
@@ -67,9 +158,7 @@ macro_rules! config {
         impl ::std::default::Default for $name {
             fn default() -> Self {
                 Self {
-                    $(
-                        $fields : $def_vals,
-                    )*
+                    $($fields : $def_vals,)*
                 }
             }
         }
@@ -90,19 +179,30 @@ macro_rules! config {
                 }
             }
 
-            impl TryFrom<$crate::settings::config_utils::Value> for [<Partial $name>] {
-                type Error = (String, Self);
+            impl $crate::settings::config_utils::LenientConvert for [<Partial $name>] {
+                fn convert(
+                    value: super::config_utils::Value,
+                    context: &mut super::config_utils::ConvertContext,
+                ) -> Option<Self> {
+                    let super::config_utils::Value::Object(mut map) = value else {
+                        context.err("expected an object".to_string());
+                        return None;
+                    };
 
-                fn try_from(value: $crate::settings::config_utils::Value) -> Result<Self, Self::Error> {
-                    match value {
-                        $crate::settings::config_utils::Value::Object(map) => {
-                            let json_value = ::serde_json::to_value(map)
-                                .expect("Failed to convert map to JSON value"); // should not happen
-                            ::serde_json::from_value(json_value)
-                                .map_err(|e| (e.to_string(), Self::default()))
-                        }
-                        _ => Err(("Expected an object for partial config".to_string(), Self::default())),
-                    }
+                    Some(Self {
+                        $(
+                            $fields: {
+                                if let Some(value) = map.remove(stringify!($fields)) {
+                                    context.at(
+                                        $crate::settings::config_utils::Segment::Key(stringify!($fields).to_string()),
+                                        |ctx| <$type as $crate::settings::config_utils::LenientConvert>::convert(value, ctx)
+                                    )
+                                } else {
+                                    None
+                                }
+                            },
+                        )*
+                    })
                 }
             }
         }
@@ -122,6 +222,42 @@ macro_rules! impl_merge_prims {
             }
         })*
     };
+}
+
+#[macro_export]
+macro_rules! impl_lenient_prims {
+    ($($t:ty => $($variant:ident)+),* $(,)?) => {
+        $(impl $crate::settings::config_utils::LenientConvert for $t {
+            fn convert(value: super::config_utils::Value, context: &mut super::config_utils::ConvertContext) -> Option<Self> {
+                match value {
+                    $(super::config_utils::Value::$variant(v) => Some(v as $t),)+
+                    _ => {
+                        context.err(format!("expected one of: {}", stringify!($($variant),+)));
+                        None
+                    }
+                }
+            }
+        })*
+    };
+}
+
+#[macro_export]
+macro_rules! impl_lenient_deserialize  {
+    ($($t:ty)*) => {
+        $(impl $crate::settings::config_utils::LenientConvert for $t {
+            fn convert(value: super::config_utils::Value, context: &mut super::config_utils::ConvertContext) -> Option<Self> {
+                let json_value = ::serde_json::to_value(&value)
+                    .expect("Failed to convert Value to JSON value"); // should not happen
+                match ::serde_json::from_value::<$t>(json_value) {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        context.err(format!("deserialization error: {}", e));
+                        None
+                    }
+                }
+            }
+        })*
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

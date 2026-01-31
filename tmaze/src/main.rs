@@ -70,6 +70,7 @@ fn main() -> Result<(), GameError> {
     if args.show_config_path {
         let settings_path = paths::config();
         std::io::stdout().write_all(settings_path.as_os_str().as_bytes())?;
+        std::io::stdout().write_all(b"\n")?;
         std::io::stdout().flush()?;
         return Ok(());
     }
