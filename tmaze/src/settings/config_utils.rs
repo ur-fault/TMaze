@@ -90,14 +90,6 @@ macro_rules! config {
                 }
             }
 
-            impl From<&[<Partial $name>]> for $name {
-                fn from(partial: &[<Partial $name>]) -> Self {
-                    let mut config = Self::default();
-                    config.merge(partial);
-                    config
-                }
-            }
-
             impl TryFrom<$crate::settings::config_utils::Value> for [<Partial $name>] {
                 type Error = (String, Self);
 
