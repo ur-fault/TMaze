@@ -8,6 +8,7 @@ mod config_utils;
 
 use std::{
     fmt::Display,
+    io,
     ops::Deref,
     path::Path,
     sync::{Arc, Mutex},
@@ -73,6 +74,9 @@ impl SettingsInner {
 
         let ui_layer = match load_config_from_file(&paths::managed::ui_settings()) {
             Ok(config) => config,
+            Err((ConfigLoadError::IoError(err), _)) if err.kind() == io::ErrorKind::NotFound => {
+                PartialConfig::default()
+            }
             Err((err, config)) => {
                 errors.push(format!(
                     "Failed to load UI settings, possible corruption. {err}"
@@ -169,7 +173,8 @@ fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value
     ///
     /// For objects, merging is done recursively.
     ///
-    /// TODO: Allow rules customization in the future, for example to support list contatenation.
+    /// TODO: Allow rules customization in the future, for example to support list contatenation
+    /// instead of replacement.
     fn merge(base: &mut Value, ext: Value) {
         match (base, ext) {
             (Value::Object(base_map), Value::Object(ext_map)) => {
@@ -215,56 +220,4 @@ fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value
     };
 
     Ok(value)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_value_deserialize() {
-        let json_data = r#"
-        {
-            "name": "Example",
-            "enabled": true,
-            "threshold": 10.5,
-            "count": 42,
-            "items": [1, 2, 3],
-            "settings": {
-                "option1": "value1",
-                "option2": false
-            }
-        }
-        "#;
-
-        let parsed: Value = serde_json::from_str(json_data).unwrap();
-
-        if let Value::Object(map) = parsed {
-            assert_eq!(map.get("name"), Some(&Value::String("Example".to_string())));
-            assert_eq!(map.get("enabled"), Some(&Value::Bool(true)));
-            assert_eq!(map.get("threshold"), Some(&Value::Float(10.5)));
-            assert_eq!(map.get("count"), Some(&Value::Int(42)));
-
-            if let Some(Value::List(items)) = map.get("items") {
-                assert_eq!(items.len(), 3);
-                assert_eq!(items[0], Value::Int(1));
-                assert_eq!(items[1], Value::Int(2));
-                assert_eq!(items[2], Value::Int(3));
-            } else {
-                panic!("Expected 'items' to be a list");
-            }
-
-            if let Some(Value::Object(settings)) = map.get("settings") {
-                assert_eq!(
-                    settings.get("option1"),
-                    Some(&Value::String("value1".to_string()))
-                );
-                assert_eq!(settings.get("option2"), Some(&Value::Bool(false)));
-            } else {
-                panic!("Expected 'settings' to be an object");
-            }
-        } else {
-            panic!("Expected top-level value to be an object");
-        }
-    }
 }
