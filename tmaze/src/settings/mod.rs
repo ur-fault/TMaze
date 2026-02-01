@@ -6,13 +6,9 @@ pub mod theme;
 
 mod config_utils;
 
-use std::{
-    fmt::Display,
-    ops::Deref,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+use std::{fmt::Display, ops::Deref, path::Path, sync::Arc};
 
+use arc_swap::ArcSwap;
 use hashbrown::HashMap;
 
 use crate::{
@@ -40,21 +36,32 @@ impl Settings {
         })
     }
 
-    pub fn read(&self) -> impl Deref<Target = Config> + use<'_> {
-        self.inner.config.lock().unwrap()
+    #[track_caller]
+    pub fn read(&self) -> impl Deref<Target = Arc<Config>> + use<'_> {
+        log::trace!(
+            "Locking settings for read at {}",
+            std::panic::Location::caller()
+        );
+        self.inner.config.load()
     }
 
+    #[track_caller]
     pub fn update_ui(&self, with: impl FnOnce(&mut PartialConfig)) {
-        let mut ui_layer = self.inner.ui_layer.lock().unwrap();
-        with(&mut ui_layer);
+        log::trace!(
+            "Locking settings for update at {}",
+            std::panic::Location::caller()
+        );
+        let mut new_ui = (**self.inner.ui_layer.load()).clone();
+        with(&mut new_ui);
+        self.inner.ui_layer.store(Arc::new(new_ui));
         self.inner.rebuild();
     }
 }
 
 struct SettingsInner {
     config_layer: PartialConfig,
-    ui_layer: Mutex<PartialConfig>,
-    config: Mutex<Config>,
+    ui_layer: ArcSwap<PartialConfig>,
+    config: ArcSwap<Config>,
 }
 
 impl SettingsInner {
@@ -68,8 +75,8 @@ impl SettingsInner {
 
         let settings = Self {
             config_layer,
-            ui_layer: Mutex::new(ui_layer),
-            config: Mutex::new(Config::default()),
+            ui_layer: ArcSwap::from_pointee(ui_layer),
+            config: ArcSwap::default(),
         };
 
         settings.rebuild();
@@ -86,9 +93,9 @@ impl SettingsInner {
     fn rebuild(&self) {
         let mut config = Config::default();
         config.merge(&self.config_layer);
-        config.merge(&self.ui_layer.lock().unwrap());
+        config.merge(&self.ui_layer.load());
 
-        *self.config.lock().unwrap() = config;
+        self.config.store(Arc::new(config));
     }
 }
 

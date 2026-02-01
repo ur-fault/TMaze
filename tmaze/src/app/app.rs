@@ -250,10 +250,7 @@ impl App {
             }
 
             while let Some(change) = match self.activities.active_mut() {
-                Some(active) => {
-                    log::trace!("Updating activity: '{}'", active.name());
-                    active
-                }
+                Some(active) => active,
                 None => break 'mainloop events,
             }
             .update(std::mem::take(&mut events), &mut self.data)
