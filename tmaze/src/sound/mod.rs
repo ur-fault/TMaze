@@ -118,9 +118,8 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 text: "Global mute".into(),
                 val: !config.enable_audio,
                 fun: Box::new(|mute, data| {
-                    *mute = !*mute;
                     data.settings.update_ui(|cfg| {
-                        *cfg.audio().enable_audio() = *mute;
+                        *cfg.audio().enable_audio() = !mute;
                     });
                     update_vol(data);
                 }),
@@ -130,10 +129,9 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 val: (config.audio_volume * 5.0) as i32,
                 range: 0..=5,
                 as_num: false,
-                fun: Box::new(|up, vol, data| {
-                    *vol += if up { 1 } else { -1 };
+                fun: Box::new(|vol, data| {
                     data.settings.update_ui(|cfg| {
-                        *cfg.audio().audio_volume() = *vol as f64 / 5.0;
+                        *cfg.audio().audio_volume() = vol as f64 / 5.0;
                     });
                     update_vol(data);
                 }),
@@ -142,9 +140,8 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 text: "Music mute".into(),
                 val: !config.enable_music,
                 fun: Box::new(|mute, data| {
-                    *mute = !*mute;
                     data.settings.update_ui(|cfg| {
-                        *cfg.audio().enable_music() = !*mute;
+                        *cfg.audio().enable_music() = !mute;
                     });
                     update_vol(data);
                 }),
@@ -154,10 +151,9 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 val: (config.music_volume * 5.0) as i32,
                 range: 0..=5,
                 as_num: false,
-                fun: Box::new(|up, vol, data| {
-                    *vol += if up { 1 } else { -1 };
+                fun: Box::new(|vol, data| {
                     data.settings.update_ui(|cfg| {
-                        *cfg.audio().music_volume() = *vol as f64 / 5.0;
+                        *cfg.audio().music_volume() = vol as f64 / 5.0;
                     });
                     update_vol(data);
                 }),

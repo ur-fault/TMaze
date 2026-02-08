@@ -33,7 +33,7 @@ pub struct SliderDef {
     #[allow(clippy::type_complexity)]
     // FIXME: take value instead of change direction (bool),
     // this should allow for mouse support
-    pub fun: Box<dyn FnMut(bool, &mut i32, &mut AppData)>,
+    pub fun: Box<dyn FnMut(i32, &mut AppData)>,
     pub as_num: bool,
 }
 
@@ -42,7 +42,7 @@ pub struct OptionDef {
     pub val: bool,
     #[allow(clippy::type_complexity)]
     // FIXME: return the bool instead
-    pub fun: Box<dyn FnMut(&mut bool, &mut AppData)>,
+    pub fun: Box<dyn FnMut(bool, &mut AppData)>,
 }
 
 // TODO: styling individual items
@@ -349,7 +349,10 @@ impl Menu {
 
         match selected_opt {
             MenuItem::Text(_) => return Some(Change::pop_top_with(self.selected)),
-            MenuItem::Option(OptionDef { val, fun, .. }) => fun(val, data),
+            MenuItem::Option(OptionDef { val, fun, .. }) => {
+                *val = !*val;
+                fun(*val, data);
+            }
             MenuItem::Slider(_) | MenuItem::Separator => {}
         }
 
@@ -361,8 +364,9 @@ impl Menu {
             val, range, fun, ..
         }) = &mut self.config.options[self.selected]
         {
-            fun(right, val, data);
+            *val += if right { 1 } else { -1 };
             *val = (*val).clamp(*range.start(), *range.end());
+            fun(*val, data);
         }
     }
 

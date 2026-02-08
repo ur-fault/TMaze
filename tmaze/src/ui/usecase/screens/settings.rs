@@ -103,7 +103,6 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 text: "Enable mouse input".into(),
                 val: cfg.enable_mouse,
                 fun: Box::new(|enabled, _data| {
-                    *enabled = !*enabled;
                     // data.settings.set_enable_mouse(*enabled);
                 }),
             }),
@@ -111,7 +110,6 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 text: "Enable dpad".into(),
                 val: cfg.enable_dpad,
                 fun: Box::new(|enabled, _data| {
-                    *enabled = !*enabled;
                     // data.settings.set_enable_dpad(*enabled);
                 }),
             }),
@@ -119,7 +117,6 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 text: "Left-handed dpad".into(),
                 val: cfg.landscape_dpad_on_left,
                 fun: Box::new(|is_on_left, _data| {
-                    *is_on_left = !*is_on_left;
                     // data.settings.set_landscape_dpad_on_left(*is_on_left);
                 }),
             }),
@@ -127,7 +124,6 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 text: "Swap Up and Down buttons".into(),
                 val: cfg.dpad_swap_up_down,
                 fun: Box::new(|do_swap, _data| {
-                    *do_swap = !*do_swap;
                     // data.settings.set_dpad_swap_up_down(*do_swap);
                 }),
             }),
@@ -135,7 +131,6 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 text: "Enable margin around dpad".into(),
                 val: cfg.enable_margin_around_dpad,
                 fun: Box::new(|enabled, _data| {
-                    *enabled = !*enabled;
                     // data.settings.set_enable_margin_around_dpad(*enabled);
                 }),
             }),
@@ -143,7 +138,6 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 text: "Enable dpad highlight".into(),
                 val: cfg.enable_dpad_highlight,
                 fun: Box::new(|enabled, _data| {
-                    *enabled = !*enabled;
                     // data.settings.set_enable_dpad_highlight(*enabled);
                 }),
             }),
