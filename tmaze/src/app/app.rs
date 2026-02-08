@@ -192,6 +192,7 @@ impl App {
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone(), event_sink.clone());
+        event_receivers.push(sound_player.register());
 
         let appereance = Appearance::new(&config);
 
@@ -235,7 +236,7 @@ impl App {
             let mut events = vec![];
 
             // FIXME: better polling strategy, IO will need faster response times
-            let mut delay = Duration::from_millis(45);
+            let mut delay = Duration::from_millis(10);
             while let Ok(true) = crossterm::event::poll(delay) {
                 let event = read().unwrap();
 
@@ -266,11 +267,14 @@ impl App {
             }
 
             // Update handle the event receivers
-            for receiver in &mut self.data.event_receivers {
+            // (hack): due to borrow issues
+            let mut receivers = std::mem::take(&mut self.data.event_receivers);
+            for receiver in receivers.iter_mut() {
                 for event in &events {
-                    receiver(event);
+                    receiver(event, &mut self.data);
                 }
             }
+            self.data.event_receivers = receivers;
 
             while let Some(change) = match self.activities.active_mut() {
                 Some(active) => active,

@@ -12,7 +12,11 @@ use arc_swap::ArcSwap;
 use hashbrown::HashMap;
 
 use crate::{
-    app::{app::EventSink, event::EventReceiver, Event},
+    app::{
+        app::{AppData, EventSink},
+        event::EventReceiver,
+        Event,
+    },
     helpers::{constants::paths, TupleMap},
     settings::config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value},
 };
@@ -72,9 +76,9 @@ impl Settings {
 }
 
 impl EventReceiver for &Settings {
-    fn register(self) -> Box<dyn FnMut(&Event)> {
+    fn register(self) -> Box<dyn FnMut(&Event, &mut AppData)> {
         let settings = self.clone();
-        Box::new(move |event| {
+        Box::new(move |event, _| {
             if let Event::SettingsChanged = event {
                 log::trace!("Writing UI settings to file from event");
                 settings.write_ui();

@@ -33,7 +33,8 @@ pub struct SliderDef {
     #[allow(clippy::type_complexity)]
     // FIXME: take value instead of change direction (bool),
     // this should allow for mouse support
-    pub fun: Box<dyn FnMut(i32, &mut AppData)>,
+    pub update_fn: Box<dyn FnMut(i32, &mut AppData)>,
+    pub reset_fn: Option<Box<dyn FnMut(&mut AppData) -> i32>>,
     pub as_num: bool,
 }
 
@@ -42,7 +43,8 @@ pub struct OptionDef {
     pub val: bool,
     #[allow(clippy::type_complexity)]
     // FIXME: return the bool instead
-    pub fun: Box<dyn FnMut(bool, &mut AppData)>,
+    pub update_fn: Box<dyn FnMut(bool, &mut AppData)>,
+    pub reset_fn: Option<Box<dyn FnMut(&mut AppData) -> bool>>,
 }
 
 // TODO: styling individual items
@@ -349,7 +351,11 @@ impl Menu {
 
         match selected_opt {
             MenuItem::Text(_) => return Some(Change::pop_top_with(self.selected)),
-            MenuItem::Option(OptionDef { val, fun, .. }) => {
+            MenuItem::Option(OptionDef {
+                val,
+                update_fn: fun,
+                ..
+            }) => {
                 *val = !*val;
                 fun(*val, data);
             }
@@ -361,7 +367,10 @@ impl Menu {
 
     fn update_slider(&mut self, right: bool, data: &mut AppData) {
         if let MenuItem::Slider(SliderDef {
-            val, range, fun, ..
+            val,
+            range,
+            update_fn: fun,
+            ..
         }) = &mut self.config.options[self.selected]
         {
             *val += if right { 1 } else { -1 };
@@ -386,6 +395,24 @@ impl Menu {
         }
 
         Some(selected)
+    }
+
+    fn reset(&mut self, data: &mut AppData) {
+        let selected_opt = &mut self.config.options[self.selected];
+        match selected_opt {
+            MenuItem::Text(_) => {}
+            MenuItem::Option(OptionDef { val, reset_fn, .. }) => {
+                if let Some(reset_fn) = reset_fn {
+                    *val = reset_fn(data);
+                }
+            }
+            MenuItem::Slider(SliderDef { val, reset_fn, .. }) => {
+                if let Some(reset_fn) = reset_fn {
+                    *val = reset_fn(data);
+                }
+            }
+            MenuItem::Separator => {}
+        }
     }
 }
 
@@ -426,7 +453,7 @@ impl ActivityHandler for Menu {
 
         for event in events {
             match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
+                Event::Term(TermEvent::Key(KeyEvent { code, kind, modifiers, .. })) if !is_release(kind) => {
                     match code {
                         KeyCode::Up | KeyCode::Char('w') => {
                             self.select(false);
@@ -458,6 +485,9 @@ impl ActivityHandler for Menu {
                         }
                         KeyCode::Right => {
                             self.update_slider(true, app_data);
+                        }
+                        KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
+                            self.reset(app_data);
                         }
                         _ => {}
                     }

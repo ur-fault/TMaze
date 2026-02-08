@@ -1,5 +1,7 @@
 use crossterm::event::Event as TermEvent;
 
+use crate::app::app::AppData;
+
 use super::activity::ActivityResult;
 
 pub enum Event {
@@ -8,7 +10,7 @@ pub enum Event {
     SettingsChanged,
 }
 
-pub type EventReceiverFn = Box<dyn FnMut(&Event)>;
+pub type EventReceiverFn = Box<dyn FnMut(&Event, &mut AppData)>;
 
 // FIXME: fix the API, this is really bad
 //

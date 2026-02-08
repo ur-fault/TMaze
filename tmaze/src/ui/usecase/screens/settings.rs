@@ -102,56 +102,92 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
             MenuItem::Option(OptionDef {
                 text: "Enable mouse input".into(),
                 val: cfg.enable_mouse,
-                fun: Box::new(|enabled, data| {
+                update_fn: Box::new(|enabled, data| {
                     data.settings.update_ui(|cfg| {
                         *cfg.nagivation().enable_mouse() = enabled;
                     });
                 }),
+                reset_fn: Some(Box::new(|data| {
+                    data.settings.update_ui(|cfg| {
+                        cfg.nagivation().enable_mouse = None;
+                    });
+                    data.settings.read().nagivation.enable_mouse
+                })),
             }),
             MenuItem::Option(OptionDef {
                 text: "Enable dpad".into(),
                 val: cfg.enable_dpad,
-                fun: Box::new(|enabled, data| {
+                update_fn: Box::new(|enabled, data| {
                     data.settings.update_ui(|cfg| {
                         *cfg.nagivation().enable_dpad() = enabled;
                     });
                 }),
+                reset_fn: Some(Box::new(|data| {
+                    data.settings.update_ui(|cfg| {
+                        cfg.nagivation().enable_dpad = None;
+                    });
+                    data.settings.read().nagivation.enable_dpad
+                })),
             }),
             MenuItem::Option(OptionDef {
                 text: "Left-handed dpad".into(),
                 val: cfg.landscape_dpad_on_left,
-                fun: Box::new(|is_on_left, data| {
+                update_fn: Box::new(|is_on_left, data| {
                     data.settings.update_ui(|cfg| {
                         *cfg.nagivation().landscape_dpad_on_left() = is_on_left;
                     });
                 }),
+                reset_fn: Some(Box::new(|data| {
+                    data.settings.update_ui(|cfg| {
+                        cfg.nagivation().landscape_dpad_on_left = None;
+                    });
+                    data.settings.read().nagivation.landscape_dpad_on_left
+                })),
             }),
             MenuItem::Option(OptionDef {
                 text: "Swap Up and Down buttons".into(),
                 val: cfg.dpad_swap_up_down,
-                fun: Box::new(|do_swap, data| {
+                update_fn: Box::new(|do_swap, data| {
                     data.settings.update_ui(|cfg| {
                         *cfg.nagivation().dpad_swap_up_down() = do_swap;
                     });
                 }),
+                reset_fn: Some(Box::new(|data| {
+                    data.settings.update_ui(|cfg| {
+                        cfg.nagivation().dpad_swap_up_down = None;
+                    });
+                    data.settings.read().nagivation.dpad_swap_up_down
+                })),
             }),
             MenuItem::Option(OptionDef {
                 text: "Enable margin around dpad".into(),
                 val: cfg.enable_margin_around_dpad,
-                fun: Box::new(|enabled, data| {
+                update_fn: Box::new(|enabled, data| {
                     data.settings.update_ui(|cfg| {
                         *cfg.nagivation().enable_margin_around_dpad() = enabled;
                     });
                 }),
+                reset_fn: Some(Box::new(|data| {
+                    data.settings.update_ui(|cfg| {
+                        cfg.nagivation().enable_margin_around_dpad = None;
+                    });
+                    data.settings.read().nagivation.enable_margin_around_dpad
+                })),
             }),
             MenuItem::Option(OptionDef {
                 text: "Enable dpad highlight".into(),
                 val: cfg.enable_dpad_highlight,
-                fun: Box::new(|enabled, data| {
+                update_fn: Box::new(|enabled, data| {
                     data.settings.update_ui(|cfg| {
                         *cfg.nagivation().enable_dpad_highlight() = enabled;
                     });
                 }),
+                reset_fn: Some(Box::new(|data| {
+                    data.settings.update_ui(|cfg| {
+                        cfg.nagivation().enable_dpad_highlight = None;
+                    });
+                    data.settings.read().nagivation.enable_dpad_highlight
+                })),
             }),
             MenuItem::Separator,
             MenuItem::Text("Exit".into()),
