@@ -167,6 +167,15 @@ macro_rules! config {
                 $($pfields)*
             }
 
+            impl [<Partial $name>] {
+                $(
+                    #[allow(dead_code)]
+                    pub fn $fields(&mut self) -> &mut $type {
+                        self.$fields.get_or_insert($def_vals)
+                    }
+                )*
+            }
+
             impl $crate::settings::config_utils::Mergeable<[<Partial $name>]> for $name {
                 fn merge(&mut self, other: &[<Partial $name>]) {
                     $(

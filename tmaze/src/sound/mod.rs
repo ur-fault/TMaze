@@ -4,7 +4,10 @@ use menu::OptionDef;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use crate::{
-    app::{app::AppData, Activity},
+    app::{
+        app::{AppData, EventSink},
+        Activity,
+    },
     settings::Settings,
     ui::{menu, MenuItem, SliderDef},
 };
@@ -20,15 +23,17 @@ struct SoundHandles {
 pub struct SoundPlayer {
     handles: Option<SoundHandles>,
     settings: Settings,
+    event_sink: EventSink,
 }
 
 impl SoundPlayer {
-    pub fn new(settings: Settings) -> Self {
+    pub fn new(settings: Settings, event_sink: EventSink) -> Self {
         let Ok((stream, handle)) = rodio::OutputStream::try_default() else {
             log::warn!("Failed to create audio stream, no sound will be played");
             return Self {
                 handles: None,
                 settings,
+                event_sink,
             };
         };
 
@@ -41,6 +46,7 @@ impl SoundPlayer {
                 sink,
             }),
             settings,
+            event_sink,
         }
     }
 
@@ -113,7 +119,9 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 val: !config.enable_audio,
                 fun: Box::new(|mute, data| {
                     *mute = !*mute;
-                    // data.settings.set_enable_audio(!*mute);
+                    data.settings.update_ui(|cfg| {
+                        *cfg.audio().enable_audio() = *mute;
+                    });
                     update_vol(data);
                 }),
             }),
@@ -124,7 +132,9 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 as_num: false,
                 fun: Box::new(|up, vol, data| {
                     *vol += if up { 1 } else { -1 };
-                    // data.settings.set_audio_volume(*vol as f32 / 5.0);
+                    data.settings.update_ui(|cfg| {
+                        *cfg.audio().audio_volume() = *vol as f64 / 5.0;
+                    });
                     update_vol(data);
                 }),
             }),
@@ -133,7 +143,9 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 val: !config.enable_music,
                 fun: Box::new(|mute, data| {
                     *mute = !*mute;
-                    // data.settings.set_enable_music(!*mute);
+                    data.settings.update_ui(|cfg| {
+                        *cfg.audio().enable_music() = !*mute;
+                    });
                     update_vol(data);
                 }),
             }),
@@ -144,7 +156,9 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 as_num: false,
                 fun: Box::new(|up, vol, data| {
                     *vol += if up { 1 } else { -1 };
-                    // data.settings.set_music_volume(*vol as f32 / 5.0);
+                    data.settings.update_ui(|cfg| {
+                        *cfg.audio().music_volume() = *vol as f64 / 5.0;
+                    });
                     update_vol(data);
                 }),
             }),

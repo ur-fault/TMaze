@@ -76,7 +76,8 @@ fn main() -> Result<(), GameError> {
     }
 
     if args.debug_config {
-        let (config, errors) = Settings::load();
+        let (event_sink, _drain) = tmaze::app::app::App::init_event_sink();
+        let (config, errors) = Settings::load(event_sink);
         if let Some(errors) = errors {
             eprintln!("Warning: Errors were encountered while loading the config.");
             for error in errors {

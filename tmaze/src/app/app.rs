@@ -1,6 +1,6 @@
 use std::{
     rc::Rc,
-    sync::Arc,
+    sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
 
@@ -16,6 +16,7 @@ use cmaze::{
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 
 use crate::{
+    app::event::{EventReceiver, EventReceiverFn},
     data::SaveData,
     helpers::{constants::paths, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
@@ -46,6 +47,7 @@ pub struct App {
     renderer: Renderer,
     activities: Activities,
     data: AppData,
+    event_drain: mpsc::Receiver<Event>,
 }
 
 pub struct AppData {
@@ -57,6 +59,8 @@ pub struct AppData {
     pub logs: UiLogs,
     pub registries: Registries,
     jobs: Jobs,
+    pub event_sink: EventSink,
+    pub event_receivers: Vec<EventReceiverFn>,
 
     app_start: Instant,
     read_only: bool,
@@ -140,8 +144,12 @@ impl App {
                 .expect("Failed to prepare application directories. Please check permissions.");
         }
 
-        let (settings, settings_errors) = Settings::load();
+        let (event_sink, event_drain) = Self::init_event_sink();
+        let mut event_receivers = vec![];
+
+        let (settings, settings_errors) = Settings::load(event_sink.clone());
         let config = settings.read();
+        event_receivers.push(settings.register());
 
         let renderer = Renderer::new(&Rc::new(config.general.terminal_scheme.clone()))
             .expect("failed to create renderer");
@@ -183,7 +191,7 @@ impl App {
         log::info!("Loading theme");
 
         #[cfg(feature = "sound")]
-        let sound_player = SoundPlayer::new(settings.clone());
+        let sound_player = SoundPlayer::new(settings.clone(), event_sink.clone());
 
         let appereance = Appearance::new(&config);
 
@@ -192,6 +200,7 @@ impl App {
         Self {
             renderer,
             activities,
+            event_drain,
             data: AppData {
                 app_start,
                 settings,
@@ -200,6 +209,8 @@ impl App {
                 appearance: appereance,
                 screen_size: frame_size,
                 jobs,
+                event_sink,
+                event_receivers,
                 logs,
                 registries,
                 read_only,
@@ -247,6 +258,18 @@ impl App {
 
                 // just so we read all events in the frame
                 delay = Duration::from_nanos(1)
+            }
+
+            // Read events from the drain
+            while let Ok(event) = self.event_drain.try_recv() {
+                events.push(event);
+            }
+
+            // Update handle the event receivers
+            for receiver in &mut self.data.event_receivers {
+                for event in &events {
+                    receiver(event);
+                }
             }
 
             while let Some(change) = match self.activities.active_mut() {
@@ -335,6 +358,10 @@ impl App {
         Ok(())
     }
 
+    pub fn init_event_sink() -> (EventSink, mpsc::Receiver<Event>) {
+        mpsc::channel()
+    }
+
     pub fn activity_count(&self) -> usize {
         self.activities.len()
     }
@@ -359,6 +386,8 @@ impl App {
         &mut self.data
     }
 }
+
+pub type EventSink = mpsc::Sender<Event>;
 
 #[derive(Default)]
 pub struct AppStateData {

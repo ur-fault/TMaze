@@ -6,12 +6,13 @@ pub mod theme;
 
 mod config_utils;
 
-use std::{fmt::Display, ops::Deref, path::Path, sync::Arc};
+use std::{fmt::Display, ops::Deref, panic::Location, path::Path, sync::Arc};
 
 use arc_swap::ArcSwap;
 use hashbrown::HashMap;
 
 use crate::{
+    app::{app::EventSink, event::EventReceiver, Event},
     helpers::{constants::paths, TupleMap},
     settings::config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value},
 };
@@ -21,6 +22,7 @@ use model::{Config, PartialConfig};
 #[derive(Clone)]
 pub struct Settings {
     inner: Arc<SettingsInner>,
+    event_sink: EventSink,
 }
 
 impl Settings {
@@ -30,31 +32,54 @@ impl Settings {
     /// loading.
     ///
     /// TODO: Report the actual errors/warnings to the user.
-    pub fn load() -> (Self, Option<Vec<String>>) {
+    pub fn load(event_sink: EventSink) -> (Self, Option<Vec<String>>) {
         SettingsInner::load().map_first(|inner| Self {
             inner: Arc::new(inner),
+            event_sink,
         })
     }
 
-    #[track_caller]
     pub fn read(&self) -> impl Deref<Target = Arc<Config>> + use<'_> {
-        log::trace!(
-            "Locking settings for read at {}",
-            std::panic::Location::caller()
-        );
         self.inner.config.load()
     }
 
     #[track_caller]
     pub fn update_ui(&self, with: impl FnOnce(&mut PartialConfig)) {
-        log::trace!(
-            "Locking settings for update at {}",
-            std::panic::Location::caller()
-        );
+        log::trace!("Updating UI settings from {}", Location::caller());
         let mut new_ui = (**self.inner.ui_layer.load()).clone();
         with(&mut new_ui);
         self.inner.ui_layer.store(Arc::new(new_ui));
+
         self.inner.rebuild();
+        self.notify();
+    }
+
+    fn write_ui(&self) {
+        log::trace!("Writing UI settings to file");
+        std::fs::write(
+            paths::managed::ui_settings(),
+            serde_json::to_string_pretty(&**self.inner.ui_layer.load())
+                .expect("UI settings should be serializable"),
+        )
+        .expect("Failed to write UI settings to file");
+    }
+
+    fn notify(&self) {
+        self.event_sink
+            .send(Event::SettingsChanged)
+            .expect("Event drain should be alive");
+    }
+}
+
+impl EventReceiver for &Settings {
+    fn register(self) -> Box<dyn FnMut(&Event)> {
+        let settings = self.clone();
+        Box::new(move |event| {
+            if let Event::SettingsChanged = event {
+                log::trace!("Writing UI settings to file from event");
+                settings.write_ui();
+            }
+        })
     }
 }
 
