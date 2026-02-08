@@ -102,43 +102,55 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
             MenuItem::Option(OptionDef {
                 text: "Enable mouse input".into(),
                 val: cfg.enable_mouse,
-                fun: Box::new(|enabled, _data| {
-                    // data.settings.set_enable_mouse(*enabled);
+                fun: Box::new(|enabled, data| {
+                    data.settings.update_ui(|cfg| {
+                        *cfg.nagivation().enable_mouse() = enabled;
+                    });
                 }),
             }),
             MenuItem::Option(OptionDef {
                 text: "Enable dpad".into(),
                 val: cfg.enable_dpad,
-                fun: Box::new(|enabled, _data| {
-                    // data.settings.set_enable_dpad(*enabled);
+                fun: Box::new(|enabled, data| {
+                    data.settings.update_ui(|cfg| {
+                        *cfg.nagivation().enable_dpad() = enabled;
+                    });
                 }),
             }),
             MenuItem::Option(OptionDef {
                 text: "Left-handed dpad".into(),
                 val: cfg.landscape_dpad_on_left,
-                fun: Box::new(|is_on_left, _data| {
-                    // data.settings.set_landscape_dpad_on_left(*is_on_left);
+                fun: Box::new(|is_on_left, data| {
+                    data.settings.update_ui(|cfg| {
+                        *cfg.nagivation().landscape_dpad_on_left() = is_on_left;
+                    });
                 }),
             }),
             MenuItem::Option(OptionDef {
                 text: "Swap Up and Down buttons".into(),
                 val: cfg.dpad_swap_up_down,
-                fun: Box::new(|do_swap, _data| {
-                    // data.settings.set_dpad_swap_up_down(*do_swap);
+                fun: Box::new(|do_swap, data| {
+                    data.settings.update_ui(|cfg| {
+                        *cfg.nagivation().dpad_swap_up_down() = do_swap;
+                    });
                 }),
             }),
             MenuItem::Option(OptionDef {
                 text: "Enable margin around dpad".into(),
                 val: cfg.enable_margin_around_dpad,
-                fun: Box::new(|enabled, _data| {
-                    // data.settings.set_enable_margin_around_dpad(*enabled);
+                fun: Box::new(|enabled, data| {
+                    data.settings.update_ui(|cfg| {
+                        *cfg.nagivation().enable_margin_around_dpad() = enabled;
+                    });
                 }),
             }),
             MenuItem::Option(OptionDef {
                 text: "Enable dpad highlight".into(),
                 val: cfg.enable_dpad_highlight,
-                fun: Box::new(|enabled, _data| {
-                    // data.settings.set_enable_dpad_highlight(*enabled);
+                fun: Box::new(|enabled, data| {
+                    data.settings.update_ui(|cfg| {
+                        *cfg.nagivation().enable_dpad_highlight() = enabled;
+                    });
                 }),
             }),
             MenuItem::Separator,
