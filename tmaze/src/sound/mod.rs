@@ -4,11 +4,7 @@ use menu::OptionDef;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use crate::{
-    app::{
-        app::{AppData, EventSink},
-        event::EventReceiver,
-        Activity, Event,
-    },
+    app::{app::AppData, event::EventReceiver, Activity, Event},
     settings::Settings,
     ui::{menu, MenuItem, SliderDef},
 };
@@ -24,17 +20,15 @@ struct SoundHandles {
 pub struct SoundPlayer {
     handles: Option<SoundHandles>,
     settings: Settings,
-    event_sink: EventSink,
 }
 
 impl SoundPlayer {
-    pub fn new(settings: Settings, event_sink: EventSink) -> Self {
+    pub fn new(settings: Settings) -> Self {
         let Ok((stream, handle)) = rodio::OutputStream::try_default() else {
             log::warn!("Failed to create audio stream, no sound will be played");
             return Self {
                 handles: None,
                 settings,
-                event_sink,
             };
         };
 
@@ -47,7 +41,6 @@ impl SoundPlayer {
                 sink,
             }),
             settings,
-            event_sink,
         }
     }
 

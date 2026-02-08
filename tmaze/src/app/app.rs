@@ -191,7 +191,7 @@ impl App {
         log::info!("Loading theme");
 
         #[cfg(feature = "sound")]
-        let sound_player = SoundPlayer::new(settings.clone(), event_sink.clone());
+        let sound_player = SoundPlayer::new(settings.clone());
         event_receivers.push(sound_player.register());
 
         let appereance = Appearance::new(&config);
