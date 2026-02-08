@@ -1,4 +1,4 @@
-use std::{io::Write, os::unix::ffi::OsStrExt};
+use std::io::Write;
 
 use tmaze::{
     app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
@@ -69,7 +69,12 @@ fn main() -> Result<(), GameError> {
 
     if args.show_config_path {
         let settings_path = paths::config();
-        std::io::stdout().write_all(settings_path.as_os_str().as_bytes())?;
+        std::io::stdout().write_all(
+            &settings_path
+                .as_os_str()
+                .to_os_string()
+                .into_encoded_bytes(),
+        )?;
         std::io::stdout().write_all(b"\n")?;
         std::io::stdout().flush()?;
         return Ok(());
