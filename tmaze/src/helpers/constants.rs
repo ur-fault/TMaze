@@ -33,7 +33,7 @@ pub mod paths {
     }
 
     #[cfg(feature = "local_paths")]
-    pub fn base_path() -> PathBuf {
+    pub fn base() -> PathBuf {
         PathBuf::from("./")
     }
 
