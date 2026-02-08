@@ -106,7 +106,7 @@ macro_rules! config {
                 $name
                 [ $($fields)* $field : [<Partial $type>] = ::std::default::Default::default(), ]
                 [ $($rfields)* pub $field : $type, ]
-                [ $($pfields)* $(#[$attr])* pub $field : Option<[<Partial $type>]>, ]
+                [ $($pfields)* #[serde(skip_serializing_if = "Option::is_none")] $(#[$attr])* pub $field : Option<[<Partial $type>]>, ]
                 { $($rest)* }
             }
         }
@@ -122,7 +122,7 @@ macro_rules! config {
             $name
             [ $($fields)* $field : $type = ::std::default::Default::default(), ]
             [ $($rfields)* pub $field : $type, ]
-            [ $($pfields)* $(#[$attr])* pub $field : Option<$type>, ]
+            [ $($pfields)* #[serde(skip_serializing_if = "Option::is_none")] $(#[$attr])* pub $field : Option<$type>, ]
             { $($rest)* }
         }
     };
@@ -137,7 +137,7 @@ macro_rules! config {
             $name
             [ $($fields)* $field : $type = ($def), ]
             [ $($rfields)* pub $field : $type, ]
-            [ $($pfields)* $(#[$attr])* pub $field : Option<$type>, ]
+            [ $($pfields)* #[serde(skip_serializing_if = "Option::is_none")] $(#[$attr])* pub $field : Option<$type>, ]
             { $($rest)* }
         }
     };
