@@ -2,8 +2,6 @@ pub mod attribute;
 pub mod model;
 pub mod theme;
 
-// mod old_settings;
-
 mod config_utils;
 
 use std::{fmt::Display, ops::Deref, panic::Location, path::Path, sync::Arc};
@@ -18,9 +16,9 @@ use crate::{
         Event,
     },
     helpers::{constants::paths, TupleMap},
-    settings::config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value},
 };
 
+use config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value};
 use model::{Config, PartialConfig};
 
 #[derive(Clone)]
