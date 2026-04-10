@@ -40,7 +40,7 @@ pub fn check(app_data: &mut AppData) {
         return;
     }
 
-    let display_update_errors = cfg.updates.display_update_check_errors;
+    let show_errors = cfg.updates.show_errors;
 
     let qer = app_data.queuer();
 
@@ -73,7 +73,7 @@ pub fn check(app_data: &mut AppData) {
                     }
                 }));
             }
-            Err(err) if display_update_errors => {
+            Err(err) if show_errors => {
                 log::error!("Error while checking for updates: {}", err);
             }
             Err(_) => {}

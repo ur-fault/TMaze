@@ -24,7 +24,7 @@ use crate::{
     settings::{
         model::Config,
         theme::{SharedScheme, TerminalColorScheme, Theme, ThemeDefinition, ThemeResolver},
-        Settings,
+        ConfigSource, Settings,
     },
     ui,
 };
@@ -85,8 +85,8 @@ impl AppData {
         }
 
         let cfg = &self.settings.read().audio;
-        let volume = if cfg.enable_audio && cfg.enable_music {
-            cfg.audio_volume * cfg.music_volume
+        let volume = if cfg.global.enable && cfg.music.enable {
+            cfg.global.volume * cfg.music.volume
         } else {
             0.0
         } as f32;
@@ -113,21 +113,6 @@ pub struct Registries {
 }
 
 impl App {
-    /// Create a new app with a base activity
-    ///
-    /// This is a convenience method for creating an empty app and pushing
-    /// a base activity to it.
-    ///
-    /// For more information see [`App::empty`] and [`Activities::push`].
-    ///
-    /// # Arguments
-    /// * `base_activity` - The activity to push to the app
-    pub fn new(base_activity: Activity, read_only: bool) -> Self {
-        let mut s = Self::empty(read_only);
-        s.activities.push(base_activity);
-        s
-    }
-
     /// Create a new app with no activities
     ///
     /// This method intializes all of the needed components of the app.
@@ -138,7 +123,13 @@ impl App {
     /// - initializes the logging system,
     /// - initializes the job queue,
     /// - initializes the registries,
-    pub fn empty(read_only: bool) -> Self {
+    pub fn new(
+        AppOptions {
+            read_only,
+            main_activity,
+            config_source,
+        }: AppOptions,
+    ) -> Self {
         if !read_only {
             Self::prepare_dirs()
                 .expect("Failed to prepare application directories. Please check permissions.");
@@ -147,19 +138,23 @@ impl App {
         let (event_sink, event_drain) = Self::init_event_sink();
         let mut event_receivers = vec![];
 
-        let (settings, settings_errors) = Settings::load(event_sink.clone());
+        let (settings, settings_errors, settings_warnings) =
+            Settings::load(event_sink.clone(), &config_source);
         let config = settings.read();
         event_receivers.push(settings.register());
 
-        let renderer = Renderer::new(&Rc::new(config.general.terminal_scheme.clone()))
+        let renderer = Renderer::new(&Rc::new(config.general.appearance.terminal_scheme.clone()))
             .expect("failed to create renderer");
-        let activities = Activities::empty();
+        let mut activities = Activities::empty();
+        if let Some(activity) = main_activity {
+            activities.push(activity);
+        }
 
         let (logger, logs) = AppLogger::new_with_options(
-            config.general.logging_level,
+            config.general.logging.normal,
             LoggerOptions::default()
                 .read_only(read_only)
-                .file_level(config.general.file_logging_level),
+                .file_level(config.general.logging.file),
         );
         logger.init();
 
@@ -167,6 +162,13 @@ impl App {
             log::error!("Errors were encountered while loading the config.");
             for err in errors {
                 log::error!(" - {}", err);
+            }
+        }
+
+        if let Some(warnings) = settings_warnings {
+            log::warn!("Warnings were encountered while loading the config.");
+            for warn in warnings {
+                log::warn!(" - {}", warn);
             }
         }
 
@@ -250,7 +252,7 @@ impl App {
                         ..
                     }) => self.switch_debug(),
                     event @ crossterm::event::Event::Mouse(_) => {
-                        if self.data.settings.read().nagivation.enable_mouse {
+                        if self.data.settings.read().controls.mouse.enable {
                             events.push(Event::Term(event));
                         }
                     }
@@ -391,6 +393,12 @@ impl App {
     }
 }
 
+pub struct AppOptions<'a> {
+    pub read_only: bool,
+    pub main_activity: Option<Activity>,
+    pub config_source: ConfigSource<'a>,
+}
+
 pub type EventSink = mpsc::Sender<Event>;
 
 #[derive(Default)]
@@ -431,7 +439,7 @@ impl Appearance {
 
 impl Appearance {
     fn load_theme(config: &Config, resolver: &ThemeResolver) -> Theme {
-        match config.general.theme.as_str() {
+        match config.general.appearance.theme.as_str() {
             "" => resolver.resolve(&ThemeDefinition::parse_default()),
             name => match ThemeDefinition::load_by_name(name) {
                 Ok(def) => resolver.resolve(&def),
@@ -444,7 +452,7 @@ impl Appearance {
     }
 
     fn load_scheme(config: &Config) -> SharedScheme {
-        Rc::new(config.general.terminal_scheme.clone())
+        Rc::new(config.general.appearance.terminal_scheme.clone())
     }
 }
 

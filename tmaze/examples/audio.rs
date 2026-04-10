@@ -15,7 +15,7 @@ fn main() {
             MenuItem::Option(OptionDef {
                 text: "Global mute".into(),
                 val: !app.data().settings.get_enable_audio(),
-                fun: Box::new(|mute, data| {
+                update_fn: Box::new(|mute, data| {
                     *mute = !*mute;
                     data.settings.set_enable_audio(!*mute);
                     update_vol(data);
@@ -26,7 +26,7 @@ fn main() {
                 val: (app.data().settings.get_audio_volume() * 5.0) as i32,
                 range: 0..=5,
                 as_num: false,
-                fun: Box::new(|up, vol, data| {
+                update_fn: Box::new(|up, vol, data| {
                     *vol += if up { 1 } else { -1 };
                     data.settings.set_audio_volume(*vol as f32 / 5.0);
                     update_vol(data);
@@ -35,7 +35,7 @@ fn main() {
             MenuItem::Option(OptionDef {
                 text: "Music mute".into(),
                 val: !app.data().settings.get_enable_music(),
-                fun: Box::new(|mute, data| {
+                update_fn: Box::new(|mute, data| {
                     *mute = !*mute;
                     data.settings.set_enable_music(!*mute);
                     update_vol(data);
@@ -46,7 +46,7 @@ fn main() {
                 val: (app.data().settings.get_music_volume() * 5.0) as i32,
                 range: 0..=5,
                 as_num: false,
-                fun: Box::new(|up, vol, data| {
+                update_fn: Box::new(|up, vol, data| {
                     *vol += if up { 1 } else { -1 };
                     data.settings.set_music_volume(*vol as f32 / 5.0);
                     update_vol(data);

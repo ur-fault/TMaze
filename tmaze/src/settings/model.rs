@@ -4,6 +4,8 @@ use cmaze::{
     algorithms::{MazeSpec, MazeSpecType},
     dims::{Dims, Offset},
 };
+
+use log::Level;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -17,49 +19,72 @@ use crate::{
 config! {
     pub struct Config {
         #[nest] general: General,
-        #[nest] viewport: Viewport,
-        #[nest] nagivation: Navigation,
+        #[nest] game: Game,
+        #[nest] controls: Controls,
         #[nest] updates: Updates,
         #[nest] audio: Audio,
-        presets: PresetList,
     }
 
     pub struct General {
-        theme: String,
-        logging_level: log::Level = log::Level::Info,
-        debug_logging_level: log::Level = log::Level::Info,
-        file_logging_level: log::Level = log::Level::Info,
-        #[nest] terminal_scheme: TerminalColorScheme,
+        #[nest] logging: Logging,
+        #[nest] appearance: Appearance,
     }
 
-    pub struct Viewport {
+    pub struct Game {
         slow: bool,
         disable_tower_auto_up: bool,
         camera_mode: CameraMode,
         camera_smoothing: f64 = 0.5,
         player_smoothing: f64 = 0.5,
         viewport_margin: Dims = Dims(4, 3),
+        #[nest] content: Content,
     }
 
-    pub struct Navigation {
-        enable_mouse: bool = true,
-        enable_dpad: bool,
-        landscape_dpad_on_left: bool,
-        dpad_swap_up_down: bool,
-        enable_margin_around_dpad: bool,
-        enable_dpad_highlight: bool = true,
+    pub struct Content {
+        presets: PresetList,
+    }
+
+    pub struct Controls {
+        #[nest] mouse: Mouse,
+    }
+
+    pub struct Mouse {
+        enable: bool = true,
+        #[nest] dpad: Dpad,
+    }
+
+    pub struct Dpad {
+        enable: bool,
+        landscape_on_left: bool,
+        swap_up_down: bool,
+        enable_margin: bool,
+        enable_highlight: bool = true,
+    }
+
+    pub struct Appearance {
+        theme: String,
+        #[nest] terminal_scheme: TerminalColorScheme,
+    }
+
+    pub struct Logging {
+        normal: Level = Level::Info,
+        debug: Level = Level::Debug,
+        file: Level = Level::Info,
     }
 
     pub struct Updates {
         check_interval: UpdateCheckInterval,
-        display_update_check_errors: bool,
+        show_errors: bool,
     }
 
     pub struct Audio {
-        enable_audio: bool,
-        audio_volume: f64,
-        enable_music: bool,
-        music_volume: f64,
+        #[nest] global: Volume,
+        #[nest] music: Volume,
+    }
+
+    pub struct Volume {
+        enable: bool,
+        volume: f64,
     }
 }
 
@@ -72,9 +97,10 @@ impl_merge_prims! {
     Rgb
     Dims
 
-    log::Level
+    Level
     CameraMode
     UpdateCheckInterval
+    Volume
 }
 
 impl_lenient_prims! {
@@ -85,7 +111,7 @@ impl_lenient_prims! {
 }
 
 impl_lenient_deserialize! {
-    log::Level
+    Level
     CameraMode
     UpdateCheckInterval
     MazePreset
@@ -97,6 +123,7 @@ type Rgb = (u8, u8, u8);
 
 #[derive(Default, Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "mode")]
+// TODO: allow fieldless variants to be specified as strings for convenience
 pub enum CameraMode {
     #[default]
     CloseFollow,
@@ -107,6 +134,7 @@ pub enum CameraMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum UpdateCheckInterval {
     Never,
     #[default]

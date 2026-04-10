@@ -1,9 +1,13 @@
 use std::io::Write;
 
 use tmaze::{
-    app::{app::init_theme_resolver, game::MainMenu, Activity, App, GameError},
+    app::{
+        app::{init_theme_resolver, AppOptions},
+        game::MainMenu,
+        Activity, App, GameError,
+    },
     helpers::constants::paths,
-    settings::{theme::TerminalColorScheme, Settings},
+    settings::{theme::TerminalColorScheme, ConfigSource, Settings},
 };
 
 #[cfg(feature = "updates")]
@@ -21,6 +25,8 @@ struct Args {
     show_config_path: bool,
     #[clap(long, help = "Show config in debug format and quit")]
     debug_config: bool,
+    #[clap(long, action, help = "Use default config, ignoring user-defined one")]
+    default_config: bool,
     #[clap(short, long, action, help = "Delete all saved data and quit")]
     delete_data: bool,
     #[clap(
@@ -80,13 +86,27 @@ fn main() -> Result<(), GameError> {
         return Ok(());
     }
 
+    let config_source = if args.default_config {
+        ConfigSource::String(include_str!("./settings/files/default_settings.json5").to_string())
+    } else {
+        ConfigSource::User
+    };
+
     if args.debug_config {
         let (event_sink, _drain) = tmaze::app::app::App::init_event_sink();
-        let (config, errors) = Settings::load(event_sink);
+        let (config, errors, warnings) = Settings::load(event_sink, &config_source);
+
         if let Some(errors) = errors {
-            eprintln!("Warning: Errors were encountered while loading the config.");
+            eprintln!("Errors were encountered while loading the config.");
             for error in errors {
                 eprintln!("- {}", error);
+            }
+        }
+
+        if let Some(warnings) = warnings {
+            eprintln!("Warnings were encountered while loading the config.");
+            for warning in warnings {
+                eprintln!("- {}", warning);
             }
         }
 
@@ -112,10 +132,13 @@ fn main() -> Result<(), GameError> {
 
     better_panic::install();
 
-    let mut app = App::empty(args.read_only);
     let menu = MainMenu::new();
-    app.activities_mut()
-        .push(Activity::new_base_boxed("main menu", menu));
+    let menu = Activity::new_base_boxed("main menu", menu);
+    let mut app = App::new(AppOptions {
+        read_only: args.read_only,
+        main_activity: Some(menu),
+        config_source,
+    });
 
     #[cfg(feature = "updates")]
     updates::check(app.data_mut());

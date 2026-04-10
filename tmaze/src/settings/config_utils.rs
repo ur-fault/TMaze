@@ -42,6 +42,7 @@ impl std::fmt::Display for ConvertError {
 pub struct ConvertContext {
     pub path: Path,
     pub errors: Vec<ConvertError>,
+    pub warnings: Vec<ConvertError>,
 }
 
 impl ConvertContext {
@@ -49,6 +50,7 @@ impl ConvertContext {
         Self {
             path: vec![],
             errors: vec![],
+            warnings: vec![],
         }
     }
 
@@ -83,8 +85,15 @@ impl ConvertContext {
         });
     }
 
-    pub fn errors(self) -> Vec<ConvertError> {
-        self.errors
+    pub fn warn(&mut self, detail: String) {
+        self.warnings.push(ConvertError {
+            path: self.path.clone(),
+            detail,
+        });
+    }
+
+    pub fn extract(self) -> (Vec<ConvertError>, Vec<ConvertError>) {
+        (self.errors, self.warnings)
     }
 }
 
@@ -188,15 +197,15 @@ macro_rules! config {
 
             impl $crate::settings::config_utils::LenientConvert for [<Partial $name>] {
                 fn convert(
-                    value: super::config_utils::Value,
-                    context: &mut super::config_utils::ConvertContext,
+                    value: $crate::settings::config_utils::Value,
+                    context: &mut $crate::settings::config_utils::ConvertContext,
                 ) -> Option<Self> {
-                    let super::config_utils::Value::Object(mut map) = value else {
+                    let $crate::settings::config_utils::Value::Object(mut map) = value else {
                         context.err("expected an object".to_string());
                         return None;
                     };
 
-                    Some(Self {
+                    let res = Self {
                         $(
                             $fields: {
                                 if let Some(value) = map.remove(stringify!($fields)) {
@@ -209,7 +218,18 @@ macro_rules! config {
                                 }
                             },
                         )*
-                    })
+                    };
+
+                    if !map.is_empty() {
+                        for key in map.keys() {
+                            context.at(
+                                $crate::settings::config_utils::Segment::Key(key.clone()),
+                                |ctx| ctx.warn("unknown field".to_string())
+                            );
+                        }
+                    }
+
+                    Some(res)
                 }
             }
         }
@@ -235,9 +255,9 @@ macro_rules! impl_merge_prims {
 macro_rules! impl_lenient_prims {
     ($($t:ty => $($variant:ident)+),* $(,)?) => {
         $(impl $crate::settings::config_utils::LenientConvert for $t {
-            fn convert(value: super::config_utils::Value, context: &mut super::config_utils::ConvertContext) -> Option<Self> {
+            fn convert(value: $crate::settings::config_utils::Value, context: &mut super::config_utils::ConvertContext) -> Option<Self> {
                 match value {
-                    $(super::config_utils::Value::$variant(v) => Some(v as $t),)+
+                    $($crate::settings::config_utils::Value::$variant(v) => Some(v as $t),)+
                     _ => {
                         context.err(format!("expected one of: {}", stringify!($($variant),+)));
                         None
@@ -306,7 +326,6 @@ mod tests {
             assert_eq!(map.get("enabled"), Some(&Value::Bool(true)));
             assert_eq!(map.get("threshold"), Some(&Value::Float(10.5)));
             assert_eq!(map.get("count"), Some(&Value::Int(42)));
-
             if let Some(Value::List(items)) = map.get("items") {
                 assert_eq!(items.len(), 3);
                 assert_eq!(items[0], Value::Int(1));

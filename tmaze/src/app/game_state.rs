@@ -103,7 +103,7 @@ impl GameData {
         Ok(())
     }
 
-    pub fn apply_move(&mut self, settings: &Config, wall: CellWall, fast: bool) {
+    pub fn apply_move(&mut self, cfg: &Config, wall: CellWall, fast: bool) {
         match self.view_mode {
             GameViewMode::Spectator => {
                 let mut off = wall.reverse_wall().to_coord();
@@ -122,14 +122,14 @@ impl GameData {
                 self.game
                     .move_player(
                         wall,
-                        if settings.viewport.slow {
+                        if cfg.game.slow {
                             MoveMode::Slow
                         } else if fast {
                             MoveMode::Fast
                         } else {
                             MoveMode::Normal
                         },
-                        !settings.viewport.disable_tower_auto_up,
+                        !cfg.game.disable_tower_auto_up,
                     )
                     .unwrap();
             }

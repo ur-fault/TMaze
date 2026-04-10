@@ -15,7 +15,7 @@ use crate::{
         event::EventReceiver,
         Event,
     },
-    helpers::{constants::paths, TupleMap},
+    helpers::constants::paths,
 };
 
 use config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value};
@@ -30,15 +30,21 @@ pub struct Settings {
 impl Settings {
     /// Loads settings from configuration files.
     ///
-    /// Returns the loaded settings and a boolean indicating whether any warnings occurred during
+    /// Returns the loaded settings and any errors and warnings that occurred during
     /// loading.
-    ///
-    /// TODO: Report the actual errors/warnings to the user.
-    pub fn load(event_sink: EventSink) -> (Self, Option<Vec<String>>) {
-        SettingsInner::load().map_first(|inner| Self {
-            inner: Arc::new(inner),
-            event_sink,
-        })
+    pub fn load(
+        event_sink: EventSink,
+        source: &ConfigSource,
+    ) -> (Self, Option<Vec<String>>, Option<Vec<String>>) {
+        let (inner, load_errors, load_warnings) = SettingsInner::load(source);
+        (
+            Self {
+                inner: Arc::new(inner),
+                event_sink,
+            },
+            load_errors,
+            load_warnings,
+        )
     }
 
     pub fn read(&self) -> impl Deref<Target = Arc<Config>> + use<'_> {
@@ -92,11 +98,13 @@ struct SettingsInner {
 }
 
 impl SettingsInner {
-    fn load() -> (Self, Option<Vec<String>>) {
+    fn load(source: &ConfigSource<'_>) -> (Self, Option<Vec<String>>, Option<Vec<String>>) {
         let mut errors = vec![];
+        let mut warnings = vec![];
 
-        let (config_layer, load_errors) = load_config_from_file(&paths::config());
+        let (config_layer, load_errors, load_warnings) = load_config_from_source(source);
         errors.extend(load_errors.iter().map(ConvertError::to_string));
+        warnings.extend(load_warnings.iter().map(ConvertError::to_string));
 
         let ui_layer = load_ui_config_from_file(&paths::managed::ui_settings());
 
@@ -114,7 +122,13 @@ impl SettingsInner {
             Some(errors)
         };
 
-        (settings, errors)
+        let warnings = if warnings.is_empty() {
+            None
+        } else {
+            Some(warnings)
+        };
+
+        (settings, errors, warnings)
     }
 
     fn rebuild(&self) {
@@ -143,6 +157,13 @@ impl Display for ConfigLoadError {
     }
 }
 
+pub enum ConfigSource<'a> {
+    User,
+    Path(&'a Path),
+    String(String),
+    Default,
+}
+
 fn load_ui_config_from_file(path: &Path) -> PartialConfig {
     std::fs::read_to_string(path)
         .ok()
@@ -150,9 +171,11 @@ fn load_ui_config_from_file(path: &Path) -> PartialConfig {
         .unwrap_or_default()
 }
 
-fn load_config_from_file(path: &Path) -> (PartialConfig, Vec<ConvertError>) {
+fn load_config_from_source(
+    source: &ConfigSource<'_>,
+) -> (PartialConfig, Vec<ConvertError>, Vec<ConvertError>) {
     let mut context = ConvertContext::new();
-    let config = match load_values_from_file(path) {
+    let config = match load_values_from_source(source) {
         Ok(value) => PartialConfig::convert(value, &mut context),
         Err((e, val)) => {
             context.err(format!("Failed to load config: {}", e));
@@ -160,10 +183,11 @@ fn load_config_from_file(path: &Path) -> (PartialConfig, Vec<ConvertError>) {
         }
     };
 
-    (config.unwrap_or_default(), context.errors())
+    let (errors, warnings) = context.extract();
+    (config.unwrap_or_default(), errors, warnings)
 }
 
-fn load_values_from_file(path: &Path) -> Result<Value, (ConfigLoadError, Value)> {
+fn load_values_from_source(source: &ConfigSource) -> Result<Value, (ConfigLoadError, Value)> {
     macro_rules! pack_error {
         ($err:expr) => {
             match $err {
@@ -173,11 +197,22 @@ fn load_values_from_file(path: &Path) -> Result<Value, (ConfigLoadError, Value)>
         };
     }
 
-    // json5 doesn't support reading from reader
-    let content = pack_error!(std::fs::read_to_string(path))?;
-    let config_value = pack_error!(json5::from_str::<Value>(&content))?;
-    let values_with_extensions = load_extension_blocks(config_value)?;
-    Ok(values_with_extensions)
+    match source {
+        ConfigSource::Path(path) => {
+            // json5 doesn't support reading from reader
+            let content = pack_error!(std::fs::read_to_string(path))?;
+            let config_value = pack_error!(json5::from_str::<Value>(&content))?;
+            let values_with_extensions = load_extension_blocks(config_value)?;
+            Ok(values_with_extensions)
+        }
+        ConfigSource::User => load_values_from_source(&ConfigSource::Path(&paths::config())),
+        ConfigSource::Default => Ok(Value::Object(HashMap::new())),
+        ConfigSource::String(s) => {
+            let config_value = pack_error!(json5::from_str::<Value>(s))?;
+            let values_with_extensions = load_extension_blocks(config_value)?;
+            Ok(values_with_extensions)
+        }
+    }
 }
 
 mod config_file_constants {
@@ -219,7 +254,8 @@ fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value
         Value::Object(map) => {
             if map.contains_key(IMPORT_KEY) {
                 if let Value::String(file_path) = &map[IMPORT_KEY] {
-                    let mut base_config = load_values_from_file(Path::new(file_path))?;
+                    let mut base_config =
+                        load_values_from_source(&ConfigSource::Path(Path::new(file_path)))?;
                     merge(&mut base_config, Value::Object(map));
                     base_config
                 } else {

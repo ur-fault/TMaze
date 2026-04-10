@@ -17,7 +17,7 @@ use crate::{
     lerp, menu_actions,
     renderer::{draw::Align, CellContent, GBuffer, GMutView, Padding},
     settings::{
-        model::{CameraMode, Config, MazePreset, Viewport},
+        model::{self, CameraMode, Config, MazePreset},
         theme::{SharedScheme, Theme, ThemeResolver},
     },
     ui::{
@@ -237,14 +237,14 @@ pub struct MazePresetMenu {
 
 impl MazePresetMenu {
     pub fn new(config: &Config, app_state_data: &AppStateData) -> Option<Self> {
-        if config.presets.is_empty() {
+        let presets = &config.game.content.presets;
+        if presets.is_empty() {
             return None;
         }
 
         let mut menu_config = MenuConfig::new_from_strings(
             "Maze preset".to_string(),
-            config
-                .presets
+            presets
                 .iter()
                 .map(|maze| maze.title.clone())
                 .collect::<Vec<_>>(),
@@ -252,7 +252,7 @@ impl MazePresetMenu {
 
         let default = app_state_data
             .last_selected_preset
-            .or_else(|| config.presets.iter().position(|maze| maze.default));
+            .or_else(|| presets.iter().position(|maze| maze.default));
 
         if let Some(i) = default {
             menu_config = menu_config.default(i);
@@ -260,7 +260,7 @@ impl MazePresetMenu {
 
         let menu = Menu::new(menu_config);
 
-        let presets = config.presets.to_vec();
+        let presets = presets.to_vec();
 
         Some(Self { menu, presets })
     }
@@ -526,12 +526,12 @@ pub struct GameActivity {
 impl GameActivity {
     pub fn new(game: GameData, app_data: &mut AppData) -> Self {
         let config = app_data.settings.read();
-        let viewport_cfg = &config.viewport;
+        let game_cfg = &config.game;
         let appear = &app_data.appearance;
 
-        let camera_mode = viewport_cfg.camera_mode;
+        let camera_mode = game_cfg.camera_mode;
         let maze_board = MazeBoard::new(&game.game, appear.theme(), appear.scheme().clone());
-        let margins = viewport_cfg.viewport_margin;
+        let margins = game_cfg.viewport_margin;
         drop(config);
 
         #[cfg(feature = "sound")]
@@ -656,12 +656,12 @@ impl GameActivity {
     }
 
     fn update_viewport(&mut self, data: &AppData) {
-        let cfg = &data.settings.read().nagivation;
+        let cfg = &data.settings.read().controls.mouse.dpad;
 
         if self.is_dpad_enabled() {
             let (viewport_rect, dpad_rect) = DPad::split_screen(data);
             let mut dpad_rect = dpad_rect;
-            if cfg.enable_margin_around_dpad {
+            if cfg.enable_margin {
                 dpad_rect = dpad_rect.margin(self.margins);
             }
 
@@ -679,16 +679,18 @@ impl GameActivity {
 
     fn init_dpad(&mut self, data: &AppData) {
         let dpad_type = DPadType::from_maze(self.data.game.get_maze());
-        let swap_up_down = data.settings.read().nagivation.dpad_swap_up_down;
+        let swap_up_down = data.settings.read().controls.mouse.dpad.swap_up_down;
 
         let touch_controls = DPad::new(None, swap_up_down, dpad_type);
         self.touch_controls = Some(Box::new(touch_controls));
     }
 
     fn update_dpad(&mut self, data: &AppData) {
-        let config = &data.settings.read().nagivation;
-        if (config.enable_dpad && config.enable_mouse) != self.is_dpad_enabled() {
-            if config.enable_dpad {
+        let mouse_cfg = &data.settings.read().controls.mouse;
+        let dpad_cfg = &data.settings.read().controls.mouse.dpad;
+
+        if (dpad_cfg.enable && mouse_cfg.enable) != self.is_dpad_enabled() {
+            if dpad_cfg.enable {
                 log::info!("Enabling dpad");
                 self.init_dpad(data);
             } else {
@@ -700,8 +702,8 @@ impl GameActivity {
         if self.is_dpad_enabled() {
             let dpad = self.touch_controls.as_mut().unwrap();
 
-            dpad.swap_up_down = config.dpad_swap_up_down;
-            dpad.disable_highlight(!config.enable_dpad_highlight);
+            dpad.swap_up_down = dpad_cfg.swap_up_down;
+            dpad.disable_highlight(!dpad_cfg.enable_highlight);
         }
     }
 
@@ -799,11 +801,11 @@ impl ActivityHandler for GameActivity {
             }
         }
 
-        let Viewport {
+        let model::Game {
             camera_smoothing,
             player_smoothing,
             ..
-        } = data.settings.read().viewport;
+        } = data.settings.read().game;
 
         self.sm_player_pos = lerp!((self.sm_player_pos) -> (maze2screen_3d(self.data.game.get_player_pos())) at player_smoothing);
         self.sm_camera_pos =

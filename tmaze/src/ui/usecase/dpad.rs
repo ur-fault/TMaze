@@ -119,7 +119,7 @@ impl DPad {
         if is_vertical {
             screen_rect.split_y_end(Offset::Abs(dpad_size))
         } else {
-            let on_left = data.settings.read().nagivation.landscape_dpad_on_left;
+            let on_left = data.settings.read().controls.mouse.dpad.landscape_on_left;
             let offset = Offset::Abs(dpad_size);
 
             if on_left {

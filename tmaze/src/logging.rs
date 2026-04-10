@@ -115,9 +115,9 @@ impl UiLogs {
         let config = &settings.general;
 
         if *debug {
-            *self.min_level.write().unwrap() = config.debug_logging_level;
+            *self.min_level.write().unwrap() = config.logging.debug;
         } else {
-            *self.min_level.write().unwrap() = config.logging_level;
+            *self.min_level.write().unwrap() = config.logging.normal;
         }
     }
 
