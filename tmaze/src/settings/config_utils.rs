@@ -157,7 +157,7 @@ macro_rules! config {
          [$($pfields:tt)*]
          { }
     ) => {
-        #[derive(Clone, Debug)]
+        #[derive(Clone, Debug, Serialize, Deserialize)]
         pub struct $name {
             $($rfields)*
         }

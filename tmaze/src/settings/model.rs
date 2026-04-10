@@ -58,7 +58,7 @@ config! {
         landscape_on_left: bool,
         swap_up_down: bool,
         enable_margin: bool,
-        enable_highlight: bool = true,
+        enable_highlight: bool = false,
     }
 
     pub struct Appearance {

@@ -2,12 +2,12 @@
     "general": {
         "logging": {
             // valid levels: trace, debug, info, warn, error
-            "normal": "info",
-            "debug": "trace",
-            "file": "info",
+            "normal": "{{ general.logging.normal }}",
+            "debug": "{{ general.logging.debug }}",
+            "file": "{{ general.logging.file }}",
         },
         "appearance": {
-            // "theme": "catppuccin",
+            "theme": "",
             "terminal_scheme": {
                 // read docs for the usage and format of this option
             }
@@ -15,8 +15,8 @@
     },
 
     "game": {
-        "slow": false,
-        "disable_tower_auto_up": false,
+        "slow": {{ game.slow }},
+        "disable_tower_auto_up": {{ game.disable_tower_auto_up }},
 
         //  CloseFollow - player will always be centered
         //  EdgeFollow(horizontal margin, vertical margin)
@@ -24,12 +24,12 @@
         //    he will be centered on that axis.
         //    margin can be either relative (0.0 - 0.5) or absolute.
         //    floating point values are relative, integer values are absolute.
-        "camera_mode": {"mode": "CloseFollow"},
+        "camera_mode": {{ game.camera_mode | json_encode }},
         // "camera_mode": {"mode": "EdgeFollow", "x": 0.25, "y": 0.25},
 
-        "camera_smoothing": 0.5,
-        "player_smoothing": 0.5,
-        "viewport_margin": [4, 3],
+        "camera_smoothing": {{ game.camera_smoothing }},
+        "player_smoothing": {{ game.player_smoothing }},
+        "viewport_margin": {{ game.viewport_margin | json_encode }},
         "content": {
             // Preset:
             // - title - title of the preset
@@ -52,12 +52,12 @@
             // - active_region_heuristic - when neither `start` nor `end` are specified, this heuristic will be used to choose the region, can be either:
             //   - "biggest", "random", "first", "last"
             "presets": [
-                {
-                    "title": "10x5",
-                    "size": [10, 5, 1],
-                    "default": true,
-                    "type": "simple",
-                }, 
+                // {
+                //     "title": "10x5",
+                //     "size": [10, 5, 1],
+                //     "default": true,
+                //     "type": "simple",
+                // }, 
                 // {
                 //     "title": "20x10",
                 //     "size": [20, 10, 1],
@@ -101,31 +101,31 @@
 
     "controls": {
         "mouse": {
-            "enable": true,
+            "enable": {{ controls.mouse.enable }},
             "dpad": {
-                "enable": false,
-                "landscape_on_left": false,
-                "swap_up_down": false,
-                "enable_margin": false,
-                "enable_highlight": true,
+                "enable": {{ controls.mouse.dpad.enable }},
+                "landscape_on_left": {{ controls.mouse.dpad.landscape_on_left }},
+                "swap_up_down": {{ controls.mouse.dpad.swap_up_down }},
+                "enable_margin": {{ controls.mouse.dpad.enable_margin }},
+                "enable_highlight": {{ controls.mouse.dpad.enable_highlight }},
             }
         }
     },
 
     "updates": {
         // valid intervals: never, daily, weekly, monthly, yearly, always
-        "check_interval": "daily",
-        "show_errors": false,
+        "check_interval": "{{ updates.check_interval }}",
+        "show_errors": {{ updates.show_errors }},
     },
 
     "audio": {
         "global":  {
-            "enable": true,
-            "volume": 0.5,
+            "enable": {{ audio.global.enable }},
+            "volume": {{ audio.global.volume }},
         },
         "music": {
-            "enable": true,
-            "volume": 0.5,
+            "enable": {{ audio.music.enable }},
+            "volume": {{ audio.music.volume }},
         }
     }
 }

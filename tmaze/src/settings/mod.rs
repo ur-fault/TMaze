@@ -8,6 +8,7 @@ use std::{fmt::Display, ops::Deref, panic::Location, path::Path, sync::Arc};
 
 use arc_swap::ArcSwap;
 use hashbrown::HashMap;
+use tera::Tera;
 
 use crate::{
     app::{
@@ -76,6 +77,17 @@ impl Settings {
         self.event_sink
             .send(Event::SettingsChanged)
             .expect("Event drain should be alive");
+    }
+
+    fn build_default_config() -> Result<String, tera::Error> {
+        let mut tera = Tera::default();
+        const TEMPLATE_NAME: &str = "default_config.json5";
+        tera.add_raw_template(
+            TEMPLATE_NAME,
+            include_str!("./files/default_settings.json5"),
+        )?;
+        let context = tera::Context::from_serialize(Config::default())?;
+        tera.render(TEMPLATE_NAME, &context)
     }
 }
 
@@ -275,4 +287,39 @@ fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value
     };
 
     Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+
+    use crate::settings::{
+        config_utils::Mergeable,
+        model::{Config, PartialConfig},
+    };
+
+    #[test]
+    fn test_build_default_config() {
+        let config_str =
+            super::Settings::build_default_config().expect("Failed to build default config");
+        let config = &json5::from_str::<PartialConfig>(&config_str)
+            .expect("Default config should be valid JSON5");
+        let mut base_config = Config::default();
+        base_config.merge(&config);
+
+        let config_value: super::Value = json5::from_str(
+            &json5::to_string(&base_config).expect("Default config should be valid JSON5"),
+        )
+        .expect("Default config should be a JSON object");
+        assert_eq!(
+            config_value,
+            json5::from_str(
+                json5::to_string(&super::Config::default())
+                    .unwrap()
+                    .as_str()
+            )
+            .unwrap(),
+            "Default config should be a JSON object"
+        );
+    }
 }

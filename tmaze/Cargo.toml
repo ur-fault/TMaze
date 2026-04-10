@@ -40,6 +40,7 @@ crates_io_api = { version = "0.11.0", optional = true, default-features = false,
 semver = { version = "1.0.23", optional = true }
 tokio = { version = "1.40.0", optional = true, features = ["rt", "rt-multi-thread"] }
 rodio = { version = "0.18.1", optional = true, default-features = false, features = ["wav", "mp3"] }
+tera = "1.20.1"
 
 [features]
 default = ["updates", "sound"]
@@ -51,3 +52,6 @@ local_paths = []
 [build-dependencies]
 boml = "1"
 thiserror = "2"
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
