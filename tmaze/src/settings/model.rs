@@ -147,7 +147,7 @@ pub enum UpdateCheckInterval {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct PresetList(Vec<MazePreset>);
+pub struct PresetList(pub Vec<MazePreset>);
 
 impl Deref for PresetList {
     type Target = [MazePreset];

@@ -297,6 +297,7 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
+    Nil,
 }
 
 #[cfg(test)]
