@@ -453,45 +453,44 @@ impl ActivityHandler for Menu {
 
         for event in events {
             match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, kind, modifiers, .. })) if !is_release(kind) => {
-                    match code {
-                        KeyCode::Up | KeyCode::Char('w') => {
-                            self.select(false);
-                        }
-                        KeyCode::Down | KeyCode::Char('s') => {
-                            self.select(true);
-                        }
-                        KeyCode::Enter | KeyCode::Char(' ') => {
+                Event::Term(TermEvent::Key(KeyEvent {
+                    code,
+                    kind,
+                    modifiers,
+                    ..
+                })) if !is_release(kind) => match code {
+                    KeyCode::Up | KeyCode::Char('w') => {
+                        self.select(false);
+                    }
+                    KeyCode::Down | KeyCode::Char('s') => {
+                        self.select(true);
+                    }
+                    KeyCode::Enter | KeyCode::Char(' ') => {
+                        return_if_some!(self.switch(app_data));
+                    }
+                    KeyCode::Char('q') if !self.config.q_to_quit => return Some(Change::pop_top()),
+                    KeyCode::Char('q') if self.config.q_to_quit => return Some(Change::pop_all()),
+                    KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
+                        let old_sel = self.selected;
+                        self.selected =
+                            (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
+
+                        if old_sel == self.selected {
                             return_if_some!(self.switch(app_data));
                         }
-                        KeyCode::Char('q') if !self.config.q_to_quit => {
-                            return Some(Change::pop_top())
-                        }
-                        KeyCode::Char('q') if self.config.q_to_quit => {
-                            return Some(Change::pop_all())
-                        }
-                        KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
-                            let old_sel = self.selected;
-                            self.selected =
-                                (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
-
-                            if old_sel == self.selected {
-                                return_if_some!(self.switch(app_data));
-                            }
-                        }
-                        KeyCode::Esc => return Some(Change::pop_top()),
-                        KeyCode::Left => {
-                            self.update_slider(false, app_data);
-                        }
-                        KeyCode::Right => {
-                            self.update_slider(true, app_data);
-                        }
-                        KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
-                            self.reset(app_data);
-                        }
-                        _ => {}
                     }
-                }
+                    KeyCode::Esc => return Some(Change::pop_top()),
+                    KeyCode::Left => {
+                        self.update_slider(false, app_data);
+                    }
+                    KeyCode::Right => {
+                        self.update_slider(true, app_data);
+                    }
+                    KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
+                        self.reset(app_data);
+                    }
+                    _ => {}
+                },
                 Event::Term(TermEvent::Mouse(MouseEvent {
                     kind,
                     column,
