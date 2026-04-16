@@ -4,9 +4,16 @@ pub mod theme;
 
 mod config_utils;
 
-use std::{fmt::Display, ops::Deref, panic::Location, path::Path, sync::Arc};
+use std::{
+    fmt::Display,
+    ops::Deref,
+    panic::Location,
+    path::Path,
+    sync::{Arc, LazyLock},
+};
 
 use arc_swap::ArcSwap;
+use cmaze::algorithms::{MazeSpec, MazeSpecType, MazeType};
 use hashbrown::HashMap;
 use tera::Tera;
 
@@ -17,6 +24,7 @@ use crate::{
         Event,
     },
     helpers::constants::paths,
+    settings::model::MazePreset,
 };
 
 use config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value};
@@ -79,15 +87,32 @@ impl Settings {
             .expect("Event drain should be alive");
     }
 
-    fn build_default_config() -> Result<String, tera::Error> {
+    pub fn build_default_config() -> Result<String, tera::Error> {
         let mut tera = Tera::default();
         const TEMPLATE_NAME: &str = "default_config.json5";
         tera.add_raw_template(
             TEMPLATE_NAME,
             include_str!("./files/default_settings.json5"),
         )?;
-        let context = tera::Context::from_serialize(Config::default())?;
-        tera.render(TEMPLATE_NAME, &context)
+        tera.register_function(
+            "repeat",
+            |args: &std::collections::HashMap<String, tera::Value>| {
+                let string = args.get("string").and_then(|v| v.as_str()).ok_or_else(|| {
+                    tera::Error::msg("repeat filter requires a string argument of type `string`")
+                })?;
+                let times: usize = args.get("times").and_then(|v| v.as_u64()).ok_or_else(|| {
+                    tera::Error::msg("repeat filter requires a times argument of type `number`")
+                })? as usize;
+                let result = string.repeat(times);
+                Ok(tera::Value::String(result))
+            },
+        );
+        tera.register_filter("json_encode_2", |value, args| Ok(tera::Value::Null));
+
+        let mut context = tera::Context::from_serialize(Config::default())?;
+        context.insert("__presets", &*DEFAULT_PRESETS);
+
+        panic!("{}", tera.render(TEMPLATE_NAME, &context).unwrap())
     }
 }
 
@@ -289,13 +314,54 @@ fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value
     Ok(value)
 }
 
+static DEFAULT_PRESETS: LazyLock<Vec<MazePreset>> = LazyLock::new(|| {
+    fn simple_maze(size: (i32, i32, i32), tower: bool) -> MazePreset {
+        MazePreset {
+            title: match (size.2, tower) {
+                (1, false) => format!("{}x{}", size.0, size.1),
+                (1, true) => format!("{}x{} Tower", size.0, size.1),
+                (z, false) => format!("{}x{}x{}", size.0, size.1, z),
+                (z, true) => format!("{}x{}x{} Tower", size.0, size.1, z),
+            },
+            description: None,
+            default: false,
+            maze_spec: MazeSpec {
+                inner_spec: MazeSpecType::Simple {
+                    size: Some(size.into()),
+                    start: None,
+                    end: None,
+                    mask: None,
+                    splitter: None,
+                    generator: None,
+                },
+                seed: None,
+                maze_type: if tower { Some(MazeType::Tower) } else { None },
+            },
+        }
+    }
+
+    vec![
+        MazePreset {
+            default: true,
+            ..simple_maze((10, 5, 1), false)
+        },
+        simple_maze((20, 10, 1), false),
+        simple_maze((60, 30, 1), false),
+        simple_maze((200, 100, 1), false),
+        simple_maze((6, 3, 3), false),
+        simple_maze((10, 5, 5), false),
+        simple_maze((12, 6, 5), true),
+        simple_maze((40, 20, 10), true),
+    ]
+});
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
 
     use crate::settings::{
         config_utils::Mergeable,
-        model::{Config, PartialConfig},
+        model::{Config, PartialConfig, PresetList},
     };
 
     #[test]
@@ -308,7 +374,7 @@ mod tests {
         base_config.merge(&config);
 
         // Ignored fields
-        base_config.game.content.presets.0 = vec![];
+        // base_config.game.content.presets.0 = vec![];
 
         let config_value: super::Value = json5::from_str(
             &json5::to_string(&base_config).expect("Default config should be valid JSON5: B"),
@@ -317,9 +383,13 @@ mod tests {
         assert_eq!(
             config_value,
             json5::from_str(
-                json5::to_string(&super::Config::default())
-                    .unwrap()
-                    .as_str()
+                json5::to_string(&{
+                    let mut config = super::Config::default();
+                    config.game.content.presets = PresetList(super::DEFAULT_PRESETS.clone());
+                    config
+                })
+                .unwrap()
+                .as_str()
             )
             .unwrap(),
             "Default config should be a JSON object"
