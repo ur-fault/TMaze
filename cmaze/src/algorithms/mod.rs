@@ -188,6 +188,8 @@ impl Generator {
     }
 
     pub fn generate(&self, progress: ProgressHandle) -> Result<Maze, GeneratorError> {
+        // TODO: this method is damn big, split it
+
         let seed = self.seed.unwrap_or_else(|| thread_rng().gen());
         let mut rng = Random::seed_from_u64(seed);
 
