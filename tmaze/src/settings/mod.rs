@@ -15,6 +15,7 @@ use std::{
 use arc_swap::ArcSwap;
 use cmaze::algorithms::{MazeSpec, MazeSpecType, MazeType};
 use hashbrown::HashMap;
+use serde::Serialize;
 use tera::Tera;
 
 use crate::{
@@ -107,12 +108,53 @@ impl Settings {
                 Ok(tera::Value::String(result))
             },
         );
-        tera.register_filter("json_encode_2", |value, args| Ok(tera::Value::Null));
+        tera.register_filter(
+            "json_encode_2",
+            |value: &tera::Value, args: &std::collections::HashMap<_, tera::Value>| {
+                let base_indent = args
+                    .get("base_indent")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize;
+                let block_indent = args
+                    .get("block_indent")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(4) as usize;
+                let indent = args.get("indent").and_then(|v| v.as_str()).unwrap_or(" ");
+
+                let base_indent = " ".repeat(base_indent);
+                let indent = indent.repeat(block_indent);
+
+                let mut out_buf = Vec::new();
+                value.serialize(&mut serde_json::Serializer::with_formatter(
+                    &mut out_buf,
+                    serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes()),
+                ))?;
+
+                let out_str = String::from_utf8(out_buf).map_err(|e| {
+                    tera::Error::msg(format!("Failed to convert JSON output to string: {}", e))
+                })?;
+
+                let indented = out_str
+                    .lines()
+                    .map(|line| {
+                        if line.is_empty() {
+                            line.into()
+                        } else {
+                            format!("{}{}", base_indent, line)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                Ok(tera::Value::String(indented))
+            },
+        );
 
         let mut context = tera::Context::from_serialize(Config::default())?;
         context.insert("__presets", &*DEFAULT_PRESETS);
 
-        panic!("{}", tera.render(TEMPLATE_NAME, &context).unwrap())
+        // panic!("{}", tera.render(TEMPLATE_NAME, &context).unwrap())
+        tera.render(TEMPLATE_NAME, &context)
     }
 }
 
@@ -365,16 +407,13 @@ mod tests {
     };
 
     #[test]
-    fn test_build_default_config() {
+    fn test_config_build_default() {
         let config_str =
             super::Settings::build_default_config().expect("Failed to build default config");
         let config = &json5::from_str::<PartialConfig>(&config_str)
             .expect("Default config should be valid JSON5: A");
         let mut base_config = Config::default();
         base_config.merge(&config);
-
-        // Ignored fields
-        // base_config.game.content.presets.0 = vec![];
 
         let config_value: super::Value = json5::from_str(
             &json5::to_string(&base_config).expect("Default config should be valid JSON5: B"),
@@ -394,5 +433,30 @@ mod tests {
             .unwrap(),
             "Default config should be a JSON object"
         );
+    }
+
+    #[test]
+    fn test_config_default_format() {
+        let config =
+            super::Settings::build_default_config().expect("Failed to build default config");
+
+        for (i, line) in config.lines().enumerate() {
+            assert!(
+                !line.contains('\t'),
+                "Default config should not contain tabs for indentation: {i}: {line}"
+            );
+            assert!(
+                line.find(|c: char| !c.is_whitespace()).unwrap_or(0) % 4 == 0,
+                "Default config should be indented with multiples of 4 spaces\n{config}"
+            );
+            assert!(
+                !line.ends_with(' '),
+                "Default config should not have trailing spaces: {i}: {line}, config:\n{config}"
+            );
+            assert!(
+                line.len() <= 120,
+                "Default config lines should not exceed 120 characters: {i}: {line}"
+            );
+        }
     }
 }
