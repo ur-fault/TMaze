@@ -398,6 +398,7 @@ impl Generator {
 
                         // connect the floors
                         // TODO: this implementation has a bug, when each floor is not fully connected
+                        // FIX: `and` should be used instead of `or`
                         for (floor, window) in parts.windows(2).enumerate() {
                             let [from, to] = window else {
                                 unreachable!("windows should be long 2");
