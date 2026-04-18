@@ -59,6 +59,9 @@ config! {
         swap_up_down: bool,
         enable_margin: bool,
         enable_highlight: bool = false,
+        space: f64 = 2. / 5.,
+        min_size: Dims = Dims(10, 5),
+        max_size: Dims = Dims(50, 25),
     }
 
     pub struct Appearance {

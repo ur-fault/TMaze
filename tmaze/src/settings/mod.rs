@@ -88,13 +88,14 @@ impl Settings {
             .expect("Event drain should be alive");
     }
 
-    pub fn build_default_config() -> Result<String, tera::Error> {
+    pub fn build_default_config() -> String {
         let mut tera = Tera::default();
         const TEMPLATE_NAME: &str = "default_config.json5";
         tera.add_raw_template(
             TEMPLATE_NAME,
             include_str!("./files/default_settings.json5"),
-        )?;
+        )
+        .expect("Default config template should be valid");
         tera.register_function(
             "repeat",
             |args: &std::collections::HashMap<String, tera::Value>| {
@@ -150,11 +151,13 @@ impl Settings {
             },
         );
 
-        let mut context = tera::Context::from_serialize(Config::default())?;
+        let mut context = tera::Context::from_serialize(Config::default())
+            .expect("Default config should be serializable");
         context.insert("__presets", &*DEFAULT_PRESETS);
 
         // panic!("{}", tera.render(TEMPLATE_NAME, &context).unwrap())
         tera.render(TEMPLATE_NAME, &context)
+            .expect("Default config should render correctly")
     }
 }
 
@@ -401,24 +404,34 @@ static DEFAULT_PRESETS: LazyLock<Vec<MazePreset>> = LazyLock::new(|| {
 mod tests {
     use pretty_assertions::assert_eq;
 
-    use crate::settings::{
-        config_utils::Mergeable,
-        model::{Config, PartialConfig, PresetList},
-    };
+    use crate::settings::{model::PresetList, theme::TerminalColorScheme};
 
     #[test]
     fn test_config_build_default() {
-        let config_str =
-            super::Settings::build_default_config().expect("Failed to build default config");
-        let config = &json5::from_str::<PartialConfig>(&config_str)
-            .expect("Default config should be valid JSON5: A");
-        let mut base_config = Config::default();
-        base_config.merge(&config);
+        let config_str = super::Settings::build_default_config();
+        let mut config_value = json5::from_str::<super::Value>(&config_str)
+            .expect("Default config should be valid JSON5");
 
-        let config_value: super::Value = json5::from_str(
-            &json5::to_string(&base_config).expect("Default config should be valid JSON5: B"),
-        )
-        .expect("Default config should be a JSON object");
+        use super::Value::*;
+        match &mut config_value {
+            Object(map) => match map.get_mut("general") {
+                Some(Object(map)) => match map.get_mut("appearance") {
+                    Some(Object(map)) => {
+                        map.insert(
+                            "terminal_scheme".into(),
+                            json5::from_str(
+                                &json5::to_string(&TerminalColorScheme::default()).unwrap(),
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    _ => panic!("Appearance should be an object"),
+                },
+                _ => panic!("General should be an object"),
+            },
+            _ => panic!("Config should be an object"),
+        }
+
         assert_eq!(
             config_value,
             json5::from_str(
@@ -437,8 +450,7 @@ mod tests {
 
     #[test]
     fn test_config_default_format() {
-        let config =
-            super::Settings::build_default_config().expect("Failed to build default config");
+        let config = super::Settings::build_default_config();
 
         for (i, line) in config.lines().enumerate() {
             assert!(

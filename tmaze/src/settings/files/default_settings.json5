@@ -65,6 +65,9 @@
                 "swap_up_down": {{ controls.mouse.dpad.swap_up_down }},
                 "enable_margin": {{ controls.mouse.dpad.enable_margin }},
                 "enable_highlight": {{ controls.mouse.dpad.enable_highlight }},
+                "dpad_space": {{ controls.mouse.dpad.space }},
+                "dpad_min_size": {{ controls.mouse.dpad.min_size | json_encode }},
+                "dpad_max_size": {{ controls.mouse.dpad.max_size | json_encode }},
             }
         }
     },
