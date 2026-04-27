@@ -428,7 +428,7 @@ impl CellMask {
     }
 
     pub fn random_cell(&self, rng: &mut Random) -> Option<Dims3D> {
-        // If less then 10% of the cells are enabled, we can collect all of them and choose one,
+        // If less than 10% of the cells are enabled, we can collect all of them and choose one,
         // otherwise we can just choose random cell and check that it's enabled.
 
         let enabled = self.enabled_count();
