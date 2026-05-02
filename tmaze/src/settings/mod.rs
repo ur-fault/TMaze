@@ -404,7 +404,10 @@ static DEFAULT_PRESETS: LazyLock<Vec<MazePreset>> = LazyLock::new(|| {
 mod tests {
     use pretty_assertions::assert_eq;
 
-    use crate::settings::{model::PresetList, theme::TerminalColorScheme};
+    use crate::settings::{
+        model::{PresetGroup, PresetGroupItem, Presets},
+        theme::TerminalColorScheme,
+    };
 
     #[test]
     fn test_config_build_default() {
@@ -437,7 +440,13 @@ mod tests {
             json5::from_str(
                 json5::to_string(&{
                     let mut config = super::Config::default();
-                    config.game.content.presets = PresetList(super::DEFAULT_PRESETS.clone());
+                    config.game.content.presets = Presets(
+                        super::DEFAULT_PRESETS
+                            .iter()
+                            .cloned()
+                            .map(PresetGroupItem::Preset)
+                            .collect(),
+                    );
                     config
                 })
                 .unwrap()

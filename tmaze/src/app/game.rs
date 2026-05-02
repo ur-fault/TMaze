@@ -17,7 +17,7 @@ use crate::{
     lerp, menu_actions,
     renderer::{draw::Align, CellContent, GBuffer, GMutView, Padding},
     settings::{
-        model::{self, CameraMode, Config, MazePreset},
+        model::{self, CameraMode, Config, MazePreset, PresetGroup, PresetGroupItem},
         theme::{SharedScheme, Theme, ThemeResolver},
     },
     ui::{
@@ -185,7 +185,14 @@ impl MainMenu {
     }
 
     fn start_new_game(settings: &Config, use_data: &AppStateData) -> Change {
-        match MazePresetMenu::new(settings, use_data) {
+        let items = settings.game.content.presets.0.clone();
+        match MazePresetMenu::new(
+            PresetGroup {
+                group: "".into(),
+                items,
+            },
+            use_data,
+        ) {
             Some(preset_menu) => Change::push(Activity::new_base_boxed("maze preset", preset_menu)),
             None => {
                 // TODO: reference settings once ready
@@ -230,39 +237,107 @@ impl ActivityHandler for MainMenu {
     }
 }
 
+// pub struct MazePresetGroupMenu {
+//     menu: Menu,
+//     groups: Vec<PresetGroup>,
+// }
+//
+// impl MazePresetGroupMenu {
+//     pub fn new(config: &Config, app_state_data: &AppStateData) -> Option<Self> {
+//         let groups = &config.game.content.presets;
+//
+//         let mut menu_config = MenuConfig::new_from_strings(
+//             "Maze preset group".to_string(),
+//             groups
+//                 .iter()
+//                 .map(|group| group.name.clone())
+//                 .collect::<Vec<_>>(),
+//         );
+//
+//         let default = app_state_data
+//             .last_selected_preset
+//             .last()
+//             .map(|(i, _)| *i)
+//             .or_else(|| groups.default_preset_index().map(|(i, _)| i));
+//
+//         if let Some(i) = default {
+//             menu_config = menu_config.default(i);
+//         }
+//
+//         let menu = Menu::try_new(menu_config)?;
+//
+//         let groups = groups.to_vec();
+//
+//         Some(Self { menu, groups })
+//     }
+// }
+//
+// impl ActivityHandler for MazePresetGroupMenu {
+//     fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
+//         todo!()
+//     }
+//
+//     fn screen(&mut self) -> &mut dyn Screen {
+//         todo!()
+//     }
+// }
+
 pub struct MazePresetMenu {
     menu: Menu,
-    presets: Vec<MazePreset>,
+    // items: Vec<PresetGroupItem>,
+    group: PresetGroup,
 }
 
 impl MazePresetMenu {
-    pub fn new(config: &Config, app_state_data: &AppStateData) -> Option<Self> {
-        let presets = &config.game.content.presets;
-        if presets.is_empty() {
-            return None;
-        }
+    pub fn new(group: PresetGroup, _app_state_data: &AppStateData) -> Option<Self> {
+        // let group = config.game.content.presets.get_group(&group_idxs)?;
+        // let title = if group_idxs.is_empty() {
+        //     "Maze preset".to_string()
+        // } else {
+        //     group.group.clone()
+        // };
+        let title = if group.group.is_empty() {
+            "Maze preset".to_string()
+        } else {
+            group.group.clone()
+        };
 
-        let mut menu_config = MenuConfig::new_from_strings(
-            "Maze preset".to_string(),
-            presets
+        // let mut menu_config = MenuConfig::new_from_strings(
+        //     "Maze preset".to_string(),
+        //     group
+        //         .presets
+        //         .iter()
+        //         .map(|maze| maze.title.clone())
+        //         .collect::<Vec<_>>(),
+        // );
+
+        use model::PresetGroupItem::*;
+
+        let menu_config = MenuConfig::new_from_strings(
+            title,
+            group
+                .items
                 .iter()
-                .map(|maze| maze.title.clone())
+                .map(|maze| match maze {
+                    Preset(maze_preset) => maze_preset.title.clone(),
+                    Group(preset_group) => format!("{} >", preset_group.group),
+                })
                 .collect::<Vec<_>>(),
         );
 
-        let default = app_state_data
-            .last_selected_preset
-            .or_else(|| presets.iter().position(|maze| maze.default));
+        // let default = app_state_data
+        //     .last_selected_preset
+        //     .get(&group_i)
+        //     .cloned()
+        //     .or_else(|| group.default_preset_index());
+        //
+        // if let Some(i) = default {
+        //     menu_config = menu_config.default(i);
+        // }
 
-        if let Some(i) = default {
-            menu_config = menu_config.default(i);
-        }
+        let menu = Menu::try_new(menu_config)?;
 
-        let menu = Menu::new(menu_config);
-
-        let presets = presets.to_vec();
-
-        Some(Self { menu, presets })
+        Some(Self { menu, group })
     }
 }
 
@@ -274,14 +349,31 @@ impl ActivityHandler for MazePresetMenu {
                     res: Some(size), ..
                 } => {
                     let index = *size.downcast::<usize>().expect("menu should return index");
-                    data.use_data.last_selected_preset = Some(index);
+                    // data.use_data.last_selected_preset.insert_before(
+                    //     data.use_data.last_selected_preset.len(),
+                    //     self.group,
+                    //     index,
+                    // );
 
-                    let preset = self.presets[index].clone();
+                    match self.group.items[index].clone() {
+                        PresetGroupItem::Preset(maze_preset) => {
+                            Some(Change::push(Activity::new_base_boxed(
+                                "maze_gen".to_string(),
+                                MazeGenerationActivity::new(maze_preset, &data.registries),
+                            )))
+                        }
+                        PresetGroupItem::Group(preset_group) => {
+                            Some(Change::push(Activity::new_base_boxed(
+                                "maze preset".to_string(),
+                                MazePresetMenu::new(preset_group, &data.use_data)?,
+                            )))
+                        }
+                    }
 
-                    Some(Change::push(Activity::new_base_boxed(
-                        "maze_gen".to_string(),
-                        MazeGenerationActivity::new(preset, &data.registries),
-                    )))
+                    // Some(Change::push(Activity::new_base_boxed(
+                    //     "maze_gen".to_string(),
+                    //     MazeGenerationActivity::new(preset, &data.registries),
+                    // )))
                 }
                 res => Some(res),
             },

@@ -109,6 +109,7 @@ fn main() -> Result<(), GameError> {
                 eprintln!("- {}", warning);
             }
         }
+        return Ok(());
 
         println!("{:#?}", *config.read());
 

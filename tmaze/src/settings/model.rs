@@ -41,7 +41,7 @@ config! {
     }
 
     pub struct Content {
-        presets: PresetList,
+        presets: Presets,
     }
 
     pub struct Controls {
@@ -150,41 +150,154 @@ pub enum UpdateCheckInterval {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct PresetList(pub Vec<MazePreset>);
+pub struct Presets(pub Vec<PresetGroupItem>);
 
-impl Deref for PresetList {
-    type Target = [MazePreset];
+impl Presets {
+    pub fn default_indeces(&self) -> Option<Vec<usize>> {
+        let mut idxs = self.0.iter().enumerate().find_map(|(i, item)| match item {
+            PresetGroupItem::Preset(p) if p.default => Some(vec![i]),
+            PresetGroupItem::Group(g) => {
+                let mut idxs = g.default_preset_index()?;
+                idxs.push(i);
+                Some(idxs)
+            }
+            _ => None,
+        })?;
+
+        idxs.reverse();
+        Some(idxs)
+    }
+
+    // Iterate through the group hierarchy according to the given indices, returning the preset
+    // group at the end if it exists.
+    //
+    // If `indices` is empty, returns `self`.
+    pub fn get_group(&self, indices: &[usize]) -> Option<&PresetGroup> {
+        match self.0.get(indices[0])? {
+            PresetGroupItem::Group(g) => g.get_group(&indices[1..]),
+            PresetGroupItem::Preset(_) => None,
+        }
+    }
+}
+
+impl Mergeable<Self> for Presets {
+    fn merge(&mut self, other: &Self) {
+        self.0.extend_from_slice(&other.0);
+    }
+}
+
+impl LenientConvert for Presets {
+    fn convert(value: Value, context: &mut ConvertContext) -> Option<Self> {
+        let value = Value::Object(
+            [
+                ("presets".to_string(), value),
+                ("group".to_string(), Value::String("".into())),
+            ]
+            .into_iter()
+            .collect(),
+        );
+
+        Some(Presets(PresetGroup::convert(value, context)?.items))
+    }
+}
+
+impl Deref for Presets {
+    type Target = Vec<PresetGroupItem>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl Mergeable<Self> for PresetList {
-    fn merge(&mut self, other: &Self) {
-        self.0.extend_from_slice(&other.0);
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PresetGroup {
+    pub group: String,
+    pub items: Vec<PresetGroupItem>,
+}
+
+impl PresetGroup {
+    fn default_preset_index(&self) -> Option<Vec<usize>> {
+        self.items.iter().enumerate().find_map(|(i, g)| match g {
+            PresetGroupItem::Preset(p) if p.default => Some(vec![i]),
+            PresetGroupItem::Group(g) => {
+                let mut sub_indices = g.default_preset_index()?;
+                sub_indices.push(i);
+                Some(sub_indices)
+            }
+            _ => None,
+        })
+    }
+
+    pub(self) fn get_group(&self, indices: &[usize]) -> Option<&PresetGroup> {
+        let mut group = self;
+        for &index in indices {
+            match group.items.get(index)? {
+                PresetGroupItem::Group(g) => group = g,
+                PresetGroupItem::Preset(_) => return None,
+            }
+        }
+        Some(group)
     }
 }
 
-impl LenientConvert for PresetList {
+// impl Mergeable<Self> for PresetGroup {
+//     fn merge(&mut self, other: &Self) {
+//         self.0.extend_from_slice(&other.0);
+//     }
+// }
+
+impl LenientConvert for PresetGroup {
     fn convert(value: Value, context: &mut ConvertContext) -> Option<Self> {
-        let Value::List(list) = value else {
-            context.err("expected a list of maze presets".to_string());
+        let Value::Object(mut obj) = value else {
+            context.err("expected an object for maze preset group".to_string());
             return None;
         };
 
-        let mut presets = vec![];
+        let Some(Value::String(group)) = obj.remove("group") else {
+            context.err("expected a name (`group`) for maze preset group".to_string());
+            return None;
+        };
+
+        let Some(Value::List(list)) = obj.remove("presets") else {
+            context.err("expected a list of maze presets (`presets`)".to_string());
+            return None;
+        };
+
+        for (key, _) in obj.into_iter() {
+            context.warn(format!("unexpected field '{}' in maze preset group", key));
+        }
+
+        let mut items = vec![];
         for (i, item) in list.into_iter().enumerate() {
             context.push_index(i);
-            match MazePreset::convert(item, context) {
-                Some(preset) => presets.push(preset),
-                None => { /* error already recorded */ }
+            let (preset_opt, preset_branch) = context.branch("preset".into(), |ctx| {
+                MazePreset::convert(item.clone(), ctx)
+            });
+
+            let (group_opt, group_branch) =
+                context.branch("group".into(), |ctx| PresetGroup::convert(item, ctx));
+
+            match (preset_opt, group_opt) {
+                (Some(preset), _) => items.push(PresetGroupItem::Preset(preset)),
+                (_, Some(group)) => items.push(PresetGroupItem::Group(group)),
+                _ => {
+                    preset_branch.apply(context);
+                    group_branch.apply(context);
+                    context.err("expected a maze preset or group".to_string());
+                }
             }
+
             context.pop();
         }
 
-        Some(PresetList(presets))
+        Some(PresetGroup { group, items })
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PresetGroupItem {
+    Preset(MazePreset),
+    Group(PresetGroup),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

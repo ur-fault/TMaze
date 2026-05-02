@@ -14,6 +14,7 @@ use cmaze::{
 };
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
+// use indexmap::IndexMap;
 
 use crate::{
     app::event::{EventReceiver, EventReceiverFn},
@@ -403,7 +404,7 @@ pub type EventSink = mpsc::Sender<Event>;
 
 #[derive(Default)]
 pub struct AppStateData {
-    pub last_selected_preset: Option<usize>,
+    // pub last_selected_preset: IndexMap<usize, usize>,
     pub show_debug: bool,
 }
 

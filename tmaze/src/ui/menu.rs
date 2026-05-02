@@ -312,16 +312,25 @@ pub struct Menu {
 
 impl Menu {
     pub fn new(config: MenuConfig) -> Self {
+        let title = config.title.clone();
+        Self::try_new(config)
+            .unwrap_or_else(|| panic!("invalid menu config `{}`: no options provided", title))
+    }
+
+    pub fn try_new(config: MenuConfig) -> Option<Self> {
         let MenuConfig { options, .. } = &config;
-        debug_assert!(!options.is_empty(), "Menu must have at least one option");
+        if options.is_empty() {
+            log::warn!("Menu `{}` with no options", config.title);
+            return None;
+        }
 
         let default = config.default.unwrap_or(0).clamp(0, options.len() - 1);
 
-        Self {
+        Some(Self {
             selected: default,
             config,
             items_pos: None,
-        }
+        })
     }
 
     pub fn into_activity(self) -> Activity {

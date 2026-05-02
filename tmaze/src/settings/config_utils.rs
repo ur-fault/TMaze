@@ -11,6 +11,7 @@ pub trait Mergeable<O> {
 pub enum Segment {
     Key(String),
     Index(usize),
+    Branch(String),
 }
 
 impl Display for Segment {
@@ -18,6 +19,7 @@ impl Display for Segment {
         match self {
             Segment::Key(key) => write!(f, "{}", key),
             Segment::Index(index) => write!(f, "[{}]", index),
+            Segment::Branch(name) => write!(f, "<{}>", name),
         }
     }
 }
@@ -40,17 +42,19 @@ impl std::fmt::Display for ConvertError {
 }
 
 pub struct ConvertContext {
-    pub path: Path,
-    pub errors: Vec<ConvertError>,
-    pub warnings: Vec<ConvertError>,
+    path: Path,
+    errors: Vec<ConvertError>,
+    warnings: Vec<ConvertError>,
+    branch_stack: Vec<ConvertContextBranch>,
 }
 
 impl ConvertContext {
     pub fn new() -> Self {
         Self {
-            path: vec![],
+            path: Path::new(),
             errors: vec![],
             warnings: vec![],
+            branch_stack: vec![],
         }
     }
 
@@ -59,6 +63,24 @@ impl ConvertContext {
         let t = inside(self);
         self.pop();
         t
+    }
+
+    pub fn branch<T>(
+        &mut self,
+        name: String,
+        inside: impl FnOnce(&mut Self) -> T,
+    ) -> (T, ConvertContextBranch) {
+        let branch = ConvertContextBranch::new(name.clone());
+        self.branch_stack.push(branch);
+        self.push(Segment::Branch(name));
+
+        let t = inside(self);
+        self.pop();
+        let branch = self
+            .branch_stack
+            .pop()
+            .expect("branch stack should not be empty");
+        (t, branch)
     }
 
     pub fn push(&mut self, segment: Segment) {
@@ -79,21 +101,55 @@ impl ConvertContext {
     }
 
     pub fn err(&mut self, detail: String) {
-        self.errors.push(ConvertError {
+        let err = ConvertError {
             path: self.path.clone(),
             detail,
-        });
+        };
+
+        self.diagnostics(false).push(err);
     }
 
     pub fn warn(&mut self, detail: String) {
-        self.warnings.push(ConvertError {
+        let warn = ConvertError {
             path: self.path.clone(),
             detail,
-        });
+        };
+
+        self.diagnostics(true).push(warn);
     }
 
     pub fn extract(self) -> (Vec<ConvertError>, Vec<ConvertError>) {
         (self.errors, self.warnings)
+    }
+
+    fn diagnostics(&mut self, warns: bool) -> &mut Vec<ConvertError> {
+        match (self.branch_stack.last_mut(), warns) {
+            (Some(branch), false) => &mut branch.errors,
+            (Some(branch), true) => &mut branch.warnings,
+            (None, false) => &mut self.errors,
+            (None, true) => &mut self.warnings,
+        }
+    }
+}
+
+pub struct ConvertContextBranch {
+    name: String,
+    errors: Vec<ConvertError>,
+    warnings: Vec<ConvertError>,
+}
+
+impl ConvertContextBranch {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            errors: vec![],
+            warnings: vec![],
+        }
+    }
+
+    pub fn apply(self, parent: &mut ConvertContext) {
+        parent.errors.extend(self.errors.into_iter());
+        parent.warnings.extend(self.warnings.into_iter());
     }
 }
 
