@@ -99,7 +99,15 @@ impl Settings {
             .expect("Default config template should be valid");
 
         engine.add_function(
-            "json_encode_2",
+            "json",
+            |value: &Value| -> std::result::Result<String, String> {
+                serde_json::to_string(value)
+                    .map_err(|e| format!("failed to serialize value to JSON: {}", e))
+            },
+        );
+
+        engine.add_function(
+            "json_pretty",
             |value: &Value, base| -> std::result::Result<String, String> {
                 let base_indent = " ".repeat(base);
                 let indent = " ".repeat(4);
