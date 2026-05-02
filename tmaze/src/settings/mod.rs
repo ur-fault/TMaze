@@ -16,7 +16,6 @@ use arc_swap::ArcSwap;
 use cmaze::algorithms::{MazeSpec, MazeSpecType, MazeType};
 use hashbrown::HashMap;
 use serde::Serialize;
-use tera::Tera;
 
 use crate::{
     app::{
@@ -25,11 +24,10 @@ use crate::{
         Event,
     },
     helpers::constants::paths,
-    settings::model::MazePreset,
 };
 
 use config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value};
-use model::{Config, PartialConfig};
+use model::{Config, MazePreset, PartialConfig};
 
 #[derive(Clone)]
 pub struct Settings {
@@ -89,51 +87,33 @@ impl Settings {
     }
 
     pub fn build_default_config() -> String {
-        let mut tera = Tera::default();
-        const TEMPLATE_NAME: &str = "default_config.json5";
-        tera.add_raw_template(
-            TEMPLATE_NAME,
-            include_str!("./files/default_settings.json5"),
-        )
-        .expect("Default config template should be valid");
-        tera.register_function(
-            "repeat",
-            |args: &std::collections::HashMap<String, tera::Value>| {
-                let string = args.get("string").and_then(|v| v.as_str()).ok_or_else(|| {
-                    tera::Error::msg("repeat filter requires a string argument of type `string`")
-                })?;
-                let times: usize = args.get("times").and_then(|v| v.as_u64()).ok_or_else(|| {
-                    tera::Error::msg("repeat filter requires a times argument of type `number`")
-                })? as usize;
-                let result = string.repeat(times);
-                Ok(tera::Value::String(result))
-            },
-        );
-        tera.register_filter(
-            "json_encode_2",
-            |value: &tera::Value, args: &std::collections::HashMap<_, tera::Value>| {
-                let base_indent = args
-                    .get("base_indent")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0) as usize;
-                let block_indent = args
-                    .get("block_indent")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(4) as usize;
-                let indent = args.get("indent").and_then(|v| v.as_str()).unwrap_or(" ");
+        use upon::*;
 
-                let base_indent = " ".repeat(base_indent);
-                let indent = indent.repeat(block_indent);
+        let mut engine = Engine::default();
+        const TEMPLATE_NAME: &str = "default_config.json5";
+        engine
+            .add_template(
+                TEMPLATE_NAME,
+                include_str!("./files/default_settings.json5"),
+            )
+            .expect("Default config template should be valid");
+
+        engine.add_function(
+            "json_encode_2",
+            |value: &Value, base| -> std::result::Result<String, String> {
+                let base_indent = " ".repeat(base);
+                let indent = " ".repeat(4);
 
                 let mut out_buf = Vec::new();
-                value.serialize(&mut serde_json::Serializer::with_formatter(
-                    &mut out_buf,
-                    serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes()),
-                ))?;
+                value
+                    .serialize(&mut serde_json::Serializer::with_formatter(
+                        &mut out_buf,
+                        serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes()),
+                    ))
+                    .map_err(|e| format!("failed to serialize value to JSON: {}", e))?;
 
-                let out_str = String::from_utf8(out_buf).map_err(|e| {
-                    tera::Error::msg(format!("Failed to convert JSON output to string: {}", e))
-                })?;
+                let out_str = String::from_utf8(out_buf)
+                    .map_err(|e| format!("failed to convert JSON output to string: {}", e))?;
 
                 let indented = out_str
                     .lines()
@@ -147,16 +127,27 @@ impl Settings {
                     .collect::<Vec<_>>()
                     .join("\n");
 
-                Ok(tera::Value::String(indented))
+                Ok(indented)
             },
         );
 
-        let mut context = tera::Context::from_serialize(Config::default())
-            .expect("Default config should be serializable");
-        context.insert("__presets", &*DEFAULT_PRESETS);
+        let mut context =
+            serde_json::to_value(Config::default()).expect("Default config should be serializable");
+        match context {
+            serde_json::Value::Object(ref mut map) => {
+                map.insert(
+                    "__presets".into(),
+                    serde_json::to_value(&*DEFAULT_PRESETS)
+                        .expect("Default presets should be serializable"),
+                );
+            }
+            _ => panic!("Context should be a JSON object"),
+        }
 
-        // panic!("{}", tera.render(TEMPLATE_NAME, &context).unwrap())
-        tera.render(TEMPLATE_NAME, &context)
+        engine
+            .template(TEMPLATE_NAME)
+            .render(&context)
+            .to_string()
             .expect("Default config should render correctly")
     }
 }
