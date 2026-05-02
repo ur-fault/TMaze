@@ -24,12 +24,12 @@
         //    he will be centered on that axis.
         //    margin can be either relative (0.0 - 0.5) or absolute.
         //    floating point values are relative, integer values are absolute.
-        "camera_mode": {{ game.camera_mode | json_encode }},
+        "camera_mode": {{ game.camera_mode | json }},
         // "camera_mode": {"mode": "EdgeFollow", "x": 0.25, "y": 0.25},
 
         "camera_smoothing": {{ game.camera_smoothing }},
         "player_smoothing": {{ game.player_smoothing }},
-        "viewport_margin": {{ game.viewport_margin | json_encode }},
+        "viewport_margin": {{ game.viewport_margin | json }},
         "content": {
             // Preset:
             // - title - title of the preset
@@ -52,7 +52,7 @@
             // - active_region_heuristic - when neither `start` nor `end` are specified,
             //   this heuristic will be used to choose the region, can be either:
             //   - "biggest", "random", "first", "last"
-            "presets": {{ __presets | json_encode_2(base_indent = 12) }}
+            "presets": {{ __presets | json_pretty: 12 }}
         }
     },
 
@@ -65,9 +65,9 @@
                 "swap_up_down": {{ controls.mouse.dpad.swap_up_down }},
                 "enable_margin": {{ controls.mouse.dpad.enable_margin }},
                 "enable_highlight": {{ controls.mouse.dpad.enable_highlight }},
-                "dpad_space": {{ controls.mouse.dpad.space }},
-                "dpad_min_size": {{ controls.mouse.dpad.min_size | json_encode }},
-                "dpad_max_size": {{ controls.mouse.dpad.max_size | json_encode }},
+                "space": {{ controls.mouse.dpad.space }},
+                "min_size": {{ controls.mouse.dpad.min_size | json }},
+                "max_size": {{ controls.mouse.dpad.max_size | json }},
             }
         }
     },
