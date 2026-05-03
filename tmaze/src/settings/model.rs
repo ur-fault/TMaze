@@ -190,7 +190,7 @@ impl LenientConvert for Presets {
     fn convert(value: Value, context: &mut ConvertContext) -> Option<Self> {
         let value = Value::Object(
             [
-                ("presets".to_string(), value),
+                ("items".to_string(), value),
                 ("group".to_string(), Value::String("".into())),
             ]
             .into_iter()
@@ -254,12 +254,12 @@ impl LenientConvert for PresetGroup {
         };
 
         let Some(Value::String(group)) = obj.remove("group") else {
-            context.err("expected a name (`group`) for maze preset group".to_string());
+            context.err("expected a name (`group`: string) for maze preset group".to_string());
             return None;
         };
 
-        let Some(Value::List(list)) = obj.remove("presets") else {
-            context.err("expected a list of maze presets (`presets`)".to_string());
+        let Some(Value::List(list)) = obj.remove("items") else {
+            context.err("expected a list of items (`items`: list)".to_string());
             return None;
         };
 
@@ -295,6 +295,7 @@ impl LenientConvert for PresetGroup {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum PresetGroupItem {
     Preset(MazePreset),
     Group(PresetGroup),

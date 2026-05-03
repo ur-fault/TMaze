@@ -16,7 +16,7 @@ fn main() {
     .counted()
     .default(1);
 
-    let menu = menu::Menu::try_new(menu_config).into_activity();
+    let menu = menu::Menu::new(menu_config).into_activity();
     let mut app = App::new(AppOptions {
         read_only: true,
         main_activity: Some(menu),

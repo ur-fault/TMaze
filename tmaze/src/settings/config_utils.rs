@@ -26,7 +26,7 @@ impl Display for Segment {
 
 pub type Path = Vec<Segment>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConvertError {
     // TODO: Add source file/line info
     pub path: Path,
@@ -122,8 +122,8 @@ impl ConvertContext {
         (self.errors, self.warnings)
     }
 
-    fn diagnostics(&mut self, warns: bool) -> &mut Vec<ConvertError> {
-        match (self.branch_stack.last_mut(), warns) {
+    fn diagnostics(&mut self, warnings: bool) -> &mut Vec<ConvertError> {
+        match (self.branch_stack.last_mut(), warnings) {
             (Some(branch), false) => &mut branch.errors,
             (Some(branch), true) => &mut branch.warnings,
             (None, false) => &mut self.errors,

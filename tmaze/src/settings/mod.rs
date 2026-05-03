@@ -402,9 +402,11 @@ static DEFAULT_PRESETS: LazyLock<Vec<MazePreset>> = LazyLock::new(|| {
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
+    use serde_json::json;
 
     use crate::settings::{
-        model::{PresetGroup, PresetGroupItem, Presets},
+        config_utils::LenientConvert as _,
+        model::{MazePreset, PresetGroupItem, Presets},
         theme::TerminalColorScheme,
     };
 
@@ -478,5 +480,55 @@ mod tests {
                 "Default config lines should not exceed 120 characters: {i}: {line}"
             );
         }
+    }
+
+    #[test]
+    fn test_config_presets_group() {
+        let x = serde_json::from_value(json! ([{
+            "group": "A",
+            "items": [],
+        }]))
+        .unwrap();
+
+        let mut context = super::ConvertContext::new();
+        let presets = Presets::convert(x, &mut context);
+        let (errors, warnings) = context.extract();
+
+        assert_eq!(
+            errors,
+            vec![],
+            "Presets conversion should not produce errors"
+        );
+        assert_eq!(
+            warnings,
+            vec![],
+            "Presets conversion should not produce warnings"
+        );
+        assert!(presets.is_some(), "Presets should be converted correctly");
+    }
+
+    #[test]
+    fn test_config_presets_preset() {
+        let x = serde_json::from_value(json! ({
+            "title": "Preset 1",
+            "type": "simple",
+        }))
+        .unwrap();
+
+        let mut context = super::ConvertContext::new();
+        let presets = MazePreset::convert(x, &mut context);
+        let (errors, warnings) = context.extract();
+
+        assert_eq!(
+            errors,
+            vec![],
+            "Presets conversion should not produce errors"
+        );
+        assert_eq!(
+            warnings,
+            vec![],
+            "Presets conversion should not produce warnings"
+        );
+        assert!(presets.is_some(), "Presets should be converted correctly");
     }
 }
