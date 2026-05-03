@@ -70,7 +70,7 @@ impl ConvertContext {
         name: String,
         inside: impl FnOnce(&mut Self) -> T,
     ) -> (T, ConvertContextBranch) {
-        let branch = ConvertContextBranch::new(name.clone());
+        let branch = ConvertContextBranch::new();
         self.branch_stack.push(branch);
         self.push(Segment::Branch(name));
 
@@ -133,15 +133,13 @@ impl ConvertContext {
 }
 
 pub struct ConvertContextBranch {
-    name: String,
     errors: Vec<ConvertError>,
     warnings: Vec<ConvertError>,
 }
 
 impl ConvertContextBranch {
-    pub fn new(name: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            name,
             errors: vec![],
             warnings: vec![],
         }
