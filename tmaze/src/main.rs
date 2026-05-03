@@ -87,7 +87,7 @@ fn main() -> Result<(), GameError> {
     }
 
     let config_source = if args.default_config {
-        ConfigSource::String(include_str!("./settings/files/default_settings.json5").to_string())
+        ConfigSource::String(Settings::build_default_config())
     } else {
         ConfigSource::User
     };
@@ -109,7 +109,7 @@ fn main() -> Result<(), GameError> {
                 eprintln!("- {}", warning);
             }
         }
-        return Ok(());
+        // return Ok(());
 
         println!("{:#?}", *config.read());
 
