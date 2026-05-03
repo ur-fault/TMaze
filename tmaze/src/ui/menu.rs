@@ -3,7 +3,7 @@ use crossterm::event::{
 };
 
 use pad::PadStr;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use std::{borrow::Cow, fmt, ops::RangeInclusive};
 
@@ -49,16 +49,40 @@ pub struct OptionDef {
 
 // TODO: styling individual items
 pub enum MenuItem {
-    Text(MbyStaticStr),
+    Text {
+        text: MbyStaticStr,
+        first_col: char,
+        last_col: char,
+    },
     Option(OptionDef),
     Slider(SliderDef),
     Separator,
 }
 
+pub const NULL_CHAR: char = '\0';
+
+impl MenuItem {
+    pub fn text(text: Cow<'_, str>) -> Self {
+        MenuItem::Text {
+            text: MbyStaticStr::Owned(text.into_owned()),
+            first_col: NULL_CHAR,
+            last_col: NULL_CHAR,
+        }
+    }
+}
+
 impl MenuItem {
     fn width(&self, special: usize) -> Option<usize> {
         match self {
-            MenuItem::Text(text) => Some(text.width()),
+            MenuItem::Text {
+                text,
+                first_col,
+                last_col,
+            } => Some(
+                text.width()
+                    + first_col.width().map(|w| w + 1).unwrap_or(0)
+                    + last_col.width().map(|w| w + 1).unwrap_or(0),
+            ),
             MenuItem::Option(OptionDef { text, .. }) => Some(text.width() + 4),
             MenuItem::Slider(SliderDef {
                 text,
@@ -91,7 +115,26 @@ impl MenuItem {
     // so we don't allocate a new string every time
     fn render(&self, width: usize) -> Cow<'_, str> {
         match self {
-            MenuItem::Text(text) => text.as_ref_cow(),
+            MenuItem::Text {
+                text,
+                first_col,
+                last_col,
+            } => {
+                let first_col = if first_col.is_control() {
+                    "".into()
+                } else {
+                    format!("{} ", first_col)
+                };
+
+                let last_col = if last_col.is_control() {
+                    "".into()
+                } else {
+                    format!(" {}", last_col)
+                };
+
+                let rem_width = width.saturating_sub(first_col.width() + text.width()) - 1;
+                format!("{first_col}{text}{last_col:>rem_width$}").into()
+            }
             MenuItem::Option(OptionDef { text, val, .. }) => {
                 // TODO: this is not a prefix tho ?!?
                 let prefix = if *val { "[▪]" } else { "[ ]" };
@@ -136,20 +179,24 @@ impl MenuItem {
 
 impl From<String> for MenuItem {
     fn from(s: String) -> Self {
-        MenuItem::Text(s.into())
+        MenuItem::text(s.into())
     }
 }
 
 impl From<&str> for MenuItem {
     fn from(s: &str) -> Self {
-        MenuItem::Text(s.to_string().into())
+        MenuItem::text(s.into())
     }
 }
 
 impl fmt::Debug for MenuItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MenuItem::Text(s) => write!(f, "Text({})", s),
+            MenuItem::Text {
+                text,
+                first_col,
+                last_col,
+            } => write!(f, "Text('{first_col}' '{text}' '{last_col}')"),
             MenuItem::Option(OptionDef { text, val, .. }) => write!(f, "Option({}, {})", text, val),
             MenuItem::Slider(SliderDef {
                 text, val, range, ..
@@ -359,7 +406,7 @@ impl Menu {
         let selected_opt = &mut self.config.options[self.selected];
 
         match selected_opt {
-            MenuItem::Text(_) => return Some(Change::pop_top_with(self.selected)),
+            MenuItem::Text { .. } => return Some(Change::pop_top_with(self.selected)),
             MenuItem::Option(OptionDef {
                 val,
                 update_fn: fun,
@@ -409,7 +456,7 @@ impl Menu {
     fn reset(&mut self, data: &mut AppData) {
         let selected_opt = &mut self.config.options[self.selected];
         match selected_opt {
-            MenuItem::Text(_) => {}
+            MenuItem::Text { .. } => {}
             MenuItem::Option(OptionDef { val, reset_fn, .. }) => {
                 if let Some(reset_fn) = reset_fn {
                     *val = reset_fn(data);

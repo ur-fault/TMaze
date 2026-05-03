@@ -29,7 +29,8 @@ use crate::{
             settings::SettingsActivity,
             style_browser::StyleBrowser,
         },
-        Menu, MenuAction, MenuConfig, Popup, ProgressBar, Rect, RedirectMenu, Screen, ScreenError,
+        Menu, MenuAction, MenuConfig, MenuItem, Popup, ProgressBar, Rect, RedirectMenu, Screen,
+        ScreenError, NULL_CHAR,
     },
 };
 
@@ -237,51 +238,6 @@ impl ActivityHandler for MainMenu {
     }
 }
 
-// pub struct MazePresetGroupMenu {
-//     menu: Menu,
-//     groups: Vec<PresetGroup>,
-// }
-//
-// impl MazePresetGroupMenu {
-//     pub fn new(config: &Config, app_state_data: &AppStateData) -> Option<Self> {
-//         let groups = &config.game.content.presets;
-//
-//         let mut menu_config = MenuConfig::new_from_strings(
-//             "Maze preset group".to_string(),
-//             groups
-//                 .iter()
-//                 .map(|group| group.name.clone())
-//                 .collect::<Vec<_>>(),
-//         );
-//
-//         let default = app_state_data
-//             .last_selected_preset
-//             .last()
-//             .map(|(i, _)| *i)
-//             .or_else(|| groups.default_preset_index().map(|(i, _)| i));
-//
-//         if let Some(i) = default {
-//             menu_config = menu_config.default(i);
-//         }
-//
-//         let menu = Menu::try_new(menu_config)?;
-//
-//         let groups = groups.to_vec();
-//
-//         Some(Self { menu, groups })
-//     }
-// }
-//
-// impl ActivityHandler for MazePresetGroupMenu {
-//     fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
-//         todo!()
-//     }
-//
-//     fn screen(&mut self) -> &mut dyn Screen {
-//         todo!()
-//     }
-// }
-
 pub struct MazePresetMenu {
     menu: Menu,
     // items: Vec<PresetGroupItem>,
@@ -290,37 +246,26 @@ pub struct MazePresetMenu {
 
 impl MazePresetMenu {
     pub fn new(group: PresetGroup, _app_state_data: &AppStateData) -> Option<Self> {
-        // let group = config.game.content.presets.get_group(&group_idxs)?;
-        // let title = if group_idxs.is_empty() {
-        //     "Maze preset".to_string()
-        // } else {
-        //     group.group.clone()
-        // };
         let title = if group.group.is_empty() {
             "Maze preset".to_string()
         } else {
             group.group.clone()
         };
 
-        // let mut menu_config = MenuConfig::new_from_strings(
-        //     "Maze preset".to_string(),
-        //     group
-        //         .presets
-        //         .iter()
-        //         .map(|maze| maze.title.clone())
-        //         .collect::<Vec<_>>(),
-        // );
-
         use model::PresetGroupItem::*;
 
-        let menu_config = MenuConfig::new_from_strings(
+        let menu_config = MenuConfig::new(
             title,
             group
                 .items
                 .iter()
                 .map(|maze| match maze {
-                    Preset(maze_preset) => maze_preset.title.clone(),
-                    Group(preset_group) => format!("{} >", preset_group.group),
+                    Preset(maze_preset) => MenuItem::text(maze_preset.title.clone().into()),
+                    Group(preset_group) => MenuItem::Text {
+                        text: preset_group.group.clone().into(),
+                        first_col: NULL_CHAR,
+                        last_col: '>',
+                    },
                 })
                 .collect::<Vec<_>>(),
         );
@@ -369,11 +314,6 @@ impl ActivityHandler for MazePresetMenu {
                             )))
                         }
                     }
-
-                    // Some(Change::push(Activity::new_base_boxed(
-                    //     "maze_gen".to_string(),
-                    //     MazeGenerationActivity::new(preset, &data.registries),
-                    // )))
                 }
                 res => Some(res),
             },
