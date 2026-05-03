@@ -66,8 +66,8 @@ impl MbyStaticStr {
 impl fmt::Display for MbyStaticStr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Static(s) => write!(f, "{}", s),
-            Self::Owned(s) => write!(f, "{}", s),
+            Self::Static(s) => f.write_str(s),
+            Self::Owned(s) => f.write_str(s),
         }
     }
 }
