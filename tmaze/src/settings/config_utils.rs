@@ -138,7 +138,7 @@ pub struct ConvertContextBranch {
 }
 
 impl ConvertContextBranch {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             errors: vec![],
             warnings: vec![],
