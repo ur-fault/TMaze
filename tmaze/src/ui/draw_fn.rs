@@ -75,5 +75,18 @@ pub fn draw_char(frame: &mut GMutView, x: i32, y: i32, text: char, style: Style)
         return;
     }
 
+    let settings = crate::app::get_settings(); 
+    let player_pos = crate::app::get_player_pos();
+
+    if settings.get_fog_of_war() {
+        let dx = (x - player_pos.0).abs();
+        let dy = (y - player_pos.1).abs();
+
+        if dx > 5 || dy > 5 {
+            frame.draw(Dims(x, y), '░', style);
+            return;
+        }
+    }
+
     frame.draw(Dims(x, y), text, style);
 }
