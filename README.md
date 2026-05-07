@@ -90,3 +90,18 @@ After `cargo` command add `--features` to enable features, such as `updates`. To
     1. Run it one time only: `docker run --rm -it tmaze`
     1. Run it with persistent storage for config and saved data: `docker run -it --rm -v tmaze_data:/root/.config/tmaze tmaze`
         - In this case you can edit config using somthing like `docker run --rm -it -v tmaze_data:/root thinca/vim:latest`
+
+#### Controls:
+
+In Game:
+WASD or the Arrow Keys: Move
+Space: Switch between adventure and spectator modes
+QFL: Move Down 
+ERP: Move Up
+SHIFT: Move all the way in a single direction
+
+In End Game Popup:
+Escape: Pause menu 
+Enter or Space: Return to the main menu 
+R: restart the game
+Q: quit the application
