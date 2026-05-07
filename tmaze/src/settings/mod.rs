@@ -121,6 +121,11 @@ pub struct SettingsInner {
     #[serde(default)]
     pub slow: Option<bool>,
     #[serde(default)]
+    
+    //Fog of war
+    pub fog_of_war: Option<bool>,
+    #[serde(default)]
+    
     pub disable_tower_auto_up: Option<bool>,
     #[serde(default)]
     pub camera_mode: Option<CameraMode>,
@@ -274,6 +279,16 @@ impl Settings {
 
     pub fn set_slow(&mut self, value: bool) -> &mut Self {
         self.write().slow = Some(value);
+        self
+    }
+
+    //Fog of war
+    pub fn get_fog_of_war(&self) -> bool {
+        self.read().fog_of_war.unwrap_or(false)
+    }
+
+    pub fn set_fog_of_war(&mut self, value: bool) -> &mut Self {
+        self.write().fog_of_war = Some(value);
         self
     }
 
@@ -615,6 +630,15 @@ pub fn create_controls_settings(data: &mut AppData) -> Activity {
                 fun: Box::new(|enabled, data| {
                     *enabled = !*enabled;
                     data.settings.set_enable_dpad_highlight(*enabled);
+                }),
+            }),
+            //Fog of War
+            MenuItem::Option(OptionDef {
+                text: "Enable Fog of War".into(),
+                val: data.settings.get_fog_of_war(),
+                fun: Box::new(|enabled, data| {
+                    *enabled = !*enabled;
+                    data.settings.set_fog_of_war(*enabled);
                 }),
             }),
             MenuItem::Separator,
