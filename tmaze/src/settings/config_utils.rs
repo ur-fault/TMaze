@@ -100,19 +100,19 @@ impl ConvertContext {
         self.path.pop();
     }
 
-    pub fn err(&mut self, detail: String) {
+    pub fn err(&mut self, detail: impl Into<String>) {
         let err = ConvertError {
             path: self.path.clone(),
-            detail,
+            detail: detail.into(),
         };
 
         self.diagnostics(false).push(err);
     }
 
-    pub fn warn(&mut self, detail: String) {
+    pub fn warn(&mut self, detail: impl Into<String>) {
         let warn = ConvertError {
             path: self.path.clone(),
-            detail,
+            detail: detail.into(),
         };
 
         self.diagnostics(true).push(warn);
