@@ -780,7 +780,7 @@ mod tests {
     }
 
     #[test]
-    fn test_default_theme() {
+    fn default_theme() {
         assert!(json5::from_str::<ThemeDefinition>(DEFAULT_THEME).is_ok());
     }
 
