@@ -16,6 +16,8 @@ use crate::{
     },
 };
 
+pub const FORMAT_VERSION: i32 = 2;
+
 config! {
     pub struct Config {
         #[nest] general: General,
@@ -66,7 +68,7 @@ config! {
 
     pub struct Appearance {
         theme: String,
-        #[nest] terminal_scheme: TerminalColorScheme,
+        #[nest] terminal_scheme: TerminalSchemeDef,
     }
 
     pub struct Logging {
@@ -123,6 +125,75 @@ impl_lenient_deserialize! {
 }
 
 type Rgb = (u8, u8, u8);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TerminalSchemeDef {
+    Named(String),
+    Custom(TerminalColorScheme),
+}
+
+impl Default for TerminalSchemeDef {
+    fn default() -> Self {
+        TerminalSchemeDef::Custom(TerminalColorScheme::default())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PartialTerminalSchemeDef {
+    Named(String),
+    Custom(PartialTerminalColorScheme),
+}
+
+impl Default for PartialTerminalSchemeDef {
+    fn default() -> Self {
+        PartialTerminalSchemeDef::Custom(PartialTerminalColorScheme::default())
+    }
+}
+
+impl LenientConvert for PartialTerminalSchemeDef {
+    fn convert(value: Value, context: &mut ConvertContext) -> Option<Self> {
+        let (named_opt, named_branch) =
+            context.branch("named".into(), |ctx| String::convert(value.clone(), ctx));
+
+        let (custom_opt, custom_branch) = context.branch("custom".into(), |ctx| {
+            PartialTerminalColorScheme::convert(value, ctx)
+        });
+
+        match (named_opt, custom_opt) {
+            (Some(named), _) => Some(PartialTerminalSchemeDef::Named(named)),
+            (_, Some(custom)) => Some(PartialTerminalSchemeDef::Custom(custom)),
+            _ => {
+                named_branch.apply(context);
+                custom_branch.apply(context);
+                context.err("expected a terminal scheme definition with either a 'named' or 'custom' scheme");
+                None
+            }
+        }
+    }
+}
+
+impl Mergeable<PartialTerminalSchemeDef> for TerminalSchemeDef {
+    fn merge(&mut self, other: &PartialTerminalSchemeDef) {
+        match (self, other) {
+            (TerminalSchemeDef::Named(self_name), PartialTerminalSchemeDef::Named(named)) => {
+                *self_name = named.clone();
+            }
+            (
+                TerminalSchemeDef::Custom(custom),
+                PartialTerminalSchemeDef::Custom(partial_custom),
+            ) => {
+                custom.merge(partial_custom);
+            }
+            (this @ TerminalSchemeDef::Named(_), other @ PartialTerminalSchemeDef::Custom(_)) => {
+                *this = TerminalSchemeDef::Custom(Default::default());
+                this.merge(other);
+            }
+            (this @ TerminalSchemeDef::Custom(_), PartialTerminalSchemeDef::Named(name)) => {
+                *this = TerminalSchemeDef::Named(name.clone());
+            }
+        }
+    }
+}
 
 #[derive(Default, Clone, Copy, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(tag = "mode")]
@@ -240,26 +311,20 @@ impl PresetGroup {
     }
 }
 
-// impl Mergeable<Self> for PresetGroup {
-//     fn merge(&mut self, other: &Self) {
-//         self.0.extend_from_slice(&other.0);
-//     }
-// }
-
 impl LenientConvert for PresetGroup {
     fn convert(value: Value, context: &mut ConvertContext) -> Option<Self> {
         let Value::Object(mut obj) = value else {
-            context.err("expected an object for maze preset group".to_string());
+            context.err("expected an object for maze preset group");
             return None;
         };
 
         let Some(Value::String(group)) = obj.remove("group") else {
-            context.err("expected a name (`group`: string) for maze preset group".to_string());
+            context.err("expected a name (`group`: string) for maze preset group");
             return None;
         };
 
         let Some(Value::List(list)) = obj.remove("items") else {
-            context.err("expected a list of items (`items`: list)".to_string());
+            context.err("expected a list of items (`items`: list)");
             return None;
         };
 
@@ -283,7 +348,7 @@ impl LenientConvert for PresetGroup {
                 _ => {
                     preset_branch.apply(context);
                     group_branch.apply(context);
-                    context.err("expected a maze preset or group".to_string());
+                    context.err("expected a maze preset or group");
                 }
             }
 

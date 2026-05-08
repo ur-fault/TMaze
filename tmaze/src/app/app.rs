@@ -23,7 +23,7 @@ use crate::{
     logging::{self, AppLogger, LoggerOptions, UiLogs},
     renderer::{self, draw::Draw, CellContent, GMutView, Renderer},
     settings::{
-        model::Config,
+        model::{Config, TerminalSchemeDef},
         theme::{SharedScheme, TerminalColorScheme, Theme, ThemeDefinition, ThemeResolver},
         ConfigSource, Settings,
     },
@@ -144,8 +144,9 @@ impl App {
         let config = settings.read();
         event_receivers.push(settings.register());
 
-        let renderer = Renderer::new(&Rc::new(config.general.appearance.terminal_scheme.clone()))
-            .expect("failed to create renderer");
+        let scheme = Appearance::load_scheme(&config);
+        let renderer = Renderer::new(scheme).expect("failed to create renderer");
+
         let mut activities = Activities::empty();
         if let Some(activity) = main_activity {
             activities.push(activity);
@@ -197,7 +198,7 @@ impl App {
         let sound_player = SoundPlayer::new(settings.clone());
         event_receivers.push(sound_player.register());
 
-        let appereance = Appearance::new(&config);
+        let appearance = Appearance::new(&config);
 
         drop(config);
 
@@ -210,7 +211,7 @@ impl App {
                 settings,
                 save,
                 use_data,
-                appearance: appereance,
+                appearance,
                 screen_size: frame_size,
                 jobs,
                 event_sink,
@@ -453,7 +454,15 @@ impl Appearance {
     }
 
     fn load_scheme(config: &Config) -> SharedScheme {
-        Rc::new(config.general.appearance.terminal_scheme.clone())
+        let scheme = config.general.appearance.terminal_scheme.clone();
+        let scheme = match scheme {
+            TerminalSchemeDef::Named(name) => match TerminalColorScheme::named(&name) {
+                Some(scheme) => scheme,
+                None => TerminalColorScheme::default(),
+            },
+            TerminalSchemeDef::Custom(scheme) => scheme,
+        };
+        Rc::new(scheme)
     }
 }
 

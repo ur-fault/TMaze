@@ -155,6 +155,12 @@ pub trait LenientConvert: Sized {
     fn convert(value: Value, context: &mut ConvertContext) -> Option<Self>;
 }
 
+impl LenientConvert for () {
+    fn convert(_: Value, _: &mut ConvertContext) -> Option<Self> {
+        Some(())
+    }
+}
+
 #[macro_export]
 macro_rules! config {
     (@step $name:ident
@@ -225,7 +231,7 @@ macro_rules! config {
         }
 
         ::paste::paste! {
-            #[derive(Default, Clone, Serialize, Deserialize)]
+            #[derive(Default, Debug, Clone, Serialize, Deserialize)]
             pub struct [<Partial $name>] {
                 $($pfields)*
             }
@@ -261,15 +267,12 @@ macro_rules! config {
 
                     let res = Self {
                         $(
-                            $fields: {
-                                if let Some(value) = map.remove(stringify!($fields)) {
-                                    context.at(
-                                        $crate::settings::config_utils::Segment::Key(stringify!($fields).to_string()),
-                                        |ctx| <$type as $crate::settings::config_utils::LenientConvert>::convert(value, ctx)
-                                    )
-                                } else {
-                                    None
-                                }
+                            $fields: match map.remove(stringify!($fields)) {
+                                Some(value) => context.at(
+                                    $crate::settings::config_utils::Segment::Key(stringify!($fields).to_string()),
+                                    |ctx| <$type as $crate::settings::config_utils::LenientConvert>::convert(value, ctx)
+                                ),
+                                None => None,
                             },
                         )*
                     };
@@ -309,7 +312,10 @@ macro_rules! impl_merge_prims {
 macro_rules! impl_lenient_prims {
     ($($t:ty => $($variant:ident)+),* $(,)?) => {
         $(impl $crate::settings::config_utils::LenientConvert for $t {
-            fn convert(value: $crate::settings::config_utils::Value, context: &mut super::config_utils::ConvertContext) -> Option<Self> {
+            fn convert(
+                value: $crate::settings::config_utils::Value,
+                context: &mut $crate::settings::config_utils::ConvertContext,
+            ) -> Option<Self> {
                 match value {
                     $($crate::settings::config_utils::Value::$variant(v) => Some(v as $t),)+
                     _ => {
@@ -326,7 +332,10 @@ macro_rules! impl_lenient_prims {
 macro_rules! impl_lenient_deserialize  {
     ($($t:ty)*) => {
         $(impl $crate::settings::config_utils::LenientConvert for $t {
-            fn convert(value: super::config_utils::Value, context: &mut super::config_utils::ConvertContext) -> Option<Self> {
+            fn convert(
+                value: $crate::settings::config_utils::Value,
+                context: &mut $crate::settings::config_utils::ConvertContext,
+            ) -> Option<Self> {
                 let json_value = ::serde_json::to_value(&value)
                     .expect("Failed to convert Value to JSON value"); // should not happen
                 match ::serde_json::from_value::<$t>(json_value) {
@@ -341,7 +350,7 @@ macro_rules! impl_lenient_deserialize  {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(untagged)]
 // Note: order of variants matters for correct deserialization
 pub enum Value {
@@ -351,6 +360,7 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
+    #[default]
     Nil,
 }
 

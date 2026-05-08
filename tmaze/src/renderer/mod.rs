@@ -34,11 +34,11 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(scheme: &SharedScheme) -> io::Result<Self> {
+    pub fn new(scheme: SharedScheme) -> io::Result<Self> {
         let (w, h) = term_size();
         let size = Dims(w as i32, h as i32);
-        let hidden = GBuffer::new(size, scheme);
-        let shown = GBuffer::new(size, scheme);
+        let hidden = GBuffer::new(size, &scheme);
+        let shown = GBuffer::new(size, &scheme);
 
         let mut ren = Renderer {
             size,

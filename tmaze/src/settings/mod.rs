@@ -1,8 +1,14 @@
 pub mod attribute;
-pub mod model;
+pub mod meta;
 pub mod theme;
 
+mod model_versions;
+
 mod config_utils;
+
+pub mod model {
+    pub use super::model_versions::*;
+}
 
 use std::{
     fmt::Display,
@@ -23,11 +29,15 @@ use crate::{
         event::EventReceiver,
         Event,
     },
-    helpers::constants::paths,
+    helpers::{constants::paths, value_if},
+    settings::{
+        meta::UserContent,
+        model::{ver_1, ToCurrentConfig as _},
+    },
 };
 
 use config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value};
-use model::{Config, MazePreset, PartialConfig};
+use model_versions::{Config, MazePreset, PartialConfig};
 
 #[derive(Clone)]
 pub struct Settings {
@@ -56,7 +66,7 @@ impl Settings {
     }
 
     pub fn read(&self) -> impl Deref<Target = Arc<Config>> + use<'_> {
-        self.inner.config.load()
+        self.inner.compiled.load()
     }
 
     #[track_caller]
@@ -172,10 +182,12 @@ impl EventReceiver for &Settings {
     }
 }
 
+type UserConfig<C = PartialConfig> = UserContent<C>;
+
 struct SettingsInner {
-    config_layer: PartialConfig,
+    config_layer: UserConfig,
     ui_layer: ArcSwap<PartialConfig>,
-    config: ArcSwap<Config>,
+    compiled: ArcSwap<Config>,
 }
 
 impl SettingsInner {
@@ -192,22 +204,13 @@ impl SettingsInner {
         let settings = Self {
             config_layer,
             ui_layer: ArcSwap::from_pointee(ui_layer),
-            config: ArcSwap::default(),
+            compiled: ArcSwap::default(),
         };
 
         settings.rebuild();
 
-        let errors = if errors.is_empty() {
-            None
-        } else {
-            Some(errors)
-        };
-
-        let warnings = if warnings.is_empty() {
-            None
-        } else {
-            Some(warnings)
-        };
+        let errors = value_if(!errors.is_empty(), || Some(errors));
+        let warnings = value_if(!warnings.is_empty(), || Some(warnings));
 
         (settings, errors, warnings)
     }
@@ -217,7 +220,7 @@ impl SettingsInner {
         config.merge(&self.config_layer);
         config.merge(&self.ui_layer.load());
 
-        self.config.store(Arc::new(config));
+        self.compiled.store(Arc::new(config));
     }
 }
 
@@ -254,18 +257,38 @@ fn load_ui_config_from_file(path: &Path) -> PartialConfig {
 
 fn load_config_from_source(
     source: &ConfigSource<'_>,
-) -> (PartialConfig, Vec<ConvertError>, Vec<ConvertError>) {
+) -> (UserConfig, Vec<ConvertError>, Vec<ConvertError>) {
     let mut context = ConvertContext::new();
     let config = match load_values_from_source(source) {
-        Ok(value) => PartialConfig::convert(value, &mut context),
+        Ok(value) => match extract_format_version(value.clone()) {
+            1 => {
+                context.warn("Config format version 1 is deprecated, please update your config to the latest format");
+                UserConfig::<ver_1::PartialConfig>::convert(value, &mut context)
+                    .map(|c| c.map_content(|partial| partial.to_current_config()))
+            }
+            2 => UserConfig::convert(value, &mut context),
+            v => {
+                context.warn(format!(
+                    "Config format version {v} is not supported, expected 1"
+                ));
+                todo!()
+            }
+        },
         Err((e, val)) => {
-            context.err(format!("Failed to load config: {}", e));
-            PartialConfig::convert(val, &mut context)
+            context.err(format!("failed to load config: {}", e));
+            UserConfig::convert(val, &mut context)
         }
     };
 
     let (errors, warnings) = context.extract();
     (config.unwrap_or_default(), errors, warnings)
+}
+
+fn extract_format_version(config_value: Value) -> i32 {
+    let with_meta =
+        UserContent::<()>::convert(config_value, &mut ConvertContext::new()).unwrap_or_default();
+
+    with_meta.meta.format_version
 }
 
 fn load_values_from_source(source: &ConfigSource) -> Result<Value, (ConfigLoadError, Value)> {
@@ -289,7 +312,7 @@ fn load_values_from_source(source: &ConfigSource) -> Result<Value, (ConfigLoadEr
         ConfigSource::User => load_values_from_source(&ConfigSource::Path(&paths::config())),
         ConfigSource::Default => Ok(Value::Object(HashMap::new())),
         ConfigSource::String(s) => {
-            let config_value = pack_error!(json5::from_str::<Value>(s))?;
+            let config_value = pack_error!(json5::from_str(s))?;
             let values_with_extensions = load_extension_blocks(config_value)?;
             Ok(values_with_extensions)
         }
