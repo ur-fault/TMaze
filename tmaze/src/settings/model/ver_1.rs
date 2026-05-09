@@ -96,7 +96,7 @@ impl ToCurrentConfig for PartialConfig {
                         enable_margin: self.enable_margin_around_dpad,
                         enable_highlight: self.enable_dpad_highlight,
 
-                        // other don't have equivalents
+                        // other fields don't have equivalents
                         ..PartialDpad::default()
                     }),
                 }),
