@@ -2,10 +2,10 @@ use cmaze::dims::Dims;
 use serde::{Deserialize, Serialize};
 
 use crate::config;
-use crate::settings::model_versions::ToCurrentConfig;
+use crate::settings::model::{Presets, ToCurrentConfig};
 
 // Don't depend on `settings::model` directly to avoid broken code on version update
-use crate::settings::model_versions::ver_2::{
+use crate::settings::model::ver_2::{
     CameraMode, PartialTerminalSchemeDef, TerminalSchemeDef, UpdateCheckInterval,
 };
 
@@ -47,7 +47,7 @@ config! {
         music_volume: f64,
 
         // presets
-        presets: super::Presets,
+        presets: Presets,
     }
 }
 

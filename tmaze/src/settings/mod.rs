@@ -2,13 +2,9 @@ pub mod attribute;
 pub mod meta;
 pub mod theme;
 
-mod model_versions;
+pub mod model;
 
 mod config_utils;
-
-pub mod model {
-    pub use super::model_versions::*;
-}
 
 use std::{
     fmt::Display,
@@ -37,7 +33,7 @@ use crate::{
 };
 
 use config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value};
-use model_versions::{Config, MazePreset, PartialConfig};
+use model::{Config, MazePreset, PartialConfig};
 
 #[derive(Clone)]
 pub struct Settings {
