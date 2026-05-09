@@ -52,6 +52,11 @@ struct Args {
         help = "Print built-in terminal color schemes and quit"
     )]
     print_terminal_schemes: bool,
+    #[clap(
+        long = "print-default-config",
+        help = "Print the default config and quit"
+    )]
+    print_default_config: bool,
     // TODO: styles don't have descriptions yet
     // #[clap(long = "style-desc", help = "When printing styles, show descriptions")]
     // style_desc: bool,
@@ -83,6 +88,11 @@ fn main() -> Result<(), GameError> {
         )?;
         std::io::stdout().write_all(b"\n")?;
         std::io::stdout().flush()?;
+        return Ok(());
+    }
+
+    if args.print_default_config {
+        println!("{}", Settings::build_default_config());
         return Ok(());
     }
 

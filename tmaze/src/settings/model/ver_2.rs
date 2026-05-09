@@ -369,6 +369,7 @@ pub enum PresetGroupItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazePreset {
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
 
     #[serde(default)]

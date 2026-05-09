@@ -550,4 +550,30 @@ mod tests {
         );
         assert!(presets.is_some(), "Presets should be converted correctly");
     }
+
+    #[test]
+    fn test_no_null_in_config() {
+        let config_str = super::Settings::build_default_config();
+        let config_value = json5::from_str::<super::Value>(&config_str)
+            .expect("Default config should be valid JSON5");
+
+        fn assert_no_null(value: &super::Value, path: &str) {
+            match value {
+                super::Value::Nil => panic!("Config value at path '{}' should not be null", path),
+                super::Value::Object(map) => {
+                    for (key, val) in map {
+                        assert_no_null(val, &format!("{}.{}", path, key));
+                    }
+                }
+                super::Value::List(arr) => {
+                    for (i, val) in arr.iter().enumerate() {
+                        assert_no_null(val, &format!("{}[{}]", path, i));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        assert_no_null(&config_value, "config");
+    }
 }
