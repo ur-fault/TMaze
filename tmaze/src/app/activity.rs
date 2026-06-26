@@ -3,9 +3,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::ui::Screen;
+use crate::{
+    app::event::{ActivityEvent, GlobalEvent},
+    ui::Screen,
+};
 
-use super::{app::AppData, event::Event};
+use super::app::AppData;
 
 pub type ActivityResult = Box<dyn Any>;
 
@@ -137,6 +140,14 @@ impl Activities {
         self.activities.last()
     }
 
+    pub fn all(&self) -> &[Activity] {
+        &self.activities
+    }
+
+    pub fn all_mut(&mut self) -> &mut [Activity] {
+        &mut self.activities
+    }
+
     pub fn active_mut(&mut self) -> Option<&mut Activity> {
         self.activities.last_mut()
     }
@@ -214,7 +225,9 @@ impl DerefMut for Activity {
 
 pub trait ActivityHandler {
     #[must_use]
-    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change>;
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change>;
+
+    fn on_global_event(&mut self, _event: GlobalEvent, _data: &mut AppData) {}
 
     fn screen(&mut self) -> &mut dyn Screen;
 }

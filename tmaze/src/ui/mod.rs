@@ -12,7 +12,6 @@ pub mod menu;
 pub mod popup;
 pub mod progressbar;
 pub mod rect;
-pub mod redirect_menu;
 pub mod usecase;
 
 pub use button::*;
@@ -22,7 +21,6 @@ pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
 pub use rect::*;
-pub use redirect_menu::*;
 
 pub enum ScreenError {
     SmallScreen,

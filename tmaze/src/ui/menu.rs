@@ -13,7 +13,7 @@ use crate::{
     app::{
         activity::{Activity, ActivityHandler, Change},
         app::AppData,
-        event::Event,
+        ActivityEvent,
     },
     helpers::{is_release, strings::MbyStaticStr, LineDir},
     renderer::GMutView,
@@ -380,8 +380,12 @@ impl Menu {
         })
     }
 
-    pub fn into_activity(self) -> Activity {
-        Activity::new_base("menu", Box::new(self))
+    pub fn into_activity(self, name: impl Into<String>) -> Activity {
+        Activity::new_base(name, Box::new(self))
+    }
+
+    pub fn config(&self) -> &MenuConfig {
+        &self.config
     }
 
     fn select(&mut self, down: bool) {
@@ -473,7 +477,7 @@ impl Menu {
 }
 
 impl ActivityHandler for Menu {
-    fn update(&mut self, events: Vec<Event>, app_data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, app_data: &mut AppData) -> Option<Change> {
         let opt_count = self.config.options.len() as isize;
         let non_sep_count = self
             .config
@@ -509,7 +513,7 @@ impl ActivityHandler for Menu {
 
         for event in events {
             match event {
-                Event::Term(TermEvent::Key(KeyEvent {
+                ActivityEvent::Term(TermEvent::Key(KeyEvent {
                     code,
                     kind,
                     modifiers,
@@ -547,7 +551,7 @@ impl ActivityHandler for Menu {
                     }
                     _ => {}
                 },
-                Event::Term(TermEvent::Mouse(MouseEvent {
+                ActivityEvent::Term(TermEvent::Mouse(MouseEvent {
                     kind,
                     column,
                     row,
@@ -814,4 +818,42 @@ pub fn menu_theme_resolver() -> ThemeResolver {
         .link("ui.menu.number", "ui.menu.text");
 
     resolver
+}
+
+pub fn simple_menu(
+    title: impl Into<String>,
+    items: Vec<(MenuItem, Box<dyn Fn(&mut AppData) -> Change>)>,
+) -> impl ActivityHandler {
+    struct SimpleMenu {
+        menu: Menu,
+        actions: Vec<MenuAction<Change>>,
+    }
+
+    impl ActivityHandler for SimpleMenu {
+        fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
+            match self.menu.update(events, data)? {
+                Change::Pop {
+                    res: Some(result), ..
+                } => {
+                    let index = *result
+                        .downcast::<usize>()
+                        .expect("menu should return index");
+                    Some((self.actions[index])(data))
+                }
+                res => Some(res),
+            }
+        }
+
+        fn screen(&mut self) -> &mut dyn Screen {
+            &mut self.menu
+        }
+    }
+
+    let (options, actions) = split_menu_actions(items);
+    let menu_config = MenuConfig::new(title, options);
+
+    SimpleMenu {
+        menu: Menu::new(menu_config),
+        actions,
+    }
 }

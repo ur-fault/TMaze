@@ -4,13 +4,19 @@ use crate::app::app::AppData;
 
 use super::activity::ActivityResult;
 
-pub enum Event {
+#[derive(Debug)]
+pub enum ActivityEvent {
     Term(TermEvent),
     ActiveAfterPop(Option<ActivityResult>),
-    SettingsChanged,
 }
 
-pub type EventReceiverFn = Box<dyn FnMut(&Event, &mut AppData)>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobalEvent {
+    SettingsChanged,
+    ThemeChanged,
+}
+
+pub type EventReceiverFn = Box<dyn FnMut(GlobalEvent, &mut AppData)>;
 
 // FIXME: fix the API, this is really bad
 //

@@ -17,7 +17,7 @@ use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
 // use indexmap::IndexMap;
 
 use crate::{
-    app::event::{EventReceiver, EventReceiverFn},
+    app::event::{ActivityEvent, EventReceiver, EventReceiverFn, GlobalEvent},
     data::SaveData,
     helpers::{constants::paths, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
@@ -38,17 +38,16 @@ use rodio::{self, Source};
 
 use super::{
     activity::{Activities, Activity, ActivityResult, Change},
-    event::Event,
     game,
     jobs::Qer,
-    Jobs,
+    DispatchQueue,
 };
 
 pub struct App {
     renderer: Renderer,
     activities: Activities,
     data: AppData,
-    event_drain: mpsc::Receiver<Event>,
+    event_drain: mpsc::Receiver<GlobalEvent>,
 }
 
 pub struct AppData {
@@ -59,7 +58,7 @@ pub struct AppData {
     pub screen_size: Dims,
     pub logs: UiLogs,
     pub registries: Registries,
-    jobs: Jobs,
+    jobs: DispatchQueue,
     pub event_sink: EventSink,
     pub event_receivers: Vec<EventReceiverFn>,
 
@@ -105,6 +104,10 @@ impl AppData {
 
     pub fn is_ro(&self) -> bool {
         self.read_only
+    }
+
+    pub fn send_event(&self, event: GlobalEvent) {
+        self.event_sink.send(event).unwrap();
     }
 }
 
@@ -176,7 +179,7 @@ impl App {
 
         let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
-        let jobs = Jobs::new();
+        let jobs = DispatchQueue::new();
         let app_start = Instant::now();
         let frame_size = renderer.frame_size();
         let registries = Registries {
@@ -199,6 +202,7 @@ impl App {
         event_receivers.push(sound_player.register());
 
         let appearance = Appearance::new(&config);
+        event_receivers.push(appearance.register());
 
         drop(config);
 
@@ -237,7 +241,7 @@ impl App {
                 job.call(&mut self.data);
             }
 
-            let mut events = vec![];
+            let mut activity_events = vec![];
 
             // FIXME: better polling strategy, IO will need faster response times
             let mut delay = Duration::from_millis(10);
@@ -255,10 +259,10 @@ impl App {
                     }) => self.switch_debug(),
                     event @ crossterm::event::Event::Mouse(_) => {
                         if self.data.settings.read().controls.mouse.enable {
-                            events.push(Event::Term(event));
+                            activity_events.push(ActivityEvent::Term(event));
                         }
                     }
-                    event => events.push(Event::Term(event)),
+                    event => activity_events.push(ActivityEvent::Term(event)),
                 }
 
                 // just so we read all events in the frame
@@ -266,25 +270,34 @@ impl App {
             }
 
             // Read events from the drain
+            let mut global_events = vec![];
             while let Ok(event) = self.event_drain.try_recv() {
-                events.push(event);
+                global_events.push(event);
             }
 
             // Update handle the event receivers
             // (hack): due to borrow issues
             let mut receivers = std::mem::take(&mut self.data.event_receivers);
             for receiver in receivers.iter_mut() {
-                for event in &events {
+                for event in global_events.clone() {
                     receiver(event, &mut self.data);
                 }
             }
             self.data.event_receivers = receivers;
 
+            {
+                for activity in self.activities.all_mut() {
+                    for event in global_events.clone() {
+                        activity.on_global_event(event, &mut self.data);
+                    }
+                }
+            }
+
             while let Some(change) = match self.activities.active_mut() {
                 Some(active) => active,
-                None => break 'mainloop events,
+                None => break 'mainloop activity_events,
             }
-            .update(std::mem::take(&mut events), &mut self.data)
+            .update(std::mem::take(&mut activity_events), &mut self.data)
             {
                 match change {
                     Change::Push(activity) => {
@@ -297,12 +310,12 @@ impl App {
                     }
                     Change::Pop { n, res } => {
                         self.activities.pop_n(n);
-                        events.push(Event::ActiveAfterPop(res));
+                        activity_events.push(ActivityEvent::ActiveAfterPop(res));
                         log::trace!("Popped {} activities", n);
                     }
                     Change::PopUntil { name, res } => {
                         self.activities.pop_until(&name);
-                        events.push(Event::ActiveAfterPop(res));
+                        activity_events.push(ActivityEvent::ActiveAfterPop(res));
                         log::trace!("Popped until '{}'", name);
                     }
                     Change::Replace(activity) => self.activities.replace(activity),
@@ -344,7 +357,7 @@ impl App {
         log::trace!("Main loop ended");
 
         rem_events.into_iter().find_map(|e| match e {
-            Event::ActiveAfterPop(Some(res)) => Some(res),
+            ActivityEvent::ActiveAfterPop(Some(res)) => Some(res),
             _ => None,
         })
     }
@@ -366,7 +379,7 @@ impl App {
         Ok(())
     }
 
-    pub fn init_event_sink() -> (EventSink, mpsc::Receiver<Event>) {
+    pub fn init_event_sink() -> (EventSink, mpsc::Receiver<GlobalEvent>) {
         mpsc::channel()
     }
 
@@ -401,7 +414,12 @@ pub struct AppOptions<'a> {
     pub config_source: ConfigSource<'a>,
 }
 
-pub type EventSink = mpsc::Sender<Event>;
+pub type EventSink = mpsc::Sender<GlobalEvent>;
+
+#[derive(Clone, Copy, Default)]
+pub struct EventOptions {
+    pub to_every_activity: bool,
+}
 
 #[derive(Default)]
 pub struct AppStateData {
@@ -463,6 +481,19 @@ impl Appearance {
             TerminalSchemeDef::Custom(scheme) => scheme,
         };
         Rc::new(scheme)
+    }
+}
+
+impl EventReceiver for &Appearance {
+    fn register(self) -> EventReceiverFn {
+        Box::new(move |event, data| match event {
+            GlobalEvent::SettingsChanged => {
+                let config = data.settings.read();
+                data.appearance.theme = Appearance::load_theme(&config, &data.appearance.resolver);
+                data.send_event(GlobalEvent::ThemeChanged);
+            }
+            _ => {}
+        })
     }
 }
 

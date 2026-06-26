@@ -21,9 +21,9 @@ use serde::Serialize;
 
 use crate::{
     app::{
-        app::{AppData, EventSink},
-        event::EventReceiver,
-        Event,
+        app::EventSink,
+        event::{EventReceiver, EventReceiverFn},
+        GlobalEvent,
     },
     helpers::{constants::paths, value_if},
     settings::{
@@ -88,7 +88,7 @@ impl Settings {
 
     fn notify(&self) {
         self.event_sink
-            .send(Event::SettingsChanged)
+            .send(GlobalEvent::SettingsChanged)
             .expect("Event drain should be alive");
     }
 
@@ -167,10 +167,10 @@ impl Settings {
 }
 
 impl EventReceiver for &Settings {
-    fn register(self) -> Box<dyn FnMut(&Event, &mut AppData)> {
+    fn register(self) -> EventReceiverFn {
         let settings = self.clone();
         Box::new(move |event, _| {
-            if let Event::SettingsChanged = event {
+            if matches!(event, GlobalEvent::SettingsChanged) {
                 log::trace!("Writing UI settings to file from event");
                 settings.write_ui();
             }
