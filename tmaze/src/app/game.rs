@@ -10,7 +10,7 @@ use cmaze::{
 };
 
 use crate::{
-    app::{game_state::GameData, GameViewMode},
+    app::{event::ActivityEvent, game_state::GameData, GameViewMode, GlobalEvent},
     helpers::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
@@ -23,14 +23,14 @@ use crate::{
     ui::{
         self,
         helpers::format_duration,
-        multisize_duration_format, split_menu_actions,
+        multisize_duration_format, simple_menu, split_menu_actions,
         usecase::{
             dpad::{DPad, DPadType},
             settings::SettingsActivity,
             style_browser::StyleBrowser,
         },
-        Menu, MenuAction, MenuConfig, MenuItem, Popup, ProgressBar, Rect, RedirectMenu, Screen,
-        ScreenError, NULL_CHAR,
+        Menu, MenuAction, MenuConfig, MenuItem, Popup, ProgressBar, Rect, Screen, ScreenError,
+        NULL_CHAR,
     },
 };
 
@@ -46,7 +46,7 @@ use rodio::Source;
 
 use super::{
     app::{AppData, AppStateData, Registries},
-    Activity, ActivityHandler, Change, Event,
+    Activity, ActivityHandler, Change,
 };
 
 pub fn create_controls_popup() -> Activity {
@@ -164,25 +164,21 @@ impl MainMenu {
     }
 
     fn show_info_menu() -> Change {
-        let options = menu_actions!(
-            "Style options browser" -> data => Change::Push(
-                Activity::new_base_boxed(
-                    "style options browser".to_string(),
-                    StyleBrowser::new(data.appearance.resolver().clone())
-                )
+        Change::Push(Activity::new_base_boxed(
+            "info menu",
+            simple_menu(
+                "TMaze",
+                menu_actions!(
+                    "Style options browser" -> data => Change::Push(
+                        Activity::new_base_boxed(
+                            "style options browser".to_string(),
+                            StyleBrowser::new(data.appearance.resolver().clone())
+                        )
+                    ),
+                    "Back" -> _ => Change::pop_top(),
+                ),
             ),
-            "Back" -> _ => Change::pop_top(),
-        );
-
-        let (options, actions) = split_menu_actions(options);
-
-        Change::Push(
-            RedirectMenu {
-                menu: Menu::new(MenuConfig::new("TMaze", options).counted()),
-                actions,
-            }
-            .to_activity("info menu"),
-        )
+        ))
     }
 
     fn start_new_game(settings: &Config, use_data: &AppStateData) -> Change {
@@ -215,7 +211,7 @@ impl MainMenu {
 }
 
 impl ActivityHandler for MainMenu {
-    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
         #[cfg(feature = "sound")]
         Self::play_menu_bgm(data);
 
@@ -240,7 +236,6 @@ impl ActivityHandler for MainMenu {
 
 pub struct MazePresetMenu {
     menu: Menu,
-    // items: Vec<PresetGroupItem>,
     group: PresetGroup,
 }
 
@@ -287,7 +282,7 @@ impl MazePresetMenu {
 }
 
 impl ActivityHandler for MazePresetMenu {
-    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
                 Change::Pop {
@@ -354,11 +349,13 @@ impl MazeGenerationActivity {
 }
 
 impl ActivityHandler for MazeGenerationActivity {
-    fn update(&mut self, events: Vec<super::Event>, data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
         for event in events {
             #[allow(clippy::collapsible_match)]
             match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
+                ActivityEvent::Term(TermEvent::Key(KeyEvent { code, kind, .. }))
+                    if !is_release(kind) =>
+                {
                     match code {
                         KeyCode::Esc | KeyCode::Char('q') => {
                             let mut comm = Err(GeneratorError::Unknown); // dummy value
@@ -469,7 +466,7 @@ impl PauseMenu {
 }
 
 impl ActivityHandler for PauseMenu {
-    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
         match self.menu.update(events, data) {
             Some(change) => match change {
                 Change::Pop { res: Some(res), .. } => {
@@ -509,7 +506,7 @@ impl EndGamePopup {
 }
 
 impl ActivityHandler for EndGamePopup {
-    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
         match self.popup.update(events, data) {
             Some(Change::Pop {
                 n: 1,
@@ -748,7 +745,7 @@ impl GameActivity {
 }
 
 impl ActivityHandler for GameActivity {
-    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
         match self.data.game.get_state() {
             RunningGameState::NotStarted => self.data.game.start().unwrap(),
             RunningGameState::Paused => self.data.game.resume().unwrap(),
@@ -767,7 +764,7 @@ impl ActivityHandler for GameActivity {
         for event in events {
             #[allow(clippy::single_match)]
             match event {
-                Event::Term(event) => match event {
+                ActivityEvent::Term(event) => match event {
                     TermEvent::Key(key_event) => match self.data.handle_event(&config, key_event) {
                         Err(false) => {
                             self.data.game.pause().unwrap();
@@ -856,6 +853,19 @@ impl ActivityHandler for GameActivity {
         };
 
         None
+    }
+
+    fn on_global_event(&mut self, event: GlobalEvent, data: &mut AppData) {
+        match event {
+            GlobalEvent::ThemeChanged => {
+                self.maze_board = MazeBoard::new(
+                    &self.data.game,
+                    data.appearance.theme(),
+                    data.appearance.scheme().clone(),
+                );
+            }
+            _ => {}
+        }
     }
 
     fn screen(&mut self) -> &mut dyn ui::Screen {

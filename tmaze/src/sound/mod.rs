@@ -4,9 +4,9 @@ use menu::OptionDef;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use crate::{
-    app::{app::AppData, event::EventReceiver, Activity, Event},
+    app::{Activity, GlobalEvent, app::AppData, event::EventReceiver},
     settings::Settings,
-    ui::{menu, MenuItem, SliderDef},
+    ui::{MenuItem, SliderDef, menu},
 };
 
 use self::track::Track;
@@ -92,7 +92,7 @@ impl SoundPlayer {
 impl EventReceiver for &SoundPlayer {
     fn register(self) -> crate::app::event::EventReceiverFn {
         Box::new(move |event, data| {
-            if let Event::SettingsChanged = event {
+            if let GlobalEvent::SettingsChanged = event {
                 let cfg = &data.settings.read().audio;
 
                 if cfg.global.enable && cfg.music.enable {

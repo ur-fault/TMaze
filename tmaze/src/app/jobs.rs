@@ -2,11 +2,11 @@ use std::sync::{Arc, Mutex};
 
 use super::app::AppData;
 
-pub struct Jobs {
+pub struct DispatchQueue {
     jobs: Arc<Mutex<Vec<Job>>>,
 }
 
-impl Jobs {
+impl DispatchQueue {
     pub fn new() -> Self {
         Self {
             jobs: Arc::new(Mutex::new(Vec::new())),
@@ -28,7 +28,7 @@ impl Jobs {
     }
 }
 
-impl Default for Jobs {
+impl Default for DispatchQueue {
     fn default() -> Self {
         Self::new()
     }
