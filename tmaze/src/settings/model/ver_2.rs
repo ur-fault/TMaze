@@ -35,11 +35,15 @@ config! {
     pub struct Game {
         slow: bool,
         disable_tower_auto_up: bool,
+        #[nest] view: GameView,
+        #[nest] content: Content,
+    }
+
+    pub struct GameView {
         camera_mode: CameraMode,
         camera_smoothing: f64 = 0.5,
         player_smoothing: f64 = 0.5,
         viewport_margin: Dims = Dims(4, 3),
-        #[nest] content: Content,
     }
 
     pub struct Content {

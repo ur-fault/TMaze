@@ -1,13 +1,13 @@
 use crate::{
-    app::{app::AppData, Activity, ActivityEvent, ActivityHandler, Change},
+    app::{
+        activity::ActivityHandlerExt as _, app::AppData, Activity, ActivityEvent, ActivityHandler,
+        Change,
+    },
     helpers::constants::paths::{config, theme},
     menu_actions,
     renderer::MouseGuard,
     sound::create_audio_settings,
-    ui::{
-        simple_menu, split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem, OptionDef, Popup,
-        Screen,
-    },
+    ui::{menu_result, simple_menu, Menu, MenuConfig, MenuItem, OptionDef, Popup, Screen},
 };
 
 struct OtherSettingsPopup(Popup, MouseGuard);
@@ -39,177 +39,242 @@ impl ActivityHandler for OtherSettingsPopup {
     }
 }
 
-pub struct SettingsActivity {
-    actions: Vec<MenuAction<Change>>,
-    menu: Menu,
-}
-
-impl SettingsActivity {
-    fn other_settings_popup() -> Activity {
-        Activity::new_base_boxed("settings".to_string(), OtherSettingsPopup::new())
-    }
-}
-
-#[allow(clippy::new_without_default)]
-impl SettingsActivity {
-    pub fn new() -> Self {
-        let options = menu_actions!(
+pub fn create_settings_activity() -> Activity {
+    simple_menu(
+        "Settings",
+        menu_actions!(
             "General" -> _ => Change::push(create_general_settings()),
             "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
             "Controls" -> data => Change::push(create_controls_settings(data)),
-            "Other settings" -> _ => Change::push(SettingsActivity::other_settings_popup()),
+            "Other settings" -> _ => Change::push(OtherSettingsPopup::new().to_base_activity("other settings")),
             "Back" -> _ => Change::pop_top(),
-        );
-
-        let (options, actions) = split_menu_actions(options);
-        let menu_config = MenuConfig::new("Settings", options);
-
-        Self {
-            actions,
-            menu: Menu::new(menu_config),
-        }
-    }
-
-    pub fn new_activity() -> Activity {
-        Activity::new_base_boxed("settings".to_string(), Self::new())
-    }
-}
-
-impl ActivityHandler for SettingsActivity {
-    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
-        match self.menu.update(events, data)? {
-            Change::Pop {
-                res: Some(result), ..
-            } => {
-                let index = *result
-                    .downcast::<usize>()
-                    .expect("menu should return index");
-                Some((self.actions[index])(data))
-            }
-            res => Some(res),
-        }
-    }
-
-    fn screen(&mut self) -> &mut dyn Screen {
-        &mut self.menu
-    }
+        ),
+    )
+    .to_base_activity("settings")
 }
 
 fn create_general_settings() -> Activity {
+    fn appearance_settings() -> Activity {
+        fn theme_settings() -> Activity {
+            use std::{fs::read_dir, path::Path};
+
+            let themes = match read_dir(theme()) {
+                Ok(iter) => Ok(iter
+                    .filter_map(|entry| {
+                        const SUPPORTED_EXTENSIONS: &[&str] = &["json", "json5"];
+
+                        let entry = entry.ok()?;
+                        if !entry.file_type().ok()?.is_file() {
+                            return None;
+                        }
+
+                        let filename = entry.file_name();
+                        let filename = Path::new(&filename);
+                        let extension = filename.extension()?.to_str()?;
+                        if !SUPPORTED_EXTENSIONS.contains(&extension) {
+                            return None;
+                        }
+
+                        Some(MenuItem::text(filename.to_str()?.into()))
+                    })
+                    .collect::<Vec<_>>()),
+                Err(err) => Err(err.to_string()),
+            };
+
+            let menu = match themes {
+                Ok(themes) if themes.is_empty() => {
+                    return Activity::new_base_boxed(
+                        "theme settings",
+                        Popup::new(
+                            "No themes found".into(),
+                            vec![
+                                format!("No theme files found in {}", theme().to_string_lossy()),
+                                "Please add a theme file to the themes directory.".into(),
+                            ],
+                        ),
+                    )
+                }
+                Err(err) => {
+                    return Activity::new_base_boxed(
+                        "err theme settings",
+                        Popup::new("Error listing themes".into(), vec![err]),
+                    )
+                }
+
+                Ok(themes) => MenuConfig::new("Select a theme", themes),
+            };
+
+            struct ThemesActivity {
+                menu: Menu,
+            }
+
+            impl ActivityHandler for ThemesActivity {
+                fn update(
+                    &mut self,
+                    events: Vec<ActivityEvent>,
+                    data: &mut AppData,
+                ) -> Option<Change> {
+                    match self.menu.update(events, data)? {
+                        Change::Pop {
+                            res: Some(result), ..
+                        } => {
+                            let index = *result
+                                .downcast::<usize>()
+                                .expect("menu should return index");
+                            let MenuItem::Text { text, .. } =
+                                self.menu.config().options.get(index).unwrap()
+                            else {
+                                panic!("menu should return index of a text item");
+                            };
+
+                            data.settings.update_ui(|cfg| {
+                                *cfg.general().appearance().theme() = text.as_ref_cow().into();
+                            });
+
+                            None
+                        }
+                        res => Some(res),
+                    }
+                }
+
+                fn screen(&mut self) -> &mut dyn Screen {
+                    &mut self.menu
+                }
+            }
+
+            Activity::new_base_boxed(
+                "theme settings",
+                ThemesActivity {
+                    menu: Menu::new(menu),
+                },
+            )
+        }
+
+        Activity::new_base_boxed(
+            "appearance settings",
+            simple_menu(
+                "Appearance settings",
+                menu_actions!(
+                    "Theme" -> _ => Change::push(theme_settings()),
+                    // "Terminal scheme" -> data => Change::push(create_appearance_settings(data)),
+                    "Back" -> _ => Change::pop_top(),
+                ),
+            ),
+        )
+    }
+
+    fn logging_settings() -> Activity {
+        enum LoggingDst {
+            Normal,
+            Debug,
+            File,
+        }
+
+        fn logging_dst_settings(dst: LoggingDst, data: &AppData) -> Activity {
+            const LOG_LEVELS: [(&str, log::Level); 5] = [
+                ("Error", log::Level::Error),
+                ("Warn", log::Level::Warn),
+                ("Info", log::Level::Info),
+                ("Debug", log::Level::Debug),
+                ("Trace", log::Level::Trace),
+            ];
+
+            const fn level_to_index(level: log::Level) -> usize {
+                match level {
+                    log::Level::Error => 0,
+                    log::Level::Warn => 1,
+                    log::Level::Info => 2,
+                    log::Level::Debug => 3,
+                    log::Level::Trace => 4,
+                }
+            }
+
+            let title = match dst {
+                LoggingDst::Normal => "UI logging",
+                LoggingDst::Debug => "UI Debug logging",
+                LoggingDst::File => "File logging",
+            };
+
+            struct LoggingDstActivity {
+                dst: LoggingDst,
+                menu: Menu,
+            }
+
+            impl ActivityHandler for LoggingDstActivity {
+                fn update(
+                    &mut self,
+                    events: Vec<ActivityEvent>,
+                    data: &mut AppData,
+                ) -> Option<Change> {
+                    match self.menu.update(events, data)? {
+                        Change::Pop { n: 1, res: Some(res) } => {
+                            let level = LOG_LEVELS[menu_result(res)].1;
+                            data.settings.update_ui(|cfg| {
+                                let logging = cfg.general().logging();
+                                match self.dst {
+                                    LoggingDst::Normal => *logging.normal() = level,
+                                    LoggingDst::Debug => *logging.debug() = level,
+                                    LoggingDst::File => *logging.file() = level,
+                                }
+                            });
+                            Some(Change::pop_top())
+                        }
+                        change => Some(change),
+                    }
+                }
+
+                fn screen(&mut self) -> &mut dyn Screen {
+                    &mut self.menu
+                }
+            }
+
+            let logging = &data.settings.read().general.logging;
+
+            let menu = MenuConfig::new_from_strings(
+                title,
+                LOG_LEVELS
+                    .iter()
+                    .map(|(name, _)| String::from(*name))
+                    .collect::<Vec<_>>(),
+            )
+            .default(match dst {
+                LoggingDst::Normal => level_to_index(logging.normal),
+                LoggingDst::Debug => level_to_index(logging.debug),
+                LoggingDst::File => level_to_index(logging.file),
+            })
+            .counted();
+
+            Activity::new_base_boxed(
+                format!("{} settings", title.to_lowercase()),
+                LoggingDstActivity {
+                    dst,
+                    menu: Menu::new(menu),
+                },
+            )
+        }
+
+        simple_menu(
+            "Logging",
+            menu_actions!(
+                "UI logging" -> data => Change::push(logging_dst_settings(LoggingDst::Normal, data)),
+                "UI Debug logging" -> data => Change::push(logging_dst_settings(LoggingDst::Debug, data)),
+                "File logging" -> data => Change::push(logging_dst_settings(LoggingDst::File, data)),
+                "Back" -> _ => Change::pop_top(),
+            ),
+        )
+        .to_base_activity("logging settings")
+    }
+
     Activity::new_base_boxed(
         "general settings",
         simple_menu(
             "General settings",
             menu_actions!(
-                "Appearance" -> _ => Change::push(create_appearance_settings()),
+                "Appearance" -> _ => Change::push(appearance_settings()),
+                "Logging" -> _ => Change::push(logging_settings()),
                 "Back" -> _ => Change::pop_top(),
             ),
         ),
-    )
-}
-
-fn create_appearance_settings() -> Activity {
-    Activity::new_base_boxed(
-        "appearance settings",
-        simple_menu(
-            "Appearance settings",
-            menu_actions!(
-                "Theme" -> _ => Change::push(create_theme_settings()),
-                // "Terminal scheme" -> data => Change::push(create_appearance_settings(data)),
-                "Back" -> _ => Change::pop_top(),
-            ),
-        ),
-    )
-}
-
-fn create_theme_settings() -> Activity {
-    use std::{fs::read_dir, path::Path};
-
-    let themes = match read_dir(theme()) {
-        Ok(iter) => Ok(iter
-            .filter_map(|entry| {
-                const SUPPORTED_EXTENSIONS: &[&str] = &["json", "json5"];
-
-                let entry = entry.ok()?;
-                if !entry.file_type().ok()?.is_file() {
-                    return None;
-                }
-
-                let filename = entry.file_name();
-                let filename = Path::new(&filename);
-                let extension = filename.extension()?.to_str()?;
-                if !SUPPORTED_EXTENSIONS.contains(&extension) {
-                    return None;
-                }
-
-                Some(MenuItem::text(filename.to_str()?.into()))
-            })
-            .collect::<Vec<_>>()),
-        Err(err) => Err(err.to_string()),
-    };
-
-    let menu = match themes {
-        Ok(themes) if themes.is_empty() => {
-            return Activity::new_base_boxed(
-                "theme settings",
-                Popup::new(
-                    "No themes found".into(),
-                    vec![
-                        format!("No theme files found in {}", theme().to_string_lossy()),
-                        "Please add a theme file to the themes directory.".into(),
-                    ],
-                ),
-            )
-        }
-        Err(err) => {
-            return Activity::new_base_boxed(
-                "err theme settings",
-                Popup::new("Error listing themes".into(), vec![err]),
-            )
-        }
-
-        Ok(themes) => MenuConfig::new("Select a theme", themes),
-    };
-
-    struct ThemesActivity {
-        menu: Menu,
-    }
-
-    impl ActivityHandler for ThemesActivity {
-        fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
-            match self.menu.update(events, data)? {
-                Change::Pop {
-                    res: Some(result), ..
-                } => {
-                    let index = *result
-                        .downcast::<usize>()
-                        .expect("menu should return index");
-                    let MenuItem::Text { text, .. } =
-                        self.menu.config().options.get(index).unwrap()
-                    else {
-                        panic!("menu should return index of a text item");
-                    };
-
-                    data.settings.update_ui(|cfg| {
-                        *cfg.general().appearance().theme() = text.as_ref_cow().into();
-                    });
-
-                    None
-                }
-                res => Some(res),
-            }
-        }
-
-        fn screen(&mut self) -> &mut dyn Screen {
-            &mut self.menu
-        }
-    }
-
-    Activity::new_base_boxed(
-        "theme settings",
-        ThemesActivity {
-            menu: Menu::new(menu),
-        },
     )
 }
 

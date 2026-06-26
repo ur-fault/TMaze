@@ -231,3 +231,21 @@ pub trait ActivityHandler {
 
     fn screen(&mut self) -> &mut dyn Screen;
 }
+
+pub trait ActivityHandlerExt: ActivityHandler {
+    fn to_activity(self, source: impl Into<String>, name: impl Into<String>) -> Activity
+    where
+        Self: Sized + 'static,
+    {
+        Activity::new(source, name, Box::new(self))
+    }
+
+    fn to_base_activity(self, name: impl Into<String>) -> Activity
+    where
+        Self: Sized + 'static,
+    {
+        Activity::new_base(name, Box::new(self))
+    }
+}
+
+impl<T: ActivityHandler + 'static> ActivityHandlerExt for T {}

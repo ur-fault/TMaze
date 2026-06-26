@@ -22,18 +22,21 @@
         "slow": {{ game.slow }},
         "disable_tower_auto_up": {{ game.disable_tower_auto_up }},
 
-        //  CloseFollow - player will always be centered
-        //  EdgeFollow(horizontal margin, vertical margin)
-        //    player will move on screen, but when he gets close to the edge
-        //    he will be centered on that axis.
-        //    margin can be either relative (0.0 - 0.5) or absolute.
-        //    floating point values are relative, integer values are absolute.
-        "camera_mode": {{ game.camera_mode | json }},
-        // "camera_mode": {"mode": "EdgeFollow", "x": 0.25, "y": 0.25},
+        "view": {
+            //  CloseFollow - player will always be centered
+            //  EdgeFollow(horizontal margin, vertical margin)
+            //    player will move on screen, but when he gets close to the edge
+            //    he will be centered on that axis.
+            //    margin can be either relative (0.0 - 0.5) or absolute.
+            //    floating point values are relative, integer values are absolute.
+            "camera_mode": {{ game.view.camera_mode | json }},
+            // "camera_mode": {"mode": "EdgeFollow", "x": 0.25, "y": 0.25},
 
-        "camera_smoothing": {{ game.camera_smoothing }},
-        "player_smoothing": {{ game.player_smoothing }},
-        "viewport_margin": {{ game.viewport_margin | json }},
+            "camera_smoothing": {{ game.view.camera_smoothing }},
+            "player_smoothing": {{ game.view.player_smoothing }},
+            "viewport_margin": {{ game.view.viewport_margin | json }},
+        },
+
         "content": {
             // Preset:
             // - title - title of the preset
