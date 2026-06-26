@@ -17,7 +17,7 @@ use crate::{
     lerp, menu_actions,
     renderer::{draw::Align, CellContent, GBuffer, GMutView, Padding},
     settings::{
-        model::{self, CameraMode, Config, MazePreset, PresetGroup, PresetGroupItem},
+        model::{self, CameraMode, Config, GameView, MazePreset, PresetGroup, PresetGroupItem},
         theme::{SharedScheme, Theme, ThemeResolver},
     },
     ui::{
@@ -26,7 +26,7 @@ use crate::{
         multisize_duration_format, simple_menu, split_menu_actions,
         usecase::{
             dpad::{DPad, DPadType},
-            settings::SettingsActivity,
+            settings::create_settings_activity,
             style_browser::StyleBrowser,
         },
         Menu, MenuAction, MenuConfig, MenuItem, Popup, ProgressBar, Rect, Screen, ScreenError,
@@ -100,10 +100,7 @@ impl MainMenu {
     }
 
     fn show_settings_screen() -> Change {
-        Change::push(Activity::new_base_boxed(
-            "settings".to_string(),
-            SettingsActivity::new(),
-        ))
+        Change::push(create_settings_activity())
     }
 
     fn show_controls_popup() -> Change {
@@ -453,7 +450,7 @@ impl PauseMenu {
             "Resume" -> _ => Change::pop_top(),
             "Main Menu" -> _ => Change::pop_until("main menu"),
             "Controls" -> _ => Change::push(create_controls_popup()),
-            "Settings" -> _ => Change::push(SettingsActivity::new_activity()),
+            "Settings" -> _ => Change::push(create_settings_activity()),
             "Quit" -> _ => Change::pop_all(),
         );
 
@@ -558,9 +555,9 @@ impl GameActivity {
         let game_cfg = &config.game;
         let appear = &app_data.appearance;
 
-        let camera_mode = game_cfg.camera_mode;
+        let camera_mode = game_cfg.view.camera_mode;
         let maze_board = MazeBoard::new(&game.game, appear.theme(), appear.scheme().clone());
-        let margins = game_cfg.viewport_margin;
+        let margins = game_cfg.view.viewport_margin;
         drop(config);
 
         #[cfg(feature = "sound")]
@@ -831,8 +828,12 @@ impl ActivityHandler for GameActivity {
         }
 
         let model::Game {
-            camera_smoothing,
-            player_smoothing,
+            view:
+                GameView {
+                    camera_smoothing,
+                    player_smoothing,
+                    ..
+                },
             ..
         } = data.settings.read().game;
 

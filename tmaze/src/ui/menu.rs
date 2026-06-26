@@ -785,6 +785,19 @@ pub type MenuAction<R> = Box<dyn Fn(&mut AppData) -> R>;
 
 #[macro_export]
 macro_rules! menu_actions {
+    (move $($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
+        {
+            let opts: Vec<(_, $crate::ui::menu::MenuAction<_>)> = vec![
+                $(
+                    $(#[cfg(feature = $feature)])?
+                    { ($crate::ui::menu::MenuItem::from($name), Box::new(move |$data: &mut AppData| $action)) },
+                )*
+            ];
+
+            opts
+        }
+    };
+
     ($($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
         {
             let opts: Vec<(_, $crate::ui::menu::MenuAction<_>)> = vec![
@@ -833,7 +846,8 @@ pub fn simple_menu(
         fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
             match self.menu.update(events, data)? {
                 Change::Pop {
-                    res: Some(result), ..
+                    res: Some(result),
+                    n: 1,
                 } => {
                     let index = *result
                         .downcast::<usize>()
@@ -856,4 +870,8 @@ pub fn simple_menu(
         menu: Menu::new(menu_config),
         actions,
     }
+}
+
+pub fn menu_result(res: Box<dyn std::any::Any>) -> usize {
+    *res.downcast::<usize>().unwrap()
 }

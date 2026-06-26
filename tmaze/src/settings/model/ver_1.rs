@@ -78,10 +78,12 @@ impl ToCurrentConfig for PartialConfig {
             game: Some(PartialGame {
                 slow: self.slow,
                 disable_tower_auto_up: self.disable_tower_auto_up,
-                camera_mode: self.camera_mode,
-                camera_smoothing: self.camera_smoothing,
-                player_smoothing: self.player_smoothing,
-                viewport_margin: self.viewport_margin,
+                view: Some(PartialGameView {
+                    camera_mode: self.camera_mode,
+                    camera_smoothing: self.camera_smoothing,
+                    player_smoothing: self.player_smoothing,
+                    viewport_margin: self.viewport_margin,
+                }),
                 content: Some(PartialContent {
                     presets: self.presets,
                 }),
