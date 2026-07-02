@@ -1,13 +1,22 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     app::{
         activity::ActivityHandlerExt as _, app::AppData, Activity, ActivityEvent, ActivityHandler,
         Change,
     },
     helpers::constants::paths::{config, theme},
-    menu_actions,
+    match_scheme_field, menu_actions,
     renderer::MouseGuard,
+    settings::{
+        model::{PartialTerminalSchemeDef, TerminalSchemeDef},
+        theme::{Rgb, TerminalColorScheme},
+    },
     sound::create_audio_settings,
-    ui::{menu_result, simple_menu, Menu, MenuConfig, MenuItem, OptionDef, Popup, Screen},
+    ui::{
+        menu_result, simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup,
+        Screen, SimpleMenuOptions, SliderDef,
+    },
 };
 
 struct OtherSettingsPopup(Popup, MouseGuard);
@@ -150,13 +159,191 @@ pub fn create_settings_activity() -> Activity {
                 )
             }
 
+            fn terminal_scheme_settings(data: &AppData) -> Activity {
+                fn named_settings(_: &AppData) -> Activity {
+                    simple_menu_ex(
+                        "Choose named scheme",
+                        vec![],
+                        SimpleMenuOptions { default: Some(0) },
+                    )
+                    .to_base_activity("named scheme settings")
+                }
+
+                fn custom_settings(data: &AppData) -> Activity {
+                    let scheme = match &data.settings.read().general.appearance.terminal_scheme {
+                        TerminalSchemeDef::Custom(scheme) => scheme.clone(),
+                        _ => TerminalColorScheme::default(),
+                    };
+
+                    fn field<'a>(
+                        field: &'a str,
+                        title: &'a str,
+                        scheme: &TerminalColorScheme,
+                    ) -> (&'a str, &'a str, Rgb, Rc<dyn Fn(&mut AppData, Rgb) -> Rgb>)
+                    {
+                        let scheme_field = match_scheme_field!(field, scheme,);
+
+                        let field2 = field.to_string();
+                        let fn_ = Rc::new(move |data: &mut AppData, color| {
+                            data.settings.update_ui(|cfg| {
+                                let PartialTerminalSchemeDef::Custom(scheme) =
+                                    cfg.general().appearance().terminal_scheme()
+                                else {
+                                    panic!()
+                                };
+                                *match_scheme_field!(field2.as_str(), scheme, &mut) = Some(color);
+                            });
+
+                            color
+                        });
+
+                        (field, title, scheme_field, fn_)
+                    }
+
+                    fn fun_name<'a>(
+                        (name, title, color, fn_): (
+                            &'a str,
+                            &'a str,
+                            (u8, u8, u8),
+                            Rc<dyn Fn(&mut AppData, (u8, u8, u8)) -> (u8, u8, u8)>,
+                        ),
+                    ) -> (MenuItem, Box<dyn Fn(&mut AppData) -> Change + 'a>) {
+                        (
+                            MenuItem::text(name.into()),
+                            Box::new(move |_: &mut _| {
+                                let fn2 = fn_.clone();
+
+                                #[derive(Clone)]
+                                struct ColorState {
+                                    color: Rc<RefCell<Rgb>>,
+                                    set: Rc<dyn Fn(&mut AppData, Rgb) -> Rgb>,
+                                }
+
+                                impl ColorState {
+                                    fn red(&self, data: &mut AppData, r: i32) -> i32 {
+                                        self.set(data, 0, r)
+                                    }
+
+                                    fn green(&self, data: &mut AppData, g: i32) -> i32 {
+                                        self.set(data, 1, g)
+                                    }
+
+                                    fn blue(&self, data: &mut AppData, b: i32) -> i32 {
+                                        self.set(data, 2, b)
+                                    }
+
+                                    fn set(&self, data: &mut AppData, i: usize, val: i32) -> i32 {
+                                        assert!(i < 3);
+                                        let mut borrow = self.color.borrow_mut();
+                                        *match i {
+                                            0 => &mut borrow.0,
+                                            1 => &mut borrow.1,
+                                            2 => &mut borrow.2,
+                                            _ => unreachable!(),
+                                        } = val as u8;
+                                        (self.set)(data, *borrow);
+                                        val
+                                    }
+                                }
+
+                                let color_state = ColorState {
+                                    color: Rc::new(RefCell::new(color)),
+                                    set: fn2,
+                                };
+
+                                let slider =
+                                    |f: fn(&ColorState, &mut AppData, i32) -> i32,
+                                     clf: Box<dyn Fn(Rgb) -> u8>,
+                                     text: &'static str| {
+                                        let u1 = color_state.clone();
+                                        let u2 = color_state.clone();
+
+                                        MenuItem::Slider(SliderDef {
+                                            text: text.into(),
+                                            val: clf(color) as i32,
+                                            range: 0..=255,
+                                            update_fn: Box::new(move |val, data| {
+                                                f(&u1, data, val);
+                                            }),
+                                            reset_fn: Some(Box::new(move |data| {
+                                                f(&u2, data, clf(color) as i32)
+                                            })),
+                                            as_num: true,
+                                        })
+                                    };
+
+                                use ColorState as CS;
+                                let config = MenuConfig::new(
+                                    title,
+                                    vec![
+                                        slider(CS::red, Box::new(|c| c.0), "Red"),
+                                        slider(CS::green, Box::new(|c| c.1), "Green"),
+                                        slider(CS::blue, Box::new(|c| c.2), "Blue"),
+                                    ],
+                                );
+                                Change::push(
+                                    Menu::new(config).to_base_activity("scheme color settings"),
+                                )
+                            }) as Box<dyn Fn(&mut _) -> _>,
+                        )
+                    }
+
+                    simple_menu(
+                        "Custom scheme",
+                        [
+                            field("primary_fg", "Primary Fg", &scheme),
+                            field("primary_bg", "Primary Bg", &scheme),
+                            field("black", "Black", &scheme),
+                            field("dark_grey", "Dark grey", &scheme),
+                            field("red", "Red", &scheme),
+                            field("dark_red", "Dark red", &scheme),
+                            field("green", "Green", &scheme),
+                            field("dark_green", "Dark green", &scheme),
+                            field("yellow", "Yellow", &scheme),
+                            field("dark_yellow", "Dark Yellow", &scheme),
+                            field("blue", "Blue", &scheme),
+                            field("dark_blue", "Dark Blue", &scheme),
+                            field("magenta", "Magenta", &scheme),
+                            field("dark_magenta", "Dark Magenta", &scheme),
+                            field("cyan", "Cyan", &scheme),
+                            field("dark_cyan", "Dark_cyan", &scheme),
+                            field("white", "White", &scheme),
+                            field("grey", "Grey", &scheme),
+                        ]
+                        .into_iter()
+                        .map(fun_name)
+                        .collect(),
+                    )
+                    .to_base_activity("custom scheme settings")
+                }
+
+                let menu = simple_menu_ex(
+                    "Terminal Color Scheme",
+                    menu_actions!(
+                        "Named" -> data => Change::push(named_settings(data)),
+                        "Custom" -> data => Change::push(custom_settings(data)),
+                        "Back" -> _ => Change::pop_top(),
+                    ),
+                    SimpleMenuOptions {
+                        default: Some(
+                            match &data.settings.read().general.appearance.terminal_scheme {
+                                TerminalSchemeDef::Named(_) => 0,
+                                TerminalSchemeDef::Custom(_) => 1,
+                            },
+                        ),
+                    },
+                );
+
+                menu.to_base_activity("terminal scheme settings")
+            }
+
             Activity::new_base_boxed(
                 "appearance settings",
                 simple_menu(
                     "Appearance settings",
                     menu_actions!(
                         "Theme" -> data => Change::push(theme_settings(data)),
-                        // "Terminal scheme" -> data => Change::push(terminal_scheme_settings(data)),
+                        "Terminal scheme" -> data => Change::push(terminal_scheme_settings(data)),
                         "Back" -> _ => Change::pop_top(),
                     ),
                 ),
@@ -214,11 +401,11 @@ pub fn create_settings_activity() -> Activity {
                                 let level = LOG_LEVELS[menu_result(res)].1;
                                 data.settings.update_ui(|cfg| {
                                     let logging = cfg.general().logging();
-                                    match self.dst {
-                                        LoggingDst::Normal => *logging.normal() = level,
-                                        LoggingDst::Debug => *logging.debug() = level,
-                                        LoggingDst::File => *logging.file() = level,
-                                    }
+                                    *match self.dst {
+                                        LoggingDst::Normal => logging.normal(),
+                                        LoggingDst::Debug => logging.debug(),
+                                        LoggingDst::File => logging.file(),
+                                    } = level;
                                 });
                                 Some(Change::pop_top())
                             }

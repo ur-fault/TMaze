@@ -31,8 +31,6 @@ pub struct SliderDef {
     pub val: i32,
     pub range: RangeInclusive<i32>,
     #[allow(clippy::type_complexity)]
-    // FIXME: take value instead of change direction (bool),
-    // this should allow for mouse support
     pub update_fn: Box<dyn FnMut(i32, &mut AppData)>,
     pub reset_fn: Option<Box<dyn FnMut(&mut AppData) -> i32>>,
     pub as_num: bool,
@@ -833,9 +831,22 @@ pub fn menu_theme_resolver() -> ThemeResolver {
     resolver
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct SimpleMenuOptions {
+    pub default: Option<usize>,
+}
+
 pub fn simple_menu(
     title: impl Into<String>,
     items: Vec<(MenuItem, Box<dyn Fn(&mut AppData) -> Change>)>,
+) -> impl ActivityHandler {
+    simple_menu_ex(title, items, SimpleMenuOptions::default())
+}
+
+pub fn simple_menu_ex(
+    title: impl Into<String>,
+    items: Vec<(MenuItem, Box<dyn Fn(&mut AppData) -> Change>)>,
+    options: SimpleMenuOptions,
 ) -> impl ActivityHandler {
     struct SimpleMenu {
         menu: Menu,
@@ -863,8 +874,8 @@ pub fn simple_menu(
         }
     }
 
-    let (options, actions) = split_menu_actions(items);
-    let menu_config = MenuConfig::new(title, options);
+    let (menu_opts, actions) = split_menu_actions(items);
+    let menu_config = MenuConfig::new(title, menu_opts).maybe_default(options.default);
 
     SimpleMenu {
         menu: Menu::new(menu_config),
