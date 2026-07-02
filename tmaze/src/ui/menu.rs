@@ -51,6 +51,7 @@ pub enum MenuItem {
         text: MbyStaticStr,
         first_col: char,
         last_col: char,
+        click_fn: Option<Box<dyn FnMut(&mut AppData) -> Option<Change>>>,
     },
     Option(OptionDef),
     Slider(SliderDef),
@@ -65,6 +66,7 @@ impl MenuItem {
             text: MbyStaticStr::Owned(text.into_owned()),
             first_col: NULL_CHAR,
             last_col: NULL_CHAR,
+            click_fn: None,
         }
     }
 
@@ -73,6 +75,7 @@ impl MenuItem {
             text: MbyStaticStr::Static(text),
             first_col: NULL_CHAR,
             last_col: NULL_CHAR,
+            click_fn: None,
         }
     }
 }
@@ -84,6 +87,7 @@ impl MenuItem {
                 text,
                 first_col,
                 last_col,
+                ..
             } => Some(
                 text.width()
                     + first_col.width().map(|w| w + 1).unwrap_or(0)
@@ -125,6 +129,7 @@ impl MenuItem {
                 text,
                 first_col,
                 last_col,
+                ..
             } => {
                 let first_col = if first_col.is_control() {
                     "".into()
@@ -202,6 +207,7 @@ impl fmt::Debug for MenuItem {
                 text,
                 first_col,
                 last_col,
+                ..
             } => write!(f, "Text('{first_col}' '{text}' '{last_col}')"),
             MenuItem::Option(OptionDef { text, val, .. }) => write!(f, "Option({}, {})", text, val),
             MenuItem::Slider(SliderDef {
@@ -416,7 +422,12 @@ impl Menu {
         let selected_opt = &mut self.config.options[self.selected];
 
         match selected_opt {
-            MenuItem::Text { .. } => return Some(Change::pop_top_with(self.selected)),
+            MenuItem::Text { click_fn, .. } => {
+                if let Some(fun) = click_fn {
+                    return fun(data);
+                }
+                return Some(Change::pop_top_with(self.selected))
+            },
             MenuItem::Option(OptionDef {
                 val,
                 update_fn: fun,

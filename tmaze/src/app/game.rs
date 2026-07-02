@@ -257,6 +257,7 @@ impl MazePresetMenu {
                         text: preset_group.group.clone().into(),
                         first_col: NULL_CHAR,
                         last_col: '>',
+                        click_fn: None,
                     },
                 })
                 .collect::<Vec<_>>(),
@@ -750,6 +751,7 @@ impl ActivityHandler for GameActivity {
         }
 
         let config = data.settings.read();
+        self.camera_mode = config.game.view.camera_mode;
 
         self.update_dpad(data);
         self.update_viewport(data);

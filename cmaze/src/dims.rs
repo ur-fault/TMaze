@@ -343,3 +343,15 @@ impl Default for Offset {
         Offset::Rel(0.25)
     }
 }
+
+impl From<i32> for Offset {
+    fn from(value: i32) -> Self {
+        Offset::Abs(value)
+    }
+}
+
+impl From<f32> for Offset {
+    fn from(value: f32) -> Self {
+        Offset::Rel(value)
+    }
+}

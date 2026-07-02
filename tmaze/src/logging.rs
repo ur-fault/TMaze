@@ -115,6 +115,7 @@ impl UiLogs {
     pub fn switch_debug(&self, settings: &Config) {
         let mut debug = self.debug.write().unwrap();
         *debug = !*debug;
+        drop(debug);
 
         self.update_levels(settings);
     }
