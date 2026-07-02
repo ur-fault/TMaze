@@ -12,6 +12,10 @@ use log::{Log, Metadata, Record};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
+    app::{
+        event::{EventReceiver, EventReceiverFn},
+        GlobalEvent,
+    },
     helpers::constants::paths,
     renderer::{draw::Draw, GMutView},
     settings::{
@@ -112,12 +116,17 @@ impl UiLogs {
         let mut debug = self.debug.write().unwrap();
         *debug = !*debug;
 
-        let config = &settings.general;
+        self.update_levels(settings);
+    }
 
-        if *debug {
-            *self.min_level.write().unwrap() = config.logging.debug;
+    fn update_levels(&self, settings: &Config) {
+        let config = &settings.general.logging;
+
+        let debug = *self.debug.read().unwrap();
+        if debug {
+            *self.min_level.write().unwrap() = config.debug;
         } else {
-            *self.min_level.write().unwrap() = config.logging.normal;
+            *self.min_level.write().unwrap() = config.normal;
         }
     }
 
@@ -308,6 +317,16 @@ impl Log for AppLogger {
         if let Some(file) = &self.file {
             file.lock().unwrap().flush().unwrap();
         }
+    }
+}
+
+impl EventReceiver for &AppLogger {
+    fn register(self) -> EventReceiverFn {
+        Box::new(move |ev, data| {
+            if matches!(ev, GlobalEvent::SettingsChanged) {
+                data.logs.update_levels(&data.settings.read());
+            }
+        })
     }
 }
 

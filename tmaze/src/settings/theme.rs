@@ -55,38 +55,11 @@ macro_rules! default_theme_name {
         "default_theme.json5"
     };
 }
-const DEFAULT_THEME_NAME: &str = default_theme_name!();
 const DEFAULT_THEME: &str = include_str!(concat!("./files/", default_theme_name!()));
 
 impl ThemeDefinition {
     pub fn parse_default() -> Self {
         json5::from_str(DEFAULT_THEME).expect("default theme should be always valid")
-    }
-
-    pub fn load_default(read_only: bool) -> Result<Self, LoadError> {
-        if read_only {
-            return Ok(Self::parse_default());
-        }
-
-        let result = Self::prepare_default_theme();
-        match result {
-            Ok(theme) => Ok(theme),
-            Err(e) => {
-                log::error!("Failed to prepare default theme: {}", e);
-                Err(e)
-            }
-        }
-    }
-
-    fn prepare_default_theme() -> Result<Self, LoadError> {
-        let path = theme_file(DEFAULT_THEME_NAME);
-
-        std::fs::create_dir_all(path.parent().unwrap())?;
-        if !path.exists() {
-            std::fs::write(&path, DEFAULT_THEME)?;
-        }
-
-        Self::load_by_path(path)
     }
 
     pub fn load_by_name(name: &str) -> Result<Self, LoadError> {
@@ -99,7 +72,7 @@ impl ThemeDefinition {
         let ext = path
             .extension()
             .and_then(|s| s.to_str())
-            .expect("No extension");
+            .expect("No or invalid extension");
 
         // TODO: names without extension
 
@@ -486,6 +459,33 @@ config! {
         white: Rgb = (255, 255, 255),
         grey: Rgb = (192, 192, 192),
     }
+}
+
+#[macro_export]
+macro_rules! match_scheme_field {
+    ($field:expr, $scheme:expr, $($ex:tt)*) => {
+        match $field {
+            "primary_fg" => $($ex)* ($scheme.primary_fg),
+            "primary_bg" => $($ex)* ($scheme.primary_bg),
+            "black" => $($ex)* ($scheme.black),
+            "dark_grey" => $($ex)* ($scheme.dark_grey),
+            "red" => $($ex)* ($scheme.red),
+            "dark_red" => $($ex)* ($scheme.dark_red),
+            "green" => $($ex)* ($scheme.green),
+            "dark_green" => $($ex)* ($scheme.dark_green),
+            "yellow" => $($ex)* ($scheme.yellow),
+            "dark_yellow" => $($ex)* ($scheme.dark_yellow),
+            "blue" => $($ex)* ($scheme.blue),
+            "dark_blue" => $($ex)* ($scheme.dark_blue),
+            "magenta" => $($ex)* ($scheme.magenta),
+            "dark_magenta" => $($ex)* ($scheme.dark_magenta),
+            "cyan" => $($ex)* ($scheme.cyan),
+            "dark_cyan" => $($ex)* ($scheme.dark_cyan),
+            "white" => $($ex)* ($scheme.white),
+            "grey" => $($ex)* ($scheme.grey),
+            field => panic!("unknown field: {}", field),
+        }
+    };
 }
 
 impl TerminalColorScheme {

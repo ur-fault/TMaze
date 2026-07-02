@@ -161,6 +161,7 @@ impl App {
                 .read_only(read_only)
                 .file_level(config.general.logging.file),
         );
+        event_receivers.push(logger.register());
         logger.init();
 
         if let Some(errors) = settings_errors {
@@ -194,8 +195,6 @@ impl App {
                 reg
             },
         };
-
-        log::info!("Loading theme");
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
