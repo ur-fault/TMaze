@@ -160,11 +160,41 @@ pub fn create_settings_activity() -> Activity {
             }
 
             fn terminal_scheme_settings(data: &AppData) -> Activity {
-                fn named_settings(_: &AppData) -> Activity {
+                fn named_settings(data: &AppData) -> Activity {
+                    let appearance = &data.settings.read().general.appearance;
+
                     simple_menu_ex(
                         "Choose named scheme",
-                        vec![],
-                        SimpleMenuOptions { default: Some(0) },
+                        TerminalColorScheme::all_schemes()
+                            .into_iter()
+                            // FIXME(hack): cannot currently display large number of schemes in menu
+                            .take(10)
+                            .map(|scheme| {
+                                (
+                                    MenuItem::static_text(*scheme),
+                                    Box::new(move |data: &mut AppData| -> Change {
+                                        data.settings.update_ui(|cfg| {
+                                            *cfg.general().appearance().terminal_scheme() =
+                                                PartialTerminalSchemeDef::Named((*scheme).into())
+                                        });
+                                        Change::pop_top()
+                                    })
+                                        as Box<dyn Fn(&mut AppData) -> Change + 'static>,
+                                )
+                            })
+                            .collect(),
+                        SimpleMenuOptions {
+                            default: match &appearance.terminal_scheme {
+                                TerminalSchemeDef::Named(original) => {
+                                    TerminalColorScheme::all_schemes()
+                                        .iter()
+                                        // FIXME(hack): cannot currently display large number of schemes in menu
+                                        .take(10)
+                                        .position(|scheme| *scheme == original)
+                                }
+                                _ => None,
+                            },
+                        },
                     )
                     .to_base_activity("named scheme settings")
                 }

@@ -67,6 +67,14 @@ impl MenuItem {
             last_col: NULL_CHAR,
         }
     }
+
+    pub fn static_text(text: &'static str) -> Self {
+        MenuItem::Text {
+            text: MbyStaticStr::Static(text),
+            first_col: NULL_CHAR,
+            last_col: NULL_CHAR,
+        }
+    }
 }
 
 impl MenuItem {
