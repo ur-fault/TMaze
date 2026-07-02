@@ -161,18 +161,16 @@ impl RunningGame {
 
         match move_mode {
             MoveMode::Slow => {
-                return if self
+                if !self
                     .maze
                     .board
                     .get_cell(self.player_pos)
                     .unwrap()
                     .get_wall(dir)
                 {
-                    Ok((self.player_pos, 0))
-                } else {
                     self.moves.push((self.player_pos, dir));
                     self.player_pos += dir.to_coord();
-                    Ok((self.player_pos, 1))
+                    count = 1;
                 }
             }
 

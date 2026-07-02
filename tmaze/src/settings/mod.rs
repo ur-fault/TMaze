@@ -66,14 +66,15 @@ impl Settings {
     }
 
     #[track_caller]
-    pub fn update_ui(&self, with: impl FnOnce(&mut PartialConfig)) {
+    pub fn update_ui<T>(&self, with: impl FnOnce(&mut PartialConfig) -> T) -> T {
         log::trace!("Updating UI settings from {}", Location::caller());
         let mut new_ui = (**self.inner.ui_layer.load()).clone();
-        with(&mut new_ui);
+        let x = with(&mut new_ui);
         self.inner.ui_layer.store(Arc::new(new_ui));
 
         self.inner.rebuild();
         self.notify();
+        x
     }
 
     fn write_ui(&self) {

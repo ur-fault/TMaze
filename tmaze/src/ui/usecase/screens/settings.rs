@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+use cmaze::dims::Offset;
+
 use crate::{
     app::{
         activity::ActivityHandlerExt as _, app::AppData, Activity, ActivityEvent, ActivityHandler,
@@ -9,13 +11,13 @@ use crate::{
     match_scheme_field, menu_actions,
     renderer::MouseGuard,
     settings::{
-        model::{PartialTerminalSchemeDef, TerminalSchemeDef},
+        model::{CameraMode, PartialTerminalSchemeDef, TerminalSchemeDef},
         theme::{Rgb, TerminalColorScheme},
     },
     sound::create_audio_settings,
     ui::{
         menu_result, simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup,
-        Screen, SimpleMenuOptions, SliderDef,
+        Screen, SimpleMenuOptions, SliderDef, NULL_CHAR,
     },
 };
 
@@ -498,6 +500,203 @@ pub fn create_settings_activity() -> Activity {
         )
     }
 
+    fn game_settings(data: &mut AppData) -> Activity {
+        fn view_settings(data: &mut AppData) -> Activity {
+            fn free_follow_settings() -> Activity {
+                fn offset_settings(is_y: bool) -> Activity {
+                    fn abs_settings(data: &mut AppData, is_y: bool) -> Activity {
+                        let val = match data.settings.read().game.view.camera_mode {
+                            CameraMode::EdgeFollow { x, y } => {
+                                match match is_y {
+                                    true => y,
+                                    false => x,
+                                } {
+                                    Offset::Abs(v) => v,
+                                    Offset::Rel(_) => 0,
+                                }
+                            }
+                            _ => 0,
+                        };
+
+                        let config = MenuConfig::new(
+                            "Absolute Offset",
+                            vec![MenuItem::Slider(SliderDef {
+                                text: if is_y { "y" } else { "x" }.into(),
+                                val,
+                                range: 0..=100,
+                                update_fn: Box::new(move |v, d| {
+                                    d.settings.update_ui(|cfg| {
+                                        let (mut x, mut y) = match cfg.game().view().camera_mode {
+                                            Some(CameraMode::EdgeFollow { x, y }) => (x, y),
+                                            _ => (Offset::Abs(0), Offset::Abs(0)),
+                                        };
+
+                                        if is_y {
+                                            y = Offset::Abs(v);
+                                        } else {
+                                            x = Offset::Abs(v);
+                                        }
+
+                                        *cfg.game().view().camera_mode() =
+                                            CameraMode::EdgeFollow { x, y };
+                                    });
+                                }),
+                                reset_fn: None,
+                                as_num: true,
+                            })],
+                        );
+
+                        Activity::new_base_boxed("free follow settings", Menu::new(config))
+                    }
+
+                    fn rel_settings() -> Activity {
+                        todo!("Relative offset settings not implemented yet")
+                    }
+
+                    simple_menu(
+                        "",
+                        menu_actions!(move
+                            "Absolute" -> d => Change::push(abs_settings(d, is_y)),
+                            "Relative" -> _ => Change::push(rel_settings()),
+                            "Back" -> _ => Change::pop_top(),
+                        ),
+                    )
+                    .to_base_activity("")
+                }
+
+                simple_menu(
+                    "Free follow settings",
+                    menu_actions!(
+                        "x offset" -> _ => Change::push(offset_settings(false)),
+                        "y offset" -> _ => Change::push(offset_settings(true)),
+                        "Back" -> _ => Change::pop_top(),
+                    ),
+                )
+                .to_base_activity("")
+            }
+
+            let settings = &data.settings.read().game.view;
+
+            let config = MenuConfig::new(
+                "Game View Settings",
+                vec![
+                    MenuItem::Text {
+                        text: "Camera Mode".into(),
+                        first_col: NULL_CHAR,
+                        last_col: NULL_CHAR,
+                        click_fn: Some(Box::new(|_| {
+                            Some(Change::push(simple_menu(
+                                "Camera Mode",
+                                menu_actions!(
+                                    "Follow player" -> d => {
+                                        d.settings.update_ui(|cfg| {
+                                            *cfg.game().view().camera_mode() = CameraMode::CloseFollow;
+                                        });
+                                        Change::pop_top()
+                                    },
+                                    "Free" -> _ => Change::push(free_follow_settings()),
+                                    "Back" -> _ => Change::pop_top(),
+                                ),
+                            ).to_base_activity("camera mode settings")))
+                        })),
+                    },
+                    MenuItem::Slider(SliderDef {
+                        text: "Camera smoothing".into(),
+                        val: (settings.camera_smoothing * 10.) as i32,
+                        range: 5..=10,
+                        update_fn: Box::new(|v, d| {
+                            d.settings.update_ui(|cfg| {
+                                *cfg.game().view().camera_smoothing() = v as f64 / 10.;
+                            });
+                        }),
+                        reset_fn: Some(Box::new(|d| {
+                            d.settings.update_ui(|cfg| {
+                                cfg.game().view().camera_smoothing = None;
+                            });
+                            (d.settings.read().game.view.camera_smoothing * 10.) as i32
+                        })),
+                        as_num: false,
+                    }),
+                    MenuItem::Slider(SliderDef {
+                        text: "Player smoothing".into(),
+                        val: (settings.player_smoothing * 10.) as i32,
+                        range: 5..=10,
+                        update_fn: Box::new(|v, d| {
+                            d.settings.update_ui(|cfg| {
+                                *cfg.game().view().player_smoothing() = v as f64 / 10.;
+                            });
+                        }),
+                        reset_fn: Some(Box::new(|d| {
+                            d.settings.update_ui(|cfg| {
+                                cfg.game().view().player_smoothing = None;
+                            });
+                            (d.settings.read().game.view.player_smoothing * 10.) as i32
+                        })),
+                        as_num: false,
+                    }),
+                ],
+            );
+
+            Activity::new_base_boxed("view settings", Menu::new(config))
+        }
+
+        fn content_settings() -> Activity {
+            todo!()
+        }
+
+        let settings = &data.settings.read().game;
+
+        let config = MenuConfig::new(
+            "Game settings",
+            vec![
+                MenuItem::Option(OptionDef {
+                    text: "Slow".into(),
+                    val: settings.slow,
+                    update_fn: Box::new(|enabled, data| {
+                        data.settings.update_ui(|cfg| {
+                            *cfg.game().slow() = enabled;
+                        });
+                    }),
+                    reset_fn: Some(Box::new(|data| {
+                        data.settings.update_ui(|cfg| {
+                            cfg.game().slow = None;
+                        });
+                        data.settings.read().game.slow
+                    })),
+                }),
+                MenuItem::Option(OptionDef {
+                    text: "Don't auto advance up".into(),
+                    val: settings.disable_tower_auto_up,
+                    update_fn: Box::new(|enabled, data| {
+                        data.settings.update_ui(|cfg| {
+                            *cfg.game().disable_tower_auto_up() = enabled;
+                        });
+                    }),
+                    reset_fn: Some(Box::new(|data| {
+                        data.settings.update_ui(|cfg| {
+                            cfg.game().disable_tower_auto_up = None;
+                        });
+                        data.settings.read().game.disable_tower_auto_up
+                    })),
+                }),
+                MenuItem::Text {
+                    text: "View".into(),
+                    first_col: NULL_CHAR,
+                    last_col: NULL_CHAR,
+                    click_fn: Some(Box::new(|d| Some(Change::push(view_settings(d))))),
+                },
+                MenuItem::Text {
+                    text: "Content".into(),
+                    first_col: NULL_CHAR,
+                    last_col: NULL_CHAR,
+                    click_fn: Some(Box::new(|_| Some(Change::push(content_settings())))),
+                },
+            ],
+        );
+
+        Activity::new_base_boxed("game settings", Menu::new(config))
+    }
+
     fn control_settings(data: &mut AppData) -> Activity {
         let cfg = &data.settings.read().controls;
 
@@ -606,8 +805,9 @@ pub fn create_settings_activity() -> Activity {
         "Settings",
         menu_actions!(
             "General" -> _ => Change::push(general_settings()),
-            "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
+            "Game" -> data => Change::push(game_settings(data)),
             "Controls" -> data => Change::push(control_settings(data)),
+            "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
             "Other settings" -> _ => Change::push(OtherSettingsPopup::new().to_base_activity("other settings")),
             "Back" -> _ => Change::pop_top(),
         ),
