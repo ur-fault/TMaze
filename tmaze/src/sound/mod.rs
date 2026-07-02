@@ -4,9 +4,9 @@ use menu::OptionDef;
 use rodio::{OutputStream, OutputStreamHandle, Sink};
 
 use crate::{
-    app::{Activity, GlobalEvent, app::AppData, event::EventReceiver},
+    app::{app::AppData, event::EventReceiver, Activity, GlobalEvent},
     settings::Settings,
-    ui::{MenuItem, SliderDef, menu},
+    ui::{menu, MenuItem, SliderDef},
 };
 
 use self::track::Track;
@@ -177,7 +177,7 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 })),
             }),
             MenuItem::Separator,
-            MenuItem::text("Exit".into()),
+            MenuItem::static_text("Exit"),
         ],
     );
 

@@ -230,7 +230,7 @@ pub fn create_settings_activity() -> Activity {
                         (field, title, scheme_field, fn_)
                     }
 
-                    fn fun_name<'a>(
+                    fn channel_field_item<'a>(
                         (name, title, color, fn_): (
                             &'a str,
                             &'a str,
@@ -341,7 +341,7 @@ pub fn create_settings_activity() -> Activity {
                             field("grey", "Grey", &scheme),
                         ]
                         .into_iter()
-                        .map(fun_name)
+                        .map(channel_field_item)
                         .collect(),
                     )
                     .to_base_activity("custom scheme settings")
@@ -595,7 +595,7 @@ pub fn create_settings_activity() -> Activity {
                     })),
                 }),
                 MenuItem::Separator,
-                MenuItem::text("Exit".into()),
+                MenuItem::static_text("Exit"),
             ],
         );
 
