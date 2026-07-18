@@ -198,6 +198,7 @@ impl App {
 
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
+        #[cfg(feature = "sound")]
         event_receivers.push(sound_player.register());
 
         let appearance = Appearance::new(&config);
