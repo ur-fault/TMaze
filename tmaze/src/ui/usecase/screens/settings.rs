@@ -14,12 +14,14 @@ use crate::{
         model::{CameraMode, PartialTerminalSchemeDef, TerminalSchemeDef, UpdateCheckInterval},
         theme::{Rgb, TerminalColorScheme},
     },
-    sound::create_audio_settings,
     ui::{
         menu_result, simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup,
         Screen, SimpleMenuOptions, SliderDef, NULL_CHAR,
     },
 };
+
+#[cfg(feature = "sound")]
+use crate::sound::create_audio_settings;
 
 struct OtherSettingsPopup(Popup, MouseGuard);
 
