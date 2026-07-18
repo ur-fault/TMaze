@@ -61,9 +61,9 @@ pub enum MenuItem {
 pub const NULL_CHAR: char = '\0';
 
 impl MenuItem {
-    pub fn text(text: Cow<'_, str>) -> Self {
+    pub fn text<'a>(text: impl Into<Cow<'a, str>>) -> Self {
         MenuItem::Text {
-            text: MbyStaticStr::Owned(text.into_owned()),
+            text: MbyStaticStr::Owned(text.into().into_owned()),
             first_col: NULL_CHAR,
             last_col: NULL_CHAR,
             click_fn: None,
@@ -190,13 +190,13 @@ impl MenuItem {
 
 impl From<String> for MenuItem {
     fn from(s: String) -> Self {
-        MenuItem::text(s.into())
+        MenuItem::text(s)
     }
 }
 
 impl From<&str> for MenuItem {
     fn from(s: &str) -> Self {
-        MenuItem::text(s.into())
+        MenuItem::text(s)
     }
 }
 
@@ -426,8 +426,8 @@ impl Menu {
                 if let Some(fun) = click_fn {
                     return fun(data);
                 }
-                return Some(Change::pop_top_with(self.selected))
-            },
+                return Some(Change::pop_top_with(self.selected));
+            }
             MenuItem::Option(OptionDef {
                 val,
                 update_fn: fun,

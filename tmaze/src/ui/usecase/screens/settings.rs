@@ -11,7 +11,7 @@ use crate::{
     match_scheme_field, menu_actions,
     renderer::MouseGuard,
     settings::{
-        model::{CameraMode, PartialTerminalSchemeDef, TerminalSchemeDef},
+        model::{CameraMode, PartialTerminalSchemeDef, TerminalSchemeDef, UpdateCheckInterval},
         theme::{Rgb, TerminalColorScheme},
     },
     sound::create_audio_settings,
@@ -108,7 +108,7 @@ pub fn create_settings_activity() -> Activity {
 
                         let themes = themes
                             .into_iter()
-                            .map(|theme| MenuItem::text(theme.into()))
+                            .map(|theme| MenuItem::text(theme))
                             .collect::<Vec<_>>();
 
                         MenuConfig::new("Select a theme", themes).maybe_default(selected)
@@ -241,7 +241,7 @@ pub fn create_settings_activity() -> Activity {
                         ),
                     ) -> (MenuItem, Box<dyn Fn(&mut AppData) -> Change + 'a>) {
                         (
-                            MenuItem::text(name.into()),
+                            MenuItem::text(name),
                             Box::new(move |_: &mut _| {
                                 let fn2 = fn_.clone();
 
@@ -634,14 +634,16 @@ pub fn create_settings_activity() -> Activity {
                         })),
                         as_num: false,
                     }),
+                    MenuItem::Text {
+                        text: "Viewport margin (todo)".into(),
+                        first_col: NULL_CHAR,
+                        last_col: NULL_CHAR,
+                        click_fn: Some(Box::new(|_| Some(Change::nothing()))),
+                    },
                 ],
             );
 
             Activity::new_base_boxed("view settings", Menu::new(config))
-        }
-
-        fn content_settings() -> Activity {
-            todo!()
         }
 
         let settings = &data.settings.read().game;
@@ -686,10 +688,10 @@ pub fn create_settings_activity() -> Activity {
                     click_fn: Some(Box::new(|d| Some(Change::push(view_settings(d))))),
                 },
                 MenuItem::Text {
-                    text: "Content".into(),
+                    text: "Content (todo)".into(),
                     first_col: NULL_CHAR,
                     last_col: NULL_CHAR,
-                    click_fn: Some(Box::new(|_| Some(Change::push(content_settings())))),
+                    click_fn: Some(Box::new(|_| Some(Change::nothing()))),
                 },
             ],
         );
@@ -697,108 +699,202 @@ pub fn create_settings_activity() -> Activity {
         Activity::new_base_boxed("game settings", Menu::new(config))
     }
 
-    fn control_settings(data: &mut AppData) -> Activity {
-        let cfg = &data.settings.read().controls;
+    fn control_settings() -> Activity {
+        fn mouse_settings(data: &mut AppData) -> Activity {
+            fn dpad_settings(data: &mut AppData) -> Activity {
+                let cfg = &data.settings.read().controls.mouse.dpad;
 
-        let menu_config = MenuConfig::new(
-            "Controls settings",
-            [
-                MenuItem::Option(OptionDef {
-                    text: "Enable mouse input".into(),
-                    val: cfg.mouse.enable,
-                    update_fn: Box::new(|enabled, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.controls().mouse().enable() = enabled;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.controls().mouse().enable = None;
-                        });
-                        data.settings.read().controls.mouse.enable
-                    })),
-                }),
-                MenuItem::Option(OptionDef {
-                    text: "Enable dpad".into(),
-                    val: cfg.mouse.dpad.enable,
-                    update_fn: Box::new(|enabled, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.controls().mouse().dpad().enable() = enabled;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.controls().mouse().dpad().enable = None;
-                        });
-                        data.settings.read().controls.mouse.dpad.enable
-                    })),
-                }),
-                MenuItem::Option(OptionDef {
-                    text: "Left-handed dpad".into(),
-                    val: cfg.mouse.dpad.landscape_on_left,
-                    update_fn: Box::new(|is_on_left, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.controls().mouse().dpad().landscape_on_left() = is_on_left;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.controls().mouse().dpad().landscape_on_left = None;
-                        });
-                        data.settings.read().controls.mouse.dpad.landscape_on_left
-                    })),
-                }),
-                MenuItem::Option(OptionDef {
-                    text: "Swap Up and Down buttons".into(),
-                    val: cfg.mouse.dpad.swap_up_down,
-                    update_fn: Box::new(|do_swap, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.controls().mouse().dpad().swap_up_down() = do_swap;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.controls().mouse().dpad().swap_up_down = None;
-                        });
-                        data.settings.read().controls.mouse.dpad.swap_up_down
-                    })),
-                }),
-                MenuItem::Option(OptionDef {
-                    text: "Enable margin around dpad".into(),
-                    val: cfg.mouse.dpad.enable_margin,
-                    update_fn: Box::new(|enabled, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.controls().mouse().dpad().enable_margin() = enabled;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.controls().mouse().dpad().enable_margin = None;
-                        });
-                        data.settings.read().controls.mouse.dpad.enable_margin
-                    })),
-                }),
-                MenuItem::Option(OptionDef {
-                    text: "Enable dpad highlight".into(),
-                    val: cfg.mouse.dpad.enable_highlight,
-                    update_fn: Box::new(|enabled, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.controls().mouse().dpad().enable_highlight() = enabled;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.controls().mouse().dpad().enable_highlight = None;
-                        });
-                        data.settings.read().controls.mouse.dpad.enable_highlight
-                    })),
-                }),
-                MenuItem::Separator,
-                MenuItem::static_text("Exit"),
-            ],
-        );
+                let menu_config = MenuConfig::new(
+                    "DPad settings",
+                    [
+                        MenuItem::Option(OptionDef {
+                            text: "Enable".into(),
+                            val: cfg.enable,
+                            update_fn: Box::new(|enabled, data| {
+                                data.settings.update_ui(|cfg| {
+                                    *cfg.controls().mouse().dpad().enable() = enabled;
+                                });
+                            }),
+                            reset_fn: Some(Box::new(|data| {
+                                data.settings.update_ui(|cfg| {
+                                    cfg.controls().mouse().dpad().enable = None;
+                                });
+                                data.settings.read().controls.mouse.dpad.enable
+                            })),
+                        }),
+                        MenuItem::Option(OptionDef {
+                            text: "Left-handed".into(),
+                            val: cfg.landscape_on_left,
+                            update_fn: Box::new(|is_on_left, data| {
+                                data.settings.update_ui(|cfg| {
+                                    *cfg.controls().mouse().dpad().landscape_on_left() = is_on_left;
+                                });
+                            }),
+                            reset_fn: Some(Box::new(|data| {
+                                data.settings.update_ui(|cfg| {
+                                    cfg.controls().mouse().dpad().landscape_on_left = None;
+                                });
+                                data.settings.read().controls.mouse.dpad.landscape_on_left
+                            })),
+                        }),
+                        MenuItem::Option(OptionDef {
+                            text: "Swap Up and Down buttons".into(),
+                            val: cfg.swap_up_down,
+                            update_fn: Box::new(|do_swap, data| {
+                                data.settings.update_ui(|cfg| {
+                                    *cfg.controls().mouse().dpad().swap_up_down() = do_swap;
+                                });
+                            }),
+                            reset_fn: Some(Box::new(|data| {
+                                data.settings.update_ui(|cfg| {
+                                    cfg.controls().mouse().dpad().swap_up_down = None;
+                                });
+                                data.settings.read().controls.mouse.dpad.swap_up_down
+                            })),
+                        }),
+                        MenuItem::Option(OptionDef {
+                            text: "Enable margin".into(),
+                            val: cfg.enable_margin,
+                            update_fn: Box::new(|enabled, data| {
+                                data.settings.update_ui(|cfg| {
+                                    *cfg.controls().mouse().dpad().enable_margin() = enabled;
+                                });
+                            }),
+                            reset_fn: Some(Box::new(|data| {
+                                data.settings.update_ui(|cfg| {
+                                    cfg.controls().mouse().dpad().enable_margin = None;
+                                });
+                                data.settings.read().controls.mouse.dpad.enable_margin
+                            })),
+                        }),
+                        MenuItem::Option(OptionDef {
+                            text: "Enable highlight".into(),
+                            val: cfg.enable_highlight,
+                            update_fn: Box::new(|enabled, data| {
+                                data.settings.update_ui(|cfg| {
+                                    *cfg.controls().mouse().dpad().enable_highlight() = enabled;
+                                });
+                            }),
+                            reset_fn: Some(Box::new(|data| {
+                                data.settings.update_ui(|cfg| {
+                                    cfg.controls().mouse().dpad().enable_highlight = None;
+                                });
+                                data.settings.read().controls.mouse.dpad.enable_highlight
+                            })),
+                        }),
+                        MenuItem::Text {
+                            text: "Space (todo)".into(),
+                            first_col: NULL_CHAR,
+                            last_col: NULL_CHAR,
+                            click_fn: Some(Box::new(|_| Some(Change::nothing()))),
+                        },
+                        MenuItem::Text {
+                            text: "Min size (todo)".into(),
+                            first_col: NULL_CHAR,
+                            last_col: NULL_CHAR,
+                            click_fn: Some(Box::new(|_| Some(Change::nothing()))),
+                        },
+                        MenuItem::Text {
+                            text: "Max size (todo)".into(),
+                            first_col: NULL_CHAR,
+                            last_col: NULL_CHAR,
+                            click_fn: Some(Box::new(|_| Some(Change::nothing()))),
+                        },
+                    ],
+                );
 
-        Activity::new_base_boxed("controls settings", Menu::new(menu_config))
+                Activity::new_base_boxed("dpad settings", Menu::new(menu_config))
+            }
+
+            let cfg = &data.settings.read().controls.mouse;
+
+            let menu_config = MenuConfig::new(
+                "Controls settings",
+                [
+                    MenuItem::Option(OptionDef {
+                        text: "Enable mouse input".into(),
+                        val: cfg.enable,
+                        update_fn: Box::new(|enabled, data| {
+                            data.settings.update_ui(|cfg| {
+                                *cfg.controls().mouse().enable() = enabled;
+                            });
+                        }),
+                        reset_fn: Some(Box::new(|data| {
+                            data.settings.update_ui(|cfg| {
+                                cfg.controls().mouse().enable = None;
+                            });
+                            data.settings.read().controls.mouse.enable
+                        })),
+                    }),
+                    MenuItem::Text {
+                        text: "DPad".into(),
+                        first_col: NULL_CHAR,
+                        last_col: NULL_CHAR,
+                        click_fn: Some(Box::new(|d| Some(Change::push(dpad_settings(d))))),
+                    },
+                ],
+            );
+
+            Activity::new_base_boxed("mouse settings", Menu::new(menu_config))
+        }
+
+        simple_menu(
+            "Control settings",
+            menu_actions!(
+                "Mouse" -> data => Change::push(mouse_settings(data)),
+            ),
+        )
+        .to_base_activity("control settings")
+    }
+
+    fn update_settings() -> Activity {
+        fn interval_settings(data: &AppData) -> Activity {
+            use UpdateCheckInterval::*;
+
+            Menu::new(
+                MenuConfig::new(
+                    "Check interval",
+                    vec![
+                        ("Never", Never),
+                        ("Daily", Daily),
+                        ("Weekly", Weekly),
+                        ("Monthly", Monthly),
+                        ("Yearly", Yearly),
+                        ("Always", Always),
+                    ]
+                    .into_iter()
+                    .map(|(name, int)| MenuItem::Text {
+                        text: name.into(),
+                        first_col: NULL_CHAR,
+                        last_col: NULL_CHAR,
+                        click_fn: Some(Box::new(move |data| {
+                            data.settings.update_ui(|cfg| {
+                                *cfg.updates().check_interval() = int;
+                            });
+                            Some(Change::pop_top())
+                        })),
+                    })
+                    .collect::<Vec<_>>(),
+                )
+                .default(match data.settings.read().updates.check_interval {
+                    Never => 0,
+                    Daily => 1,
+                    Weekly => 2,
+                    Monthly => 3,
+                    Yearly => 4,
+                    Always => 5,
+                }),
+            )
+            .to_base_activity("update check interval")
+        }
+
+        simple_menu(
+            "Update settings",
+            menu_actions!(
+                "Check interval" -> data => Change::push(interval_settings(data)),
+            ),
+        )
+        .to_base_activity("update settings")
     }
 
     simple_menu(
@@ -806,7 +902,8 @@ pub fn create_settings_activity() -> Activity {
         menu_actions!(
             "General" -> _ => Change::push(general_settings()),
             "Game" -> data => Change::push(game_settings(data)),
-            "Controls" -> data => Change::push(control_settings(data)),
+            "Controls" -> _ => Change::push(control_settings()),
+            "Updates" -> _ => Change::push(update_settings()),
             "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
             "Other settings" -> _ => Change::push(OtherSettingsPopup::new().to_base_activity("other settings")),
             "Back" -> _ => Change::pop_top(),
