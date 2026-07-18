@@ -252,7 +252,7 @@ impl MazePresetMenu {
                 .items
                 .iter()
                 .map(|maze| match maze {
-                    Preset(maze_preset) => MenuItem::text(maze_preset.title.clone().into()),
+                    Preset(maze_preset) => MenuItem::text(maze_preset.title.clone()),
                     Group(preset_group) => MenuItem::Text {
                         text: preset_group.group.clone().into(),
                         first_col: NULL_CHAR,

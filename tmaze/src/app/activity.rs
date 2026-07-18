@@ -42,6 +42,10 @@ impl Change {
         Self::Pop { n, res: None }
     }
 
+    pub fn nothing() -> Self {
+        Self::Pop { n: 0, res: None }
+    }
+
     pub fn pop_with<T: 'static>(n: usize, res: T) -> Self {
         Self::Pop {
             n,
