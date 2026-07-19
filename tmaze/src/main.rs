@@ -73,11 +73,6 @@ enum StylesPrintMode {
 fn main() -> Result<(), GameError> {
     let args = Args::parse();
 
-    // if _args.reset_config {
-    //     Settings::reset_json_config(settings_path());
-    //     return Ok(());
-    // }
-
     if args.show_config_path {
         let settings_path = paths::config();
         std::io::stdout().write_all(
