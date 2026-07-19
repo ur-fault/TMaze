@@ -20,6 +20,15 @@ pub struct Meta {
     pub format_version: i32,
 }
 
+impl Meta {
+    pub fn with_version(version: i32) -> Self {
+        Self {
+            format_version: version,
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for Meta {
     fn default() -> Self {
         Self {
