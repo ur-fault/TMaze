@@ -642,6 +642,12 @@ pub fn create_settings_activity() -> Activity {
                         last_col: NULL_CHAR,
                         click_fn: Some(Box::new(|_| Some(Change::nothing()))),
                     },
+                    MenuItem::Text {
+                        text: "Back".into(),
+                        first_col: NULL_CHAR,
+                        last_col: NULL_CHAR,
+                        click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
+                    },
                 ],
             );
 
@@ -694,6 +700,12 @@ pub fn create_settings_activity() -> Activity {
                     first_col: NULL_CHAR,
                     last_col: NULL_CHAR,
                     click_fn: Some(Box::new(|_| Some(Change::nothing()))),
+                },
+                MenuItem::Text {
+                    text: "Back".into(),
+                    first_col: NULL_CHAR,
+                    last_col: NULL_CHAR,
+                    click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
                 },
             ],
         );
@@ -844,6 +856,7 @@ pub fn create_settings_activity() -> Activity {
             "Control settings",
             menu_actions!(
                 "Mouse" -> data => Change::push(mouse_settings(data)),
+                "Back" -> _ => Change::pop_top(),
             ),
         )
         .to_base_activity("control settings")
@@ -894,6 +907,7 @@ pub fn create_settings_activity() -> Activity {
             "Update settings",
             menu_actions!(
                 "Check interval" -> data => Change::push(interval_settings(data)),
+                "Back" -> _ => Change::pop_top(),
             ),
         )
         .to_base_activity("update settings")

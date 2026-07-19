@@ -177,7 +177,7 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                 })),
             }),
             MenuItem::Separator,
-            MenuItem::static_text("Exit"),
+            MenuItem::static_text("Back"),
         ],
     );
 
