@@ -16,7 +16,6 @@ use std::{
 
 use arc_swap::ArcSwap;
 use cmaze::algorithms::{MazeSpec, MazeSpecType, MazeType};
-use hashbrown::HashMap;
 use serde::Serialize;
 
 use crate::{
@@ -28,7 +27,7 @@ use crate::{
     helpers::{constants::paths, value_if},
     settings::{
         meta::UserContent,
-        model::{ver_1, ToCurrentConfig as _},
+        model::{ver_1, ToCurrentConfig as _, CURRENT_VERSION},
     },
 };
 
@@ -258,7 +257,7 @@ pub enum ConfigSource<'a> {
     User,
     Path(&'a Path),
     String(String),
-    Default,
+    Empty,
 }
 
 fn load_ui_config_from_file(path: &Path) -> PartialConfig {
@@ -282,9 +281,9 @@ fn load_config_from_source(
             2 => UserConfig::convert(value, &mut context),
             v => {
                 context.warn(format!(
-                    "Config format version {v} is not supported, expected 1"
+                    "Config format version {v} is not supported, interpreting as latest supported version ({CURRENT_VERSION})"
                 ));
-                todo!()
+                UserConfig::convert(value, &mut context)
             }
         },
         Err((e, val)) => {
@@ -305,11 +304,18 @@ fn extract_format_version(config_value: Value) -> i32 {
 }
 
 fn load_values_from_source(source: &ConfigSource) -> Result<Value, (ConfigLoadError, Value)> {
+    use meta::Meta;
+    use serde_json::{from_value, to_value};
+
+    let empty = || {
+        from_value::<Value>(to_value(UserConfig::new(Meta::with_version(2), ())).unwrap()).unwrap()
+    };
+
     macro_rules! pack_error {
         ($err:expr) => {
             match $err {
                 Ok(val) => Ok(val),
-                Err(e) => Err((e.into(), Value::Object(HashMap::new()))),
+                Err(e) => Err((e.into(), empty())),
             }
         };
     }
@@ -317,13 +323,22 @@ fn load_values_from_source(source: &ConfigSource) -> Result<Value, (ConfigLoadEr
     match source {
         ConfigSource::Path(path) => {
             // json5 doesn't support reading from reader
-            let content = pack_error!(std::fs::read_to_string(path))?;
+            let content = match std::fs::read_to_string(path) {
+                Ok(s) => s,
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        return Ok(empty());
+                    } else {
+                        return pack_error!(Err(err));
+                    }
+                }
+            };
             let config_value = pack_error!(json5::from_str::<Value>(&content))?;
             let values_with_extensions = load_extension_blocks(config_value)?;
             Ok(values_with_extensions)
         }
         ConfigSource::User => load_values_from_source(&ConfigSource::Path(&paths::config())),
-        ConfigSource::Default => Ok(Value::Object(HashMap::new())),
+        ConfigSource::Empty => Ok(empty()),
         ConfigSource::String(s) => {
             let config_value = pack_error!(json5::from_str(s))?;
             let values_with_extensions = load_extension_blocks(config_value)?;
