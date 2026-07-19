@@ -272,7 +272,7 @@ fn load_config_from_source(
             }
         },
         Err((e, val)) => {
-            context.err(format!("failed to load config: {}", e));
+            context.err(format!("Failed to load config: {}", e));
             UserConfig::convert(val, &mut context)
         }
     };
