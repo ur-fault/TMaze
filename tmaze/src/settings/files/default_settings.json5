@@ -59,7 +59,7 @@
             // - active_region_heuristic - when neither `start` nor `end` are specified,
             //   this heuristic will be used to choose the region, can be either:
             //   - "biggest", "random", "first", "last"
-            "presets": {{ __presets | json_pretty: 12 }}
+            "presets": {{ __presets | json_pretty: "0:12" }}
         }
     },
 
