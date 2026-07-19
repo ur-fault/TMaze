@@ -115,8 +115,27 @@ impl Settings {
 
         engine.add_function(
             "json_pretty",
-            |value: &Value, base| -> std::result::Result<String, String> {
-                let base_indent = " ".repeat(base);
+            |value: &Value, offset: &str| -> std::result::Result<String, String> {
+                let (first_line, remainder) = match offset.split_once(":") {
+                    Some((l, r)) => {
+                        let remainder = r.parse().map_err(|_| "invalid `json_pretty` argument")?;
+                        let first_line = if l.is_empty() {
+                            remainder
+                        } else {
+                            l.parse().map_err(|_| "invalid `json_pretty` argument")?
+                        };
+                        (first_line, remainder)
+                    }
+                    None => {
+                        let val = offset
+                            .parse()
+                            .map_err(|_| "invalid `json_pretty` argument")?;
+                        (val, val)
+                    }
+                };
+
+                let first_indent = " ".repeat(first_line);
+                let base_indent = " ".repeat(remainder);
                 let indent = " ".repeat(4);
 
                 let mut out_buf = Vec::new();
@@ -130,15 +149,12 @@ impl Settings {
                 let out_str = String::from_utf8(out_buf)
                     .map_err(|e| format!("failed to convert JSON output to string: {}", e))?;
 
-                let indented = out_str
-                    .lines()
-                    .map(|line| {
-                        if line.is_empty() {
-                            line.into()
-                        } else {
-                            format!("{}{}", base_indent, line)
-                        }
-                    })
+                let lines = out_str.lines();
+                let indented = lines
+                    .clone()
+                    .take(1)
+                    .map(|line| format!("{}{}", first_indent, line))
+                    .chain(lines.skip(1).map(|line| format!("{}{}", base_indent, line)))
                     .collect::<Vec<_>>()
                     .join("\n");
 
