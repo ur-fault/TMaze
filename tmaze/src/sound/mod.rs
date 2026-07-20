@@ -176,7 +176,6 @@ pub fn create_audio_settings(data: &mut AppData) -> Activity {
                     (data.settings.read().audio.music.volume * 5.0) as i32
                 })),
             }),
-            MenuItem::Separator,
             MenuItem::static_text("Back"),
         ],
     );
