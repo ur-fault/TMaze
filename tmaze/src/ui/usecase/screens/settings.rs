@@ -12,7 +12,7 @@ use crate::{
     renderer::MouseGuard,
     settings::{
         model::{CameraMode, PartialTerminalSchemeDef, TerminalSchemeDef, UpdateCheckInterval},
-        theme::{Rgb, TerminalColorScheme},
+        theme::{PartialTerminalColorScheme, Rgb, TerminalColorScheme},
     },
     ui::{
         menu_result, simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup,
@@ -103,7 +103,6 @@ pub fn create_settings_activity() -> Activity {
                             Popup::new("Error listing themes".into(), vec![err]),
                         )
                     }
-
                     Ok(themes) => {
                         let current_theme = data.settings.read().general.appearance.theme.clone();
                         let selected = themes.iter().position(|t| *t == current_theme);
@@ -111,6 +110,12 @@ pub fn create_settings_activity() -> Activity {
                         let themes = themes
                             .into_iter()
                             .map(|theme| MenuItem::text(theme))
+                            .chain(std::iter::once(MenuItem::Text {
+                                text: "Back".into(),
+                                first_col: NULL_CHAR,
+                                last_col: NULL_CHAR,
+                                click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
+                            }))
                             .collect::<Vec<_>>();
 
                         MenuConfig::new("Select a theme", themes).maybe_default(selected)
@@ -186,6 +191,11 @@ pub fn create_settings_activity() -> Activity {
                                         as Box<dyn Fn(&mut AppData) -> Change + 'static>,
                                 )
                             })
+                            .chain(std::iter::once((
+                                MenuItem::static_text("Back"),
+                                Box::new(|_: &mut _| Change::pop_top())
+                                    as Box<dyn Fn(&mut AppData) -> Change + 'static>,
+                            )))
                             .collect(),
                         SimpleMenuOptions {
                             default: match &appearance.terminal_scheme {
@@ -213,17 +223,24 @@ pub fn create_settings_activity() -> Activity {
                         field: &'a str,
                         title: &'a str,
                         scheme: &TerminalColorScheme,
-                    ) -> (&'a str, &'a str, Rgb, Rc<dyn Fn(&mut AppData, Rgb) -> Rgb>)
-                    {
+                    ) -> (&'a str, Rgb, Rc<dyn Fn(&mut AppData, Rgb) -> Rgb>) {
                         let scheme_field = match_scheme_field!(field, scheme,);
 
                         let field2 = field.to_string();
                         let fn_ = Rc::new(move |data: &mut AppData, color| {
                             data.settings.update_ui(|cfg| {
-                                let PartialTerminalSchemeDef::Custom(scheme) =
-                                    cfg.general().appearance().terminal_scheme()
-                                else {
-                                    panic!()
+                                use crate::settings::model::PartialTerminalSchemeDef::*;
+                                use PartialTerminalColorScheme as PTCS;
+
+                                let scheme = match cfg.general().appearance().terminal_scheme() {
+                                    mut_scheme @ Named(_) => {
+                                        *mut_scheme = Custom(PTCS::default());
+                                        match mut_scheme {
+                                            Named(_) => unreachable!(),
+                                            Custom(scheme) => scheme,
+                                        }
+                                    }
+                                    Custom(scheme) => scheme,
                                 };
                                 *match_scheme_field!(field2.as_str(), scheme, &mut) = Some(color);
                             });
@@ -231,19 +248,18 @@ pub fn create_settings_activity() -> Activity {
                             color
                         });
 
-                        (field, title, scheme_field, fn_)
+                        (title, scheme_field, fn_)
                     }
 
                     fn channel_field_item<'a>(
-                        (name, title, color, fn_): (
-                            &'a str,
+                        (title, color, fn_): (
                             &'a str,
                             (u8, u8, u8),
                             Rc<dyn Fn(&mut AppData, (u8, u8, u8)) -> (u8, u8, u8)>,
                         ),
                     ) -> (MenuItem, Box<dyn Fn(&mut AppData) -> Change + 'a>) {
                         (
-                            MenuItem::text(name),
+                            MenuItem::text(title),
                             Box::new(move |_: &mut _| {
                                 let fn2 = fn_.clone();
 
@@ -346,6 +362,16 @@ pub fn create_settings_activity() -> Activity {
                         ]
                         .into_iter()
                         .map(channel_field_item)
+                        .chain(std::iter::once((
+                            MenuItem::Text {
+                                text: "Back".into(),
+                                first_col: NULL_CHAR,
+                                last_col: NULL_CHAR,
+                                click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
+                            },
+                            Box::new(|_: &mut _| Change::pop_top())
+                                as Box<dyn Fn(&mut AppData) -> Change + 'static>,
+                        )))
                         .collect(),
                     )
                     .to_base_activity("custom scheme settings")
