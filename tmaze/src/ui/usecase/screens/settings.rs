@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, iter::once, rc::Rc};
 
 use cmaze::dims::Offset;
 
@@ -11,12 +11,14 @@ use crate::{
     match_scheme_field, menu_actions,
     renderer::MouseGuard,
     settings::{
-        model::{CameraMode, PartialTerminalSchemeDef, TerminalSchemeDef, UpdateCheckInterval},
+        model::{
+            CameraMode, Logging, PartialTerminalSchemeDef, TerminalSchemeDef, UpdateCheckInterval,
+        },
         theme::{PartialTerminalColorScheme, Rgb, TerminalColorScheme},
     },
     ui::{
-        menu_result, simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup,
-        Screen, SimpleMenuOptions, SliderDef, NULL_CHAR,
+        simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup, Screen,
+        SimpleMenuOptions, SliderDef, NULL_CHAR,
     },
 };
 
@@ -110,7 +112,7 @@ pub fn create_settings_activity() -> Activity {
                         let themes = themes
                             .into_iter()
                             .map(|theme| MenuItem::text(theme))
-                            .chain(std::iter::once(MenuItem::Text {
+                            .chain(once(MenuItem::Text {
                                 text: "Back".into(),
                                 first_col: NULL_CHAR,
                                 last_col: NULL_CHAR,
@@ -191,7 +193,7 @@ pub fn create_settings_activity() -> Activity {
                                         as Box<dyn Fn(&mut AppData) -> Change + 'static>,
                                 )
                             })
-                            .chain(std::iter::once((
+                            .chain(once((
                                 MenuItem::static_text("Back"),
                                 Box::new(|_: &mut _| Change::pop_top())
                                     as Box<dyn Fn(&mut AppData) -> Change + 'static>,
@@ -362,7 +364,7 @@ pub fn create_settings_activity() -> Activity {
                         ]
                         .into_iter()
                         .map(channel_field_item)
-                        .chain(std::iter::once((
+                        .chain(once((
                             MenuItem::Text {
                                 text: "Back".into(),
                                 first_col: NULL_CHAR,
@@ -411,6 +413,7 @@ pub fn create_settings_activity() -> Activity {
         }
 
         fn logging_settings() -> Activity {
+            #[derive(Clone, Copy)]
             enum LoggingDst {
                 Normal,
                 Debug,
@@ -418,89 +421,75 @@ pub fn create_settings_activity() -> Activity {
             }
 
             fn logging_dst_settings(dst: LoggingDst, data: &AppData) -> Activity {
+                use log::Level;
+                use LoggingDst::*;
+
                 const LOG_LEVELS: [(&str, log::Level); 5] = [
-                    ("Error", log::Level::Error),
-                    ("Warn", log::Level::Warn),
-                    ("Info", log::Level::Info),
-                    ("Debug", log::Level::Debug),
-                    ("Trace", log::Level::Trace),
+                    ("Error", Level::Error),
+                    ("Warn", Level::Warn),
+                    ("Info", Level::Info),
+                    ("Debug", Level::Debug),
+                    ("Trace", Level::Trace),
                 ];
 
-                const fn level_to_index(level: log::Level) -> usize {
+                const fn level_to_index(level: Level) -> usize {
                     match level {
-                        log::Level::Error => 0,
-                        log::Level::Warn => 1,
-                        log::Level::Info => 2,
-                        log::Level::Debug => 3,
-                        log::Level::Trace => 4,
+                        Level::Error => 0,
+                        Level::Warn => 1,
+                        Level::Info => 2,
+                        Level::Debug => 3,
+                        Level::Trace => 4,
                     }
                 }
 
                 let title = match dst {
-                    LoggingDst::Normal => "UI logging",
-                    LoggingDst::Debug => "UI Debug logging",
-                    LoggingDst::File => "File logging",
+                    Normal => "UI logging",
+                    Debug => "UI Debug logging",
+                    File => "File logging",
                 };
 
-                struct LoggingDstActivity {
-                    dst: LoggingDst,
-                    menu: Menu,
-                }
+                let Logging {
+                    normal,
+                    debug,
+                    file,
+                } = &data.settings.read().general.logging;
 
-                impl ActivityHandler for LoggingDstActivity {
-                    fn update(
-                        &mut self,
-                        events: Vec<ActivityEvent>,
-                        data: &mut AppData,
-                    ) -> Option<Change> {
-                        match self.menu.update(events, data)? {
-                            Change::Pop {
-                                n: 1,
-                                res: Some(res),
-                            } => {
-                                let level = LOG_LEVELS[menu_result(res)].1;
-                                data.settings.update_ui(|cfg| {
-                                    let logging = cfg.general().logging();
-                                    *match self.dst {
-                                        LoggingDst::Normal => logging.normal(),
-                                        LoggingDst::Debug => logging.debug(),
-                                        LoggingDst::File => logging.file(),
-                                    } = level;
-                                });
-                                Some(Change::pop_top())
-                            }
-                            change => Some(change),
-                        }
-                    }
-
-                    fn screen(&mut self) -> &mut dyn Screen {
-                        &mut self.menu
-                    }
-                }
-
-                let logging = &data.settings.read().general.logging;
-
-                let menu = MenuConfig::new_from_strings(
-                    title,
-                    LOG_LEVELS
-                        .iter()
-                        .map(|(name, _)| String::from(*name))
-                        .collect::<Vec<_>>(),
+                Menu::new(
+                    MenuConfig::new(
+                        "Logging level",
+                        LOG_LEVELS
+                            .into_iter()
+                            .map(|(name, lvl)| MenuItem::Text {
+                                text: name.into(),
+                                first_col: NULL_CHAR,
+                                last_col: NULL_CHAR,
+                                click_fn: Some(Box::new(move |data| {
+                                    data.settings.update_ui(|cfg| {
+                                        let logging = cfg.general().logging();
+                                        *match dst {
+                                            Normal => logging.normal(),
+                                            Debug => logging.debug(),
+                                            File => logging.file(),
+                                        } = lvl;
+                                    });
+                                    Some(Change::pop_top())
+                                })),
+                            })
+                            .chain(once(MenuItem::Text {
+                                text: "Back".into(),
+                                first_col: NULL_CHAR,
+                                last_col: NULL_CHAR,
+                                click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
+                            }))
+                            .collect::<Vec<_>>(),
+                    )
+                    .default(level_to_index(match dst {
+                        Normal => *normal,
+                        Debug => *debug,
+                        File => *file,
+                    })),
                 )
-                .default(match dst {
-                    LoggingDst::Normal => level_to_index(logging.normal),
-                    LoggingDst::Debug => level_to_index(logging.debug),
-                    LoggingDst::File => level_to_index(logging.file),
-                })
-                .counted();
-
-                Activity::new_base_boxed(
-                    format!("{} settings", title.to_lowercase()),
-                    LoggingDstActivity {
-                        dst,
-                        menu: Menu::new(menu),
-                    },
-                )
+                .to_base_activity(format!("{} settings", title.to_lowercase()))
             }
 
             simple_menu(
