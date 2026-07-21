@@ -630,35 +630,35 @@ pub fn create_settings_activity() -> Activity {
                     },
                     MenuItem::Slider(SliderDef {
                         text: "Camera smoothing".into(),
-                        val: (settings.camera_smoothing * 10.) as i32,
-                        range: 5..=10,
+                        val: 10 - (settings.camera_smoothing * 10.) as i32,
+                        range: 0..=5,
                         update_fn: Box::new(|v, d| {
                             d.settings.update_ui(|cfg| {
-                                *cfg.game().view().camera_smoothing() = v as f64 / 10.;
+                                *cfg.game().view().camera_smoothing() = 1. - v as f64 / 10.;
                             });
                         }),
                         reset_fn: Some(Box::new(|d| {
                             d.settings.update_ui(|cfg| {
                                 cfg.game().view().camera_smoothing = None;
                             });
-                            (d.settings.read().game.view.camera_smoothing * 10.) as i32
+                            10 - (d.settings.read().game.view.camera_smoothing * 10.) as i32
                         })),
                         as_num: false,
                     }),
                     MenuItem::Slider(SliderDef {
                         text: "Player smoothing".into(),
-                        val: (settings.player_smoothing * 10.) as i32,
-                        range: 5..=10,
+                        val: 10 - (settings.player_smoothing * 10.) as i32,
+                        range: 0..=5,
                         update_fn: Box::new(|v, d| {
                             d.settings.update_ui(|cfg| {
-                                *cfg.game().view().player_smoothing() = v as f64 / 10.;
+                                *cfg.game().view().player_smoothing() = 1. - v as f64 / 10.;
                             });
                         }),
                         reset_fn: Some(Box::new(|d| {
                             d.settings.update_ui(|cfg| {
                                 cfg.game().view().player_smoothing = None;
                             });
-                            (d.settings.read().game.view.player_smoothing * 10.) as i32
+                            10 - (d.settings.read().game.view.player_smoothing * 10.) as i32
                         })),
                         as_num: false,
                     }),
