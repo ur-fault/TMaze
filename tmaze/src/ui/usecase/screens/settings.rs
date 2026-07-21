@@ -18,7 +18,7 @@ use crate::{
     },
     ui::{
         simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup, Screen,
-        SimpleMenuOptions, SliderDef, NULL_CHAR,
+        SimpleMenuOptions, SliderDef,
     },
 };
 
@@ -83,91 +83,58 @@ pub fn create_settings_activity() -> Activity {
                     Err(err) => Err(err.to_string()),
                 };
 
-                let menu = match themes {
+                let themes = match themes {
                     Ok(themes) if themes.is_empty() => {
-                        return Activity::new_base_boxed(
-                            "theme settings",
-                            Popup::new(
-                                "No themes found".into(),
-                                vec![
-                                    format!(
-                                        "No theme files found in {}",
-                                        theme().to_string_lossy()
-                                    ),
-                                    "Please add a theme file to the themes directory.".into(),
-                                ],
-                            ),
+                        let theme = theme().to_string_lossy().into_owned();
+                        return Popup::new(
+                            "No themes found".into(),
+                            vec![
+                                format!("No theme files found in {}", theme),
+                                "Please add a theme file to the themes directory.".into(),
+                            ],
                         )
+                        .to_base_activity("no themes popup");
                     }
                     Err(err) => {
-                        return Activity::new_base_boxed(
-                            "err theme settings",
-                            Popup::new("Error listing themes".into(), vec![err]),
-                        )
+                        return Popup::new("Error listing themes".into(), vec![err])
+                            .to_base_activity("error listing themes popup")
                     }
-                    Ok(themes) => {
-                        let current_theme = data.settings.read().general.appearance.theme.clone();
-                        let selected = themes.iter().position(|t| *t == current_theme);
-
-                        let themes = themes
-                            .into_iter()
-                            .map(|theme| MenuItem::text(theme))
-                            .chain(once(MenuItem::Text {
-                                text: "Back".into(),
-                                first_col: NULL_CHAR,
-                                last_col: NULL_CHAR,
-                                click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
-                            }))
-                            .collect::<Vec<_>>();
-
-                        MenuConfig::new("Select a theme", themes).maybe_default(selected)
-                    }
+                    Ok(themes) => themes,
                 };
+                let current_theme = data.settings.read().general.appearance.theme.clone();
 
-                struct ThemesActivity {
-                    menu: Menu,
-                }
-
-                impl ActivityHandler for ThemesActivity {
-                    fn update(
-                        &mut self,
-                        events: Vec<ActivityEvent>,
-                        data: &mut AppData,
-                    ) -> Option<Change> {
-                        match self.menu.update(events, data)? {
-                            Change::Pop {
-                                res: Some(result), ..
-                            } => {
-                                let index = *result
-                                    .downcast::<usize>()
-                                    .expect("menu should return index");
-                                let MenuItem::Text { text, .. } =
-                                    self.menu.config().options.get(index).unwrap()
-                                else {
-                                    panic!("menu should return index of a text item");
-                                };
-
+                Menu::new(
+                    MenuConfig::new(
+                        "Theme",
+                        themes
+                            .iter()
+                            .cloned()
+                            .map(|theme| {
+                                MenuItem::active_text(theme.clone(), move |data| {
+                                    data.settings.update_ui(|cfg| {
+                                        *cfg.general().appearance().theme() = theme.clone();
+                                    });
+                                    Some(Change::pop_top())
+                                })
+                            })
+                            .chain(once(MenuItem::active_text("None", |data| {
                                 data.settings.update_ui(|cfg| {
-                                    *cfg.general().appearance().theme() = text.as_ref_cow().into();
+                                    *cfg.general().appearance().theme() = String::new();
                                 });
-
-                                None
-                            }
-                            res => Some(res),
-                        }
-                    }
-
-                    fn screen(&mut self) -> &mut dyn Screen {
-                        &mut self.menu
-                    }
-                }
-
-                Activity::new_base_boxed(
-                    "theme settings",
-                    ThemesActivity {
-                        menu: Menu::new(menu),
-                    },
+                                Some(Change::pop_top())
+                            })))
+                            .chain(once(back_button()))
+                            .collect::<Vec<_>>(),
+                    )
+                    .default(
+                        themes
+                            .iter()
+                            .chain(once(&String::new()))
+                            .position(|theme| theme == &current_theme)
+                            .unwrap_or_default(),
+                    ),
                 )
+                .to_base_activity("theme settings")
             }
 
             fn terminal_scheme_settings(data: &AppData) -> Activity {
@@ -365,12 +332,7 @@ pub fn create_settings_activity() -> Activity {
                         .into_iter()
                         .map(channel_field_item)
                         .chain(once((
-                            MenuItem::Text {
-                                text: "Back".into(),
-                                first_col: NULL_CHAR,
-                                last_col: NULL_CHAR,
-                                click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
-                            },
+                            back_button(),
                             Box::new(|_: &mut _| Change::pop_top())
                                 as Box<dyn Fn(&mut AppData) -> Change + 'static>,
                         )))
@@ -459,11 +421,8 @@ pub fn create_settings_activity() -> Activity {
                         "Logging level",
                         LOG_LEVELS
                             .into_iter()
-                            .map(|(name, lvl)| MenuItem::Text {
-                                text: name.into(),
-                                first_col: NULL_CHAR,
-                                last_col: NULL_CHAR,
-                                click_fn: Some(Box::new(move |data| {
+                            .map(|(name, lvl)| {
+                                MenuItem::active_text(name, move |data| {
                                     data.settings.update_ui(|cfg| {
                                         let logging = cfg.general().logging();
                                         *match dst {
@@ -473,14 +432,9 @@ pub fn create_settings_activity() -> Activity {
                                         } = lvl;
                                     });
                                     Some(Change::pop_top())
-                                })),
+                                })
                             })
-                            .chain(once(MenuItem::Text {
-                                text: "Back".into(),
-                                first_col: NULL_CHAR,
-                                last_col: NULL_CHAR,
-                                click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
-                            }))
+                            .chain(once(back_button()))
                             .collect::<Vec<_>>(),
                     )
                     .default(level_to_index(match dst {
@@ -597,26 +551,21 @@ pub fn create_settings_activity() -> Activity {
             let config = MenuConfig::new(
                 "Game View Settings",
                 vec![
-                    MenuItem::Text {
-                        text: "Camera Mode".into(),
-                        first_col: NULL_CHAR,
-                        last_col: NULL_CHAR,
-                        click_fn: Some(Box::new(|_| {
-                            Some(Change::push(simple_menu(
-                                "Camera Mode",
-                                menu_actions!(
-                                    "Follow player" -> d => {
-                                        d.settings.update_ui(|cfg| {
-                                            *cfg.game().view().camera_mode() = CameraMode::CloseFollow;
-                                        });
-                                        Change::pop_top()
-                                    },
-                                    "Free" -> _ => Change::push(free_follow_settings()),
-                                    "Back" -> _ => Change::pop_top(),
-                                ),
+                    MenuItem::active_text("Camera Mode", |_| {
+                        Some(Change::push(simple_menu(
+                                        "Camera Mode",
+                                        menu_actions!(
+                                            "Follow player" -> d => {
+                                                d.settings.update_ui(|cfg| {
+                                                    *cfg.game().view().camera_mode() = CameraMode::CloseFollow;
+                                                });
+                                                Change::pop_top()
+                                            },
+                                            "Free" -> _ => Change::push(free_follow_settings()),
+                                            "Back" -> _ => Change::pop_top(),
+                                        ),
                             ).to_base_activity("camera mode settings")))
-                        })),
-                    },
+                    }),
                     MenuItem::Slider(SliderDef {
                         text: "Camera smoothing".into(),
                         val: 10 - (settings.camera_smoothing * 10.) as i32,
@@ -651,18 +600,8 @@ pub fn create_settings_activity() -> Activity {
                         })),
                         as_num: false,
                     }),
-                    MenuItem::Text {
-                        text: "Viewport margin (todo)".into(),
-                        first_col: NULL_CHAR,
-                        last_col: NULL_CHAR,
-                        click_fn: Some(Box::new(|_| Some(Change::nothing()))),
-                    },
-                    MenuItem::Text {
-                        text: "Back".into(),
-                        first_col: NULL_CHAR,
-                        last_col: NULL_CHAR,
-                        click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
-                    },
+                    MenuItem::text("Viewport margin (todo)"),
+                    back_button(),
                 ],
             );
 
@@ -704,24 +643,9 @@ pub fn create_settings_activity() -> Activity {
                         data.settings.read().game.disable_tower_auto_up
                     })),
                 }),
-                MenuItem::Text {
-                    text: "View".into(),
-                    first_col: NULL_CHAR,
-                    last_col: NULL_CHAR,
-                    click_fn: Some(Box::new(|d| Some(Change::push(view_settings(d))))),
-                },
-                MenuItem::Text {
-                    text: "Content (todo)".into(),
-                    first_col: NULL_CHAR,
-                    last_col: NULL_CHAR,
-                    click_fn: Some(Box::new(|_| Some(Change::nothing()))),
-                },
-                MenuItem::Text {
-                    text: "Back".into(),
-                    first_col: NULL_CHAR,
-                    last_col: NULL_CHAR,
-                    click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
-                },
+                MenuItem::active_text("View", |d| Some(Change::push(view_settings(d)))),
+                MenuItem::text("Content (todo)"),
+                back_button(),
             ],
         );
 
@@ -811,24 +735,10 @@ pub fn create_settings_activity() -> Activity {
                                 data.settings.read().controls.mouse.dpad.enable_highlight
                             })),
                         }),
-                        MenuItem::Text {
-                            text: "Space (todo)".into(),
-                            first_col: NULL_CHAR,
-                            last_col: NULL_CHAR,
-                            click_fn: Some(Box::new(|_| Some(Change::nothing()))),
-                        },
-                        MenuItem::Text {
-                            text: "Min size (todo)".into(),
-                            first_col: NULL_CHAR,
-                            last_col: NULL_CHAR,
-                            click_fn: Some(Box::new(|_| Some(Change::nothing()))),
-                        },
-                        MenuItem::Text {
-                            text: "Max size (todo)".into(),
-                            first_col: NULL_CHAR,
-                            last_col: NULL_CHAR,
-                            click_fn: Some(Box::new(|_| Some(Change::nothing()))),
-                        },
+                        MenuItem::text("Space (todo)"),
+                        MenuItem::text("Min size (todo)"),
+                        MenuItem::text("Max size (todo)"),
+                        back_button(),
                     ],
                 );
 
@@ -855,12 +765,8 @@ pub fn create_settings_activity() -> Activity {
                             data.settings.read().controls.mouse.enable
                         })),
                     }),
-                    MenuItem::Text {
-                        text: "DPad".into(),
-                        first_col: NULL_CHAR,
-                        last_col: NULL_CHAR,
-                        click_fn: Some(Box::new(|d| Some(Change::push(dpad_settings(d))))),
-                    },
+                    MenuItem::active_text("DPad", |d| Some(Change::push(dpad_settings(d)))),
+                    back_button(),
                 ],
             );
 
@@ -893,16 +799,13 @@ pub fn create_settings_activity() -> Activity {
                         ("Always", Always),
                     ]
                     .into_iter()
-                    .map(|(name, int)| MenuItem::Text {
-                        text: name.into(),
-                        first_col: NULL_CHAR,
-                        last_col: NULL_CHAR,
-                        click_fn: Some(Box::new(move |data| {
+                    .map(|(name, int)| {
+                        MenuItem::active_text(name, move |data| {
                             data.settings.update_ui(|cfg| {
                                 *cfg.updates().check_interval() = int;
                             });
                             Some(Change::pop_top())
-                        })),
+                        })
                     })
                     .collect::<Vec<_>>(),
                 )
@@ -932,24 +835,18 @@ pub fn create_settings_activity() -> Activity {
         Menu::new(MenuConfig::new(
             "Are you sure?",
             vec![
-                MenuItem::Text {
-                    text: "Yes".into(),
-                    first_col: NULL_CHAR,
-                    last_col: NULL_CHAR,
-                    click_fn: Some(Box::new(|data| {
-                        data.settings.reset();
-                        Some(Change::pop_top())
-                    })),
-                },
-                MenuItem::Text {
-                    text: "No".into(),
-                    first_col: NULL_CHAR,
-                    last_col: NULL_CHAR,
-                    click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
-                },
+                MenuItem::active_text("Yes", |data| {
+                    data.settings.reset();
+                    Some(Change::pop_top())
+                }),
+                MenuItem::active_text("No", |_| Some(Change::pop_top())),
             ],
         ))
         .to_base_activity("reset settings")
+    }
+
+    fn back_button() -> MenuItem {
+        MenuItem::active_text("Back", |_| Some(Change::pop_top()))
     }
 
     simple_menu(
