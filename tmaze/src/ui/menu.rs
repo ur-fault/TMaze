@@ -78,6 +78,18 @@ impl MenuItem {
             click_fn: None,
         }
     }
+
+    pub fn active_text(
+        text: impl Into<String>,
+        click_fn: impl FnMut(&mut AppData) -> Option<Change> + 'static,
+    ) -> Self {
+        MenuItem::Text {
+            text: text.into().into(),
+            first_col: NULL_CHAR,
+            last_col: NULL_CHAR,
+            click_fn: Some(Box::new(click_fn)),
+        }
+    }
 }
 
 impl MenuItem {
