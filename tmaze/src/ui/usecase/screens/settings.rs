@@ -939,6 +939,30 @@ pub fn create_settings_activity() -> Activity {
         .to_base_activity("update settings")
     }
 
+    fn reset_settings_dialog() -> Activity {
+        Menu::new(MenuConfig::new(
+            "Are you sure?",
+            vec![
+                MenuItem::Text {
+                    text: "Yes".into(),
+                    first_col: NULL_CHAR,
+                    last_col: NULL_CHAR,
+                    click_fn: Some(Box::new(|data| {
+                        data.settings.reset();
+                        Some(Change::pop_top())
+                    })),
+                },
+                MenuItem::Text {
+                    text: "No".into(),
+                    first_col: NULL_CHAR,
+                    last_col: NULL_CHAR,
+                    click_fn: Some(Box::new(|_| Some(Change::pop_top()))),
+                },
+            ],
+        ))
+        .to_base_activity("reset settings")
+    }
+
     simple_menu(
         "Settings",
         menu_actions!(
@@ -948,6 +972,7 @@ pub fn create_settings_activity() -> Activity {
             "Updates" -> _ => Change::push(update_settings()),
             "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
             "Other settings" -> _ => Change::push(OtherSettingsPopup::new().to_base_activity("other settings")),
+            "Restore defaults" -> _ => Change::push(reset_settings_dialog()),
             "Back" -> _ => Change::pop_top(),
         ),
     )

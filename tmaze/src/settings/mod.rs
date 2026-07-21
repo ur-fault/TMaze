@@ -76,6 +76,16 @@ impl Settings {
         x
     }
 
+    pub fn reset(&self) {
+        log::trace!("Resetting UI settings to default");
+        self.inner
+            .ui_layer
+            .store(Arc::new(PartialConfig::default()));
+
+        self.inner.rebuild();
+        self.notify();
+    }
+
     fn write_ui(&self) {
         log::trace!("Writing UI settings to file");
         std::fs::write(
