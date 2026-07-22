@@ -2391,7 +2391,6 @@ dependencies = [
  "derivative",
  "dirs",
  "hashbrown 0.14.5",
- "indexmap",
  "json5",
  "log",
  "pad",
