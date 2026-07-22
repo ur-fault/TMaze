@@ -1,626 +1,621 @@
-mod attribute;
-pub mod style_browser;
+pub mod attribute;
+pub mod meta;
 pub mod theme;
 
-use cmaze::{
-    algorithms::{MazeSpec, MazeSpecType},
-    dims::{Dims, Offset},
-};
-use derivative::Derivative;
-use serde::{Deserialize, Serialize};
+pub mod model;
+
+mod config_utils;
+
 use std::{
-    fs, io,
-    path::PathBuf,
-    sync::{Arc, RwLock},
+    fmt::Display,
+    ops::Deref,
+    panic::Location,
+    path::Path,
+    sync::{Arc, LazyLock},
 };
-use theme::ThemeDefinition;
+
+use arc_swap::ArcSwap;
+use cmaze::algorithms::{MazeSpec, MazeSpecType, MazeType};
+use serde::Serialize;
 
 use crate::{
-    app::{self, app::AppData, Activity, ActivityHandler, Change},
-    helpers::constants::paths::settings_path,
-    menu_actions,
-    renderer::MouseGuard,
-    settings::theme::{SharedScheme, TerminalColorScheme},
-    ui::{split_menu_actions, Menu, MenuAction, MenuConfig, MenuItem, OptionDef, Popup, Screen},
+    app::{
+        app::EventSink,
+        event::{EventReceiver, EventReceiverFn},
+        GlobalEvent,
+    },
+    helpers::{constants::paths, value_if},
+    settings::{
+        meta::UserContent,
+        model::{ver_1, ToCurrentConfig as _, CURRENT_VERSION},
+    },
 };
 
-#[cfg(feature = "sound")]
-use crate::sound::create_audio_settings;
+use config_utils::{ConvertContext, ConvertError, LenientConvert, Mergeable, Value};
+use model::{Config, MazePreset, PartialConfig};
 
-const DEFAULT_SETTINGS_JSON: &str = include_str!("./default_settings.json5");
-
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-#[serde(tag = "mode")]
-pub enum CameraMode {
-    #[default]
-    CloseFollow,
-    EdgeFollow {
-        x: Offset,
-        y: Offset,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MazePreset {
-    pub title: String,
-    pub description: Option<String>,
-
-    #[serde(default)]
-    pub default: bool,
-
-    // TODO: make `serde(flatten)` once switched to TOML/JSON
-    #[serde(flatten)]
-    pub maze_spec: MazeSpec,
-}
-
-impl MazePreset {
-    pub fn short_desc(&self) -> Option<String> {
-        let (size, cells): (_, usize) = match &self.maze_spec.inner_spec {
-            MazeSpecType::Regions { regions, .. } => (
-                self.maze_spec.size()?,
-                regions.iter().map(|r| r.mask.enabled_count()).sum(),
-            ),
-            MazeSpecType::Simple { mask, .. } => (
-                self.maze_spec.size()?,
-                mask.as_ref()
-                    .map(|m| m.enabled_count())
-                    .unwrap_or(self.maze_spec.size()?.product() as usize),
-            ),
-        };
-
-        if size.2 == 1 {
-            Some(format!(
-                "{}: {}x{} ({} cells)",
-                self.title, size.0, size.1, cells
-            ))
-        } else {
-            Some(format!(
-                "{}: {}x{}x{} ({} cells)",
-                self.title, size.0, size.1, size.2, cells
-            ))
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
-pub enum UpdateCheckInterval {
-    Never,
-    #[default]
-    Daily,
-    Weekly,
-    Monthly,
-    Yearly,
-    Always,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum TerminalSchemeDef {
-    Named(String),
-    Custom(TerminalColorScheme),
-}
-
-#[derive(Debug, Derivative, Serialize, Deserialize)]
-#[derivative(Default)]
-#[serde(rename = "Settings")]
-// FIXME: separate sections into their own struct
-pub struct SettingsInner {
-    // general
-    #[serde(default)]
-    pub theme: Option<String>,
-    #[serde(default)]
-    pub logging_level: Option<String>,
-    #[serde(default)]
-    pub debug_logging_level: Option<String>,
-    #[serde(default)]
-    pub file_logging_level: Option<String>,
-    #[serde(default)]
-    pub terminal_scheme: Option<TerminalSchemeDef>,
-
-    // viewport
-    #[serde(default)]
-    pub slow: Option<bool>,
-    #[serde(default)]
-    pub disable_tower_auto_up: Option<bool>,
-    #[serde(default)]
-    pub camera_mode: Option<CameraMode>,
-    #[serde(default)]
-    pub camera_smoothing: Option<f32>,
-    #[serde[default]]
-    pub player_smoothing: Option<f32>,
-    #[serde(default)]
-    pub viewport_margin: Option<(i32, i32)>,
-
-    // navigation
-    #[serde(default)]
-    pub enable_mouse: Option<bool>,
-    #[serde(default)]
-    pub enable_dpad: Option<bool>,
-    #[serde(default)]
-    pub landscape_dpad_on_left: Option<bool>,
-    #[serde(default)]
-    pub dpad_swap_up_down: Option<bool>,
-    #[serde(default)]
-    pub enable_margin_around_dpad: Option<bool>,
-    #[serde(default)]
-    pub enable_dpad_highlight: Option<bool>,
-
-    // update check
-    #[serde(default)]
-    pub update_check_interval: Option<UpdateCheckInterval>,
-    #[serde(default)]
-    pub display_update_check_errors: Option<bool>,
-
-    // audio
-    #[serde(default)]
-    pub enable_audio: Option<bool>,
-    #[serde(default)]
-    pub audio_volume: Option<f32>,
-    #[serde(default)]
-    pub enable_music: Option<bool>,
-    #[serde(default)]
-    pub music_volume: Option<f32>,
-
-    // presets
-    #[serde(default)]
-    pub presets: Option<Vec<MazePreset>>,
-    // TODO: it's not possible in RON to have a HashMap with flattened keys,
-    // so we will support it in different way formats
-    // once we support them - this would mean dropping RON support
-    // https://github.com/ron-rs/ron/issues/115
-    // pub unknown_fields: HashMap<String, Value>,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Settings {
-    shared: Arc<RwLock<SettingsInner>>,
-    path: PathBuf,
-    read_only: bool,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        let settings = SettingsInner::default();
-        Self {
-            shared: Arc::new(RwLock::new(settings)),
-            path: settings_path(),
-            read_only: false,
-        }
-    }
-}
-
-#[allow(dead_code)]
-impl Settings {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn path(&self) -> PathBuf {
-        self.path.clone()
-    }
-
-    pub fn is_ro(&self) -> bool {
-        self.read_only
-    }
-
-    pub fn read(&self) -> std::sync::RwLockReadGuard<'_, SettingsInner> {
-        self.shared.read().unwrap()
-    }
-
-    pub fn write(&mut self) -> std::sync::RwLockWriteGuard<'_, SettingsInner> {
-        self.shared.write().unwrap()
-    }
+    inner: Arc<SettingsInner>,
+    event_sink: EventSink,
 }
 
 impl Settings {
-    pub fn get_theme(&self) -> ThemeDefinition {
-        let name = self.read().theme.clone();
-        let maybe_theme = match &name {
-            Some(theme_name) => ThemeDefinition::load_by_name(theme_name),
-            None => ThemeDefinition::load_default(self.read_only),
-        };
+    /// Loads settings from configuration files.
+    ///
+    /// Returns the loaded settings and any errors and warnings that occurred during
+    /// loading.
+    pub fn load(
+        event_sink: EventSink,
+        source: &ConfigSource,
+    ) -> (Self, Option<Vec<String>>, Option<Vec<String>>) {
+        let (inner, load_errors, load_warnings) = SettingsInner::load(source);
+        (
+            Self {
+                inner: Arc::new(inner),
+                event_sink,
+            },
+            load_errors,
+            load_warnings,
+        )
+    }
 
-        match maybe_theme {
-            Ok(theme) => theme,
-            Err(err) if name.is_some() => {
-                log::error!("Could not load the theme: {}", err);
-                ThemeDefinition::parse_default()
+    pub fn read(&self) -> impl Deref<Target = Arc<Config>> + use<'_> {
+        self.inner.compiled.load()
+    }
+
+    #[track_caller]
+    pub fn update_ui<T>(&self, with: impl FnOnce(&mut PartialConfig) -> T) -> T {
+        log::trace!("Updating UI settings from {}", Location::caller());
+        let mut new_ui = (**self.inner.ui_layer.load()).clone();
+        let x = with(&mut new_ui);
+        self.inner.ui_layer.store(Arc::new(new_ui));
+
+        self.inner.rebuild();
+        self.notify();
+        x
+    }
+
+    pub fn reset(&self) {
+        log::trace!("Resetting UI settings to default");
+        self.inner
+            .ui_layer
+            .store(Arc::new(PartialConfig::default()));
+
+        self.inner.rebuild();
+        self.notify();
+    }
+
+    fn write_ui(&self) {
+        log::trace!("Writing UI settings to file");
+        std::fs::write(
+            paths::managed::ui_settings(),
+            serde_json::to_string_pretty(&**self.inner.ui_layer.load())
+                .expect("UI settings should be serializable"),
+        )
+        .expect("Failed to write UI settings to file");
+    }
+
+    fn notify(&self) {
+        self.event_sink
+            .send(GlobalEvent::SettingsChanged)
+            .expect("Event drain should be alive");
+    }
+
+    pub fn build_default_config() -> String {
+        use upon::*;
+
+        let mut engine = Engine::default();
+        const TEMPLATE_NAME: &str = "default_config.json5";
+        engine
+            .add_template(
+                TEMPLATE_NAME,
+                include_str!("./files/default_settings.json5"),
+            )
+            .expect("Default config template should be valid");
+
+        engine.add_function(
+            "json",
+            |value: &Value| -> std::result::Result<String, String> {
+                serde_json::to_string(value)
+                    .map_err(|e| format!("failed to serialize value to JSON: {}", e))
+            },
+        );
+
+        engine.add_function(
+            "json_pretty",
+            |value: &Value, offset: &str| -> std::result::Result<String, String> {
+                let (first_line, remainder) = match offset.split_once(":") {
+                    Some((l, r)) => {
+                        let remainder = r.parse().map_err(|_| "invalid `json_pretty` argument")?;
+                        let first_line = if l.is_empty() {
+                            remainder
+                        } else {
+                            l.parse().map_err(|_| "invalid `json_pretty` argument")?
+                        };
+                        (first_line, remainder)
+                    }
+                    None => {
+                        let val = offset
+                            .parse()
+                            .map_err(|_| "invalid `json_pretty` argument")?;
+                        (val, val)
+                    }
+                };
+
+                let first_indent = " ".repeat(first_line);
+                let base_indent = " ".repeat(remainder);
+                let indent = " ".repeat(4);
+
+                let mut out_buf = Vec::new();
+                value
+                    .serialize(&mut serde_json::Serializer::with_formatter(
+                        &mut out_buf,
+                        serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes()),
+                    ))
+                    .map_err(|e| format!("failed to serialize value to JSON: {}", e))?;
+
+                let out_str = String::from_utf8(out_buf)
+                    .map_err(|e| format!("failed to convert JSON output to string: {}", e))?;
+
+                let lines = out_str.lines();
+                let indented = lines
+                    .clone()
+                    .take(1)
+                    .map(|line| format!("{}{}", first_indent, line))
+                    .chain(lines.skip(1).map(|line| format!("{}{}", base_indent, line)))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                Ok(indented)
+            },
+        );
+
+        let mut context =
+            serde_json::to_value(Config::default()).expect("Default config should be serializable");
+        match context {
+            serde_json::Value::Object(ref mut map) => {
+                map.insert(
+                    "__presets".into(),
+                    serde_json::to_value(&*DEFAULT_PRESETS)
+                        .expect("Default presets should be serializable"),
+                );
             }
-            Err(err) if name.is_none() => {
-                log::error!("Could not load the default theme: {}", err);
-                ThemeDefinition::parse_default()
-            }
-            _ => unreachable!("`is_none` and `is_some` handle all cases"),
+            _ => panic!("Context should be a JSON object"),
         }
-    }
 
-    pub fn get_logging_level(&self) -> log::Level {
-        self.read()
-            .logging_level
-            .clone()
-            .and_then(|level| level.parse().ok())
-            .unwrap_or(log::Level::Info)
-    }
-
-    pub fn get_debug_logging_level(&self) -> log::Level {
-        self.read()
-            .debug_logging_level
-            .clone()
-            .and_then(|level| level.parse().ok())
-            .unwrap_or(log::Level::Info)
-    }
-
-    pub fn get_file_logging_level(&self) -> log::Level {
-        self.read()
-            .file_logging_level
-            .clone()
-            .and_then(|level| level.parse().ok())
-            .unwrap_or(log::Level::Info)
-    }
-
-    pub fn get_terminal_scheme(&self) -> Option<SharedScheme> {
-        match &self.read().terminal_scheme {
-            Some(TerminalSchemeDef::Named(name)) => {
-                Some(SharedScheme::new(TerminalColorScheme::named(name)?))
-            }
-            Some(TerminalSchemeDef::Custom(scheme)) => Some(SharedScheme::new(scheme.clone())),
-            None => Some(SharedScheme::new(TerminalColorScheme::default())),
-        }
-    }
-
-    pub fn get_slow(&self) -> bool {
-        self.read().slow.unwrap_or_default()
-    }
-
-    pub fn set_slow(&mut self, value: bool) -> &mut Self {
-        self.write().slow = Some(value);
-        self
-    }
-
-    pub fn get_disable_tower_auto_up(&self) -> bool {
-        self.read().disable_tower_auto_up.unwrap_or_default()
-    }
-
-    pub fn set_disable_tower_auto_up(&mut self, value: bool) -> &mut Self {
-        self.write().disable_tower_auto_up = Some(value);
-        self
-    }
-
-    pub fn get_camera_mode(&self) -> CameraMode {
-        self.read().camera_mode.unwrap_or_default()
-    }
-
-    pub fn set_camera_mode(&mut self, value: CameraMode) -> &mut Self {
-        self.write().camera_mode = Some(value);
-        self
-    }
-
-    pub fn get_camera_smoothing(&self) -> f32 {
-        self.read().camera_smoothing.unwrap_or(0.5).clamp(0.5, 1.0)
-    }
-
-    pub fn set_camera_smoothing(&mut self, value: f32) -> &mut Self {
-        self.write().camera_smoothing = Some(value.clamp(0.5, 1.0));
-        self
-    }
-
-    pub fn get_player_smoothing(&self) -> f32 {
-        self.read().player_smoothing.unwrap_or(0.8).clamp(0.5, 1.0)
-    }
-
-    pub fn set_player_smoothing(&mut self, value: f32) -> &mut Self {
-        self.write().player_smoothing = Some(value.clamp(0.5, 1.0));
-        self
-    }
-
-    pub fn get_viewport_margin(&self) -> Dims {
-        self.read()
-            .viewport_margin
-            .map(Dims::from)
-            .unwrap_or(Dims(4, 3))
-    }
-
-    pub fn set_viewport_margin(&mut self, value: Dims) -> &mut Self {
-        self.write().viewport_margin = Some(value.into());
-        self
-    }
-
-    pub fn get_enable_mouse(&self) -> bool {
-        self.read().enable_mouse.unwrap_or(true)
-    }
-
-    pub fn set_enable_mouse(&mut self, value: bool) -> &mut Self {
-        self.write().enable_mouse = Some(value);
-        self
-    }
-
-    pub fn get_enable_dpad(&self) -> bool {
-        self.read().enable_dpad.unwrap_or(false)
-    }
-
-    pub fn set_enable_dpad(&mut self, value: bool) -> &mut Self {
-        self.write().enable_dpad = Some(value);
-        self
-    }
-
-    pub fn get_landscape_dpad_on_left(&self) -> bool {
-        self.read().landscape_dpad_on_left.unwrap_or(false)
-    }
-
-    pub fn set_landscape_dpad_on_left(&mut self, value: bool) -> &mut Self {
-        self.write().landscape_dpad_on_left = Some(value);
-        self
-    }
-
-    pub fn get_dpad_swap_up_down(&self) -> bool {
-        self.read().dpad_swap_up_down.unwrap_or(false)
-    }
-
-    pub fn set_dpad_swap_up_down(&mut self, value: bool) -> &mut Self {
-        self.write().dpad_swap_up_down = Some(value);
-        self
-    }
-
-    pub fn get_enable_margin_around_dpad(&self) -> bool {
-        self.read().enable_margin_around_dpad.unwrap_or(false)
-    }
-
-    pub fn set_enable_margin_around_dpad(&mut self, value: bool) -> &mut Self {
-        self.write().enable_margin_around_dpad = Some(value);
-        self
-    }
-
-    pub fn get_enable_dpad_highlight(&self) -> bool {
-        self.read().enable_dpad_highlight.unwrap_or(true)
-    }
-
-    pub fn set_enable_dpad_highlight(&mut self, value: bool) -> &mut Self {
-        self.write().enable_dpad_highlight = Some(value);
-        self
-    }
-
-    pub fn set_check_interval(&mut self, value: UpdateCheckInterval) -> &mut Self {
-        self.write().update_check_interval = Some(value);
-        self
-    }
-
-    pub fn get_check_interval(&self) -> UpdateCheckInterval {
-        self.read().update_check_interval.unwrap_or_default()
-    }
-
-    pub fn get_display_update_check_errors(&self) -> bool {
-        self.read().display_update_check_errors.unwrap_or(true)
-    }
-
-    pub fn set_display_update_check_errors(&mut self, value: bool) -> &mut Self {
-        self.write().display_update_check_errors = Some(value);
-        self
-    }
-
-    pub fn get_enable_audio(&self) -> bool {
-        self.read().enable_audio.unwrap_or_default()
-    }
-
-    pub fn set_enable_audio(&mut self, value: bool) -> &mut Self {
-        self.write().enable_audio = Some(value);
-        self
-    }
-
-    pub fn get_audio_volume(&self) -> f32 {
-        self.read().audio_volume.unwrap_or_default().clamp(0., 1.)
-    }
-
-    pub fn set_audio_volume(&mut self, value: f32) -> &mut Self {
-        self.write().audio_volume = Some(value.clamp(0., 1.));
-        self
-    }
-
-    pub fn get_enable_music(&self) -> bool {
-        self.read().enable_music.unwrap_or_default()
-    }
-
-    pub fn set_enable_music(&mut self, value: bool) -> &mut Self {
-        self.write().enable_music = Some(value);
-        self
-    }
-
-    pub fn get_music_volume(&self) -> f32 {
-        self.read().music_volume.unwrap_or_default().clamp(0., 1.)
-    }
-
-    pub fn set_music_volume(&mut self, value: f32) -> &mut Self {
-        self.write().music_volume = Some(value.clamp(0., 1.));
-        self
-    }
-
-    pub fn set_presets(&mut self, value: Vec<MazePreset>) -> &mut Self {
-        self.write().presets = Some(value);
-        self
-    }
-
-    pub fn get_presets(&self) -> Vec<MazePreset> {
-        self.read().presets.clone().unwrap_or_default()
+        engine
+            .template(TEMPLATE_NAME)
+            .render(&context)
+            .to_string()
+            .expect("Default config should render correctly")
     }
 }
 
-// JSON
-impl Settings {
-    pub fn load_json(path: PathBuf, read_only: bool) -> io::Result<Self> {
-        let settings_string = fs::read_to_string(&path);
-        let settings: SettingsInner = if let Ok(settings_string) = settings_string {
-            json5::from_str(&settings_string)
-                .expect("Could not parse settings file: check the syntax")
-        } else {
-            if !read_only {
-                fs::create_dir_all(path.parent().unwrap())?;
-                fs::write(&path, DEFAULT_SETTINGS_JSON)?;
+impl EventReceiver for &Settings {
+    fn register(self) -> EventReceiverFn {
+        let settings = self.clone();
+        Box::new(move |event, _| {
+            if matches!(event, GlobalEvent::SettingsChanged) {
+                log::trace!("Writing UI settings to file from event");
+                settings.write_ui();
             }
-            json5::from_str(DEFAULT_SETTINGS_JSON).unwrap()
-        };
-
-        Ok(Self {
-            shared: Arc::new(RwLock::new(settings)),
-            path,
-            read_only,
         })
     }
+}
 
-    pub fn reset_json(&mut self) {
-        *self.write() = json5::from_str(DEFAULT_SETTINGS_JSON).unwrap();
+type UserConfig<C = PartialConfig> = UserContent<C>;
 
-        let path = settings_path();
-        fs::write(&path, DEFAULT_SETTINGS_JSON).unwrap();
+struct SettingsInner {
+    config_layer: UserConfig,
+    ui_layer: ArcSwap<PartialConfig>,
+    compiled: ArcSwap<Config>,
+}
 
-        self.path = path;
+impl SettingsInner {
+    fn load(source: &ConfigSource<'_>) -> (Self, Option<Vec<String>>, Option<Vec<String>>) {
+        let mut errors = vec![];
+        let mut warnings = vec![];
+
+        let (config_layer, load_errors, load_warnings) = load_config_from_source(source);
+        errors.extend(load_errors.iter().map(ConvertError::to_string));
+        warnings.extend(load_warnings.iter().map(ConvertError::to_string));
+
+        let ui_layer = load_ui_config_from_file(&paths::managed::ui_settings());
+
+        let settings = Self {
+            config_layer,
+            ui_layer: ArcSwap::from_pointee(ui_layer),
+            compiled: ArcSwap::default(),
+        };
+
+        settings.rebuild();
+
+        let errors = value_if(!errors.is_empty(), || Some(errors));
+        let warnings = value_if(!warnings.is_empty(), || Some(warnings));
+
+        (settings, errors, warnings)
     }
 
-    pub fn reset_json_config(path: PathBuf) {
-        fs::write(path, DEFAULT_SETTINGS_JSON).unwrap();
+    fn rebuild(&self) {
+        let mut config = Config::default();
+        config.merge(&self.config_layer);
+        config.merge(&self.ui_layer.load());
+
+        self.compiled.store(Arc::new(config));
     }
 }
 
-struct OtherSettingsPopup(Popup, MouseGuard);
-
-impl OtherSettingsPopup {
-    fn new(settings: &Settings) -> Self {
-        let popup = Popup::new(
-            "Other settings".to_string(),
-            vec![
-                "Path to the current settings:".to_string(),
-                format!(" {}", settings.path().to_string_lossy().to_string()),
-                "".to_string(),
-                "Other settings are not implemented in UI yet.".to_string(),
-                "Please edit the settings file directly.".to_string(),
-            ],
-        );
-
-        Self(popup, MouseGuard::new().unwrap())
-    }
+#[derive(Debug, thiserror::Error)]
+enum ConfigLoadError {
+    IoError(#[from] std::io::Error),
+    JsonError(#[from] json5::Error),
+    SettingsFormatError(String),
 }
 
-impl ActivityHandler for OtherSettingsPopup {
-    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
-        self.0.update(events, data)
-    }
-
-    fn screen(&mut self) -> &mut dyn Screen {
-        &mut self.0
-    }
-}
-
-pub struct SettingsActivity {
-    actions: Vec<MenuAction<Change>>,
-    menu: Menu,
-}
-
-impl SettingsActivity {
-    fn other_settings_popup(settings: &Settings) -> Activity {
-        Activity::new_base_boxed("settings".to_string(), OtherSettingsPopup::new(settings))
-    }
-}
-
-#[allow(clippy::new_without_default)]
-impl SettingsActivity {
-    pub fn new() -> Self {
-        let options = menu_actions!(
-            "Audio" on "sound" -> data => Change::push(create_audio_settings(data)),
-            "Controls" -> data => Change::push(create_controls_settings(data)),
-            "Other settings" -> data => Change::push(SettingsActivity::other_settings_popup(&data.settings)),
-            "Back" -> _ => Change::pop_top(),
-        );
-
-        let (options, actions) = split_menu_actions(options);
-
-        let menu_config = MenuConfig::new("Settings", options).subtitle("Changes are not saved");
-
-        Self {
-            actions,
-            menu: Menu::new(menu_config),
+impl Display for ConfigLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigLoadError::IoError(e) => write!(f, "I/O error: {}", e),
+            ConfigLoadError::JsonError(e) => write!(f, "Parse error: {}", e),
+            ConfigLoadError::SettingsFormatError(e) => write!(f, "Settings format error: {}", e),
         }
     }
-
-    pub fn new_activity() -> Activity {
-        Activity::new_base_boxed("settings".to_string(), Self::new())
-    }
 }
 
-impl ActivityHandler for SettingsActivity {
-    fn update(&mut self, events: Vec<app::Event>, data: &mut AppData) -> Option<Change> {
-        match self.menu.update(events, data)? {
-            Change::Pop {
-                res: Some(sub_activity),
-                ..
-            } => {
-                let index = *sub_activity
-                    .downcast::<usize>()
-                    .expect("menu should return index");
-                Some((self.actions[index])(data))
+pub enum ConfigSource<'a> {
+    User,
+    Path(&'a Path),
+    String(String),
+    Empty,
+}
+
+fn load_ui_config_from_file(path: &Path) -> PartialConfig {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn load_config_from_source(
+    source: &ConfigSource<'_>,
+) -> (UserConfig, Vec<ConvertError>, Vec<ConvertError>) {
+    let mut context = ConvertContext::new();
+    let config = match load_values_from_source(source) {
+        Ok(value) => match extract_format_version(value.clone()) {
+            1 => {
+                context.warn("Config format version 1 is deprecated, please update your config to the latest format");
+                UserConfig::<ver_1::PartialConfig>::convert(value, &mut context)
+                    .map(|c| c.map_content(|partial| partial.to_current_config()))
             }
-            res => Some(res),
+            2 => UserConfig::convert(value, &mut context),
+            v => {
+                context.warn(format!(
+                    "Config format version {v} is not supported, interpreting as latest supported version ({CURRENT_VERSION})"
+                ));
+                UserConfig::convert(value, &mut context)
+            }
+        },
+        Err((e, val)) => {
+            context.err(format!("Failed to load config: {}", e));
+            UserConfig::convert(val, &mut context)
         }
+    };
+
+    let (errors, warnings) = context.extract();
+    (config.unwrap_or_default(), errors, warnings)
+}
+
+fn extract_format_version(config_value: Value) -> i32 {
+    let with_meta =
+        UserContent::<()>::convert(config_value, &mut ConvertContext::new()).unwrap_or_default();
+
+    with_meta.meta.format_version
+}
+
+fn load_values_from_source(source: &ConfigSource) -> Result<Value, (ConfigLoadError, Value)> {
+    use meta::Meta;
+    use serde_json::{from_value, to_value};
+
+    let empty = || {
+        from_value::<Value>(to_value(UserConfig::new(Meta::with_version(2), ())).unwrap()).unwrap()
+    };
+
+    macro_rules! pack_error {
+        ($err:expr) => {
+            match $err {
+                Ok(val) => Ok(val),
+                Err(e) => Err((e.into(), empty())),
+            }
+        };
     }
 
-    fn screen(&mut self) -> &mut dyn Screen {
-        &mut self.menu
+    match source {
+        ConfigSource::Path(path) => {
+            // json5 doesn't support reading from reader
+            let content = match std::fs::read_to_string(path) {
+                Ok(s) => s,
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        return Ok(empty());
+                    } else {
+                        return pack_error!(Err(err));
+                    }
+                }
+            };
+            let config_value = pack_error!(json5::from_str::<Value>(&content))?;
+            let values_with_extensions = load_extension_blocks(config_value)?;
+            Ok(values_with_extensions)
+        }
+        ConfigSource::User => load_values_from_source(&ConfigSource::Path(&paths::config())),
+        ConfigSource::Empty => Ok(empty()),
+        ConfigSource::String(s) => {
+            let config_value = pack_error!(json5::from_str(s))?;
+            let values_with_extensions = load_extension_blocks(config_value)?;
+            Ok(values_with_extensions)
+        }
     }
 }
 
-pub fn create_controls_settings(data: &mut AppData) -> Activity {
-    let menu_config = MenuConfig::new(
-        "Controls settings",
-        [
-            MenuItem::Option(OptionDef {
-                text: "Enable mouse input".into(),
-                val: data.settings.get_enable_mouse(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_mouse(*enabled);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Enable dpad".into(),
-                val: data.settings.get_enable_dpad(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_dpad(*enabled);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Left-handed dpad".into(),
-                val: data.settings.get_landscape_dpad_on_left(),
-                fun: Box::new(|is_on_left, data| {
-                    *is_on_left = !*is_on_left;
-                    data.settings.set_landscape_dpad_on_left(*is_on_left);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Swap Up and Down buttons".into(),
-                val: data.settings.get_dpad_swap_up_down(),
-                fun: Box::new(|do_swap, data| {
-                    *do_swap = !*do_swap;
-                    data.settings.set_dpad_swap_up_down(*do_swap);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Enable margin around dpad".into(),
-                val: data.settings.get_enable_margin_around_dpad(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_margin_around_dpad(*enabled);
-                }),
-            }),
-            MenuItem::Option(OptionDef {
-                text: "Enable dpad highlight".into(),
-                val: data.settings.get_enable_dpad_highlight(),
-                fun: Box::new(|enabled, data| {
-                    *enabled = !*enabled;
-                    data.settings.set_enable_dpad_highlight(*enabled);
-                }),
-            }),
-            MenuItem::Separator,
-            MenuItem::Text("Exit".into()),
-        ],
-    );
+mod config_file_constants {
+    pub const IMPORT_KEY: &str = "#from";
+}
 
-    Activity::new_base_boxed("controls settings", Menu::new(menu_config))
+fn load_extension_blocks(config: Value) -> Result<Value, (ConfigLoadError, Value)> {
+    use config_file_constants::IMPORT_KEY;
+
+    /// Merges `ext` into `base`. In case of conflict, `ext` takes precedence.
+    /// Note that in this case, `base` is file behing `#from`, and `ext` is the current file.
+    ///
+    /// For objects, merging is done recursively.
+    ///
+    /// TODO: Allow rules customization in the future, for example to support list contatenation
+    /// instead of replacement.
+    fn merge(base: &mut Value, ext: Value) {
+        match (base, ext) {
+            (Value::Object(base_map), Value::Object(ext_map)) => {
+                for (key, ext_value) in ext_map {
+                    if key == IMPORT_KEY {
+                        continue; // skip #from key during merge
+                    }
+
+                    if let Some(base_value) = base_map.get_mut(&key) {
+                        merge(base_value, ext_value);
+                    } else {
+                        base_map.insert(key, ext_value);
+                    }
+                }
+            }
+            (base_val, ext) => {
+                *base_val = ext;
+            }
+        }
+    }
+
+    let value = match config {
+        Value::Object(map) => {
+            if map.contains_key(IMPORT_KEY) {
+                if let Value::String(file_path) = &map[IMPORT_KEY] {
+                    let mut base_config =
+                        load_values_from_source(&ConfigSource::Path(Path::new(file_path)))?;
+                    merge(&mut base_config, Value::Object(map));
+                    base_config
+                } else {
+                    return Err((
+                        ConfigLoadError::SettingsFormatError(format!(
+                            "{IMPORT_KEY} value must be a string",
+                        )),
+                        Value::Object(map),
+                    ));
+                }
+            } else {
+                Value::Object(map)
+            }
+        }
+
+        val => val,
+    };
+
+    Ok(value)
+}
+
+static DEFAULT_PRESETS: LazyLock<Vec<MazePreset>> = LazyLock::new(|| {
+    fn simple_maze(size: (i32, i32, i32), tower: bool) -> MazePreset {
+        MazePreset {
+            title: match (size.2, tower) {
+                (1, false) => format!("{}x{}", size.0, size.1),
+                (1, true) => format!("{}x{} Tower", size.0, size.1),
+                (z, false) => format!("{}x{}x{}", size.0, size.1, z),
+                (z, true) => format!("{}x{}x{} Tower", size.0, size.1, z),
+            },
+            description: None,
+            default: false,
+            maze_spec: MazeSpec {
+                inner_spec: MazeSpecType::Simple {
+                    size: Some(size.into()),
+                    start: None,
+                    end: None,
+                    mask: None,
+                    splitter: None,
+                    generator: None,
+                },
+                seed: None,
+                maze_type: if tower { Some(MazeType::Tower) } else { None },
+            },
+        }
+    }
+
+    vec![
+        MazePreset {
+            default: true,
+            ..simple_maze((10, 5, 1), false)
+        },
+        simple_maze((20, 10, 1), false),
+        simple_maze((60, 30, 1), false),
+        simple_maze((200, 100, 1), false),
+        simple_maze((6, 3, 3), false),
+        simple_maze((10, 5, 5), false),
+        simple_maze((12, 6, 5), true),
+        simple_maze((40, 20, 10), true),
+    ]
+});
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
+    use crate::settings::{
+        config_utils::LenientConvert as _,
+        model::{MazePreset, PresetGroupItem, Presets},
+        theme::TerminalColorScheme,
+    };
+
+    #[test]
+    fn test_config_build_default() {
+        let config_str = super::Settings::build_default_config();
+        let mut config_value = json5::from_str::<super::Value>(&config_str)
+            .expect("Default config should be valid JSON5");
+
+        use super::Value::*;
+        match &mut config_value {
+            Object(map) => match map.get_mut("general") {
+                Some(Object(map)) => match map.get_mut("appearance") {
+                    Some(Object(map)) => {
+                        map.insert(
+                            "terminal_scheme".into(),
+                            json5::from_str(
+                                &json5::to_string(&TerminalColorScheme::default()).unwrap(),
+                            )
+                            .unwrap(),
+                        );
+                    }
+                    _ => panic!("Appearance should be an object"),
+                },
+                _ => panic!("General should be an object"),
+            },
+            _ => panic!("Config should be an object"),
+        }
+
+        assert_eq!(
+            config_value,
+            json5::from_str(
+                json5::to_string(&{
+                    let mut config = super::Config::default();
+                    config.game.content.presets = Presets(
+                        super::DEFAULT_PRESETS
+                            .iter()
+                            .cloned()
+                            .map(PresetGroupItem::Preset)
+                            .collect(),
+                    );
+                    config
+                })
+                .unwrap()
+                .as_str()
+            )
+            .unwrap(),
+            "Default config should be a JSON object"
+        );
+    }
+
+    #[test]
+    fn test_config_default_format() {
+        let config = super::Settings::build_default_config();
+
+        for (i, line) in config.lines().enumerate() {
+            assert!(
+                !line.contains('\t'),
+                "Default config should not contain tabs for indentation: {i}: {line}"
+            );
+            assert!(
+                line.find(|c: char| !c.is_whitespace()).unwrap_or(0) % 4 == 0,
+                "Default config should be indented with multiples of 4 spaces\n{config}"
+            );
+            assert!(
+                !line.ends_with(' '),
+                "Default config should not have trailing spaces: {i}: {line}, config:\n{config}"
+            );
+            assert!(
+                line.len() <= 120,
+                "Default config lines should not exceed 120 characters: {i}: {line}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_config_presets_group() {
+        let x = serde_json::from_value(json! ([{
+            "group": "A",
+            "items": [],
+        }]))
+        .unwrap();
+
+        let mut context = super::ConvertContext::new();
+        let presets = Presets::convert(x, &mut context);
+        let (errors, warnings) = context.extract();
+
+        assert_eq!(
+            errors,
+            vec![],
+            "Presets conversion should not produce errors"
+        );
+        assert_eq!(
+            warnings,
+            vec![],
+            "Presets conversion should not produce warnings"
+        );
+        assert!(presets.is_some(), "Presets should be converted correctly");
+    }
+
+    #[test]
+    fn test_config_presets_preset() {
+        let x = serde_json::from_value(json! ({
+            "title": "Preset 1",
+            "type": "simple",
+        }))
+        .unwrap();
+
+        let mut context = super::ConvertContext::new();
+        let presets = MazePreset::convert(x, &mut context);
+        let (errors, warnings) = context.extract();
+
+        assert_eq!(
+            errors,
+            vec![],
+            "Presets conversion should not produce errors"
+        );
+        assert_eq!(
+            warnings,
+            vec![],
+            "Presets conversion should not produce warnings"
+        );
+        assert!(presets.is_some(), "Presets should be converted correctly");
+    }
+
+    #[test]
+    fn test_no_null_in_config() {
+        let config_str = super::Settings::build_default_config();
+        let config_value = json5::from_str::<super::Value>(&config_str)
+            .expect("Default config should be valid JSON5");
+
+        fn assert_no_null(value: &super::Value, path: &str) {
+            match value {
+                super::Value::Nil => panic!("Config value at path '{}' should not be null", path),
+                super::Value::Object(map) => {
+                    for (key, val) in map {
+                        assert_no_null(val, &format!("{}.{}", path, key));
+                    }
+                }
+                super::Value::List(arr) => {
+                    for (i, val) in arr.iter().enumerate() {
+                        assert_no_null(val, &format!("{}[{}]", path, i));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        assert_no_null(&config_value, "config");
+    }
 }

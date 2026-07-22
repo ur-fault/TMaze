@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
-    helpers::constants::paths::save_data_path,
-    settings::{Settings, UpdateCheckInterval},
+    helpers::constants::paths::managed::save_data,
+    settings::model::{Config, UpdateCheckInterval},
 };
 
 pub mod model {
@@ -62,12 +62,12 @@ pub enum SaveDataError {
 
 impl SaveData {
     pub fn load() -> Result<Self, SaveDataError> {
-        match Self::load_from(&save_data_path()) {
+        match Self::load_from(&save_data()) {
             Ok(data) => Ok(data),
             Err(SaveDataError::Io(_)) => Ok(SaveData {
                 last_update_check: None,
                 best_results: HashMap::new(),
-                path: save_data_path(),
+                path: save_data(),
             }),
             Err(err) => Err(err),
         }
@@ -77,7 +77,7 @@ impl SaveData {
         Self::load().unwrap_or_else(|_| Self {
             last_update_check: None,
             best_results: HashMap::new(),
-            path: save_data_path(),
+            path: save_data(),
         })
     }
 
@@ -105,10 +105,10 @@ impl SaveData {
 }
 
 impl SaveData {
-    pub fn is_update_checked(&self, settings: &Settings) -> bool {
+    pub fn is_update_checked(&self, settings: &Config) -> bool {
         use UpdateCheckInterval::*;
 
-        match settings.get_check_interval() {
+        match settings.updates.check_interval {
             Never => true,
             Daily => self.check_date(|d| d),
             Weekly => self.check_date(|d| d.iso_week()),

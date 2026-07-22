@@ -51,7 +51,8 @@ impl<T: Clone> Array3D<T> {
     }
 
     pub fn get_mut(&mut self, pos: impl Into<Dims3D>) -> Option<&mut T> {
-        self.dim_to_idx(pos.into()).and_then(move |i| self.buf.get_mut(i))
+        self.dim_to_idx(pos.into())
+            .and_then(move |i| self.buf.get_mut(i))
     }
 }
 
@@ -114,6 +115,14 @@ impl<T: Clone> Array3D<T> {
             depth: self.depth,
         })
     }
+
+    pub fn to_buf(self) -> Vec<T> {
+        self.buf
+    }
+
+    pub fn to_slice(&self) -> &[T] {
+        &self.buf
+    }
 }
 
 impl<T: Clone> Array3D<T> {
@@ -146,14 +155,6 @@ impl<T: Clone> Array3D<T> {
 
     pub fn fill(&mut self, item: T) {
         self.buf.fill(item);
-    }
-
-    pub fn to_buf(self) -> Vec<T> {
-        self.buf
-    }
-
-    pub fn to_slice(&self) -> &[T] {
-        &self.buf
     }
 }
 

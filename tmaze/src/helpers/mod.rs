@@ -210,3 +210,19 @@ macro_rules! make_even {
         }
     };
 }
+
+pub trait TupleMap<T, U> {
+    fn map_first<T2, F: FnOnce(T) -> T2>(self, f: F) -> (T2, U);
+
+    fn map_second<U2, F: FnOnce(U) -> U2>(self, f: F) -> (T, U2);
+}
+
+impl<T, U> TupleMap<T, U> for (T, U) {
+    fn map_first<T2, F: FnOnce(T) -> T2>(self, f: F) -> (T2, U) {
+        (f(self.0), self.1)
+    }
+
+    fn map_second<U2, F: FnOnce(U) -> U2>(self, f: F) -> (T, U2) {
+        (self.0, f(self.1))
+    }
+}

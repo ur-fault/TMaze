@@ -7,14 +7,12 @@ use log::debug;
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
-    app::{app::AppData, ActivityHandler, Change, Event},
+    app::{app::AppData, ActivityEvent, ActivityHandler, Change},
     helpers::not_release,
     renderer::{CellContent, GMutView, Padding},
-    settings::theme::Style,
+    settings::theme::{Style, StyleNode, Theme, ThemeResolver},
     ui::{CapsuleText, Screen, ScreenError},
 };
-
-use super::theme::{StyleNode, Theme, ThemeResolver};
 
 const CONTENT_MARGIN: Dims = Dims(4, 1);
 const LEFT_MARGIN: i32 = 1;
@@ -376,10 +374,12 @@ impl StyleBrowser {
 }
 
 impl ActivityHandler for StyleBrowser {
-    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, _: &mut AppData) -> Option<Change> {
         for event in events {
             match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if not_release(kind) => {
+                ActivityEvent::Term(TermEvent::Key(KeyEvent { code, kind, .. }))
+                    if not_release(kind) =>
+                {
                     match code {
                         KeyCode::Esc => return Some(Change::pop_top()),
                         KeyCode::Tab => match &self.mode {

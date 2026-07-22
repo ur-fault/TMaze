@@ -7,3 +7,5 @@ tmaze/themes
 tmaze/data.json
 tmaze/settings.json5
 log.txt
+settings.json5
+.managed

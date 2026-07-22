@@ -78,8 +78,6 @@ pub type Algorithm = (String, Params);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MazeSpec {
-    // /// Size of the maze.
-    // pub size: Dims3D,
     /// Specification of the maze.
     #[serde(default, flatten)]
     pub inner_spec: MazeSpecType,
@@ -87,9 +85,11 @@ pub struct MazeSpec {
     /// Seed of the maze.
     ///
     /// Used for deterministic generation.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
 
     /// Type of the maze.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub maze_type: Option<MazeType>,
 }
 
@@ -131,9 +131,11 @@ impl MazeSpec {
                     return false;
                 }
 
-                let size = regions.first().unwrap().mask.size();
-                if regions.iter().any(|r| !r.validate(size, generators)) {
-                    return false;
+                let size = regions[0].mask.size();
+                for region in regions {
+                    if !region.validate(size, generators) {
+                        return false;
+                    }
                 }
 
                 let mut union = CellMask::new_dims_empty(size).unwrap();
@@ -194,10 +196,6 @@ impl MazeSpec {
 
                 if let Some(mask) = mask {
                     if mask.size() != size {
-                        return false;
-                    }
-
-                    if mask.is_empty() {
                         return false;
                     }
 
@@ -264,12 +262,15 @@ pub enum MazeSpecType {
         regions: Vec<MazeRegionSpec>,
 
         /// Player start position.
+        #[serde(skip_serializing_if = "Option::is_none")]
         start: Option<Position>,
 
         /// Player end position.
+        #[serde(skip_serializing_if = "Option::is_none")]
         end: Option<Position>,
 
         /// Heuristic for choosing the active region.
+        #[serde(skip_serializing_if = "Option::is_none")]
         active_region_heuristic: Option<RegionChooseHeuristic>,
     },
     /// Simple maze specification.
@@ -280,27 +281,33 @@ pub enum MazeSpecType {
         /// Maze size.
         ///
         /// Can be ommited when the mask is specified.
+        #[serde(skip_serializing_if = "Option::is_none")]
         size: Option<Dims3D>,
 
         /// Player start position.
         ///
         /// We don't use [`Position`] here, because it's not possible to specify region to start in,
         /// since the regions are not generated yet.
+        #[serde(skip_serializing_if = "Option::is_none")]
         start: Option<Dims3D>,
 
         /// Player end position.
         ///
         /// We don't use [`Position`] here, because it's not possible to specify region to start in,
         /// since the regions are not generated yet.
+        #[serde(skip_serializing_if = "Option::is_none")]
         end: Option<Dims3D>,
 
         /// Mask of the maze.
+        #[serde(skip_serializing_if = "Option::is_none")]
         mask: Option<CellMask>,
 
         /// Region splitter.
+        #[serde(skip_serializing_if = "Option::is_none")]
         splitter: Option<Algorithm>,
 
         /// Region generator.
+        #[serde(skip_serializing_if = "Option::is_none")]
         generator: Option<Algorithm>,
     },
     // TODO: Combined, where we can specify specific regions and mask of the rest, and it's handled
@@ -418,11 +425,11 @@ impl CellMask {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.iter().all(|&b| !b)
+        self.enabled_count() == 0
     }
 
     pub fn is_full(&self) -> bool {
-        self.0.iter().all(|&b| b)
+        self.enabled_count() == self.0.len()
     }
 
     pub fn enabled_count(&self) -> usize {
@@ -430,7 +437,7 @@ impl CellMask {
     }
 
     pub fn random_cell(&self, rng: &mut Random) -> Option<Dims3D> {
-        // If less then 10% of the cells are enabled, we can collect all of them and choose one,
+        // If less than 10% of the cells are enabled, we can collect all of them and choose one,
         // otherwise we can just choose random cell and check that it's enabled.
 
         let enabled = self.enabled_count();

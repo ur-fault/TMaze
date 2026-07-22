@@ -5,7 +5,7 @@ use cmaze::dims::Dims;
 
 use super::{draw_fn::*, *};
 use crate::{
-    app::{app::AppData, ActivityHandler, Change, Event},
+    app::{app::AppData, ActivityEvent, ActivityHandler, Change},
     helpers::is_release,
 };
 
@@ -24,11 +24,11 @@ impl Popup {
 }
 
 impl ActivityHandler for Popup {
-    fn update(&mut self, events: Vec<Event>, _: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, _: &mut AppData) -> Option<Change> {
         for event in events {
             #[allow(clippy::single_match)]
             match event {
-                Event::Term(event) => match event {
+                ActivityEvent::Term(event) => match event {
                     TermEvent::Key(KeyEvent { code, kind, .. }) => {
                         if !is_release(kind) {
                             return Some(Change::pop_top_with(code));

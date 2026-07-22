@@ -34,11 +34,11 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(scheme: &SharedScheme) -> io::Result<Self> {
+    pub fn new(scheme: SharedScheme) -> io::Result<Self> {
         let (w, h) = term_size();
         let size = Dims(w as i32, h as i32);
-        let hidden = GBuffer::new(size, scheme);
-        let shown = GBuffer::new(size, scheme);
+        let hidden = GBuffer::new(size, &scheme);
+        let shown = GBuffer::new(size, &scheme);
 
         let mut ren = Renderer {
             size,
@@ -299,7 +299,7 @@ impl Cell {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct GBuffer(Array3D<Cell>, SharedScheme);
 
 impl GBuffer {
@@ -366,6 +366,13 @@ impl GBuffer {
             writeln!(to)?;
         }
         Ok(())
+    }
+}
+
+impl PartialEq for GBuffer {
+    fn eq(&self, other: &Self) -> bool {
+        // Note: we purposely ignore the scheme
+        self.0 == other.0
     }
 }
 

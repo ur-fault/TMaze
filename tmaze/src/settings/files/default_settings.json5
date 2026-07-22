@@ -1,0 +1,98 @@
+{
+    "meta": {
+        "format_version": 2,
+    },
+
+    "general": {
+        "logging": {
+            // valid levels: trace, debug, info, warn, error
+            "normal": "{{ general.logging.normal }}",
+            "debug": "{{ general.logging.debug }}",
+            "file": "{{ general.logging.file }}",
+        },
+        "appearance": {
+            "theme": "",
+            "terminal_scheme": {
+                // read docs for the usage and format of this option
+            }
+        },
+    },
+
+    "game": {
+        "slow": {{ game.slow }},
+        "disable_tower_auto_up": {{ game.disable_tower_auto_up }},
+
+        "view": {
+            //  CloseFollow - player will always be centered
+            //  EdgeFollow(horizontal margin, vertical margin)
+            //    player will move on screen, but when he gets close to the edge
+            //    he will be centered on that axis.
+            //    margin can be either relative (0.0 - 0.5) or absolute.
+            //    floating point values are relative, integer values are absolute.
+            "camera_mode": {{ game.view.camera_mode | json }},
+            // "camera_mode": {"mode": "EdgeFollow", "x": 0.25, "y": 0.25},
+
+            "camera_smoothing": {{ game.view.camera_smoothing }},
+            "player_smoothing": {{ game.view.player_smoothing }},
+            "viewport_margin": {{ game.view.viewport_margin | json }},
+        },
+
+        "content": {
+            // Preset:
+            // - title - title of the preset
+            // - size - array of 3 integers, width, height, depth
+            // - maze_type - type of the maze
+            //   - "normal" - normal maze
+            //   - "tower" - tower
+            // - default - selected by default in menu
+            // - type - type of the preset
+            //   - "simple" - basic generation config
+            //   - "regions" - specify generation regions or how to choose them
+            // - regions - array of regions containing mask and parameters, used when `type` is "regions"
+            //   - mask - mask of the region, can have formats:
+            //      - base64:   { "size": [width, height, depth], "base64": "<base64 of bit array>" }
+            //      - 2d array: [[bool | int, bool | int, ...], [bool | int, bool | int, ...], ...]
+            //      - 3d array: [[[bool | int, bool | int, ...], [bool | int, bool | int, ...], ...], ...]
+            //   - region_type - type of the region
+            //     - generator - ["<generator_name>", { "param1": value1, ... }]
+            //     - seed - optional seed for the generator, int
+            // - active_region_heuristic - when neither `start` nor `end` are specified,
+            //   this heuristic will be used to choose the region, can be either:
+            //   - "biggest", "random", "first", "last"
+            "presets": {{ __presets | json_pretty: "0:12" }}
+        }
+    },
+
+    "controls": {
+        "mouse": {
+            "enable": {{ controls.mouse.enable }},
+            "dpad": {
+                "enable": {{ controls.mouse.dpad.enable }},
+                "landscape_on_left": {{ controls.mouse.dpad.landscape_on_left }},
+                "swap_up_down": {{ controls.mouse.dpad.swap_up_down }},
+                "enable_margin": {{ controls.mouse.dpad.enable_margin }},
+                "enable_highlight": {{ controls.mouse.dpad.enable_highlight }},
+                "space": {{ controls.mouse.dpad.space }},
+                "min_size": {{ controls.mouse.dpad.min_size | json }},
+                "max_size": {{ controls.mouse.dpad.max_size | json }},
+            }
+        }
+    },
+
+    "updates": {
+        // valid intervals: never, daily, weekly, monthly, yearly, always
+        "check_interval": "{{ updates.check_interval }}",
+        "show_errors": {{ updates.show_errors }},
+    },
+
+    "audio": {
+        "global":  {
+            "enable": {{ audio.global.enable }},
+            "volume": {{ audio.global.volume }},
+        },
+        "music": {
+            "enable": {{ audio.music.enable }},
+            "volume": {{ audio.music.volume }},
+        }
+    }
+}

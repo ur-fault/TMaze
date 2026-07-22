@@ -1,5 +1,6 @@
 use std::{
-    sync::Arc,
+    rc::Rc,
+    sync::{mpsc, Arc},
     time::{Duration, Instant},
 };
 
@@ -13,15 +14,18 @@ use cmaze::{
 };
 
 use crossterm::event::{read, KeyCode, KeyEvent, KeyEventKind};
+// use indexmap::IndexMap;
 
 use crate::{
+    app::event::{ActivityEvent, EventReceiver, EventReceiverFn, GlobalEvent},
     data::SaveData,
-    helpers::{constants::paths::settings_path, on_off},
+    helpers::{constants::paths, on_off},
     logging::{self, AppLogger, LoggerOptions, UiLogs},
     renderer::{self, draw::Draw, CellContent, GMutView, Renderer},
     settings::{
-        theme::{Theme, ThemeResolver},
-        Settings,
+        model::{Config, TerminalSchemeDef},
+        theme::{SharedScheme, TerminalColorScheme, Theme, ThemeDefinition, ThemeResolver},
+        ConfigSource, Settings,
     },
     ui,
 };
@@ -34,29 +38,32 @@ use rodio::{self, Source};
 
 use super::{
     activity::{Activities, Activity, ActivityResult, Change},
-    event::Event,
     game,
     jobs::Qer,
-    Jobs,
+    DispatchQueue,
 };
 
 pub struct App {
     renderer: Renderer,
     activities: Activities,
     data: AppData,
+    event_drain: mpsc::Receiver<GlobalEvent>,
 }
 
 pub struct AppData {
     pub settings: Settings,
     pub save: SaveData,
     pub use_data: AppStateData,
+    pub appearance: Appearance,
     pub screen_size: Dims,
-    pub theme: Theme,
-    pub theme_resolver: ThemeResolver,
     pub logs: UiLogs,
     pub registries: Registries,
-    jobs: Jobs,
+    jobs: DispatchQueue,
+    pub event_sink: EventSink,
+    pub event_receivers: Vec<EventReceiverFn>,
+
     app_start: Instant,
+    read_only: bool,
 
     #[cfg(feature = "sound")]
     pub sound_player: SoundPlayer,
@@ -77,11 +84,13 @@ impl AppData {
             }
         }
 
-        let volume = if self.settings.get_enable_audio() && self.settings.get_enable_music() {
-            self.settings.get_audio_volume() * self.settings.get_music_volume()
+        let cfg = &self.settings.read().audio;
+        let volume = if cfg.global.enable && cfg.music.enable {
+            cfg.global.volume * cfg.music.volume
         } else {
             0.0
-        };
+        } as f32;
+
         self.sound_player.set_volume(volume);
 
         self.bgm_track = Some(track);
@@ -92,6 +101,14 @@ impl AppData {
     pub fn queuer(&self) -> Qer {
         self.jobs.queuer()
     }
+
+    pub fn is_ro(&self) -> bool {
+        self.read_only
+    }
+
+    pub fn send_event(&self, event: GlobalEvent) {
+        self.event_sink.send(event).unwrap();
+    }
 }
 
 pub struct Registries {
@@ -100,21 +117,6 @@ pub struct Registries {
 }
 
 impl App {
-    /// Create a new app with a base activity
-    ///
-    /// This is a convenience method for creating an empty app and pushing
-    /// a base activity to it.
-    ///
-    /// For more information see [`App::empty`] and [`Activities::push`].
-    ///
-    /// # Arguments
-    /// * `base_activity` - The activity to push to the app
-    pub fn new(base_activity: Activity, read_only: bool) -> Self {
-        let mut s = Self::empty(read_only);
-        s.activities.push(base_activity);
-        s
-    }
-
     /// Create a new app with no activities
     ///
     /// This method intializes all of the needed components of the app.
@@ -125,29 +127,60 @@ impl App {
     /// - initializes the logging system,
     /// - initializes the job queue,
     /// - initializes the registries,
-    pub fn empty(read_only: bool) -> Self {
-        let settings =
-            Settings::load_json(settings_path(), read_only).expect("failed to load settings");
+    pub fn new(
+        AppOptions {
+            read_only,
+            main_activity,
+            config_source,
+        }: AppOptions,
+    ) -> Self {
+        if !read_only {
+            Self::prepare_dirs()
+                .expect("Failed to prepare application directories. Please check permissions.");
+        }
 
-        let renderer = Renderer::new(
-            &settings
-                .get_terminal_scheme()
-                .expect("unknown built-in terminal color scheme, use '--print-terminal-schemes' to see options"),
-        )
-        .expect("failed to create renderer");
-        let activities = Activities::empty();
+        let (event_sink, event_drain) = Self::init_event_sink();
+        let mut event_receivers = vec![];
+
+        let (settings, settings_errors, settings_warnings) =
+            Settings::load(event_sink.clone(), &config_source);
+        let config = settings.read();
+        event_receivers.push(settings.register());
+
+        let scheme = Appearance::load_scheme(&config);
+        let renderer = Renderer::new(scheme).expect("failed to create renderer");
+
+        let mut activities = Activities::empty();
+        if let Some(activity) = main_activity {
+            activities.push(activity);
+        }
 
         let (logger, logs) = AppLogger::new_with_options(
-            settings.get_logging_level(),
+            config.general.logging.normal,
             LoggerOptions::default()
                 .read_only(read_only)
-                .file_level(settings.get_file_logging_level()),
+                .file_level(config.general.logging.file),
         );
+        event_receivers.push(logger.register());
         logger.init();
+
+        if let Some(errors) = settings_errors {
+            log::error!("Errors were encountered while loading the config.");
+            for err in errors {
+                log::error!(" - {}", err);
+            }
+        }
+
+        if let Some(warnings) = settings_warnings {
+            log::warn!("Warnings were encountered while loading the config.");
+            for warn in warnings {
+                log::warn!(" - {}", warn);
+            }
+        }
 
         let save = SaveData::load().expect("failed to load save data");
         let use_data = AppStateData::default();
-        let jobs = Jobs::new();
+        let jobs = DispatchQueue::new();
         let app_start = Instant::now();
         let frame_size = renderer.frame_size();
         let registries = Registries {
@@ -163,28 +196,33 @@ impl App {
             },
         };
 
-        log::info!("Loading theme");
-        let resolver = init_theme_resolver();
-        let theme_def = settings.get_theme();
-        let theme = resolver.resolve(&theme_def);
-
         #[cfg(feature = "sound")]
         let sound_player = SoundPlayer::new(settings.clone());
+        #[cfg(feature = "sound")]
+        event_receivers.push(sound_player.register());
+
+        let appearance = Appearance::new(&config);
+        event_receivers.push(appearance.register());
+
+        drop(config);
 
         Self {
             renderer,
             activities,
+            event_drain,
             data: AppData {
                 app_start,
                 settings,
                 save,
                 use_data,
+                appearance,
                 screen_size: frame_size,
                 jobs,
-                theme,
-                theme_resolver: resolver,
+                event_sink,
+                event_receivers,
                 logs,
                 registries,
+                read_only,
 
                 #[cfg(feature = "sound")]
                 sound_player,
@@ -203,9 +241,10 @@ impl App {
                 job.call(&mut self.data);
             }
 
-            let mut events = vec![];
+            let mut activity_events = vec![];
 
-            let mut delay = Duration::from_millis(45);
+            // FIXME: better polling strategy, IO will need faster response times
+            let mut delay = Duration::from_millis(10);
             while let Ok(true) = crossterm::event::poll(delay) {
                 let event = read().unwrap();
 
@@ -219,25 +258,46 @@ impl App {
                         ..
                     }) => self.switch_debug(),
                     event @ crossterm::event::Event::Mouse(_) => {
-                        if self.data.settings.get_enable_mouse() {
-                            events.push(Event::Term(event));
+                        if self.data.settings.read().controls.mouse.enable {
+                            activity_events.push(ActivityEvent::Term(event));
                         }
                     }
-                    event => events.push(Event::Term(event)),
+                    event => activity_events.push(ActivityEvent::Term(event)),
                 }
 
                 // just so we read all events in the frame
                 delay = Duration::from_nanos(1)
             }
 
-            while let Some(change) = match self.activities.active_mut() {
-                Some(active) => {
-                    log::trace!("Updating activity: '{}'", active.name());
-                    active
-                }
-                None => break 'mainloop events,
+            // Read events from the drain
+            let mut global_events = vec![];
+            while let Ok(event) = self.event_drain.try_recv() {
+                global_events.push(event);
             }
-            .update(std::mem::take(&mut events), &mut self.data)
+
+            // Update handle the event receivers
+            // (hack): due to borrow issues
+            let mut receivers = std::mem::take(&mut self.data.event_receivers);
+            for receiver in receivers.iter_mut() {
+                for event in global_events.clone() {
+                    receiver(event, &mut self.data);
+                }
+            }
+            self.data.event_receivers = receivers;
+
+            {
+                for activity in self.activities.all_mut() {
+                    for event in global_events.clone() {
+                        activity.on_global_event(event, &mut self.data);
+                    }
+                }
+            }
+
+            while let Some(change) = match self.activities.active_mut() {
+                Some(active) => active,
+                None => break 'mainloop activity_events,
+            }
+            .update(std::mem::take(&mut activity_events), &mut self.data)
             {
                 match change {
                     Change::Push(activity) => {
@@ -250,12 +310,12 @@ impl App {
                     }
                     Change::Pop { n, res } => {
                         self.activities.pop_n(n);
-                        events.push(Event::ActiveAfterPop(res));
+                        activity_events.push(ActivityEvent::ActiveAfterPop(res));
                         log::trace!("Popped {} activities", n);
                     }
                     Change::PopUntil { name, res } => {
                         self.activities.pop_until(&name);
-                        events.push(Event::ActiveAfterPop(res));
+                        activity_events.push(ActivityEvent::ActiveAfterPop(res));
                         log::trace!("Popped until '{}'", name);
                     }
                     Change::Replace(activity) => self.activities.replace(activity),
@@ -265,29 +325,28 @@ impl App {
                 }
             }
 
+            let theme = &self.data.appearance.theme;
             self.renderer
                 .frame()
                 .mut_view()
-                .fill(CellContent::styled(' ', self.data.theme.get("background")));
+                .fill(CellContent::styled(' ', theme.get("background")));
 
             match self
                 .activities
                 .active_mut()
                 .expect("No active active")
                 .screen()
-                .draw(&mut self.renderer.frame().mut_view(), &self.data.theme)
+                .draw(&mut self.renderer.frame().mut_view(), &theme)
             {
                 Ok(_) => {}
                 Err(ui::ScreenError::SmallScreen) => {
-                    draw_small_screen_info(&mut self.renderer.frame().mut_view(), &self.data.theme)
+                    draw_small_screen_info(&mut self.renderer.frame().mut_view(), &theme)
                 }
             }
 
-            self.data.logs.draw_on(
-                Dims(0, 0),
-                &mut self.renderer.frame().mut_view(),
-                &self.data.theme,
-            );
+            self.data
+                .logs
+                .draw_on(Dims(0, 0), &mut self.renderer.frame().mut_view(), &theme);
 
             // TODO: let activities show debug info and about the app itself
             // then we can draw it here
@@ -298,18 +357,30 @@ impl App {
         log::trace!("Main loop ended");
 
         rem_events.into_iter().find_map(|e| match e {
-            Event::ActiveAfterPop(Some(res)) => Some(res),
+            ActivityEvent::ActiveAfterPop(Some(res)) => Some(res),
             _ => None,
         })
     }
 
     fn switch_debug(&mut self) {
         self.data.use_data.show_debug = !self.data.use_data.show_debug;
-        self.data.logs.switch_debug(&self.data.settings);
+        self.data.logs.switch_debug(&self.data.settings.read());
         log::warn!(
             "Debug mode: {}",
             on_off(self.data.use_data.show_debug, false)
         );
+    }
+
+    fn prepare_dirs() -> std::io::Result<()> {
+        for dir in paths::all_dirs() {
+            std::fs::create_dir_all(&dir)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn init_event_sink() -> (EventSink, mpsc::Receiver<GlobalEvent>) {
+        mpsc::channel()
     }
 
     pub fn activity_count(&self) -> usize {
@@ -337,10 +408,93 @@ impl App {
     }
 }
 
+pub struct AppOptions<'a> {
+    pub read_only: bool,
+    pub main_activity: Option<Activity>,
+    pub config_source: ConfigSource<'a>,
+}
+
+pub type EventSink = mpsc::Sender<GlobalEvent>;
+
+#[derive(Clone, Copy, Default)]
+pub struct EventOptions {
+    pub to_every_activity: bool,
+}
+
 #[derive(Default)]
 pub struct AppStateData {
-    pub last_selected_preset: Option<usize>,
+    // pub last_selected_preset: IndexMap<usize, usize>,
     pub show_debug: bool,
+}
+
+pub struct Appearance {
+    theme: Theme,
+    scheme: SharedScheme,
+    resolver: ThemeResolver,
+}
+
+impl Appearance {
+    pub fn new(config: &Config) -> Self {
+        let resolver = init_theme_resolver();
+
+        Self {
+            theme: Self::load_theme(config, &resolver),
+            scheme: Self::load_scheme(config),
+            resolver,
+        }
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    pub fn scheme(&self) -> &Rc<TerminalColorScheme> {
+        &self.scheme
+    }
+
+    pub fn resolver(&self) -> &ThemeResolver {
+        &self.resolver
+    }
+}
+
+impl Appearance {
+    fn load_theme(config: &Config, resolver: &ThemeResolver) -> Theme {
+        match config.general.appearance.theme.as_str() {
+            "" => resolver.resolve(&ThemeDefinition::parse_default()),
+            name => match ThemeDefinition::load_by_name(name) {
+                Ok(def) => resolver.resolve(&def),
+                Err(err) => {
+                    log::error!("Failed to load theme '{}': {}", name, err);
+                    resolver.resolve(&ThemeDefinition::parse_default())
+                }
+            },
+        }
+    }
+
+    fn load_scheme(config: &Config) -> SharedScheme {
+        let scheme = config.general.appearance.terminal_scheme.clone();
+        let scheme = match scheme {
+            TerminalSchemeDef::Named(name) => match TerminalColorScheme::named(&name) {
+                Some(scheme) => scheme,
+                None => TerminalColorScheme::default(),
+            },
+            TerminalSchemeDef::Custom(scheme) => scheme,
+        };
+        Rc::new(scheme)
+    }
+}
+
+impl EventReceiver for &Appearance {
+    fn register(self) -> EventReceiverFn {
+        Box::new(move |event, data| match event {
+            GlobalEvent::SettingsChanged => {
+                let config = data.settings.read();
+                data.appearance.theme = Appearance::load_theme(&config, &data.appearance.resolver);
+                data.send_event(GlobalEvent::ThemeChanged);
+            }
+            _ => {}
+        })
+    }
 }
 
 pub fn init_theme_resolver() -> ThemeResolver {

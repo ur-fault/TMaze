@@ -2,10 +2,7 @@ pub use std::time::Duration;
 
 use crate::{
     renderer::GMutView,
-    settings::{
-        style_browser,
-        theme::{Theme, ThemeResolver},
-    },
+    settings::theme::{Theme, ThemeResolver},
 };
 
 pub mod button;
@@ -15,7 +12,6 @@ pub mod menu;
 pub mod popup;
 pub mod progressbar;
 pub mod rect;
-pub mod redirect_menu;
 pub mod usecase;
 
 pub use button::*;
@@ -25,7 +21,6 @@ pub use menu::*;
 pub use popup::*;
 pub use progressbar::*;
 pub use rect::*;
-pub use redirect_menu::*;
 
 pub enum ScreenError {
     SmallScreen,
@@ -49,8 +44,7 @@ pub fn theme_resolver() -> ThemeResolver {
         .extend(popup::popup_theme_resolver())
         .extend(progressbar::progressbar_theme_resolver())
         .extend(rect::rect_theme_resolver())
-        .extend(usecase::usedcase_ui_theme_resolver())
-        .extend(style_browser::style_browser_theme_resolver());
+        .extend(usecase::usecase_ui_theme_resolver());
 
     resolver
 }

@@ -34,12 +34,12 @@ impl ButtonStyles {
 impl Default for ButtonStyles {
     fn default() -> Self {
         Self {
-            border: "ui_button_border",
-            highlight: "ui_button_highlight",
-            text: "ui_button_text",
+            border: "ui.button.border",
+            highlight: "ui.button.highlight",
+            text: "ui.button.text",
 
-            disabled_border: "ui_button_disabled_border",
-            disabled_text: "ui_button_disabled_text",
+            disabled_border: "ui.button.disabled.border",
+            disabled_text: "ui.button.disabled.text",
         }
     }
 }
@@ -63,9 +63,6 @@ impl Button {
             text,
             pos,
             size,
-            // normal_style: None,
-            // content_style: None,
-            // highlight_style: None,
             disable_highlight: false,
             set: false,
             disabled: false,
@@ -97,23 +94,23 @@ impl Button {
         let disabled = self.disabled;
         let set = self.set && !disabled && !self.disable_highlight;
 
-        let [normal, highlight, content, disabled_border, disabled_text] =
+        let [border, highlight, content, disabled_border, disabled_text] =
             self.styles.extract(theme);
 
-        let normal = if disabled {
+        let border = if disabled {
             disabled_border
         } else if set {
             highlight
         } else {
-            normal
+            border
         };
 
         let content = if disabled { disabled_text } else { content };
 
-        let inverted_bg = Style::invert(if set { highlight } else { normal });
+        let inverted_bg = Style::invert(if set { highlight } else { border });
 
         AppliedStyles {
-            normal,
+            normal: border,
             content: if set { inverted_bg } else { content },
         }
     }

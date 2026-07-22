@@ -1,5 +1,8 @@
 use tmaze::{
-    app::{app::AppData, Activity, ActivityHandler, App, Change, Event},
+    app::{
+        app::{AppData, AppOptions},
+        Activity, ActivityHandler, App, Change, Event,
+    },
     helpers::is_release,
     renderer::GMutView,
     settings::theme::Theme,
@@ -9,7 +12,11 @@ use tmaze::{
 use crossterm::event::{Event as TermEvent, KeyEvent};
 
 fn main() {
-    let mut app = App::new(Activity::new("example", "box", Box::new(MyActivity)), true);
+    let mut app = App::new(AppOptions {
+        main_activity: Some(Activity::new("example", "box", Box::new(MyActivity))),
+        read_only: true,
+        config_source: tmaze::settings::ConfigSource::Default,
+    });
 
     log::info!("Starting app");
 

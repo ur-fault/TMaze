@@ -12,11 +12,15 @@ use log::{Log, Metadata, Record};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
+    app::{
+        event::{EventReceiver, EventReceiverFn},
+        GlobalEvent,
+    },
     helpers::constants::paths,
     renderer::{draw::Draw, GMutView},
     settings::{
+        model::Config,
         theme::{Color, NamedColor, Style, Theme},
-        Settings,
     },
 };
 
@@ -108,14 +112,22 @@ impl UiLogs {
         }
     }
 
-    pub fn switch_debug(&self, settings: &Settings) {
+    pub fn switch_debug(&self, settings: &Config) {
         let mut debug = self.debug.write().unwrap();
         *debug = !*debug;
+        drop(debug);
 
-        if *debug {
-            *self.min_level.write().unwrap() = settings.get_debug_logging_level();
+        self.update_levels(settings);
+    }
+
+    fn update_levels(&self, settings: &Config) {
+        let config = &settings.general.logging;
+
+        let debug = *self.debug.read().unwrap();
+        if debug {
+            *self.min_level.write().unwrap() = config.debug;
         } else {
-            *self.min_level.write().unwrap() = settings.get_logging_level();
+            *self.min_level.write().unwrap() = config.normal;
         }
     }
 
@@ -186,7 +198,7 @@ impl Default for LoggerOptions {
         Self {
             decay: DEFAULT_DECAY,
             max_visible: DEFAULT_MAX_VISIBLE,
-            path: Some(paths::log_file_path()),
+            path: Some(paths::managed::log_file()),
             file_level: log::Level::Debug,
         }
     }
@@ -306,6 +318,16 @@ impl Log for AppLogger {
         if let Some(file) = &self.file {
             file.lock().unwrap().flush().unwrap();
         }
+    }
+}
+
+impl EventReceiver for &AppLogger {
+    fn register(self) -> EventReceiverFn {
+        Box::new(move |ev, data| {
+            if matches!(ev, GlobalEvent::SettingsChanged) {
+                data.logs.update_levels(&data.settings.read());
+            }
+        })
     }
 }
 

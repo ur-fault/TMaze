@@ -3,7 +3,7 @@ use crossterm::event::{
 };
 
 use pad::PadStr;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use std::{borrow::Cow, fmt, ops::RangeInclusive};
 
@@ -13,7 +13,7 @@ use crate::{
     app::{
         activity::{Activity, ActivityHandler, Change},
         app::AppData,
-        event::Event,
+        ActivityEvent,
     },
     helpers::{is_release, strings::MbyStaticStr, LineDir},
     renderer::GMutView,
@@ -31,9 +31,8 @@ pub struct SliderDef {
     pub val: i32,
     pub range: RangeInclusive<i32>,
     #[allow(clippy::type_complexity)]
-    // FIXME: take value instead of change direction (bool),
-    // this should allow for mouse support
-    pub fun: Box<dyn FnMut(bool, &mut i32, &mut AppData)>,
+    pub update_fn: Box<dyn FnMut(i32, &mut AppData)>,
+    pub reset_fn: Option<Box<dyn FnMut(&mut AppData) -> i32>>,
     pub as_num: bool,
 }
 
@@ -42,21 +41,70 @@ pub struct OptionDef {
     pub val: bool,
     #[allow(clippy::type_complexity)]
     // FIXME: return the bool instead
-    pub fun: Box<dyn FnMut(&mut bool, &mut AppData)>,
+    pub update_fn: Box<dyn FnMut(bool, &mut AppData)>,
+    pub reset_fn: Option<Box<dyn FnMut(&mut AppData) -> bool>>,
 }
 
 // TODO: styling individual items
 pub enum MenuItem {
-    Text(MbyStaticStr),
+    Text {
+        text: MbyStaticStr,
+        first_col: char,
+        last_col: char,
+        click_fn: Option<Box<dyn FnMut(&mut AppData) -> Option<Change>>>,
+    },
     Option(OptionDef),
     Slider(SliderDef),
     Separator,
 }
 
+pub const NULL_CHAR: char = '\0';
+
+impl MenuItem {
+    pub fn text<'a>(text: impl Into<Cow<'a, str>>) -> Self {
+        MenuItem::Text {
+            text: MbyStaticStr::Owned(text.into().into_owned()),
+            first_col: NULL_CHAR,
+            last_col: NULL_CHAR,
+            click_fn: None,
+        }
+    }
+
+    pub fn static_text(text: &'static str) -> Self {
+        MenuItem::Text {
+            text: MbyStaticStr::Static(text),
+            first_col: NULL_CHAR,
+            last_col: NULL_CHAR,
+            click_fn: None,
+        }
+    }
+
+    pub fn active_text(
+        text: impl Into<String>,
+        click_fn: impl FnMut(&mut AppData) -> Option<Change> + 'static,
+    ) -> Self {
+        MenuItem::Text {
+            text: text.into().into(),
+            first_col: NULL_CHAR,
+            last_col: NULL_CHAR,
+            click_fn: Some(Box::new(click_fn)),
+        }
+    }
+}
+
 impl MenuItem {
     fn width(&self, special: usize) -> Option<usize> {
         match self {
-            MenuItem::Text(text) => Some(text.width()),
+            MenuItem::Text {
+                text,
+                first_col,
+                last_col,
+                ..
+            } => Some(
+                text.width()
+                    + first_col.width().map(|w| w + 1).unwrap_or(0)
+                    + last_col.width().map(|w| w + 1).unwrap_or(0),
+            ),
             MenuItem::Option(OptionDef { text, .. }) => Some(text.width() + 4),
             MenuItem::Slider(SliderDef {
                 text,
@@ -89,7 +137,27 @@ impl MenuItem {
     // so we don't allocate a new string every time
     fn render(&self, width: usize) -> Cow<'_, str> {
         match self {
-            MenuItem::Text(text) => text.as_ref_cow(),
+            MenuItem::Text {
+                text,
+                first_col,
+                last_col,
+                ..
+            } => {
+                let first_col = if first_col.is_control() {
+                    "".into()
+                } else {
+                    format!("{} ", first_col)
+                };
+
+                let last_col = if last_col.is_control() {
+                    "".into()
+                } else {
+                    format!(" {}", last_col)
+                };
+
+                let rem_width = width.saturating_sub(first_col.width() + text.width()) - 1;
+                format!("{first_col}{text}{last_col:>rem_width$}").into()
+            }
             MenuItem::Option(OptionDef { text, val, .. }) => {
                 // TODO: this is not a prefix tho ?!?
                 let prefix = if *val { "[▪]" } else { "[ ]" };
@@ -134,20 +202,25 @@ impl MenuItem {
 
 impl From<String> for MenuItem {
     fn from(s: String) -> Self {
-        MenuItem::Text(s.into())
+        MenuItem::text(s)
     }
 }
 
 impl From<&str> for MenuItem {
     fn from(s: &str) -> Self {
-        MenuItem::Text(s.to_string().into())
+        MenuItem::text(s)
     }
 }
 
 impl fmt::Debug for MenuItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MenuItem::Text(s) => write!(f, "Text({})", s),
+            MenuItem::Text {
+                text,
+                first_col,
+                last_col,
+                ..
+            } => write!(f, "Text('{first_col}' '{text}' '{last_col}')"),
             MenuItem::Option(OptionDef { text, val, .. }) => write!(f, "Option({}, {})", text, val),
             MenuItem::Slider(SliderDef {
                 text, val, range, ..
@@ -310,19 +383,33 @@ pub struct Menu {
 
 impl Menu {
     pub fn new(config: MenuConfig) -> Self {
+        let title = config.title.clone();
+        Self::try_new(config)
+            .unwrap_or_else(|| panic!("invalid menu config `{}`: no options provided", title))
+    }
+
+    pub fn try_new(config: MenuConfig) -> Option<Self> {
         let MenuConfig { options, .. } = &config;
+        if options.is_empty() {
+            log::warn!("Menu `{}` with no options", config.title);
+            return None;
+        }
 
         let default = config.default.unwrap_or(0).clamp(0, options.len() - 1);
 
-        Self {
+        Some(Self {
             selected: default,
             config,
             items_pos: None,
-        }
+        })
     }
 
-    pub fn into_activity(self) -> Activity {
-        Activity::new_base("menu", Box::new(self))
+    pub fn into_activity(self, name: impl Into<String>) -> Activity {
+        Activity::new_base(name, Box::new(self))
+    }
+
+    pub fn config(&self) -> &MenuConfig {
+        &self.config
     }
 
     fn select(&mut self, down: bool) {
@@ -347,8 +434,20 @@ impl Menu {
         let selected_opt = &mut self.config.options[self.selected];
 
         match selected_opt {
-            MenuItem::Text(_) => return Some(Change::pop_top_with(self.selected)),
-            MenuItem::Option(OptionDef { val, fun, .. }) => fun(val, data),
+            MenuItem::Text { click_fn, .. } => {
+                if let Some(fun) = click_fn {
+                    return fun(data);
+                }
+                return Some(Change::pop_top_with(self.selected));
+            }
+            MenuItem::Option(OptionDef {
+                val,
+                update_fn: fun,
+                ..
+            }) => {
+                *val = !*val;
+                fun(*val, data);
+            }
             MenuItem::Slider(_) | MenuItem::Separator => {}
         }
 
@@ -357,11 +456,15 @@ impl Menu {
 
     fn update_slider(&mut self, right: bool, data: &mut AppData) {
         if let MenuItem::Slider(SliderDef {
-            val, range, fun, ..
+            val,
+            range,
+            update_fn: fun,
+            ..
         }) = &mut self.config.options[self.selected]
         {
-            fun(right, val, data);
+            *val += if right { 1 } else { -1 };
             *val = (*val).clamp(*range.start(), *range.end());
+            fun(*val, data);
         }
     }
 
@@ -382,10 +485,28 @@ impl Menu {
 
         Some(selected)
     }
+
+    fn reset(&mut self, data: &mut AppData) {
+        let selected_opt = &mut self.config.options[self.selected];
+        match selected_opt {
+            MenuItem::Text { .. } => {}
+            MenuItem::Option(OptionDef { val, reset_fn, .. }) => {
+                if let Some(reset_fn) = reset_fn {
+                    *val = reset_fn(data);
+                }
+            }
+            MenuItem::Slider(SliderDef { val, reset_fn, .. }) => {
+                if let Some(reset_fn) = reset_fn {
+                    *val = reset_fn(data);
+                }
+            }
+            MenuItem::Separator => {}
+        }
+    }
 }
 
 impl ActivityHandler for Menu {
-    fn update(&mut self, events: Vec<Event>, app_data: &mut AppData) -> Option<Change> {
+    fn update(&mut self, events: Vec<ActivityEvent>, app_data: &mut AppData) -> Option<Change> {
         let opt_count = self.config.options.len() as isize;
         let non_sep_count = self
             .config
@@ -421,43 +542,45 @@ impl ActivityHandler for Menu {
 
         for event in events {
             match event {
-                Event::Term(TermEvent::Key(KeyEvent { code, kind, .. })) if !is_release(kind) => {
-                    match code {
-                        KeyCode::Up | KeyCode::Char('w') => {
-                            self.select(false);
-                        }
-                        KeyCode::Down | KeyCode::Char('s') => {
-                            self.select(true);
-                        }
-                        KeyCode::Enter | KeyCode::Char(' ') => {
+                ActivityEvent::Term(TermEvent::Key(KeyEvent {
+                    code,
+                    kind,
+                    modifiers,
+                    ..
+                })) if !is_release(kind) => match code {
+                    KeyCode::Up | KeyCode::Char('w') => {
+                        self.select(false);
+                    }
+                    KeyCode::Down | KeyCode::Char('s') => {
+                        self.select(true);
+                    }
+                    KeyCode::Enter | KeyCode::Char(' ') => {
+                        return_if_some!(self.switch(app_data));
+                    }
+                    KeyCode::Char('q') if !self.config.q_to_quit => return Some(Change::pop_top()),
+                    KeyCode::Char('q') if self.config.q_to_quit => return Some(Change::pop_all()),
+                    KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
+                        let old_sel = self.selected;
+                        self.selected =
+                            (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
+
+                        if old_sel == self.selected {
                             return_if_some!(self.switch(app_data));
                         }
-                        KeyCode::Char('q') if !self.config.q_to_quit => {
-                            return Some(Change::pop_top())
-                        }
-                        KeyCode::Char('q') if self.config.q_to_quit => {
-                            return Some(Change::pop_all())
-                        }
-                        KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
-                            let old_sel = self.selected;
-                            self.selected =
-                                (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
-
-                            if old_sel == self.selected {
-                                return_if_some!(self.switch(app_data));
-                            }
-                        }
-                        KeyCode::Esc => return Some(Change::pop_top()),
-                        KeyCode::Left => {
-                            self.update_slider(false, app_data);
-                        }
-                        KeyCode::Right => {
-                            self.update_slider(true, app_data);
-                        }
-                        _ => {}
                     }
-                }
-                Event::Term(TermEvent::Mouse(MouseEvent {
+                    KeyCode::Esc => return Some(Change::pop_top()),
+                    KeyCode::Left => {
+                        self.update_slider(false, app_data);
+                    }
+                    KeyCode::Right => {
+                        self.update_slider(true, app_data);
+                    }
+                    KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
+                        self.reset(app_data);
+                    }
+                    _ => {}
+                },
+                ActivityEvent::Term(TermEvent::Mouse(MouseEvent {
                     kind,
                     column,
                     row,
@@ -691,6 +814,19 @@ pub type MenuAction<R> = Box<dyn Fn(&mut AppData) -> R>;
 
 #[macro_export]
 macro_rules! menu_actions {
+    (move $($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
+        {
+            let opts: Vec<(_, $crate::ui::menu::MenuAction<_>)> = vec![
+                $(
+                    $(#[cfg(feature = $feature)])?
+                    { ($crate::ui::menu::MenuItem::from($name), Box::new(move |$data: &mut AppData| $action)) },
+                )*
+            ];
+
+            opts
+        }
+    };
+
     ($($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
         {
             let opts: Vec<(_, $crate::ui::menu::MenuAction<_>)> = vec![
@@ -724,4 +860,60 @@ pub fn menu_theme_resolver() -> ThemeResolver {
         .link("ui.menu.number", "ui.menu.text");
 
     resolver
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SimpleMenuOptions {
+    pub default: Option<usize>,
+}
+
+pub fn simple_menu(
+    title: impl Into<String>,
+    items: Vec<(MenuItem, Box<dyn Fn(&mut AppData) -> Change>)>,
+) -> impl ActivityHandler {
+    simple_menu_ex(title, items, SimpleMenuOptions::default())
+}
+
+pub fn simple_menu_ex(
+    title: impl Into<String>,
+    items: Vec<(MenuItem, Box<dyn Fn(&mut AppData) -> Change>)>,
+    options: SimpleMenuOptions,
+) -> impl ActivityHandler {
+    struct SimpleMenu {
+        menu: Menu,
+        actions: Vec<MenuAction<Change>>,
+    }
+
+    impl ActivityHandler for SimpleMenu {
+        fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
+            match self.menu.update(events, data)? {
+                Change::Pop {
+                    res: Some(result),
+                    n: 1,
+                } => {
+                    let index = *result
+                        .downcast::<usize>()
+                        .expect("menu should return index");
+                    Some((self.actions[index])(data))
+                }
+                res => Some(res),
+            }
+        }
+
+        fn screen(&mut self) -> &mut dyn Screen {
+            &mut self.menu
+        }
+    }
+
+    let (menu_opts, actions) = split_menu_actions(items);
+    let menu_config = MenuConfig::new(title, menu_opts).maybe_default(options.default);
+
+    SimpleMenu {
+        menu: Menu::new(menu_config),
+        actions,
+    }
+}
+
+pub fn menu_result(res: Box<dyn std::any::Any>) -> usize {
+    *res.downcast::<usize>().unwrap()
 }

@@ -3,9 +3,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::ui::Screen;
+use crate::{
+    app::event::{ActivityEvent, GlobalEvent},
+    ui::Screen,
+};
 
-use super::{app::AppData, event::Event};
+use super::app::AppData;
 
 pub type ActivityResult = Box<dyn Any>;
 
@@ -37,6 +40,10 @@ impl Change {
 
     pub fn pop(n: usize) -> Self {
         Self::Pop { n, res: None }
+    }
+
+    pub fn nothing() -> Self {
+        Self::Pop { n: 0, res: None }
     }
 
     pub fn pop_with<T: 'static>(n: usize, res: T) -> Self {
@@ -137,6 +144,14 @@ impl Activities {
         self.activities.last()
     }
 
+    pub fn all(&self) -> &[Activity] {
+        &self.activities
+    }
+
+    pub fn all_mut(&mut self) -> &mut [Activity] {
+        &mut self.activities
+    }
+
     pub fn active_mut(&mut self) -> Option<&mut Activity> {
         self.activities.last_mut()
     }
@@ -214,7 +229,27 @@ impl DerefMut for Activity {
 
 pub trait ActivityHandler {
     #[must_use]
-    fn update(&mut self, events: Vec<Event>, data: &mut AppData) -> Option<Change>;
+    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change>;
+
+    fn on_global_event(&mut self, _event: GlobalEvent, _data: &mut AppData) {}
 
     fn screen(&mut self) -> &mut dyn Screen;
 }
+
+pub trait ActivityHandlerExt: ActivityHandler {
+    fn to_activity(self, source: impl Into<String>, name: impl Into<String>) -> Activity
+    where
+        Self: Sized + 'static,
+    {
+        Activity::new(source, name, Box::new(self))
+    }
+
+    fn to_base_activity(self, name: impl Into<String>) -> Activity
+    where
+        Self: Sized + 'static,
+    {
+        Activity::new_base(name, Box::new(self))
+    }
+}
+
+impl<T: ActivityHandler + 'static> ActivityHandlerExt for T {}

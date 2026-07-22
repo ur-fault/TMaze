@@ -12,8 +12,8 @@ pub use game_state::GameViewMode;
 
 pub use activity::{Activity, ActivityHandler, Change};
 pub use app::App;
-pub use event::Event;
-pub use jobs::Jobs;
+pub use event::{ActivityEvent, GlobalEvent};
+pub use jobs::DispatchQueue;
 
 use thiserror::Error;
 

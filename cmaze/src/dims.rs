@@ -190,6 +190,18 @@ impl Mul<f32> for Dims3D {
     }
 }
 
+impl Mul<f64> for Dims3D {
+    type Output = Dims3D;
+
+    fn mul(self, other: f64) -> Dims3D {
+        Dims3D(
+            (self.0 as f64 * other).round() as i32,
+            (self.1 as f64 * other).round() as i32,
+            (self.2 as f64 * other).round() as i32,
+        )
+    }
+}
+
 impl MulAssign<i32> for Dims3D {
     fn mul_assign(&mut self, other: i32) {
         self.0 *= other;
@@ -329,5 +341,17 @@ impl Offset {
 impl Default for Offset {
     fn default() -> Self {
         Offset::Rel(0.25)
+    }
+}
+
+impl From<i32> for Offset {
+    fn from(value: i32) -> Self {
+        Offset::Abs(value)
+    }
+}
+
+impl From<f32> for Offset {
+    fn from(value: f32) -> Self {
+        Offset::Rel(value)
     }
 }

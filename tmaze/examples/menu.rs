@@ -1,4 +1,8 @@
-use tmaze::{app::app::App, ui::menu};
+use tmaze::{
+    app::app::{App, AppOptions},
+    settings::ConfigSource,
+    ui::menu,
+};
 
 fn main() {
     let menu_config = menu::MenuConfig::new_from_strings(
@@ -13,7 +17,11 @@ fn main() {
     .default(1);
 
     let menu = menu::Menu::new(menu_config).into_activity();
-    let mut app = App::new(menu, true);
+    let mut app = App::new(AppOptions {
+        read_only: true,
+        main_activity: Some(menu),
+        config_source: ConfigSource::Default,
+    });
 
     app.run();
 }
