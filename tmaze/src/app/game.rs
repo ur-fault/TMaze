@@ -10,27 +10,29 @@ use cmaze::{
 };
 
 use crate::{
-    app::{event::ActivityEvent, game_state::GameData, GameViewMode, GlobalEvent},
+    app::{
+        activity::ActivityHandlerExt, event::ActivityEvent, game_state::GameData, GameViewMode,
+        GlobalEvent,
+    },
     helpers::{
         constants, is_release, maze2screen, maze2screen_3d, maze_render_size, strings, LineDir,
     },
-    lerp, menu_actions,
+    lerp, menu_actions_2,
     renderer::{draw::Align, CellContent, GBuffer, GMutView, Padding},
     settings::{
-        model::{self, CameraMode, Config, GameView, MazePreset, PresetGroup, PresetGroupItem},
+        model::{self, CameraMode, Config, GameView, MazePreset, PresetGroup},
         theme::{SharedScheme, Theme, ThemeResolver},
     },
     ui::{
         self,
         helpers::format_duration,
-        multisize_duration_format, simple_menu, split_menu_actions,
+        multisize_duration_format,
         usecase::{
             dpad::{DPad, DPadType},
             settings::create_settings_activity,
             style_browser::StyleBrowser,
         },
-        Menu, MenuAction, MenuConfig, MenuItem, Popup, ProgressBar, Rect, Screen, ScreenError,
-        NULL_CHAR,
+        Menu, MenuConfig, MenuItemObj, Popup, ProgressBar, Rect, Screen, ScreenError, Text,
     },
 };
 
@@ -45,7 +47,7 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent};
 use rodio::Source;
 
 use super::{
-    app::{AppData, AppStateData, Registries},
+    app::{AppData, Registries},
     Activity, ActivityHandler, Change,
 };
 
@@ -74,39 +76,7 @@ pub fn create_controls_popup() -> Activity {
     Activity::new_base_boxed("controls".to_string(), popup)
 }
 
-pub struct MainMenu {
-    menu: Menu,
-    actions: Vec<MenuAction<Change>>,
-}
-
-#[allow(clippy::new_without_default)]
-impl MainMenu {
-    pub fn new() -> Self {
-        let options = menu_actions!(
-            "New Game" -> data => Self::start_new_game(&data.settings.read(), &data.use_data),
-            "Settings" -> _ => Self::show_settings_screen(),
-            "Controls" -> _ => Self::show_controls_popup(),
-            "Info" -> _ => Self::show_info_menu(),
-            "About" -> _ => Self::show_about_popup(),
-            "Quit" -> _ => Change::pop_top(),
-        );
-
-        let (options, actions) = split_menu_actions(options);
-
-        Self {
-            menu: Menu::new(MenuConfig::new("TMaze", options).counted()),
-            actions,
-        }
-    }
-
-    fn show_settings_screen() -> Change {
-        Change::push(create_settings_activity())
-    }
-
-    fn show_controls_popup() -> Change {
-        Change::push(create_controls_popup())
-    }
-
+pub fn main_menu() -> Activity {
     fn show_about_popup() -> Change {
         const FEATURE_LIST: [(&str, bool); 2] = [
             ("updates", cfg!(feature = "updates")),
@@ -161,11 +131,10 @@ impl MainMenu {
     }
 
     fn show_info_menu() -> Change {
-        Change::Push(Activity::new_base_boxed(
-            "info menu",
-            simple_menu(
-                "TMaze",
-                menu_actions!(
+        Change::Push(
+            Menu::new(MenuConfig::new(
+                "Info",
+                menu_actions_2!(
                     "Style options browser" -> data => Change::Push(
                         Activity::new_base_boxed(
                             "style options browser".to_string(),
@@ -174,20 +143,18 @@ impl MainMenu {
                     ),
                     "Back" -> _ => Change::pop_top(),
                 ),
-            ),
-        ))
+            ))
+            .to_base_activity("info menu"),
+        )
     }
 
-    fn start_new_game(settings: &Config, use_data: &AppStateData) -> Change {
+    fn start_new_game(settings: &Config) -> Change {
         let items = settings.game.content.presets.0.clone();
-        match MazePresetMenu::new(
-            PresetGroup {
-                group: "".into(),
-                items,
-            },
-            use_data,
-        ) {
-            Some(preset_menu) => Change::push(Activity::new_base_boxed("maze preset", preset_menu)),
+        match maze_preset_menu(PresetGroup {
+            group: "".into(),
+            items,
+        }) {
+            Some(preset_menu) => Change::push(preset_menu),
             None => {
                 // TODO: reference settings once ready
                 const MSG: &str = "No maze presets available, please add some in config";
@@ -201,122 +168,58 @@ impl MainMenu {
         }
     }
 
-    #[cfg(feature = "sound")]
-    fn play_menu_bgm(data: &mut AppData) {
-        data.play_bgm(MusicTrack::Menu);
+    fn opt(text: &'static str, mut click: impl FnMut(&AppData) -> Change + 'static) -> MenuItemObj {
+        Text::new(text)
+            .indexed()
+            .click(move |data| Some(click(data)))
     }
+
+    Menu::new(
+        MenuConfig::new(
+            "TMaze",
+            vec![
+                opt("New Game", |d| start_new_game(&d.settings.read())),
+                opt("Settings", |_| Change::Push(create_settings_activity())),
+                opt("Controls", |_| Change::Push(create_controls_popup())),
+                opt("Info", |_| show_info_menu()),
+                opt("About", |_| show_about_popup()),
+                opt("Quit", |_| Change::pop_all()),
+            ],
+        )
+        .on_enter(|d| d.play_bgm(MusicTrack::Menu)),
+    )
+    .to_base_activity("main menu")
 }
 
-impl ActivityHandler for MainMenu {
-    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
-        #[cfg(feature = "sound")]
-        Self::play_menu_bgm(data);
+fn maze_preset_menu(group: PresetGroup) -> Option<Activity> {
+    let title = if group.group.is_empty() {
+        "Maze preset".to_string()
+    } else {
+        group.group.clone()
+    };
 
-        match self.menu.update(events, data)? {
-            Change::Pop {
-                res: Some(sub_activity),
-                ..
-            } => {
-                let index = *sub_activity
-                    .downcast::<usize>()
-                    .expect("menu should return index");
-                Some(self.actions[index](data))
-            }
-            res => Some(res),
-        }
-    }
+    use model::PresetGroupItem::*;
 
-    fn screen(&mut self) -> &mut dyn ui::Screen {
-        &mut self.menu
-    }
-}
+    let menu_config = MenuConfig::new(
+        title,
+        group
+            .items
+            .into_iter()
+            .map(|maze| match maze {
+                Preset(maze_preset) => Text::new(maze_preset.title.clone()).click(move |d| {
+                    Some(Change::Push(
+                        MazeGenerationActivity::new(maze_preset.clone(), &d.registries)
+                            .to_base_activity("maze gen"),
+                    ))
+                }) as MenuItemObj,
+                Group(preset_group) => Text::new(preset_group.group.clone())
+                    .last_col('>')
+                    .click(move |_| Some(Change::Push(maze_preset_menu(preset_group.clone())?))),
+            })
+            .collect::<Vec<_>>(),
+    );
 
-pub struct MazePresetMenu {
-    menu: Menu,
-    group: PresetGroup,
-}
-
-impl MazePresetMenu {
-    pub fn new(group: PresetGroup, _app_state_data: &AppStateData) -> Option<Self> {
-        let title = if group.group.is_empty() {
-            "Maze preset".to_string()
-        } else {
-            group.group.clone()
-        };
-
-        use model::PresetGroupItem::*;
-
-        let menu_config = MenuConfig::new(
-            title,
-            group
-                .items
-                .iter()
-                .map(|maze| match maze {
-                    Preset(maze_preset) => MenuItem::text(maze_preset.title.clone()),
-                    Group(preset_group) => MenuItem::Text {
-                        text: preset_group.group.clone().into(),
-                        first_col: NULL_CHAR,
-                        last_col: '>',
-                        click_fn: None,
-                    },
-                })
-                .collect::<Vec<_>>(),
-        );
-
-        // let default = app_state_data
-        //     .last_selected_preset
-        //     .get(&group_i)
-        //     .cloned()
-        //     .or_else(|| group.default_preset_index());
-        //
-        // if let Some(i) = default {
-        //     menu_config = menu_config.default(i);
-        // }
-
-        let menu = Menu::try_new(menu_config)?;
-
-        Some(Self { menu, group })
-    }
-}
-
-impl ActivityHandler for MazePresetMenu {
-    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
-        match self.menu.update(events, data) {
-            Some(change) => match change {
-                Change::Pop {
-                    res: Some(size), ..
-                } => {
-                    let index = *size.downcast::<usize>().expect("menu should return index");
-                    // data.use_data.last_selected_preset.insert_before(
-                    //     data.use_data.last_selected_preset.len(),
-                    //     self.group,
-                    //     index,
-                    // );
-
-                    match self.group.items[index].clone() {
-                        PresetGroupItem::Preset(maze_preset) => {
-                            Some(Change::push(Activity::new_base_boxed(
-                                "maze_gen".to_string(),
-                                MazeGenerationActivity::new(maze_preset, &data.registries),
-                            )))
-                        }
-                        PresetGroupItem::Group(preset_group) => {
-                            Some(Change::push(Activity::new_base_boxed(
-                                "maze preset".to_string(),
-                                MazePresetMenu::new(preset_group, &data.use_data)?,
-                            )))
-                        }
-                    }
-                }
-                res => Some(res),
-            },
-            None => None,
-        }
-    }
-
-    fn screen(&mut self) -> &mut dyn ui::Screen {
-        &mut self.menu
-    }
+    Some(Menu::try_new(menu_config)?.to_base_activity("maze preset"))
 }
 
 pub struct MazeGenerationActivity {
@@ -439,48 +342,18 @@ impl ActivityHandler for MazeGenerationActivity {
     }
 }
 
-pub struct PauseMenu {
-    menu: Menu,
-    actions: Vec<MenuAction<Change>>,
-}
-
-#[allow(clippy::new_without_default)]
-impl PauseMenu {
-    pub fn new() -> Self {
-        let options = menu_actions!(
+fn pause_menu() -> Activity {
+    Menu::new(MenuConfig::new(
+        "Paused",
+        menu_actions_2!(
             "Resume" -> _ => Change::pop_top(),
-            "Main Menu" -> _ => Change::pop_until("main menu"),
             "Controls" -> _ => Change::push(create_controls_popup()),
             "Settings" -> _ => Change::push(create_settings_activity()),
+            "Main Menu" -> _ => Change::pop_until("main menu"),
             "Quit" -> _ => Change::pop_all(),
-        );
-
-        let (options, actions) = split_menu_actions(options);
-
-        let menu = Menu::new(MenuConfig::new("Paused", options));
-
-        Self { menu, actions }
-    }
-}
-
-impl ActivityHandler for PauseMenu {
-    fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
-        match self.menu.update(events, data) {
-            Some(change) => match change {
-                Change::Pop { res: Some(res), .. } => {
-                    let index = *res.downcast::<usize>().expect("menu should return index");
-
-                    Some((self.actions[index])(data))
-                }
-                res => Some(res),
-            },
-            None => None,
-        }
-    }
-
-    fn screen(&mut self) -> &mut dyn Screen {
-        &mut self.menu
-    }
+        ),
+    ))
+    .to_base_activity("pause menu")
 }
 
 pub struct EndGamePopup {
@@ -603,10 +476,10 @@ impl GameActivity {
     fn render_meta_texts(&self, frame: &mut GMutView, theme: &Theme) {
         let max_width = (frame.size().0 / 2 + 1) as usize;
 
-        let pl_pos = self.data.game.get_player_pos() + Dims3D(1, 1, 1);
+        let pl_pos = self.data.game.get_player_pos() + Dims3D::ONE;
 
         // texts
-        let from_start =
+        let since_start =
             multisize_duration_format(self.data.game.get_elapsed().unwrap(), max_width);
         let move_count = strings::multisize_string(
             [
@@ -645,7 +518,7 @@ impl GameActivity {
         draw(&pos_text, Align::TopLeft);
         draw(view_mode, Align::TopRight);
         draw(&move_count, Align::BottomLeft);
-        draw(&from_start, Align::BottomRight);
+        draw(&since_start, Align::BottomRight);
     }
 
     pub fn render_visited_places(&self, frame: &mut GMutView, maze_pos: Dims, theme: &Theme) {
@@ -767,11 +640,7 @@ impl ActivityHandler for GameActivity {
                     TermEvent::Key(key_event) => match self.data.handle_event(&config, key_event) {
                         Err(false) => {
                             self.data.game.pause().unwrap();
-
-                            return Some(Change::push(Activity::new_base_boxed(
-                                "pause".to_string(),
-                                PauseMenu::new(),
-                            )));
+                            return Some(Change::push(pause_menu()));
                         }
                         Err(true) => return Some(Change::pop_until("main menu")),
                         Ok(_) => {}
@@ -950,10 +819,10 @@ fn render_edge_follow_rulers(rulers: (Offset, Offset), frame: &mut GMutView, the
         draw(Dims(xo        , vps.1 + 1), V, false);
         draw(Dims(vps.0 - xo, vps.1 + 1), V, true);
 
-        draw(Dims(0         , yo        ), H, false);
-        draw(Dims(0         , vps.1 - yo), H, true);
-        draw(Dims(vps.0 + 1 , yo        ), H, false);
-        draw(Dims(vps.0 + 1 , vps.1 - yo), H, true);
+        draw(Dims(0        , yo        ), H, false);
+        draw(Dims(0        , vps.1 - yo), H, true);
+        draw(Dims(vps.0 + 1, yo        ), H, false);
+        draw(Dims(vps.0 + 1, vps.1 - yo), H, true);
     };
 }
 

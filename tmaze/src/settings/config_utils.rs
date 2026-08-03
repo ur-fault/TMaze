@@ -212,7 +212,7 @@ macro_rules! config {
     };
 
     (@step $name:ident
-         [$($fields:ident : $type:ty = $def_vals:expr),* ,]
+         [$($fields:ident : $fp_type:ty = $def_vals:expr),* ,]
          [$($rfields:tt)*]
          [$($pfields:tt)*]
          { }
@@ -239,7 +239,7 @@ macro_rules! config {
             impl [<Partial $name>] {
                 $(
                     #[allow(dead_code)]
-                    pub fn $fields(&mut self) -> &mut $type {
+                    pub fn $fields(&mut self) -> &mut $fp_type {
                         self.$fields.get_or_insert($def_vals)
                     }
                 )*
@@ -270,7 +270,7 @@ macro_rules! config {
                             $fields: match map.remove(stringify!($fields)) {
                                 Some(value) => context.at(
                                     $crate::settings::config_utils::Segment::Key(stringify!($fields).to_string()),
-                                    |ctx| <$type as $crate::settings::config_utils::LenientConvert>::convert(value, ctx)
+                                    |ctx| <$fp_type as $crate::settings::config_utils::LenientConvert>::convert(value, ctx)
                                 ),
                                 None => None,
                             },
@@ -348,6 +348,15 @@ macro_rules! impl_lenient_deserialize  {
             }
         })*
     }
+}
+
+#[macro_export]
+macro_rules! update_settings {
+    ($settings:expr, $($access:ident).+ = $val:expr) => {
+        $settings.update_ui(|cfg| {
+            *cfg.$($access()).+ = $val;
+        })
+    };
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]

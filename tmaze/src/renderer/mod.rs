@@ -785,6 +785,22 @@ impl GMutView<'_> {
         self
     }
 
+    #[inline]
+    pub fn xline(&mut self, y: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        self.off_top(y, |f| {
+            f.top(1, |f| content(f));
+        });
+        self
+    }
+
+    #[inline]
+    pub fn yline(&mut self, x: i32, content: impl FnOnce(&mut GMutView)) -> &mut Self {
+        self.off_left(x, |f| {
+            f.left(1, |f| content(f));
+        });
+        self
+    }
+
     pub fn alpha(&mut self, alpha: u8, content: impl FnOnce(&mut GMutView)) -> &mut Self {
         if alpha == 255 {
             content(self);
@@ -798,6 +814,10 @@ impl GMutView<'_> {
             self.draw(Dims::ZERO, AlphaView(buf.view(), alpha), ());
         }
         self
+    }
+
+    pub fn absolute_bounds(&self) -> Rect {
+        self.bounds
     }
 }
 

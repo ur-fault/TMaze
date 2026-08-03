@@ -1,272 +1,390 @@
+use std::ops::RangeInclusive;
+
 use crossterm::event::{
     Event as TermEvent, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 
-use pad::PadStr;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
-
-use std::{borrow::Cow, fmt, ops::RangeInclusive};
 
 use cmaze::dims::Dims;
 
 use crate::{
     app::{
-        activity::{Activity, ActivityHandler, Change},
+        activity::{ActivityHandler, Change},
         app::AppData,
         ActivityEvent,
     },
-    helpers::{is_release, strings::MbyStaticStr, LineDir},
-    renderer::GMutView,
+    helpers::{is_release, LineDir},
+    renderer::{draw::Align, CellContent, GMutView, Padding},
     settings::theme::{Style, Theme, ThemeResolver},
 };
 
-use super::{center_box_in_screen, draw_box, Rect, Screen, ScreenError};
+use super::{Rect, Screen, ScreenError};
 
 pub fn panic_on_menu_push() -> ! {
     panic!("menu should only be popping itself or staying");
 }
 
-pub struct SliderDef {
-    pub text: MbyStaticStr,
-    pub val: i32,
-    pub range: RangeInclusive<i32>,
-    #[allow(clippy::type_complexity)]
-    pub update_fn: Box<dyn FnMut(i32, &mut AppData)>,
-    pub reset_fn: Option<Box<dyn FnMut(&mut AppData) -> i32>>,
-    pub as_num: bool,
+pub type MenuItemObj = Box<dyn MenuItem>;
+
+pub trait MenuItem {
+    fn min_width(&self) -> usize;
+
+    fn render(&self, frame: &mut GMutView, style: Style);
+
+    fn on_key(
+        &mut self,
+        _key: KeyCode,
+        _modifiers: KeyModifiers,
+        _data: &mut AppData,
+    ) -> Option<Change> {
+        None
+    }
+
+    fn on_select(&mut self, _data: &mut AppData) -> Option<Change> {
+        None
+    }
+
+    /// Returns whether this menu item can be selected by the user.
+    ///
+    /// *Must* stay constant for the lifetime of the menu item.
+    fn selectable(&self) -> bool {
+        true
+    }
+
+    /// Returns whether this menu item should be counted in the menu's numbering.
+    ///
+    /// *Must* stay constant for the lifetime of the menu item.
+    fn indexed(&self) -> bool {
+        false
+    }
+
+    fn style(&self) -> &str {
+        "ui.menu.item"
+    }
 }
 
-pub struct OptionDef {
-    pub text: MbyStaticStr,
-    pub val: bool,
-    #[allow(clippy::type_complexity)]
-    // FIXME: return the bool instead
-    pub update_fn: Box<dyn FnMut(bool, &mut AppData)>,
-    pub reset_fn: Option<Box<dyn FnMut(&mut AppData) -> bool>>,
+pub struct Text {
+    text: String,
+    first_col: char,
+    last_col: char,
+    indexed: bool,
+    click_fn: Option<Box<dyn FnMut(&mut AppData) -> Option<Change>>>,
 }
 
-// TODO: styling individual items
-pub enum MenuItem {
-    Text {
-        text: MbyStaticStr,
-        first_col: char,
-        last_col: char,
-        click_fn: Option<Box<dyn FnMut(&mut AppData) -> Option<Change>>>,
-    },
-    Option(OptionDef),
-    Slider(SliderDef),
-    Separator,
-}
-
-pub const NULL_CHAR: char = '\0';
-
-impl MenuItem {
-    pub fn text<'a>(text: impl Into<Cow<'a, str>>) -> Self {
-        MenuItem::Text {
-            text: MbyStaticStr::Owned(text.into().into_owned()),
-            first_col: NULL_CHAR,
-            last_col: NULL_CHAR,
+impl Text {
+    pub fn new(text: impl Into<String>) -> Box<Self> {
+        Box::new(Self {
+            text: text.into(),
+            first_col: '\0',
+            last_col: '\0',
+            indexed: false,
             click_fn: None,
-        }
+        })
     }
 
-    pub fn static_text(text: &'static str) -> Self {
-        MenuItem::Text {
-            text: MbyStaticStr::Static(text),
-            first_col: NULL_CHAR,
-            last_col: NULL_CHAR,
-            click_fn: None,
-        }
+    pub fn click<R: CallbackReturnValue>(
+        mut self: Box<Self>,
+        mut click_fn: impl FnMut(&mut AppData) -> R + 'static,
+    ) -> Box<Self> {
+        self.click_fn = Some(Box::new(move |d| click_fn(d).to_change()));
+        self
     }
 
-    pub fn active_text(
-        text: impl Into<String>,
-        click_fn: impl FnMut(&mut AppData) -> Option<Change> + 'static,
-    ) -> Self {
-        MenuItem::Text {
-            text: text.into().into(),
-            first_col: NULL_CHAR,
-            last_col: NULL_CHAR,
-            click_fn: Some(Box::new(click_fn)),
-        }
-    }
-}
-
-impl MenuItem {
-    fn width(&self, special: usize) -> Option<usize> {
-        match self {
-            MenuItem::Text {
-                text,
-                first_col,
-                last_col,
-                ..
-            } => Some(
-                text.width()
-                    + first_col.width().map(|w| w + 1).unwrap_or(0)
-                    + last_col.width().map(|w| w + 1).unwrap_or(0),
-            ),
-            MenuItem::Option(OptionDef { text, .. }) => Some(text.width() + 4),
-            MenuItem::Slider(SliderDef {
-                text,
-                range,
-                as_num: show_as_number,
-                ..
-            }) => {
-                assert!(range.start() <= range.end());
-                assert!(
-                    (*show_as_number || *range.start() >= 0),
-                    "if range is not shown as number, it must be positive"
-                );
-
-                let text_width = text.width();
-                if *show_as_number {
-                    let min = range.start().to_string().len();
-                    let max = range.end().to_string().len();
-                    Some(text_width + min.max(max) + 3)
-                } else {
-                    let boxes = range.end() - range.start();
-                    Some(text_width + boxes as usize + 4)
-                }
-            }
-            MenuItem::Separator => None,
-        }
-        .map(|w| w + special)
+    pub fn indexed(mut self: Box<Self>) -> Box<Self> {
+        self.indexed = true;
+        self
     }
 
-    // TODO: same as Display, make it get a buffer and write to it,
-    // so we don't allocate a new string every time
-    fn render(&self, width: usize) -> Cow<'_, str> {
-        match self {
-            MenuItem::Text {
-                text,
-                first_col,
-                last_col,
-                ..
-            } => {
-                let first_col = if first_col.is_control() {
-                    "".into()
-                } else {
-                    format!("{} ", first_col)
-                };
+    pub fn first_col(mut self: Box<Self>, first_col: char) -> Box<Self> {
+        self.first_col = first_col;
+        self
+    }
 
-                let last_col = if last_col.is_control() {
-                    "".into()
-                } else {
-                    format!(" {}", last_col)
-                };
-
-                let rem_width = width.saturating_sub(first_col.width() + text.width()) - 1;
-                format!("{first_col}{text}{last_col:>rem_width$}").into()
-            }
-            MenuItem::Option(OptionDef { text, val, .. }) => {
-                // TODO: this is not a prefix tho ?!?
-                let prefix = if *val { "[▪]" } else { "[ ]" };
-                let text_w = text.width();
-                format!("{text} {prefix:>width$}", width = width - text_w - 1).into()
-            }
-            MenuItem::Slider(SliderDef {
-                text,
-                val,
-                as_num,
-                range,
-                ..
-            }) => {
-                if *as_num {
-                    format!("[{val}] {text}").into()
-                } else {
-                    // TODO: find the best character to use
-                    // const FILLED: char = '█';
-                    const FILLED: char = '#';
-                    // const FILLED: char = '-';
-
-                    let count = (range.end() - range.start()) as usize;
-
-                    let filled = (*val - range.start()) as usize;
-                    let empty = count - filled;
-
-                    let filled = FILLED.to_string().repeat(filled);
-                    let empty = " ".repeat(empty);
-
-                    let progress = filled + &empty;
-                    let text_width = text.width();
-
-                    let indicator = format!(" [{progress}]");
-
-                    format!("{text}{indicator:>width$}", width = width - text_width).into()
-                }
-            }
-            MenuItem::Separator => LineDir::Horizontal.round().to_string().repeat(width).into(),
-        }
+    pub fn last_col(mut self: Box<Self>, last_col: char) -> Box<Self> {
+        self.last_col = last_col;
+        self
     }
 }
 
-impl From<String> for MenuItem {
+impl MenuItem for Text {
+    fn min_width(&self) -> usize {
+        fn col_width(c: char) -> usize {
+            c.width().map(|w| w + 1).unwrap_or(0)
+        }
+
+        self.text.width() + col_width(self.first_col) + col_width(self.last_col)
+    }
+
+    fn render(&self, frame: &mut GMutView, style: Style) {
+        frame.draw::<Style>(Dims(0, 0), &self.text, style);
+    }
+
+    fn on_key(&mut self, key: KeyCode, _: KeyModifiers, data: &mut AppData) -> Option<Change> {
+        let Some(fun) = &mut self.click_fn else {
+            return None;
+        };
+
+        match key {
+            KeyCode::Enter | KeyCode::Char(' ') => fun(data),
+            _ => None,
+        }
+    }
+
+    fn on_select(&mut self, _data: &mut AppData) -> Option<Change> {
+        if let Some(fun) = &mut self.click_fn {
+            return fun(_data);
+        }
+
+        None
+    }
+
+    fn indexed(&self) -> bool {
+        self.indexed
+    }
+}
+
+impl From<String> for Box<Text> {
     fn from(s: String) -> Self {
-        MenuItem::text(s)
+        Text::new(s)
     }
 }
 
-impl From<&str> for MenuItem {
-    fn from(s: &str) -> Self {
-        MenuItem::text(s)
+impl From<&'static str> for Box<Text> {
+    fn from(s: &'static str) -> Self {
+        Text::new(s)
     }
 }
 
-impl fmt::Debug for MenuItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MenuItem::Text {
-                text,
-                first_col,
-                last_col,
-                ..
-            } => write!(f, "Text('{first_col}' '{text}' '{last_col}')"),
-            MenuItem::Option(OptionDef { text, val, .. }) => write!(f, "Option({}, {})", text, val),
-            MenuItem::Slider(SliderDef {
-                text, val, range, ..
-            }) => write!(f, "Slider({}, {}, {:?})", text, val, range),
-            MenuItem::Separator => write!(f, "Separator"),
+impl From<String> for MenuItemObj {
+    fn from(s: String) -> Self {
+        Text::new(s)
+    }
+}
+
+impl From<&'static str> for MenuItemObj {
+    fn from(s: &'static str) -> Self {
+        Text::new(s)
+    }
+}
+
+pub struct Separator;
+
+impl MenuItem for Separator {
+    fn min_width(&self) -> usize {
+        0
+    }
+
+    fn render(&self, frame: &mut GMutView, style: Style) {
+        let line = LineDir::Horizontal.round();
+        for _ in 0..frame.size().0 {
+            frame.draw(Dims(0, 0), line, style);
         }
+    }
+
+    fn selectable(&self) -> bool {
+        false
+    }
+}
+
+pub fn separator() -> Box<dyn MenuItem> {
+    Box::new(Separator)
+}
+
+pub struct Switch {
+    pub text: String,
+    pub val: bool,
+    pub update_fn: Box<dyn FnMut(bool, &mut AppData)>,
+}
+
+impl Switch {
+    pub fn new(
+        text: impl Into<String>,
+        val: bool,
+        update_fn: impl FnMut(bool, &mut AppData) + 'static,
+    ) -> Box<Self> {
+        Box::new(Self {
+            text: text.into(),
+            val,
+            update_fn: Box::new(update_fn),
+        })
+    }
+}
+
+impl MenuItem for Switch {
+    fn min_width(&self) -> usize {
+        self.text.width() + 5
+    }
+
+    fn render(&self, frame: &mut GMutView, style: Style) {
+        // TODO: this is not a prefix tho ?!?
+        let indicator = if self.val { "[▪]" } else { "[ ]" };
+        frame.draw(Dims(0, 0), &self.text, style);
+        frame.draw_aligned(Align::CenterRight, indicator, style);
+    }
+
+    fn on_key(
+        &mut self,
+        key: KeyCode,
+        _modifiers: KeyModifiers,
+        data: &mut AppData,
+    ) -> Option<Change> {
+        match key {
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                self.val = !self.val;
+                (self.update_fn)(self.val, data);
+            }
+            _ => {}
+        }
+
+        None
+    }
+}
+
+pub struct Slider<V> {
+    pub text: String,
+    pub val: V,
+    pub range: RangeInclusive<V>,
+    pub step: V,
+    pub update_fn: Box<dyn FnMut(V, &mut AppData) + 'static>,
+    pub width: u32,
+    pub display: SliderDisplay,
+}
+
+impl<V> Slider<V>
+where
+    V: SliderValue + 'static,
+{
+    pub fn new(
+        text: impl Into<String>,
+        val: V,
+        range: RangeInclusive<V>,
+        update_fn: impl FnMut(V, &mut AppData) + 'static,
+    ) -> Box<Self> {
+        assert!(
+            range.start() <= range.end(),
+            "Slider range start must be less than or equal to end"
+        );
+
+        Box::new(Self {
+            text: text.into(),
+            val,
+            range,
+            step: val.default_step(),
+            update_fn: Box::new(update_fn),
+            width: 5,
+            display: SliderDisplay::Bar,
+        })
+    }
+
+    pub fn step(mut self: Box<Self>, step: V) -> Box<Self> {
+        self.step = step;
+        self
+    }
+
+    pub fn width(mut self: Box<Self>, width: u32) -> Box<Self> {
+        self.width = width;
+        self
+    }
+
+    pub fn display(mut self: Box<Self>, display: SliderDisplay) -> Box<Self> {
+        self.display = display;
+        self
+    }
+}
+
+impl<V> MenuItem for Slider<V>
+where
+    V: SliderValue,
+{
+    fn min_width(&self) -> usize {
+        self.text.width() + self.width as usize + 4
+    }
+
+    fn render(&self, frame: &mut GMutView, style: Style) {
+        frame.draw(Dims(0, 0), &self.text, style);
+
+        let val = self.val.to_f64();
+        let start = *self.range.start();
+        let end = *self.range.end();
+        let width = self.width as usize;
+
+        match self.display {
+            SliderDisplay::Percentage => todo!(),
+            SliderDisplay::Value => {
+                let val_str = if self.val.is_float() {
+                    format!("[{:.2}]", val)
+                } else {
+                    format!("[{}", val as i64)
+                };
+
+                frame.draw_aligned(Align::CenterRight, &format!("{}", val_str), style);
+            }
+            SliderDisplay::Bar => {
+                let filled = ((val - start.to_f64()) / (end.to_f64() - start.to_f64())
+                    * width as f64)
+                    .round() as usize;
+                let empty = width - filled;
+
+                let progress = format!("[{}{}]", "#".repeat(filled), " ".repeat(empty));
+                frame.draw_aligned(Align::CenterRight, &progress, style);
+            }
+        }
+    }
+
+    fn on_key(
+        &mut self,
+        key: KeyCode,
+        _modifiers: KeyModifiers,
+        data: &mut AppData,
+    ) -> Option<Change> {
+        match key {
+            KeyCode::Left | KeyCode::Char('a') => self.val.sub_assign(self.step, None),
+            KeyCode::Right | KeyCode::Char('d') => self.val.add_assign(self.step, None),
+            _ => return None,
+        };
+        self.val = self.val.clamp(&self.range);
+        (self.update_fn)(self.val, data);
+
+        None
     }
 }
 
 pub struct MenuConfig {
     pub title: String,
     pub subtitles: Vec<String>,
-    pub options: Vec<MenuItem>,
+    pub options: Vec<MenuItemObj>,
     pub default: Option<usize>,
-    pub counted: bool,
     pub q_to_quit: bool,
-    pub auto_select_single: bool,
     pub styles: MenuStyles,
+
+    // Callbacks
+    pub on_enter: Option<Box<dyn FnMut(&mut AppData) -> Option<Change>>>,
+    pub on_update: Option<Box<dyn FnMut(&mut AppData) -> Option<Change>>>,
 }
 
 impl MenuConfig {
     pub fn new_from_strings(title: impl Into<String>, options: impl Into<Vec<String>>) -> Self {
         let options: Vec<_> = Into::<Vec<_>>::into(options)
             .into_iter()
-            .map(MenuItem::from)
+            .map(MenuItemObj::from)
             .collect();
 
         Self::new(title, options)
     }
 
-    pub fn new(title: impl Into<String>, options: impl Into<Vec<MenuItem>>) -> Self {
+    pub fn new(title: impl Into<String>, options: impl Into<Vec<MenuItemObj>>) -> Self {
         Self {
             title: title.into(),
             subtitles: vec![],
             options: options.into(),
             default: None,
-            counted: false,
             q_to_quit: true,
-            auto_select_single: false,
+            // auto_select_single: false,
             styles: MenuStyles::default(),
+            on_enter: None,
+            on_update: None,
         }
-    }
-
-    pub fn counted(mut self) -> Self {
-        self.counted = true;
-        self
     }
 
     pub fn default(mut self, default: usize) -> Self {
@@ -284,11 +402,6 @@ impl MenuConfig {
         self
     }
 
-    pub fn auto_select_single(mut self) -> Self {
-        self.auto_select_single = true;
-        self
-    }
-
     pub fn subtitle(mut self, subtitle: impl Into<String>) -> Self {
         self.subtitles.push(subtitle.into());
         self
@@ -299,42 +412,65 @@ impl MenuConfig {
         self
     }
 
-    pub fn with_styles(mut self, styles: MenuStyles) -> Self {
+    pub fn styled(mut self, styles: MenuStyles) -> Self {
         self.styles = styles;
         self
     }
 
+    pub fn on_enter<R: CallbackReturnValue>(
+        mut self,
+        mut f: impl FnMut(&mut AppData) -> R + 'static,
+    ) -> Self {
+        self.on_enter = Some(Box::new(move |data| f(data).to_change()));
+        self
+    }
+
+    pub fn on_update<R: CallbackReturnValue>(
+        mut self,
+        mut f: impl FnMut(&mut AppData) -> R + 'static,
+    ) -> Self {
+        self.on_update = Some(Box::new(move |data| f(data).to_change()));
+        self
+    }
+
     fn special_width(&self) -> usize {
-        let mut special = 2; // 2 is for cursor
+        let mut special = 2;
 
         if self.default.is_some() {
             special += 2;
         }
 
-        if self.counted {
-            let max_num_w = (self.options.len() as f64).log10().ceil() as usize;
-            special += max_num_w + 2;
-        }
+        if self.indexed_count() > 0 {
+            special += (self.indexed_count() as f64).log10().ceil() as usize + 2;
+        };
 
         special
     }
 
     fn map_options<'s, T>(
         &'s self,
-        f: impl Fn(&'s MenuItem) -> T + 'static,
+        f: impl Fn(&'s dyn MenuItem) -> T + 'static,
     ) -> impl Iterator<Item = T> + 's {
-        self.options.iter().map(f)
+        self.options.iter().map(move |opt| f(&**opt))
+    }
+
+    fn indexed_count(&self) -> usize {
+        self.options.iter().filter(|opt| opt.indexed()).count()
+    }
+
+    fn is_indexed(&self) -> bool {
+        self.indexed_count() > 0
     }
 }
 
 pub struct MenuStyles {
     pub title: &'static str,
     pub subtitle: &'static str,
-    pub text: &'static str,
     pub border: &'static str,
     pub separator: &'static str,
     pub selector: &'static str,
     pub number: &'static str,
+    pub item: &'static str,
 }
 
 impl MenuStyles {
@@ -342,11 +478,11 @@ impl MenuStyles {
         AppliedStyles {
             title: theme[self.title],
             subtitle: theme[self.subtitle],
-            text: theme[self.text],
             border: theme[self.border],
             separator: theme[self.separator],
             selector: theme[self.selector],
             number: theme[self.number],
+            item: theme[self.item],
         }
     }
 }
@@ -356,11 +492,11 @@ impl Default for MenuStyles {
         Self {
             title: "ui.menu.title",
             subtitle: "ui.menu.subtitle",
-            text: "ui.menu.text",
             border: "ui.menu.border",
             separator: "ui.menu.separator",
             selector: "ui.menu.selector",
             number: "ui.menu.number",
+            item: "ui.menu.item",
         }
     }
 }
@@ -368,11 +504,11 @@ impl Default for MenuStyles {
 struct AppliedStyles {
     title: Style,
     subtitle: Style,
-    text: Style,
     border: Style,
     separator: Style,
     selector: Style,
     number: Style,
+    item: Style,
 }
 
 pub struct Menu {
@@ -390,8 +526,8 @@ impl Menu {
 
     pub fn try_new(config: MenuConfig) -> Option<Self> {
         let MenuConfig { options, .. } = &config;
-        if options.is_empty() {
-            log::warn!("Menu `{}` with no options", config.title);
+        if options.iter().all(|opt| !opt.selectable()) {
+            log::warn!("Menu `{}` with no selectable options", config.title);
             return None;
         }
 
@@ -404,67 +540,22 @@ impl Menu {
         })
     }
 
-    pub fn into_activity(self, name: impl Into<String>) -> Activity {
-        Activity::new_base(name, Box::new(self))
-    }
-
     pub fn config(&self) -> &MenuConfig {
         &self.config
     }
 
     fn select(&mut self, down: bool) {
-        let opt_count = self.config.options.len();
+        let opt_count = self.config.options.len() as isize;
         loop {
-            // negative numbers wrap around zero
             if down {
-                self.selected = (self.selected + 1) % opt_count;
+                self.selected = (self.selected + 1) % opt_count as usize;
             } else {
-                self.selected =
-                    (self.selected as isize - 1).rem_euclid(opt_count as isize) as usize;
+                self.selected = (self.selected as isize - 1).rem_euclid(opt_count) as usize;
             }
 
-            // skip separators
-            if !matches!(self.config.options[self.selected], MenuItem::Separator) {
+            if self.config.options[self.selected].selectable() {
                 break;
             }
-        }
-    }
-
-    fn switch(&mut self, data: &mut AppData) -> Option<Change> {
-        let selected_opt = &mut self.config.options[self.selected];
-
-        match selected_opt {
-            MenuItem::Text { click_fn, .. } => {
-                if let Some(fun) = click_fn {
-                    return fun(data);
-                }
-                return Some(Change::pop_top_with(self.selected));
-            }
-            MenuItem::Option(OptionDef {
-                val,
-                update_fn: fun,
-                ..
-            }) => {
-                *val = !*val;
-                fun(*val, data);
-            }
-            MenuItem::Slider(_) | MenuItem::Separator => {}
-        }
-
-        None
-    }
-
-    fn update_slider(&mut self, right: bool, data: &mut AppData) {
-        if let MenuItem::Slider(SliderDef {
-            val,
-            range,
-            update_fn: fun,
-            ..
-        }) = &mut self.config.options[self.selected]
-        {
-            *val += if right { 1 } else { -1 };
-            *val = (*val).clamp(*range.start(), *range.end());
-            fun(*val, data);
         }
     }
 
@@ -479,56 +570,20 @@ impl Menu {
 
         let selected = (y - start.1) as usize;
 
-        if matches!(self.config.options[selected], MenuItem::Separator) {
+        if !self.config.options[selected].selectable() {
             return None;
         }
 
         Some(selected)
     }
-
-    fn reset(&mut self, data: &mut AppData) {
-        let selected_opt = &mut self.config.options[self.selected];
-        match selected_opt {
-            MenuItem::Text { .. } => {}
-            MenuItem::Option(OptionDef { val, reset_fn, .. }) => {
-                if let Some(reset_fn) = reset_fn {
-                    *val = reset_fn(data);
-                }
-            }
-            MenuItem::Slider(SliderDef { val, reset_fn, .. }) => {
-                if let Some(reset_fn) = reset_fn {
-                    *val = reset_fn(data);
-                }
-            }
-            MenuItem::Separator => {}
-        }
-    }
 }
 
 impl ActivityHandler for Menu {
     fn update(&mut self, events: Vec<ActivityEvent>, app_data: &mut AppData) -> Option<Change> {
-        let opt_count = self.config.options.len() as isize;
-        let non_sep_count = self
-            .config
-            .map_options(|opt| !matches!(opt, MenuItem::Separator))
-            .count() as isize;
-
-        if non_sep_count == 1 && self.config.auto_select_single {
-            log::info!("Menu with only one option, returning that");
-            let first_non_separator = self
-                .config
-                .options
-                .iter()
-                .position(|opt| !matches!(opt, MenuItem::Separator))
-                .unwrap();
-            return Some(Change::pop_top_with(first_non_separator));
-        } else if non_sep_count == 0 {
-            log::warn!("Empty menu, returning `None`");
-            return Some(Change::pop_top());
-        }
+        let opt_count = self.config.indexed_count() as isize;
 
         /// Return if the expression is `Some`, otherwise do nothing.
-        /// Can be thought of as a `?` or `try` for `Some` instead of `None`.
+        /// Can be thought of as a `?` for `Some` instead of `None`.
         macro_rules! return_if_some {
             ($change:expr) => {
                 if let Some(change) = $change {
@@ -537,8 +592,15 @@ impl ActivityHandler for Menu {
             };
         }
 
-        let dims = MenuDimenstions::calc(&self.config);
-        self.items_pos = Some(Rect::sized_at(dims.items_pos, dims.items_size));
+        if let on_enter @ Some(_) = &mut self.config.on_enter {
+            let mut swapped = None;
+            std::mem::swap(&mut swapped, on_enter);
+            return_if_some!(swapped.unwrap()(app_data));
+        }
+
+        if let Some(on_update) = &mut self.config.on_update {
+            return_if_some!(on_update(app_data));
+        }
 
         for event in events {
             match event {
@@ -554,31 +616,31 @@ impl ActivityHandler for Menu {
                     KeyCode::Down | KeyCode::Char('s') => {
                         self.select(true);
                     }
-                    KeyCode::Enter | KeyCode::Char(' ') => {
-                        return_if_some!(self.switch(app_data));
-                    }
                     KeyCode::Char('q') if !self.config.q_to_quit => return Some(Change::pop_top()),
                     KeyCode::Char('q') if self.config.q_to_quit => return Some(Change::pop_all()),
-                    KeyCode::Char(ch @ '1'..='9') if self.config.counted => {
+                    KeyCode::Char(ch @ '1'..='9') if self.config.is_indexed() => {
                         let old_sel = self.selected;
-                        self.selected =
-                            (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
+                        let index = (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
+                        self.selected = self
+                            .config
+                            .options
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, opt)| opt.indexed())
+                            .nth(index)
+                            .map(|(i, _)| i)
+                            .unwrap_or(old_sel);
 
                         if old_sel == self.selected {
-                            return_if_some!(self.switch(app_data));
+                            return self.config.options[self.selected].on_select(app_data);
                         }
                     }
                     KeyCode::Esc => return Some(Change::pop_top()),
-                    KeyCode::Left => {
-                        self.update_slider(false, app_data);
+                    code => {
+                        return_if_some!(
+                            self.config.options[self.selected].on_key(code, modifiers, app_data)
+                        );
                     }
-                    KeyCode::Right => {
-                        self.update_slider(true, app_data);
-                    }
-                    KeyCode::Char('r') if modifiers.contains(KeyModifiers::CONTROL) => {
-                        self.reset(app_data);
-                    }
-                    _ => {}
                 },
                 ActivityEvent::Term(TermEvent::Mouse(MouseEvent {
                     kind,
@@ -593,34 +655,33 @@ impl ActivityHandler for Menu {
                                 self.selected = selected;
                             }
                         }
-                        MouseEventKind::ScrollDown => {
-                            if modifiers.contains(KeyModifiers::CONTROL) {
-                                self.update_slider(false, app_data);
-                            } else {
-                                self.select(true);
-                            }
+                        MouseEventKind::ScrollDown if modifiers == KeyModifiers::empty() => {
+                            self.select(true);
                         }
-                        MouseEventKind::ScrollUp => {
-                            if modifiers.contains(KeyModifiers::CONTROL) {
-                                self.update_slider(true, app_data);
-                            } else {
-                                self.select(false);
-                            }
+                        MouseEventKind::ScrollUp if modifiers == KeyModifiers::empty() => {
+                            self.select(false);
                         }
+                        // MouseEventKind::ScrollDown if modifiers.contains(KeyModifiers::CONTROL) => {
+                        //     self.update_slider(false, app_data);
+                        // }
+                        // MouseEventKind::ScrollUp if modifiers.contains(KeyModifiers::CONTROL) => {
+                        //     self.update_slider(true, app_data);
+                        // }
                         MouseEventKind::Up(MouseButton::Left) => {
                             if let Some(selected) = self.get_opt_by_mouse_pos(mouse_pos) {
                                 self.selected = selected;
                             }
-                            return_if_some!(self.switch(app_data));
+
+                            return_if_some!(self.config.options[self.selected].on_select(app_data));
                         }
 
                         // TODO: Test these
-                        MouseEventKind::ScrollLeft => {
-                            self.update_slider(false, app_data);
-                        }
-                        MouseEventKind::ScrollRight => {
-                            self.update_slider(true, app_data);
-                        }
+                        // MouseEventKind::ScrollLeft => {
+                        //     self.update_slider(false, app_data);
+                        // }
+                        // MouseEventKind::ScrollRight => {
+                        //     self.update_slider(true, app_data);
+                        // }
                         _ => {}
                     }
                 }
@@ -638,102 +699,85 @@ impl ActivityHandler for Menu {
 
 impl Screen for Menu {
     fn draw(&mut self, frame: &mut GMutView, theme: &Theme) -> Result<(), ScreenError> {
-        let MenuConfig { title, counted, .. } = &self.config;
+        let MenuConfig {
+            title,
+            options,
+            subtitles,
+            ..
+        } = &self.config;
         let AppliedStyles {
             title: title_style,
             subtitle: subtitle_style,
-            text: text_style,
             border: border_style,
             separator: separator_style,
             selector: selector_style,
             number: number_style,
+            item: item_style,
         } = self.config.styles.apply(theme);
 
         let MenuDimenstions {
             size,
-            title_pos,
-            items_pos,
-            subtitles_pos,
-            items_size: _,
-            count_pos,
-            item_text_pos,
-            item_text_len,
+            title: title_pos,
+            subtitles: subtitles_pos,
+            separator,
+            items,
+            item_content_margin,
+            counts,
+            item_texts,
         } = MenuDimenstions::calc(&self.config);
-
-        let max_item_width = size.0 as usize - 2 - self.config.special_width();
-
-        let options = self
-            .config
-            .options
-            .iter()
-            .map(|opt| opt.render(max_item_width))
-            .collect::<Vec<_>>();
-
-        let pos = center_box_in_screen(size);
-        let opt_count = options.len();
-
-        let max_count = opt_count.to_string().len();
 
         if frame.size().0 < size.0 || frame.size().1 < size.1 {
             return Err(ScreenError::SmallScreen);
         }
 
-        draw_box(frame, pos, size, border_style);
+        frame.centered(size, |f| {
+            f.border(border_style);
 
-        frame.draw(title_pos, title.as_str(), title_style);
+            f.draw(title_pos, title, title_style);
 
-        for (i, subtitle) in self.config.subtitles.iter().enumerate() {
-            frame.draw(
-                subtitles_pos + Dims(0, i as i32),
-                subtitle.as_str(),
-                subtitle_style,
-            );
-        }
+            for (i, subtitle) in subtitles.iter().enumerate() {
+                f.draw(subtitles_pos + Dims(0, i as i32), subtitle, subtitle_style);
+            }
+            f.draw(Dims(0, 0), separator, separator_style);
 
-        frame.draw(
-            items_pos - Dims(0, 1),
-            Rect::sized(Dims(size.0 - 2, 1)),
-            separator_style,
-        );
+            f.bounds(items, |f| {
+                self.items_pos = Some(f.absolute_bounds());
 
-        for (i, option) in options.iter().enumerate() {
-            let prep_style = |style: Style| {
-                if i == self.selected {
-                    style.invert()
-                } else {
-                    style
+                let mut indexed = 1;
+                for (i, option) in options.iter().enumerate() {
+                    f.xline(i as i32, |f| {
+                        let prep_style = |style: Style| {
+                            if i == self.selected {
+                                style.invert()
+                            } else {
+                                style
+                            }
+                        };
+
+                        f.fill(CellContent::styled(' ', prep_style(item_style)));
+                        if i == self.selected {
+                            f.draw(Dims(0, 0), "> ", selector_style.invert());
+                        }
+
+                        let padding = Padding {
+                            right: item_content_margin,
+                            left: item_texts,
+                            ..Padding::default()
+                        };
+                        f.pad(padding, |f| option.render(f, prep_style(item_style)));
+
+                        if option.indexed() {
+                            f.draw(
+                                Dims(counts, 0),
+                                format!("{}. ", indexed,),
+                                prep_style(number_style),
+                            );
+                            indexed += 1;
+                        }
+                    });
                 }
-            };
-
-            // selector
-            if i == self.selected {
-                frame.draw(
-                    items_pos + Dims(0, i as i32),
-                    "> ",
-                    prep_style(selector_style),
-                );
-            } else {
-                frame.draw(
-                    items_pos + Dims(0, i as i32),
-                    "  ",
-                    prep_style(selector_style),
-                );
-            }
-
-            if *counted {
-                frame.draw(
-                    count_pos.unwrap() + Dims(0, i as i32),
-                    format!("{:width$}. ", i + 1, width = max_count),
-                    prep_style(number_style),
-                );
-            }
-
-            frame.draw(
-                item_text_pos + Dims(0, i as i32),
-                option.as_ref().pad_to_width(item_text_len),
-                prep_style(text_style),
-            );
-        }
+            });
+        });
 
         Ok(())
     }
@@ -741,20 +785,18 @@ impl Screen for Menu {
 
 struct MenuDimenstions {
     size: Dims,
-    title_pos: Dims,
-    items_pos: Dims,
-    items_size: Dims,
-    subtitles_pos: Dims,
-    count_pos: Option<Dims>,
-    item_text_pos: Dims,
-    item_text_len: usize,
+    title: Dims,
+    subtitles: Dims,
+    separator: Rect,
+    items: Rect,
+    item_content_margin: i32,
+    counts: i32,
+    item_texts: i32,
 }
 
 impl MenuDimenstions {
     fn calc(config: &MenuConfig) -> Self {
         let menu_size = {
-            let special = config.special_width();
-
             let subtitles_width = config
                 .subtitles
                 .iter()
@@ -763,49 +805,49 @@ impl MenuDimenstions {
                 .unwrap_or(0);
 
             let items_width = config
-                .map_options(move |opt| opt.width(special).unwrap_or(0))
+                .map_options(move |opt| opt.min_width())
                 .max()
                 .unwrap_or(0);
 
             let width = subtitles_width
-                .max(items_width)
-                .max(config.title.width() + 2) // title is offseted by 2
+                .max(items_width + 2 + config.special_width())
+                .max(config.title.width() + 4)
                 + 2;
 
-            let width = width + 2;
+            let width = width;
             let height = config.options.len() + 4 + config.subtitles.len();
 
             Dims(width as i32, height as i32)
         };
 
-        let pos = center_box_in_screen(menu_size);
+        let items = Rect::sized_at(
+            Dims(1, config.subtitles.len() as i32 + 3),
+            Dims(menu_size.0 - 2, config.options.len() as i32),
+        );
 
-        let items_pos = Dims(pos.0 + 1, pos.1 + config.subtitles.len() as i32 + 3);
+        let count_pos = if config.is_indexed() { 2 } else { 0 };
 
-        let mut item_text_len = menu_size.0 as usize - 4;
-
-        let count_pos = if config.counted {
-            let max_count = config.options.len().to_string().len();
-            item_text_len -= max_count + 2;
-            Some(Dims(items_pos.0 + 2, items_pos.1))
+        let item_texts = if config.is_indexed() {
+            let max_count = config.indexed_count().to_string().len();
+            2 + max_count as i32 + 2
         } else {
-            None
+            2
         };
 
-        let item_text_pos = count_pos.map_or(Dims(items_pos.0 + 2, items_pos.1), |pos| {
-            let max_count = config.options.len().to_string().len();
-            Dims(pos.0 + max_count as i32 + 2, pos.1)
-        });
+        let separator = Rect::sized_at(
+            Dims(1, config.subtitles.len() as i32 + 2),
+            Dims(menu_size.0 - 2, 1),
+        );
 
         Self {
             size: menu_size,
-            title_pos: pos + Dims(3, 1),
-            items_pos,
-            items_size: Dims(menu_size.0 - 2, config.options.len() as i32),
-            subtitles_pos: pos + Dims(2, 2),
-            count_pos,
-            item_text_pos,
-            item_text_len,
+            title: Dims(3, 1),
+            subtitles: Dims(2, 2),
+            separator,
+            items,
+            item_content_margin: 2,
+            counts: count_pos,
+            item_texts,
         }
     }
 }
@@ -813,13 +855,13 @@ impl MenuDimenstions {
 pub type MenuAction<R> = Box<dyn Fn(&mut AppData) -> R>;
 
 #[macro_export]
-macro_rules! menu_actions {
+macro_rules! menu_actions_2 {
     (move $($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
         {
-            let opts: Vec<(_, $crate::ui::menu::MenuAction<_>)> = vec![
+            let opts: Vec<$crate::ui::menu::MenuItemObj> = vec![
                 $(
                     $(#[cfg(feature = $feature)])?
-                    { ($crate::ui::menu::MenuItem::from($name), Box::new(move |$data: &mut AppData| $action)) },
+                    $crate::ui::menu::Text::new($name).click(move |$data: &mut AppData| Some($action)),
                 )*
             ];
 
@@ -829,10 +871,10 @@ macro_rules! menu_actions {
 
     ($($name:literal $(on $feature:literal)? -> $data:pat => $action:expr),* $(,)?) => {
         {
-            let opts: Vec<(_, $crate::ui::menu::MenuAction<_>)> = vec![
+            let opts: Vec<$crate::ui::menu::MenuItemObj> = vec![
                 $(
                     $(#[cfg(feature = $feature)])?
-                    { ($crate::ui::menu::MenuItem::from($name), Box::new(|$data: &mut AppData| $action)) },
+                    $crate::ui::menu::Text::new($name).click(|$data: &mut AppData| Some($action)),
                 )*
             ];
 
@@ -842,8 +884,8 @@ macro_rules! menu_actions {
 }
 
 pub fn split_menu_actions<R>(
-    actions: Vec<(MenuItem, MenuAction<R>)>,
-) -> (Vec<MenuItem>, Vec<MenuAction<R>>) {
+    actions: Vec<(MenuItemObj, MenuAction<R>)>,
+) -> (Vec<MenuItemObj>, Vec<MenuAction<R>>) {
     actions.into_iter().unzip()
 }
 
@@ -857,7 +899,8 @@ pub fn menu_theme_resolver() -> ThemeResolver {
         .link("ui.menu.subtitle", "ui.menu.text")
         .link("ui.menu.separator", "ui.menu.border")
         .link("ui.menu.selector", "ui.menu.text")
-        .link("ui.menu.number", "ui.menu.text");
+        .link("ui.menu.number", "ui.menu.text")
+        .link("ui.menu.item", "ui.menu.text");
 
     resolver
 }
@@ -869,51 +912,168 @@ pub struct SimpleMenuOptions {
 
 pub fn simple_menu(
     title: impl Into<String>,
-    items: Vec<(MenuItem, Box<dyn Fn(&mut AppData) -> Change>)>,
+    items: Vec<(String, Box<dyn Fn(&mut AppData) -> Change>)>,
 ) -> impl ActivityHandler {
     simple_menu_ex(title, items, SimpleMenuOptions::default())
 }
 
 pub fn simple_menu_ex(
     title: impl Into<String>,
-    items: Vec<(MenuItem, Box<dyn Fn(&mut AppData) -> Change>)>,
+    items: Vec<(String, Box<dyn Fn(&mut AppData) -> Change>)>,
     options: SimpleMenuOptions,
 ) -> impl ActivityHandler {
-    struct SimpleMenu {
-        menu: Menu,
-        actions: Vec<MenuAction<Change>>,
+    let mut config = MenuConfig::new(
+        title,
+        items
+            .into_iter()
+            .map(|(text, action)| {
+                Text::new(text).click(move |data| Some(action(data))) as MenuItemObj
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    if let Some(default) = options.default {
+        config = config.maybe_default(Some(default));
     }
 
-    impl ActivityHandler for SimpleMenu {
-        fn update(&mut self, events: Vec<ActivityEvent>, data: &mut AppData) -> Option<Change> {
-            match self.menu.update(events, data)? {
-                Change::Pop {
-                    res: Some(result),
-                    n: 1,
-                } => {
-                    let index = *result
-                        .downcast::<usize>()
-                        .expect("menu should return index");
-                    Some((self.actions[index])(data))
+    Menu::new(config)
+}
+
+pub trait SliderValue: PartialOrd + Copy + ToString {
+    fn from_f64(val: f64) -> Self;
+
+    fn to_f64(&self) -> f64;
+
+    fn add_assign(&mut self, other: Self, saturate: Option<Self>);
+
+    fn sub_assign(&mut self, other: Self, saturate: Option<Self>);
+
+    fn default_step(&self) -> Self;
+
+    fn clamp(&self, range: &RangeInclusive<Self>) -> Self {
+        if self < range.start() {
+            *range.start()
+        } else if self > range.end() {
+            *range.end()
+        } else {
+            *self
+        }
+    }
+
+    fn is_float(&self) -> bool;
+}
+
+macro_rules! impl_slider_value_int {
+    ($($t:ty : $s:expr),*) => {
+        $(
+            impl SliderValue for $t {
+                fn from_f64(val: f64) -> Self {
+                    val as $t
                 }
-                res => Some(res),
+
+                fn to_f64(&self) -> f64 {
+                    *self as _
+                }
+
+                fn add_assign(&mut self, other: Self, saturate: Option<Self>) {
+                    match (self.checked_add(other), saturate) {
+                        (Some(new_val), Some(sat)) if new_val > sat => *self = sat,
+                        (Some(new_val), _) => *self = new_val,
+                        (None, Some(sat)) => *self = sat,
+                        (None, None) => {}
+                    }
+                }
+
+                fn sub_assign(&mut self, other: Self, saturate: Option<Self>) {
+                    match (self.checked_sub(other), saturate) {
+                        (Some(new_val), Some(sat)) if new_val < sat => *self = sat,
+                        (Some(new_val), _) => *self = new_val,
+                        (None, Some(sat)) => *self = sat,
+                        (None, None) => {}
+                    }
+                }
+
+                fn default_step(&self) -> Self { $s }
+
+                fn is_float(&self) -> bool { false }
             }
-        }
+        )*
+    };
+}
 
-        fn screen(&mut self) -> &mut dyn Screen {
-            &mut self.menu
-        }
-    }
+macro_rules! impl_slider_value_float {
+    ($($t:ty : $s:expr),*) => {
+        $(
+            impl SliderValue for $t {
+                fn from_f64(val: f64) -> Self {
+                    val as $t
+                }
 
-    let (menu_opts, actions) = split_menu_actions(items);
-    let menu_config = MenuConfig::new(title, menu_opts).maybe_default(options.default);
+                fn to_f64(&self) -> f64 {
+                    *self as _
+                }
 
-    SimpleMenu {
-        menu: Menu::new(menu_config),
-        actions,
+                fn add_assign(&mut self, other: Self, saturate: Option<Self>) {
+                    let new_val = *self + other;
+                    match (new_val.is_nan(), saturate) {
+                        (true, Some(sat)) => *self = sat,
+                        (true, None) => {}
+                        (false, Some(sat)) if new_val > sat => *self = sat,
+                        _ => *self = new_val,
+                    }
+                }
+
+                fn sub_assign(&mut self, other: Self, saturate: Option<Self>) {
+                    let new_val = *self - other;
+                    match (new_val.is_nan(), saturate) {
+                        (true, Some(sat)) => *self = sat,
+                        (true, None) => {}
+                        (false, Some(sat)) if new_val < sat => *self = sat,
+                        _ => *self = new_val,
+                    }
+                }
+
+                fn default_step(&self) -> Self { $s }
+
+                fn is_float(&self) -> bool { true }
+            }
+        )*
+    };
+}
+
+impl_slider_value_int!(
+    i8 : 1, i16 : 1, i32 : 1, i64 : 1, isize : 1,
+    u8 : 1, u16 : 1, u32 : 1, u64 : 1, usize : 1
+);
+
+impl_slider_value_float!(
+    f32 : 0.1, f64 : 0.1
+);
+
+pub enum SliderDisplay {
+    Percentage,
+    Value,
+    Bar,
+}
+
+pub trait CallbackReturnValue {
+    fn to_change(self) -> Option<Change>;
+}
+
+impl CallbackReturnValue for Option<Change> {
+    fn to_change(self) -> Option<Change> {
+        self
     }
 }
 
-pub fn menu_result(res: Box<dyn std::any::Any>) -> usize {
-    *res.downcast::<usize>().unwrap()
+impl CallbackReturnValue for Change {
+    fn to_change(self) -> Option<Change> {
+        Some(self)
+    }
+}
+
+impl CallbackReturnValue for () {
+    fn to_change(self) -> Option<Change> {
+        None
+    }
 }

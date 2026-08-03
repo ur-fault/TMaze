@@ -3,8 +3,8 @@ use std::io::Write;
 use tmaze::{
     app::{
         app::{init_theme_resolver, AppOptions},
-        game::MainMenu,
-        Activity, App, GameError,
+        game::main_menu,
+        App, GameError,
     },
     helpers::constants::paths,
     settings::{theme::TerminalColorScheme, ConfigSource, Settings},
@@ -138,11 +138,10 @@ fn main() -> Result<(), GameError> {
 
     better_panic::install();
 
-    let menu = MainMenu::new();
-    let menu = Activity::new_base_boxed("main menu", menu);
+    let main_menu = main_menu();
     let mut app = App::new(AppOptions {
         read_only: args.read_only,
-        main_activity: Some(menu),
+        main_activity: Some(main_menu),
         config_source,
     });
 

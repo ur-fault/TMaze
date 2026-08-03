@@ -403,7 +403,7 @@ impl ActivityHandler for StyleBrowser {
                         KeyCode::Down | KeyCode::Up => {
                             self.update_selected(matches!(code, KeyCode::Up));
                         }
-                        KeyCode::Enter => panic!("{:#?}", self.mode),
+                        KeyCode::Enter => {}
                         _ => {}
                     }
                 }

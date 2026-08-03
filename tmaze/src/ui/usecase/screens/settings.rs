@@ -1,4 +1,4 @@
-use std::{cell::RefCell, iter::once, rc::Rc};
+use std::{iter::once, rc::Rc};
 
 use cmaze::dims::Offset;
 
@@ -8,7 +8,7 @@ use crate::{
         Change,
     },
     helpers::constants::paths::{config, theme},
-    match_scheme_field, menu_actions,
+    match_scheme_field, menu_actions_2,
     renderer::MouseGuard,
     settings::{
         model::{
@@ -16,10 +16,8 @@ use crate::{
         },
         theme::{PartialTerminalColorScheme, Rgb, TerminalColorScheme},
     },
-    ui::{
-        simple_menu, simple_menu_ex, Menu, MenuConfig, MenuItem, OptionDef, Popup, Screen,
-        SimpleMenuOptions, SliderDef,
-    },
+    ui::{Menu, MenuConfig, MenuItemObj, Popup, Screen, Slider, SliderDisplay, Switch, Text},
+    update_settings,
 };
 
 #[cfg(feature = "sound")]
@@ -110,20 +108,22 @@ pub fn create_settings_activity() -> Activity {
                             .iter()
                             .cloned()
                             .map(|theme| {
-                                MenuItem::active_text(theme.clone(), move |data| {
-                                    data.settings.update_ui(|cfg| {
-                                        *cfg.general().appearance().theme() = theme.clone();
-                                    });
+                                Text::new(theme.clone()).click(move |d| {
+                                    update_settings!(
+                                        d.settings,
+                                        general.appearance.theme = theme.clone()
+                                    );
                                     Some(Change::pop_top())
-                                })
+                                }) as MenuItemObj
                             })
-                            .chain(once(MenuItem::active_text("None", |data| {
-                                data.settings.update_ui(|cfg| {
-                                    *cfg.general().appearance().theme() = String::new();
-                                });
+                            .chain([Text::new("None").click(|d| {
+                                update_settings!(
+                                    d.settings,
+                                    general.appearance.theme = String::new()
+                                );
                                 Some(Change::pop_top())
-                            })))
-                            .chain(once(back_button()))
+                            }) as MenuItemObj])
+                            .chain([back_button()])
                             .collect::<Vec<_>>(),
                     )
                     .default(
@@ -141,43 +141,36 @@ pub fn create_settings_activity() -> Activity {
                 fn named_settings(data: &AppData) -> Activity {
                     let appearance = &data.settings.read().general.appearance;
 
-                    simple_menu_ex(
-                        "Choose named scheme",
-                        TerminalColorScheme::all_schemes()
-                            .into_iter()
-                            // FIXME(hack): cannot currently display large number of schemes in menu
-                            .take(10)
-                            .map(|scheme| {
-                                (
-                                    MenuItem::static_text(*scheme),
-                                    Box::new(move |data: &mut AppData| -> Change {
-                                        data.settings.update_ui(|cfg| {
-                                            *cfg.general().appearance().terminal_scheme() =
+                    Menu::new(
+                        MenuConfig::new(
+                            "Choose named scheme",
+                            TerminalColorScheme::all_schemes()
+                                .into_iter()
+                                // FIXME(hack): cannot currently display large number of schemes in menu
+                                .take(10)
+                                .map(|scheme| {
+                                    Text::new(scheme.to_string()).click(|d| {
+                                        update_settings!(
+                                            d.settings,
+                                            general.appearance.terminal_scheme =
                                                 PartialTerminalSchemeDef::Named((*scheme).into())
-                                        });
-                                        Change::pop_top()
-                                    })
-                                        as Box<dyn Fn(&mut AppData) -> Change + 'static>,
-                                )
-                            })
-                            .chain(once((
-                                MenuItem::static_text("Back"),
-                                Box::new(|_: &mut _| Change::pop_top())
-                                    as Box<dyn Fn(&mut AppData) -> Change + 'static>,
-                            )))
-                            .collect(),
-                        SimpleMenuOptions {
-                            default: match &appearance.terminal_scheme {
-                                TerminalSchemeDef::Named(original) => {
-                                    TerminalColorScheme::all_schemes()
-                                        .iter()
-                                        // FIXME(hack): cannot currently display large number of schemes in menu
-                                        .take(10)
-                                        .position(|scheme| *scheme == original)
-                                }
-                                _ => None,
-                            },
-                        },
+                                        );
+                                        Some(Change::pop_top())
+                                    }) as MenuItemObj
+                                })
+                                .chain(once(back_button()))
+                                .collect::<Vec<_>>(),
+                        )
+                        .maybe_default(match &appearance.terminal_scheme {
+                            TerminalSchemeDef::Named(original) => {
+                                TerminalColorScheme::all_schemes()
+                                    .iter()
+                                    // FIXME(hack): cannot currently display large number of schemes in menu
+                                    .take(10)
+                                    .position(|scheme| *scheme == original)
+                            }
+                            _ => None,
+                        }),
                     )
                     .to_base_activity("named scheme settings")
                 }
@@ -221,93 +214,53 @@ pub fn create_settings_activity() -> Activity {
                     }
 
                     fn channel_field_item<'a>(
-                        (title, color, fn_): (
+                        (title, color, update_global): (
                             &'a str,
                             (u8, u8, u8),
                             Rc<dyn Fn(&mut AppData, (u8, u8, u8)) -> (u8, u8, u8)>,
                         ),
-                    ) -> (MenuItem, Box<dyn Fn(&mut AppData) -> Change + 'a>) {
-                        (
-                            MenuItem::text(title),
-                            Box::new(move |_: &mut _| {
-                                let fn2 = fn_.clone();
+                    ) -> MenuItemObj {
+                        let title = title.to_string();
 
-                                #[derive(Clone)]
-                                struct ColorState {
-                                    color: Rc<RefCell<Rgb>>,
-                                    set: Rc<dyn Fn(&mut AppData, Rgb) -> Rgb>,
-                                }
+                        Text::new(&title).click(Box::new(move |_: &mut _| {
+                            let shared_color = Rc::new(std::cell::Cell::new(color));
+                            let update_global = update_global.clone();
 
-                                impl ColorState {
-                                    fn red(&self, data: &mut AppData, r: i32) -> i32 {
-                                        self.set(data, 0, r)
+                            let make_slider = |label: &'static str, channel: u8, initial: u8| {
+                                let shared_color = shared_color.clone();
+                                let update_global = update_global.clone();
+
+                                Slider::new(label, initial, 0..=255, move |val, data| {
+                                    let mut c = shared_color.get();
+                                    match channel {
+                                        0 => c.0 = val,
+                                        1 => c.1 = val,
+                                        2 => c.2 = val,
+                                        _ => unreachable!(),
                                     }
+                                    shared_color.set(c);
+                                    update_global(data, c);
+                                })
+                                .display(SliderDisplay::Value)
+                                    as MenuItemObj
+                            };
 
-                                    fn green(&self, data: &mut AppData, g: i32) -> i32 {
-                                        self.set(data, 1, g)
-                                    }
+                            let config = MenuConfig::new(
+                                &title,
+                                vec![
+                                    make_slider("Red", 0, color.0),
+                                    make_slider("Green", 1, color.1),
+                                    make_slider("Blue", 2, color.2),
+                                ],
+                            );
 
-                                    fn blue(&self, data: &mut AppData, b: i32) -> i32 {
-                                        self.set(data, 2, b)
-                                    }
-
-                                    fn set(&self, data: &mut AppData, i: usize, val: i32) -> i32 {
-                                        assert!(i < 3);
-                                        let mut borrow = self.color.borrow_mut();
-                                        *match i {
-                                            0 => &mut borrow.0,
-                                            1 => &mut borrow.1,
-                                            2 => &mut borrow.2,
-                                            _ => unreachable!(),
-                                        } = val as u8;
-                                        (self.set)(data, *borrow);
-                                        val
-                                    }
-                                }
-
-                                let color_state = ColorState {
-                                    color: Rc::new(RefCell::new(color)),
-                                    set: fn2,
-                                };
-
-                                let slider =
-                                    |f: fn(&ColorState, &mut AppData, i32) -> i32,
-                                     clf: Box<dyn Fn(Rgb) -> u8>,
-                                     text: &'static str| {
-                                        let u1 = color_state.clone();
-                                        let u2 = color_state.clone();
-
-                                        MenuItem::Slider(SliderDef {
-                                            text: text.into(),
-                                            val: clf(color) as i32,
-                                            range: 0..=255,
-                                            update_fn: Box::new(move |val, data| {
-                                                f(&u1, data, val);
-                                            }),
-                                            reset_fn: Some(Box::new(move |data| {
-                                                f(&u2, data, clf(color) as i32)
-                                            })),
-                                            as_num: true,
-                                        })
-                                    };
-
-                                use ColorState as CS;
-                                let config = MenuConfig::new(
-                                    title,
-                                    vec![
-                                        slider(CS::red, Box::new(|c| c.0), "Red"),
-                                        slider(CS::green, Box::new(|c| c.1), "Green"),
-                                        slider(CS::blue, Box::new(|c| c.2), "Blue"),
-                                    ],
-                                );
-                                Change::push(
-                                    Menu::new(config).to_base_activity("scheme color settings"),
-                                )
-                            }) as Box<dyn Fn(&mut _) -> _>,
-                        )
+                            Change::push(
+                                Menu::new(config).to_base_activity("scheme color settings"),
+                            )
+                        }))
                     }
 
-                    simple_menu(
+                    Menu::new(MenuConfig::new(
                         "Custom scheme",
                         [
                             field("primary_fg", "Primary Fg", &scheme),
@@ -331,47 +284,39 @@ pub fn create_settings_activity() -> Activity {
                         ]
                         .into_iter()
                         .map(channel_field_item)
-                        .chain(once((
-                            back_button(),
-                            Box::new(|_: &mut _| Change::pop_top())
-                                as Box<dyn Fn(&mut AppData) -> Change + 'static>,
-                        )))
-                        .collect(),
-                    )
+                        .chain(once(back_button()))
+                        .collect::<Vec<_>>(),
+                    ))
                     .to_base_activity("custom scheme settings")
                 }
 
-                let menu = simple_menu_ex(
-                    "Terminal Color Scheme",
-                    menu_actions!(
-                        "Named" -> data => Change::push(named_settings(data)),
-                        "Custom" -> data => Change::push(custom_settings(data)),
-                        "Back" -> _ => Change::pop_top(),
-                    ),
-                    SimpleMenuOptions {
-                        default: Some(
-                            match &data.settings.read().general.appearance.terminal_scheme {
-                                TerminalSchemeDef::Named(_) => 0,
-                                TerminalSchemeDef::Custom(_) => 1,
-                            },
+                let default = match &data.settings.read().general.appearance.terminal_scheme {
+                    TerminalSchemeDef::Named(_) => 0,
+                    TerminalSchemeDef::Custom(_) => 1,
+                };
+                Menu::new(
+                    MenuConfig::new(
+                        "Terminal Color Scheme",
+                        menu_actions_2!(
+                            "Named" -> data => Change::push(named_settings(data)),
+                            "Custom" -> data => Change::push(custom_settings(data)),
+                            "Back" -> _ => Change::pop_top(),
                         ),
-                    },
-                );
-
-                menu.to_base_activity("terminal scheme settings")
+                    )
+                    .default(default),
+                )
+                .to_base_activity("terminal scheme settings")
             }
 
-            Activity::new_base_boxed(
-                "appearance settings",
-                simple_menu(
-                    "Appearance settings",
-                    menu_actions!(
-                        "Theme" -> data => Change::push(theme_settings(data)),
-                        "Terminal scheme" -> data => Change::push(terminal_scheme_settings(data)),
-                        "Back" -> _ => Change::pop_top(),
-                    ),
+            Menu::new(MenuConfig::new(
+                "Appearance",
+                menu_actions_2!(
+                    "Theme" -> data => Change::push(theme_settings(data)),
+                    "Terminal scheme" -> data => Change::push(terminal_scheme_settings(data)),
+                    "Back" -> _ => Change::pop_top(),
                 ),
-            )
+            ))
+            .to_base_activity("appearance settings")
         }
 
         fn logging_settings() -> Activity {
@@ -422,7 +367,7 @@ pub fn create_settings_activity() -> Activity {
                         LOG_LEVELS
                             .into_iter()
                             .map(|(name, lvl)| {
-                                MenuItem::active_text(name, move |data| {
+                                Text::new(name).click(move |data| {
                                     data.settings.update_ui(|cfg| {
                                         let logging = cfg.general().logging();
                                         *match dst {
@@ -432,9 +377,9 @@ pub fn create_settings_activity() -> Activity {
                                         } = lvl;
                                     });
                                     Some(Change::pop_top())
-                                })
+                                }) as MenuItemObj
                             })
-                            .chain(once(back_button()))
+                            .chain([back_button()])
                             .collect::<Vec<_>>(),
                     )
                     .default(level_to_index(match dst {
@@ -446,29 +391,27 @@ pub fn create_settings_activity() -> Activity {
                 .to_base_activity(format!("{} settings", title.to_lowercase()))
             }
 
-            simple_menu(
-            "Logging",
-            menu_actions!(
+            Menu::new(MenuConfig::new(
+                    "Logging settings",
+            menu_actions_2!(
                 "UI logging" -> data => Change::push(logging_dst_settings(LoggingDst::Normal, data)),
                 "UI Debug logging" -> data => Change::push(logging_dst_settings(LoggingDst::Debug, data)),
                 "File logging" -> data => Change::push(logging_dst_settings(LoggingDst::File, data)),
                 "Back" -> _ => Change::pop_top(),
             ),
-        )
-        .to_base_activity("logging settings")
+            ))
+            .to_base_activity("logging settings")
         }
 
-        Activity::new_base_boxed(
-            "general settings",
-            simple_menu(
-                "General settings",
-                menu_actions!(
-                    "Appearance" -> _ => Change::push(appearance_settings()),
-                    "Logging" -> _ => Change::push(logging_settings()),
-                    "Back" -> _ => Change::pop_top(),
-                ),
+        Menu::new(MenuConfig::new(
+            "General settings",
+            menu_actions_2!(
+                "Appearance" -> _ => Change::push(appearance_settings()),
+                "Logging" -> _ => Change::push(logging_settings()),
+                "Back" -> _ => Change::pop_top(),
             ),
-        )
+        ))
+        .to_base_activity("general settings")
     }
 
     fn game_settings(data: &mut AppData) -> Activity {
@@ -491,11 +434,11 @@ pub fn create_settings_activity() -> Activity {
 
                         let config = MenuConfig::new(
                             "Absolute Offset",
-                            vec![MenuItem::Slider(SliderDef {
-                                text: if is_y { "y" } else { "x" }.into(),
+                            vec![Slider::new(
+                                if is_y { "y" } else { "x" },
                                 val,
-                                range: 0..=100,
-                                update_fn: Box::new(move |v, d| {
+                                0..=100,
+                                move |v, d| {
                                     d.settings.update_ui(|cfg| {
                                         let (mut x, mut y) = match cfg.game().view().camera_mode {
                                             Some(CameraMode::EdgeFollow { x, y }) => (x, y),
@@ -511,10 +454,8 @@ pub fn create_settings_activity() -> Activity {
                                         *cfg.game().view().camera_mode() =
                                             CameraMode::EdgeFollow { x, y };
                                     });
-                                }),
-                                reset_fn: None,
-                                as_num: true,
-                            })],
+                                },
+                            ) as MenuItemObj],
                         );
 
                         Activity::new_base_boxed("free follow settings", Menu::new(config))
@@ -524,25 +465,25 @@ pub fn create_settings_activity() -> Activity {
                         todo!("Relative offset settings not implemented yet")
                     }
 
-                    simple_menu(
-                        "",
-                        menu_actions!(move
+                    Menu::new(MenuConfig::new(
+                        "Offset",
+                        menu_actions_2!(move
                             "Absolute" -> d => Change::push(abs_settings(d, is_y)),
                             "Relative" -> _ => Change::push(rel_settings()),
                             "Back" -> _ => Change::pop_top(),
                         ),
-                    )
+                    ))
                     .to_base_activity("")
                 }
 
-                simple_menu(
+                Menu::new(MenuConfig::new(
                     "Free follow settings",
-                    menu_actions!(
+                    menu_actions_2!(
                         "x offset" -> _ => Change::push(offset_settings(false)),
                         "y offset" -> _ => Change::push(offset_settings(true)),
                         "Back" -> _ => Change::pop_top(),
                     ),
-                )
+                ))
                 .to_base_activity("")
             }
 
@@ -551,56 +492,35 @@ pub fn create_settings_activity() -> Activity {
             let config = MenuConfig::new(
                 "Game View Settings",
                 vec![
-                    MenuItem::active_text("Camera Mode", |_| {
-                        Some(Change::push(simple_menu(
-                                        "Camera Mode",
-                                        menu_actions!(
-                                            "Follow player" -> d => {
-                                                d.settings.update_ui(|cfg| {
-                                                    *cfg.game().view().camera_mode() = CameraMode::CloseFollow;
-                                                });
-                                                Change::pop_top()
-                                            },
-                                            "Free" -> _ => Change::push(free_follow_settings()),
-                                            "Back" -> _ => Change::pop_top(),
-                                        ),
-                            ).to_base_activity("camera mode settings")))
-                    }),
-                    MenuItem::Slider(SliderDef {
-                        text: "Camera smoothing".into(),
-                        val: 10 - (settings.camera_smoothing * 10.) as i32,
-                        range: 0..=5,
-                        update_fn: Box::new(|v, d| {
-                            d.settings.update_ui(|cfg| {
-                                *cfg.game().view().camera_smoothing() = 1. - v as f64 / 10.;
-                            });
-                        }),
-                        reset_fn: Some(Box::new(|d| {
-                            d.settings.update_ui(|cfg| {
-                                cfg.game().view().camera_smoothing = None;
-                            });
-                            10 - (d.settings.read().game.view.camera_smoothing * 10.) as i32
-                        })),
-                        as_num: false,
-                    }),
-                    MenuItem::Slider(SliderDef {
-                        text: "Player smoothing".into(),
-                        val: 10 - (settings.player_smoothing * 10.) as i32,
-                        range: 0..=5,
-                        update_fn: Box::new(|v, d| {
-                            d.settings.update_ui(|cfg| {
-                                *cfg.game().view().player_smoothing() = 1. - v as f64 / 10.;
-                            });
-                        }),
-                        reset_fn: Some(Box::new(|d| {
-                            d.settings.update_ui(|cfg| {
-                                cfg.game().view().player_smoothing = None;
-                            });
-                            10 - (d.settings.read().game.view.player_smoothing * 10.) as i32
-                        })),
-                        as_num: false,
-                    }),
-                    MenuItem::text("Viewport margin (todo)"),
+                    Text::new("Camera Mode").click(|_| {
+                        Some(Change::push(
+                            Menu::new(MenuConfig::new(
+                                "Camera Mode",
+                                menu_actions_2!(
+                                    "Follow player" -> d => {
+                                        update_settings!(d.settings, game.view.camera_mode = CameraMode::CloseFollow);
+                                        Change::pop_top()
+                                    },
+                                    "Free" -> _ => Change::push(free_follow_settings()),
+                                    "Back" -> _ => Change::pop_top(),
+                                )
+                            ))
+                            .to_base_activity("camera mode settings"),
+                        ))
+                    }) as MenuItemObj,
+                    Slider::new(
+                        "Camera smoothing",
+                        1.0 - settings.camera_smoothing,
+                        0.0..=0.5,
+                        |v, d| update_settings!(d.settings, game.view.camera_smoothing = 1.0 - v)
+                    ),
+                    Slider::new(
+                        "Player smoothing",
+                        1.0 - settings.player_smoothing,
+                        0.0..=0.5,
+                        |v, d| update_settings!(d.settings, game.view.player_smoothing = 1.0 - v)
+                    ),
+                    Text::new("Viewport margin (todo)"),
                     back_button(),
                 ],
             );
@@ -613,38 +533,16 @@ pub fn create_settings_activity() -> Activity {
         let config = MenuConfig::new(
             "Game settings",
             vec![
-                MenuItem::Option(OptionDef {
-                    text: "Slow".into(),
-                    val: settings.slow,
-                    update_fn: Box::new(|enabled, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.game().slow() = enabled;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.game().slow = None;
-                        });
-                        data.settings.read().game.slow
-                    })),
-                }),
-                MenuItem::Option(OptionDef {
-                    text: "Don't auto advance up".into(),
-                    val: settings.disable_tower_auto_up,
-                    update_fn: Box::new(|enabled, data| {
-                        data.settings.update_ui(|cfg| {
-                            *cfg.game().disable_tower_auto_up() = enabled;
-                        });
-                    }),
-                    reset_fn: Some(Box::new(|data| {
-                        data.settings.update_ui(|cfg| {
-                            cfg.game().disable_tower_auto_up = None;
-                        });
-                        data.settings.read().game.disable_tower_auto_up
-                    })),
-                }),
-                MenuItem::active_text("View", |d| Some(Change::push(view_settings(d)))),
-                MenuItem::text("Content (todo)"),
+                Switch::new("Slow", settings.slow, |enabled, data| {
+                    update_settings!(data.settings, game.slow = enabled)
+                }) as MenuItemObj,
+                Switch::new(
+                    "Don't auto advance up",
+                    settings.disable_tower_auto_up,
+                    |enabled, d| update_settings!(d.settings, game.disable_tower_auto_up = enabled),
+                ),
+                Text::new("View").click(|d| Some(Change::push(view_settings(d)))),
+                Text::new("Content (todo)"),
                 back_button(),
             ],
         );
@@ -660,84 +558,40 @@ pub fn create_settings_activity() -> Activity {
                 let menu_config = MenuConfig::new(
                     "DPad settings",
                     [
-                        MenuItem::Option(OptionDef {
-                            text: "Enable".into(),
-                            val: cfg.enable,
-                            update_fn: Box::new(|enabled, data| {
-                                data.settings.update_ui(|cfg| {
-                                    *cfg.controls().mouse().dpad().enable() = enabled;
-                                });
-                            }),
-                            reset_fn: Some(Box::new(|data| {
-                                data.settings.update_ui(|cfg| {
-                                    cfg.controls().mouse().dpad().enable = None;
-                                });
-                                data.settings.read().controls.mouse.dpad.enable
-                            })),
+                        Switch::new("Enable", cfg.enable, |enabled, d| {
+                            update_settings!(d.settings, controls.mouse.dpad.enable = enabled);
+                        }) as MenuItemObj,
+                        Switch::new("Left-handed", cfg.landscape_on_left, |is_on_left, d| {
+                            update_settings!(
+                                d.settings,
+                                controls.mouse.dpad.landscape_on_left = is_on_left
+                            );
                         }),
-                        MenuItem::Option(OptionDef {
-                            text: "Left-handed".into(),
-                            val: cfg.landscape_on_left,
-                            update_fn: Box::new(|is_on_left, data| {
-                                data.settings.update_ui(|cfg| {
-                                    *cfg.controls().mouse().dpad().landscape_on_left() = is_on_left;
-                                });
-                            }),
-                            reset_fn: Some(Box::new(|data| {
-                                data.settings.update_ui(|cfg| {
-                                    cfg.controls().mouse().dpad().landscape_on_left = None;
-                                });
-                                data.settings.read().controls.mouse.dpad.landscape_on_left
-                            })),
+                        Switch::new(
+                            "Swap Up and Down buttons",
+                            cfg.swap_up_down,
+                            |do_swap, d| {
+                                update_settings!(
+                                    d.settings,
+                                    controls.mouse.dpad.swap_up_down = do_swap
+                                );
+                            },
+                        ),
+                        Switch::new("Enable margin", cfg.enable_margin, |enabled, d| {
+                            update_settings!(
+                                d.settings,
+                                controls.mouse.dpad.enable_margin = enabled
+                            );
                         }),
-                        MenuItem::Option(OptionDef {
-                            text: "Swap Up and Down buttons".into(),
-                            val: cfg.swap_up_down,
-                            update_fn: Box::new(|do_swap, data| {
-                                data.settings.update_ui(|cfg| {
-                                    *cfg.controls().mouse().dpad().swap_up_down() = do_swap;
-                                });
-                            }),
-                            reset_fn: Some(Box::new(|data| {
-                                data.settings.update_ui(|cfg| {
-                                    cfg.controls().mouse().dpad().swap_up_down = None;
-                                });
-                                data.settings.read().controls.mouse.dpad.swap_up_down
-                            })),
+                        Switch::new("Enable highlight", cfg.enable_highlight, |enabled, d| {
+                            update_settings!(
+                                d.settings,
+                                controls.mouse.dpad.enable_highlight = enabled
+                            );
                         }),
-                        MenuItem::Option(OptionDef {
-                            text: "Enable margin".into(),
-                            val: cfg.enable_margin,
-                            update_fn: Box::new(|enabled, data| {
-                                data.settings.update_ui(|cfg| {
-                                    *cfg.controls().mouse().dpad().enable_margin() = enabled;
-                                });
-                            }),
-                            reset_fn: Some(Box::new(|data| {
-                                data.settings.update_ui(|cfg| {
-                                    cfg.controls().mouse().dpad().enable_margin = None;
-                                });
-                                data.settings.read().controls.mouse.dpad.enable_margin
-                            })),
-                        }),
-                        MenuItem::Option(OptionDef {
-                            text: "Enable highlight".into(),
-                            val: cfg.enable_highlight,
-                            update_fn: Box::new(|enabled, data| {
-                                data.settings.update_ui(|cfg| {
-                                    *cfg.controls().mouse().dpad().enable_highlight() = enabled;
-                                });
-                            }),
-                            reset_fn: Some(Box::new(|data| {
-                                data.settings.update_ui(|cfg| {
-                                    cfg.controls().mouse().dpad().enable_highlight = None;
-                                });
-                                data.settings.read().controls.mouse.dpad.enable_highlight
-                            })),
-                        }),
-                        MenuItem::text("Space (todo)"),
-                        MenuItem::text("Min size (todo)"),
-                        MenuItem::text("Max size (todo)"),
+                        Text::new("Space (todo)"),
+                        Text::new("Min size (todo)"),
+                        Text::new("Max size (todo)"),
                         back_button(),
                     ],
                 );
@@ -750,22 +604,10 @@ pub fn create_settings_activity() -> Activity {
             let menu_config = MenuConfig::new(
                 "Controls settings",
                 [
-                    MenuItem::Option(OptionDef {
-                        text: "Enable mouse input".into(),
-                        val: cfg.enable,
-                        update_fn: Box::new(|enabled, data| {
-                            data.settings.update_ui(|cfg| {
-                                *cfg.controls().mouse().enable() = enabled;
-                            });
-                        }),
-                        reset_fn: Some(Box::new(|data| {
-                            data.settings.update_ui(|cfg| {
-                                cfg.controls().mouse().enable = None;
-                            });
-                            data.settings.read().controls.mouse.enable
-                        })),
-                    }),
-                    MenuItem::active_text("DPad", |d| Some(Change::push(dpad_settings(d)))),
+                    Switch::new("Enable mouse input", cfg.enable, |enabled, data| {
+                        update_settings!(data.settings, controls.mouse.enable = enabled);
+                    }) as MenuItemObj,
+                    Text::new("DPad").click(|d| Some(Change::push(dpad_settings(d)))),
                     back_button(),
                 ],
             );
@@ -773,19 +615,28 @@ pub fn create_settings_activity() -> Activity {
             Activity::new_base_boxed("mouse settings", Menu::new(menu_config))
         }
 
-        simple_menu(
+        Menu::new(MenuConfig::new(
             "Control settings",
-            menu_actions!(
+            menu_actions_2!(
                 "Mouse" -> data => Change::push(mouse_settings(data)),
                 "Back" -> _ => Change::pop_top(),
             ),
-        )
+        ))
         .to_base_activity("control settings")
     }
 
     fn update_settings() -> Activity {
         fn interval_settings(data: &AppData) -> Activity {
             use UpdateCheckInterval::*;
+
+            let default = match data.settings.read().updates.check_interval {
+                Never => 0,
+                Daily => 1,
+                Weekly => 2,
+                Monthly => 3,
+                Yearly => 4,
+                Always => 5,
+            };
 
             Menu::new(
                 MenuConfig::new(
@@ -800,34 +651,26 @@ pub fn create_settings_activity() -> Activity {
                     ]
                     .into_iter()
                     .map(|(name, int)| {
-                        MenuItem::active_text(name, move |data| {
-                            data.settings.update_ui(|cfg| {
-                                *cfg.updates().check_interval() = int;
-                            });
+                        Text::new(name).click(move |data| {
+                            update_settings!(data.settings, updates.check_interval = int);
                             Some(Change::pop_top())
-                        })
+                        }) as MenuItemObj
                     })
+                    .chain(once(back_button()))
                     .collect::<Vec<_>>(),
                 )
-                .default(match data.settings.read().updates.check_interval {
-                    Never => 0,
-                    Daily => 1,
-                    Weekly => 2,
-                    Monthly => 3,
-                    Yearly => 4,
-                    Always => 5,
-                }),
+                .default(default),
             )
             .to_base_activity("update check interval")
         }
 
-        simple_menu(
+        Menu::new(MenuConfig::new(
             "Update settings",
-            menu_actions!(
+            menu_actions_2!(
                 "Check interval" -> data => Change::push(interval_settings(data)),
                 "Back" -> _ => Change::pop_top(),
             ),
-        )
+        ))
         .to_base_activity("update settings")
     }
 
@@ -835,23 +678,22 @@ pub fn create_settings_activity() -> Activity {
         Menu::new(MenuConfig::new(
             "Are you sure?",
             vec![
-                MenuItem::active_text("Yes", |data| {
+                Text::new("No").click(|_| Some(Change::pop_top())),
+                Text::new("Yes").click(|data| {
                     data.settings.reset();
                     Some(Change::pop_top())
-                }),
-                MenuItem::active_text("No", |_| Some(Change::pop_top())),
+                }) as MenuItemObj,
             ],
         ))
         .to_base_activity("reset settings")
     }
 
-    fn back_button() -> MenuItem {
-        MenuItem::active_text("Back", |_| Some(Change::pop_top()))
+    fn back_button() -> MenuItemObj {
+        Text::new("Back").click(|_| Some(Change::pop_top()))
     }
 
-    simple_menu(
-        "Settings",
-        menu_actions!(
+    Menu::new(MenuConfig::new("Settings",
+        menu_actions_2!(
             "General" -> _ => Change::push(general_settings()),
             "Game" -> data => Change::push(game_settings(data)),
             "Controls" -> _ => Change::push(control_settings()),
@@ -861,6 +703,6 @@ pub fn create_settings_activity() -> Activity {
             "Restore defaults" -> _ => Change::push(reset_settings_dialog()),
             "Back" -> _ => Change::pop_top(),
         ),
-    )
+    ))
     .to_base_activity("settings")
 }

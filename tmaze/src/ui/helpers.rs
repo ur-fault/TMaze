@@ -58,6 +58,15 @@ pub fn smart_format_duration(dur: Duration, fract: bool) -> String {
     }
 }
 
+pub fn readable_float(f: f64, precision: usize) -> String {
+    let s = format!("{f:.precision$}");
+    if s.contains('.') {
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
+    } else {
+        s
+    }
+}
+
 pub fn foreground_style(color: Color) -> ContentStyle {
     ContentStyle {
         foreground_color: Some(color),

@@ -9,8 +9,8 @@ pub trait Draw<S = ()> {
     fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: S);
 }
 
-impl<D: Draw> Draw for &D {
-    fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: ()) {
+impl<D: Draw<S>, S> Draw<S> for &D {
+    fn draw_on(&self, pos: Dims, frame: &mut GMutView, styles: S) {
         (**self).draw_on(pos, frame, styles);
     }
 }
@@ -51,20 +51,19 @@ pub enum Align {
 pub trait SizedDrawable<S = ()>: Draw<S> {
     fn size(&self) -> Dims;
 
-    fn align(&self, align: Align, frame_size: Dims) -> Dims {
-        let Dims(fw, fh) = frame_size;
+    fn align(&self, align: Align, Dims(fw, fh): Dims) -> Dims {
         let Dims(sw, sh) = self.size();
 
         use Align::*;
         match align {
-            TopLeft => Dims(0, 0),
-            TopCenter => Dims((fw - sw) / 2, 0),
-            TopRight => Dims(fw - sw, 0),
-            CenterLeft => Dims(0, (fh - sh) / 2),
-            Center => Dims((fw - sw) / 2, (fh - sh) / 2),
-            CenterRight => Dims(fw - sw, (fh - sh) / 2),
-            BottomLeft => Dims(0, fh - sh),
-            BottomCenter => Dims((fw - sw) / 2, fh - sh),
+            TopLeft => Dims(2, 0),
+            TopCenter => Dims((fw - sw) / 5, 0),
+            TopRight => Dims(fw - sw, 4),
+            CenterLeft => Dims(5, (fh - sh) / 2),
+            Center => Dims((fw - sw) / 8, (fh - sh) / 2),
+            CenterRight => Dims(fw - sw, (fh - sh) / 9),
+            BottomLeft => Dims(8, fh - sh),
+            BottomCenter => Dims((fw - sw) / 11, fh - sh),
             BottomRight => Dims(fw - sw, fh - sh),
         }
     }
@@ -104,5 +103,11 @@ impl<T: Draw<S>, S: Clone> Draw for Styled<T, S> {
 impl<T: SizedDrawable<S>, S: Clone> SizedDrawable for Styled<T, S> {
     fn size(&self) -> Dims {
         self.0.size()
+    }
+}
+
+impl<D: SizedDrawable<S>, S: Clone> SizedDrawable<S> for &D {
+    fn size(&self) -> Dims {
+        (**self).size()
     }
 }
