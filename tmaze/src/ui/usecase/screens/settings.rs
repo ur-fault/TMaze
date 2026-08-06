@@ -242,7 +242,7 @@ pub fn create_settings_activity() -> Activity {
                                     update_global(data, c);
                                 })
                                 .display(SliderDisplay::Value)
-                                    as MenuItemObj
+                                .width(3) as MenuItemObj
                             };
 
                             let config = MenuConfig::new(

@@ -257,7 +257,7 @@ pub struct Slider<V> {
     pub range: RangeInclusive<V>,
     pub step: V,
     pub update_fn: Box<dyn FnMut(V, &mut AppData) + 'static>,
-    pub width: u32,
+    pub width: Option<usize>,
     pub display: SliderDisplay,
 }
 
@@ -282,7 +282,7 @@ where
             range,
             step: val.default_step(),
             update_fn: Box::new(update_fn),
-            width: 5,
+            width: None,
             display: SliderDisplay::Bar,
         })
     }
@@ -292,8 +292,8 @@ where
         self
     }
 
-    pub fn width(mut self: Box<Self>, width: u32) -> Box<Self> {
-        self.width = width;
+    pub fn width(mut self: Box<Self>, width: usize) -> Box<Self> {
+        self.width = Some(width);
         self
     }
 
@@ -308,16 +308,29 @@ where
     V: SliderValue,
 {
     fn min_width(&self) -> usize {
-        self.text.width() + self.width as usize + 4
+        let value_width = match self.display {
+            SliderDisplay::Percentage => 4, // e.g. "[100%]"
+            SliderDisplay::Value => {
+                let self_width = self.width.unwrap_or(0);
+                if self.val.is_float() {
+                    let start = format!("{:.2}", self.range.start().to_f64()).len();
+                    let end = format!("{:.2}", self.range.end().to_f64()).len();
+                    start.max(end).max(self_width)
+                } else {
+                    let start = (self.range.start().to_f64() as i64).to_string().len();
+                    let end = (self.range.end().to_f64() as i64).to_string().len();
+                    start.max(end).max(self_width)
+                }
+            }
+            SliderDisplay::Bar => self.width.map(|w| w as usize).unwrap_or(5),
+        };
+        self.text.width() + value_width + 4
     }
 
     fn render(&self, frame: &mut GMutView, style: Style) {
         frame.draw(Dims(0, 0), &self.text, style);
 
         let val = self.val.to_f64();
-        let start = *self.range.start();
-        let end = *self.range.end();
-        let width = self.width as usize;
 
         match self.display {
             SliderDisplay::Percentage => todo!(),
@@ -325,12 +338,20 @@ where
                 let val_str = if self.val.is_float() {
                     format!("[{:.2}]", val)
                 } else {
-                    format!("[{}", val as i64)
+                    if let Some(width) = self.width {
+                        format!("[{:1$}]", val as i64, width)
+                    } else {
+                        format!("[{}]", val as i64)
+                    }
                 };
 
                 frame.draw_aligned(Align::CenterRight, &format!("{}", val_str), style);
             }
             SliderDisplay::Bar => {
+                let width = self.width.unwrap_or(5);
+                let start = *self.range.start();
+                let end = *self.range.end();
+
                 let filled = ((val - start.to_f64()) / (end.to_f64() - start.to_f64())
                     * width as f64)
                     .round() as usize;
