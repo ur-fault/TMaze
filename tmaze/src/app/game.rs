@@ -186,7 +186,11 @@ pub fn main_menu() -> Activity {
                 opt("Quit", |_| Change::pop_all()),
             ],
         )
-        .on_enter(|d| d.play_bgm(MusicTrack::Menu)),
+        .on_enter(|d| {
+            #[cfg(feature = "sound")]
+            d.play_bgm(MusicTrack::Menu);
+            _ = d;
+        }),
     )
     .to_base_activity("main menu")
 }
