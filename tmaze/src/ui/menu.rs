@@ -41,6 +41,16 @@ pub trait MenuItem {
         None
     }
 
+    fn on_mouse(
+        &mut self,
+        _event: MouseEventKind,
+        _pos: Dims,
+        _modifiers: KeyModifiers,
+        _data: &mut AppData,
+    ) -> Option<Change> {
+        None
+    }
+
     fn on_select(&mut self, _data: &mut AppData) -> Option<Change> {
         None
     }
@@ -576,6 +586,10 @@ impl Menu {
 
         Some(selected)
     }
+
+    fn get_selected(&mut self) -> &mut dyn MenuItem {
+        &mut *self.config.options[self.selected]
+    }
 }
 
 impl ActivityHandler for Menu {
@@ -621,25 +635,24 @@ impl ActivityHandler for Menu {
                     KeyCode::Char(ch @ '1'..='9') if self.config.is_indexed() => {
                         let old_sel = self.selected;
                         let index = (ch as isize - '1' as isize).clamp(0, opt_count - 1) as usize;
-                        self.selected = self
+                        if let Some((i, _)) = self
                             .config
                             .options
                             .iter()
                             .enumerate()
                             .filter(|(_, opt)| opt.indexed())
                             .nth(index)
-                            .map(|(i, _)| i)
-                            .unwrap_or(old_sel);
+                        {
+                            self.selected = i;
+                        }
 
                         if old_sel == self.selected {
-                            return self.config.options[self.selected].on_select(app_data);
+                            return self.get_selected().on_select(app_data);
                         }
                     }
                     KeyCode::Esc => return Some(Change::pop_top()),
                     code => {
-                        return_if_some!(
-                            self.config.options[self.selected].on_key(code, modifiers, app_data)
-                        );
+                        return_if_some!(self.get_selected().on_key(code, modifiers, app_data));
                     }
                 },
                 ActivityEvent::Term(TermEvent::Mouse(MouseEvent {
@@ -661,28 +674,21 @@ impl ActivityHandler for Menu {
                         MouseEventKind::ScrollUp if modifiers == KeyModifiers::empty() => {
                             self.select(false);
                         }
-                        // MouseEventKind::ScrollDown if modifiers.contains(KeyModifiers::CONTROL) => {
-                        //     self.update_slider(false, app_data);
-                        // }
-                        // MouseEventKind::ScrollUp if modifiers.contains(KeyModifiers::CONTROL) => {
-                        //     self.update_slider(true, app_data);
-                        // }
                         MouseEventKind::Up(MouseButton::Left) => {
                             if let Some(selected) = self.get_opt_by_mouse_pos(mouse_pos) {
                                 self.selected = selected;
+                                // register the click only on the item itself
+                                return_if_some!(self.get_selected().on_select(app_data));
                             }
-
-                            return_if_some!(self.config.options[self.selected].on_select(app_data));
                         }
-
-                        // TODO: Test these
-                        // MouseEventKind::ScrollLeft => {
-                        //     self.update_slider(false, app_data);
-                        // }
-                        // MouseEventKind::ScrollRight => {
-                        //     self.update_slider(true, app_data);
-                        // }
-                        _ => {}
+                        MouseEventKind::Up(MouseButton::Right) => {
+                            return Some(Change::pop_top());
+                        }
+                        kind => {
+                            return_if_some!(self
+                                .get_selected()
+                                .on_mouse(kind, mouse_pos, modifiers, app_data))
+                        }
                     }
                 }
                 _ => {}
