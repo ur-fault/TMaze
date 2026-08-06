@@ -202,10 +202,7 @@ fn write_scheme_case(buf: &mut String, scheme: &mut Scheme) -> Result<(), MyErro
 }
 
 fn write_scheme_name(scheme_name_array: &mut String, scheme: &Scheme) {
-    if !scheme_name_array.ends_with('[') {
-        scheme_name_array.push_str(", ");
-    }
-    write!(scheme_name_array, "\"{}\"", scheme.name).unwrap();
+    write!(scheme_name_array, "\"{}\", ", scheme.name).unwrap();
 }
 
 fn process_schemes(out_dir: &Path) -> Result<(), MyError> {
@@ -225,7 +222,7 @@ match scheme_name {
     schemes.sort_by_key(|e| e.file_name());
 
     for scheme_entry in schemes.into_iter() {
-        eprintln!("Processing scheme: {:?}", scheme_entry);
+        eprintln!("Processing scheme: {:?}", scheme_entry.path());
         let content = fs::read_to_string(scheme_entry.path())?;
         let toml = boml::parse(&content).map_err(BomlParseError::from)?;
         let mut scheme = extract_scheme(
